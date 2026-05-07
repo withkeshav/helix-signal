@@ -1,0 +1,39 @@
+# --- Secrets and Environment ---
+.env
+*.env
+!.env.example
+
+# --- Databases ---
+*.sqlite
+*.sqlite3
+backend/helix.db
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+
+# --- Docker ---
+.docker/
+
+# --- Node / Frontend ---
+node_modules/
+.DS_Store
+dist/
+build/
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Internal Planning & AI Briefs ---
+CURSOR_BRIEF.md
+helix_signal_strategy_playbook.md
+*internal_docs*
+*.plan

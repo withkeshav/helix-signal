@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///data/helix.db}
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}
+      DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
+    volumes:
+      - helix_data:/data
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  helix_data:

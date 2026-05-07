@@ -4,11 +4,143 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Helix Dashboard</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0c1018;
+        --panel: #121826;
+        --line: #273247;
+        --text: #e8edf7;
+        --muted: #9aa8c4;
+        --up: #2dd4bf;
+        --down: #f87171;
+        --neutral: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      @font-face {
+        font-family: "HelixMonoFallback";
+        src: local("JetBrains Mono"), local("Roboto Mono"), local("Consolas");
+      }
+      body {
+        margin: 0;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        background: radial-gradient(circle at top, #172138, var(--bg));
+        color: var(--text);
+      }
+      .container {
+        width: min(1200px, 96vw);
+        margin: 24px auto;
+      }
+      .header { margin-bottom: 16px; }
+      .title { margin: 0; font-size: clamp(22px, 2.6vw, 32px); }
+      .subtitle { margin: 6px 0 0; color: var(--muted); }
+      .panel {
+        background: rgba(18, 24, 38, 0.92);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .state {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .error { color: #fecaca; }
+      .table-wrap { overflow-x: auto; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 900px;
+      }
+      th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        white-space: nowrap;
+      }
+      .num {
+        text-align: right;
+        font-family: "JetBrains Mono", "Roboto Mono", "HelixMonoFallback", monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+      tr:hover td { background: rgba(255, 255, 255, 0.02); }
+      .delta-up { color: var(--up); font-weight: 600; }
+      .delta-down { color: var(--down); font-weight: 600; }
+      .delta-flat { color: var(--neutral); font-weight: 600; }
+      .peg-ok { color: var(--up); font-weight: 600; }
+      .peg-watch { color: var(--neutral); font-weight: 600; }
+      .peg-alert { color: var(--down); font-weight: 600; }
+      .sparkline { width: 110px; height: 32px; }
+      .signal-badge {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 2px 7px;
+        font-size: 11px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        vertical-align: middle;
+      }
+      .badge-growth {
+        color: #6ee7b7;
+        border-color: rgba(110, 231, 183, 0.45);
+        background: rgba(16, 185, 129, 0.12);
+      }
+      .badge-contraction {
+        color: #fca5a5;
+        border-color: rgba(252, 165, 165, 0.45);
+        background: rgba(239, 68, 68, 0.12);
+      }
+      .footer {
+        padding: 14px 16px;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        color: var(--muted);
+      }
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+      @media (max-width: 700px) {
+        .container { width: 100vw; margin: 12px 0; }
+        .header, .state, .footer { padding-left: 12px; padding-right: 12px; }
+        .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { min-width: 820px; }
+      }
+    </style>
   </head>
   <body>
-    <main>
-      <h1>Helix Dashboard</h1>
-      <p>Helix is under construction.</p>
+    <main class="container">
+      <header class="header">
+        <h1 class="title">Helix Stablecoin Signal Terminal</h1>
+        <p class="subtitle">Transparent chain-level USDT telemetry.</p>
+      </header>
+
+      <section class="panel">
+        <div id="app-state" class="state">Loading dashboard data...</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Chain</th>
+                <th class="num">USDT Supply</th>
+                <th class="num">24h Change (%)</th>
+                <th class="num">TVL</th>
+                <th>Peg Status</th>
+                <th class="num">Trend</th>
+              </tr>
+            </thead>
+            <tbody id="chain-rows"></tbody>
+          </table>
+        </div>
+        <footer id="source-footer" class="footer">
+          <span class="pill">Source Health: Pending</span>
+        </footer>
+      </section>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./main.js"></script>
   </body>
 </html>

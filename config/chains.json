@@ -1,1 +1,12 @@
-[]
+[
+  {"name": "Tron", "defillama_id": "Tron"},
+  {"name": "Ethereum", "defillama_id": "Ethereum"},
+  {"name": "BSC", "defillama_id": "BSC"},
+  {"name": "Solana", "defillama_id": "Solana"},
+  {"name": "Arbitrum", "defillama_id": "Arbitrum"},
+  {"name": "Plasma", "defillama_id": "Plasma"},
+  {"name": "Polygon", "defillama_id": "Polygon"},
+  {"name": "Aptos", "defillama_id": "Aptos"},
+  {"name": "TON", "defillama_id": "TON"},
+  {"name": "Avalanche", "defillama_id": "Avalanche"}
+]

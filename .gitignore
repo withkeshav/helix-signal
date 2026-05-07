@@ -1,39 +1,66 @@
 # --- Secrets and Environment ---
 .env
 *.env
+.env.local
+.env.*.local
 !.env.example
 
-# --- Databases ---
+# --- Databases and Local Data ---
 *.sqlite
 *.sqlite3
 backend/helix.db
+backend/*.db
+data/
 
-# --- Python ---
+# --- Python Environment ---
 __pycache__/
 *.py[cod]
 *$py.class
 .venv/
 venv/
 ENV/
+env/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+.next/
+out/
+.parcel-cache/
+.cache/
+.eslintcache
 
 # --- Docker ---
 .docker/
 
-# --- Node / Frontend ---
-node_modules/
-.DS_Store
-dist/
-build/
-
-# --- IDEs ---
+# --- IDEs and OS Metadata ---
 .vscode/
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
 
 # --- Internal Planning & AI Briefs ---
 CURSOR_BRIEF.md
 helix_signal_strategy_playbook.md
 *internal_docs*
 *.plan
+*.log
+inspect_defillama_schema.*
+summarize_defillama_probe.*
+helix_signal_repo_findings.md
+helix_signal_research_findings.md
+helix_signal_defillama_probe_summary.md

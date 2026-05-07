@@ -27,6 +27,20 @@ Reference: `.env.example`
 docker compose up --build
 ```
 
+### 3b) Run backend directly (without Docker)
+
+From `backend/`:
+
+```bash
+python main.py
+```
+
+Or:
+
+```bash
+uvicorn main:app --reload
+```
+
 ### 4) Verify
 
 - API root: `http://localhost:8000`

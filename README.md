@@ -31,6 +31,20 @@ It turns public data into a clean monitoring surface for supply concentration, p
 docker compose up --build
 ```
 
+### Backend-only (without Docker)
+
+From `backend/`:
+
+```bash
+python main.py
+```
+
+Or:
+
+```bash
+uvicorn main:app --reload
+```
+
 ### Open
 
 - Backend API: [http://localhost:8000](http://localhost:8000)

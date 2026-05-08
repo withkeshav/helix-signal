@@ -41,6 +41,23 @@ Or:
 uvicorn main:app --reload
 ```
 
+### 3c) Local backend setup with Python `venv`
+
+From `backend/`:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Windows PowerShell: .\.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+```
+
+You can also use:
+
+```bash
+uvicorn main:app --reload
+```
+
 ### 4) Verify
 
 - API root: `http://localhost:8000`

@@ -2,7 +2,15 @@ const API_URL = "http://localhost:8000/api/dashboard";
 const stateEl = document.getElementById("app-state");
 const rowsEl = document.getElementById("chain-rows");
 const sourceFooterEl = document.getElementById("source-footer");
+const refreshBtn = document.getElementById("refresh-btn");
+const themeBtn = document.getElementById("theme-btn");
+const freshnessPill = document.getElementById("freshness-pill");
+const updatedPill = document.getElementById("updated-pill");
+const staleWarningEl = document.getElementById("stale-warning");
 const charts = new Map();
+let isLoading = false;
+let lastData = null;
+let currentTheme = "auto";
 
 function formatUsd(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -48,6 +56,44 @@ function pegStatus(price) {
   return { label: `Alert (${price.toFixed(4)})`, className: "peg-alert" };
 }
 
+function resolveCurrentTheme() {
+  if (currentTheme === "auto") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  return currentTheme;
+}
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem("helix-theme", theme);
+  const effectiveTheme = resolveCurrentTheme();
+  document.documentElement.setAttribute("data-theme", effectiveTheme);
+  themeBtn.textContent = `Theme: ${theme[0].toUpperCase()}${theme.slice(1)}`;
+}
+
+function cycleTheme() {
+  const order = ["auto", "light", "dark"];
+  const idx = order.indexOf(currentTheme);
+  applyTheme(order[(idx + 1) % order.length]);
+  if (lastData) {
+    renderRows(lastData.chains || []);
+  }
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("helix-theme");
+  const initial = saved === "light" || saved === "dark" || saved === "auto" ? saved : "auto";
+  applyTheme(initial);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (currentTheme === "auto") {
+      applyTheme("auto");
+      if (lastData) {
+        renderRows(lastData.chains || []);
+      }
+    }
+  });
+}
+
 function renderSparkline(canvasId, points) {
   const canvas = document.getElementById(canvasId);
   if (!canvas || typeof Chart === "undefined") return;
@@ -62,7 +108,7 @@ function renderSparkline(canvasId, points) {
       datasets: [
         {
           data: cleanPoints,
-          borderColor: "#60a5fa",
+          borderColor: getComputedStyle(document.documentElement).getPropertyValue("--spark").trim() || "#60a5fa",
           pointRadius: 0,
           borderWidth: 2,
           tension: 0.35,
@@ -119,23 +165,81 @@ function renderSourceFooter(data) {
   `;
 }
 
-async function loadDashboard() {
-  stateEl.textContent = "Loading dashboard data...";
+function computeFreshness(data) {
+  const source = (data.sources || []).find((s) => s.source_name === "defillama");
+  if (!source) {
+    return { label: "Stale", className: "freshness-stale", message: "Source data is unavailable." };
+  }
+  if (source.status === "error") {
+    return { label: "Stale", className: "freshness-stale", message: "DefiLlama source is reporting an error." };
+  }
+  const ts = source.last_successful_fetch || source.updated_at;
+  if (!ts) {
+    return { label: "Stale", className: "freshness-stale", message: "No successful source update timestamp found." };
+  }
+  const ageMinutes = (Date.now() - new Date(ts).getTime()) / 60000;
+  if (ageMinutes <= 15) return { label: "Fresh", className: "freshness-fresh", message: "" };
+  if (ageMinutes <= 60) {
+    return { label: "Aging", className: "freshness-aging", message: "Data is aging. Consider refreshing soon." };
+  }
+  return { label: "Stale", className: "freshness-stale", message: "Data is stale (> 60 minutes old)." };
+}
+
+function renderFreshness(data) {
+  const freshness = computeFreshness(data);
+  freshnessPill.className = `pill ${freshness.className}`;
+  freshnessPill.textContent = `Freshness: ${freshness.label}`;
+  const generatedAt = data.generated_at ? new Date(data.generated_at).toLocaleString() : "Unknown";
+  updatedPill.textContent = `Last Updated: ${generatedAt}`;
+
+  if (freshness.label === "Stale") {
+    rowsEl.classList.add("stale");
+  } else {
+    rowsEl.classList.remove("stale");
+  }
+
+  if (freshness.message) {
+    staleWarningEl.textContent = freshness.message;
+    staleWarningEl.classList.add("visible");
+  } else {
+    staleWarningEl.textContent = "";
+    staleWarningEl.classList.remove("visible");
+  }
+}
+
+async function loadDashboard({ manual = false } = {}) {
+  if (isLoading) return;
+  isLoading = true;
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = manual ? "Refreshing..." : "Refresh";
+  stateEl.textContent = manual ? "Refreshing dashboard data..." : "Loading dashboard data...";
   stateEl.classList.remove("error");
   try {
     const response = await fetch(API_URL);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
+    lastData = data;
     renderRows(data.chains || []);
     renderSourceFooter(data);
-    const generatedAt = data.generated_at ? new Date(data.generated_at).toLocaleString() : "Unknown";
-    stateEl.textContent = `Live snapshot loaded (${generatedAt}).`;
+    renderFreshness(data);
+    stateEl.textContent = manual ? "Refresh completed." : "Live snapshot loaded.";
   } catch (error) {
     stateEl.textContent = `Error loading dashboard: ${error.message}`;
     stateEl.classList.add("error");
-    rowsEl.innerHTML = "";
+    if (!lastData) {
+      rowsEl.innerHTML = "";
+    }
+    staleWarningEl.textContent = "Using last known dashboard snapshot due to refresh failure.";
+    staleWarningEl.classList.add("visible");
+  } finally {
+    isLoading = false;
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = "Refresh";
   }
 }
 
+initTheme();
+themeBtn.addEventListener("click", cycleTheme);
+refreshBtn.addEventListener("click", () => loadDashboard({ manual: true }));
 loadDashboard();
-setInterval(loadDashboard, 60000);
+setInterval(() => loadDashboard({ manual: false }), 60000);

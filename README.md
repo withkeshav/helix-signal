@@ -9,7 +9,7 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - Self-hostable: runs locally with Docker, no paid dependency required for core features
 - Focused: V1 is intentionally narrow and reliable (USDT + top chains)
 
-## V1 Features
+## V2.0 Highlights
 
 - Top 10 chains by configured USDT coverage
 - USDT circulating supply snapshot per chain
@@ -18,6 +18,9 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - Peg status classification around $1.00
 - Source health footer for DefiLlama status
 - Lightweight sparklines from current / previous day / previous week supply values
+- Theme system (auto/light/dark) with saved preference
+- Manual refresh control with non-blocking error handling
+- Freshness confidence labels (Fresh, Aging, Stale)
 
 ## Quick Start
 
@@ -43,6 +46,16 @@ Or:
 
 ```bash
 uvicorn main:app --reload
+```
+
+### Local development with Python `venv`
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows PowerShell: .\.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
 ```
 
 ### Open

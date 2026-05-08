@@ -6,8 +6,29 @@
     <title>Helix Dashboard</title>
     <style>
       :root {
+        color-scheme: light dark;
+        --bg: #f4f7fb;
+        --bg-accent: #e9eef9;
+        --panel: #ffffff;
+        --line: #d5deed;
+        --text: #0f172a;
+        --muted: #52607a;
+        --up: #0f8f68;
+        --down: #b6283a;
+        --neutral: #9a6a00;
+        --ok-bg: rgba(15, 143, 104, 0.12);
+        --warn-bg: rgba(154, 106, 0, 0.12);
+        --alert-bg: rgba(182, 40, 58, 0.12);
+        --btn-bg: #111827;
+        --btn-text: #f9fafb;
+        --btn-muted-bg: #edf2ff;
+        --btn-muted-text: #1e293b;
+        --spark: #3b82f6;
+      }
+      :root[data-theme="dark"] {
         color-scheme: dark;
         --bg: #0c1018;
+        --bg-accent: #172138;
         --panel: #121826;
         --line: #273247;
         --text: #e8edf7;
@@ -15,6 +36,14 @@
         --up: #2dd4bf;
         --down: #f87171;
         --neutral: #fbbf24;
+        --ok-bg: rgba(45, 212, 191, 0.12);
+        --warn-bg: rgba(251, 191, 36, 0.12);
+        --alert-bg: rgba(248, 113, 113, 0.12);
+        --btn-bg: #e8edf7;
+        --btn-text: #0f172a;
+        --btn-muted-bg: #1b2436;
+        --btn-muted-text: #e8edf7;
+        --spark: #60a5fa;
       }
       * { box-sizing: border-box; }
       @font-face {
@@ -24,18 +53,56 @@
       body {
         margin: 0;
         font-family: Inter, Segoe UI, Arial, sans-serif;
-        background: radial-gradient(circle at top, #172138, var(--bg));
+        background: radial-gradient(circle at top, var(--bg-accent), var(--bg));
         color: var(--text);
       }
       .container {
         width: min(1200px, 96vw);
         margin: 24px auto;
       }
-      .header { margin-bottom: 16px; }
+      .header {
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .header-meta { display: flex; flex-direction: column; gap: 6px; }
       .title { margin: 0; font-size: clamp(22px, 2.6vw, 32px); }
       .subtitle { margin: 6px 0 0; color: var(--muted); }
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .btn {
+        border: 1px solid transparent;
+        border-radius: 9px;
+        padding: 8px 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--btn-bg);
+        color: var(--btn-text);
+      }
+      .btn-muted {
+        background: var(--btn-muted-bg);
+        color: var(--btn-muted-text);
+        border-color: var(--line);
+      }
       .panel {
-        background: rgba(18, 24, 38, 0.92);
+        background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 14px;
         overflow: hidden;
@@ -46,6 +113,14 @@
         color: var(--muted);
       }
       .error { color: #fecaca; }
+      .warning-banner {
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--warn-bg);
+        color: var(--text);
+        display: none;
+      }
+      .warning-banner.visible { display: block; }
       .table-wrap { overflow-x: auto; }
       table {
         width: 100%;
@@ -64,7 +139,16 @@
         font-variant-numeric: tabular-nums;
       }
       th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-      tr:hover td { background: rgba(255, 255, 255, 0.02); }
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--panel);
+      }
+      tr:hover td { background: color-mix(in srgb, var(--panel) 92%, var(--line)); }
+      tbody.stale td {
+        opacity: 0.72;
+      }
       .delta-up { color: var(--up); font-weight: 600; }
       .delta-down { color: var(--down); font-weight: 600; }
       .delta-flat { color: var(--neutral); font-weight: 600; }
@@ -103,9 +187,23 @@
         border-radius: 999px;
         padding: 4px 10px;
       }
+      .freshness-fresh {
+        color: var(--up);
+        background: var(--ok-bg);
+      }
+      .freshness-aging {
+        color: var(--neutral);
+        background: var(--warn-bg);
+      }
+      .freshness-stale {
+        color: var(--down);
+        background: var(--alert-bg);
+      }
       @media (max-width: 700px) {
         .container { width: 100vw; margin: 12px 0; }
         .header, .state, .footer { padding-left: 12px; padding-right: 12px; }
+        .header { padding-left: 12px; padding-right: 12px; }
+        .controls { width: 100%; justify-content: flex-start; }
         .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         table { min-width: 820px; }
       }
@@ -114,12 +212,23 @@
   <body>
     <main class="container">
       <header class="header">
-        <h1 class="title">Helix Stablecoin Signal Terminal</h1>
-        <p class="subtitle">Transparent chain-level USDT telemetry.</p>
+        <div class="header-meta">
+          <h1 class="title">Helix Stablecoin Signal Terminal</h1>
+          <p class="subtitle">Transparent chain-level USDT telemetry.</p>
+          <div class="status-row">
+            <span id="freshness-pill" class="pill freshness-fresh">Freshness: Pending</span>
+            <span id="updated-pill" class="pill">Last Updated: --</span>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
+          <button id="theme-btn" class="btn btn-muted" type="button">Theme: Auto</button>
+        </div>
       </header>
 
       <section class="panel">
         <div id="app-state" class="state">Loading dashboard data...</div>
+        <div id="stale-warning" class="warning-banner"></div>
         <div class="table-wrap">
           <table>
             <thead>

@@ -213,8 +213,8 @@
     <main class="container">
       <header class="header">
         <div class="header-meta">
-          <h1 class="title">Helix Stablecoin Signal Terminal</h1>
-          <p class="subtitle">Transparent chain-level USDT telemetry.</p>
+          <h1 id="dashboard-title" class="title">Helix Stablecoin Signal Terminal</h1>
+          <p id="dashboard-subtitle" class="subtitle">Transparent chain-level stablecoin telemetry.</p>
           <div class="status-row">
             <span id="freshness-pill" class="pill freshness-fresh">Freshness: Pending</span>
             <span id="updated-pill" class="pill">Last Updated: --</span>
@@ -234,7 +234,7 @@
             <thead>
               <tr>
                 <th>Chain</th>
-                <th class="num">USDT Supply</th>
+                <th id="supply-col-header" class="num">Supply</th>
                 <th class="num">24h Change (%)</th>
                 <th class="num">TVL</th>
                 <th>Peg Status</th>

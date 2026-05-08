@@ -6,18 +6,50 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from database import ChainData, SourceStatus
-from sources.defillama import DefiLlamaError, fetch_usdt_snapshot
+from database import AssetChainSnapshot, SourceStatus
+from sources.defillama import DefiLlamaError, fetch_asset_snapshot
 
-CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "chains.json"
+CHAINS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "chains.json"
+ASSETS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "assets.json"
 
 
 def load_configured_chains() -> list[dict]:
-    with CONFIG_PATH.open("r", encoding="utf-8") as file:
+    with CHAINS_CONFIG_PATH.open("r", encoding="utf-8") as file:
         chains = json.load(file)
     if not isinstance(chains, list):
         return []
     return [item for item in chains if isinstance(item, dict) and item.get("defillama_id")]
+
+
+def load_configured_assets() -> list[dict]:
+    with ASSETS_CONFIG_PATH.open("r", encoding="utf-8") as file:
+        assets = json.load(file)
+    if not isinstance(assets, list):
+        return []
+    return [item for item in assets if isinstance(item, dict) and item.get("symbol")]
+
+
+def load_enabled_assets() -> list[dict]:
+    return [asset for asset in load_configured_assets() if bool(asset.get("enabled"))]
+
+
+def get_default_asset_symbol() -> str:
+    assets = load_configured_assets()
+    for asset in assets:
+        if asset.get("default"):
+            return str(asset.get("symbol", "USDT")).upper()
+    enabled = load_enabled_assets()
+    if enabled:
+        return str(enabled[0].get("symbol", "USDT")).upper()
+    return "USDT"
+
+
+def get_asset_by_symbol(symbol: str) -> dict | None:
+    needle = symbol.upper()
+    for asset in load_configured_assets():
+        if str(asset.get("symbol", "")).upper() == needle:
+            return asset
+    return None
 
 
 def _upsert_source_status(
@@ -45,35 +77,62 @@ def refresh_chain_data(db: Session) -> None:
     attempted_at = datetime.now(timezone.utc)
     configured = load_configured_chains()
     chain_ids = [str(item["defillama_id"]) for item in configured]
+    enabled_assets = load_enabled_assets()
+    if not enabled_assets:
+        _upsert_source_status(
+            db,
+            status="error",
+            attempted_at=attempted_at,
+            successful_at=None,
+            last_error="No enabled assets in config/assets.json",
+        )
+        db.commit()
+        return
 
     try:
-        snapshot = fetch_usdt_snapshot(chain_ids)
-        fetched_at = snapshot["fetched_at"]
-        per_chain = snapshot["chain_data"]
+        latest_fetch_time: datetime | None = None
+        for asset in enabled_assets:
+            snapshot = fetch_asset_snapshot(asset_config=asset, chain_ids=chain_ids)
+            fetched_at = snapshot["fetched_at"]
+            per_chain = snapshot["chain_data"]
+            asset_symbol = str(snapshot.get("asset_symbol", asset.get("symbol", ""))).upper()
+            asset_name = str(snapshot.get("asset_name") or asset.get("name") or asset_symbol)
+            peg_type = str(snapshot.get("peg_type") or asset.get("peg_type") or "peggedUSD")
+            latest_fetch_time = fetched_at
 
-        for chain in configured:
-            chain_name = str(chain["name"])
-            key = str(chain["defillama_id"])
-            values = per_chain.get(key, {})
-            row = db.query(ChainData).filter(ChainData.chain_name == chain_name).first()
-            if row is None:
-                row = ChainData(chain_name=chain_name)
-                db.add(row)
+            for chain in configured:
+                chain_name = str(chain["name"])
+                key = str(chain["defillama_id"])
+                values = per_chain.get(key, {})
+                row = (
+                    db.query(AssetChainSnapshot)
+                    .filter(
+                        AssetChainSnapshot.asset_symbol == asset_symbol,
+                        AssetChainSnapshot.chain_name == chain_name,
+                    )
+                    .first()
+                )
+                if row is None:
+                    row = AssetChainSnapshot(asset_symbol=asset_symbol, chain_name=chain_name)
+                    db.add(row)
 
-            row.usdt_supply = float(values.get("usdt_supply", 0.0))
-            row.usdt_supply_prev_day = values.get("usdt_supply_prev_day")
-            row.usdt_supply_prev_week = values.get("usdt_supply_prev_week")
-            row.usdt_supply_prev_month = values.get("usdt_supply_prev_month")
-            row.tvl = values.get("tvl")
-            row.price = values.get("price")
-            row.fetched_at = fetched_at
-            row.updated_at = datetime.now(timezone.utc)
+                row.asset_name = asset_name
+                row.supply_current = values.get("supply_current")
+                row.supply_prev_day = values.get("supply_prev_day")
+                row.supply_prev_week = values.get("supply_prev_week")
+                row.supply_prev_month = values.get("supply_prev_month")
+                row.tvl = values.get("tvl")
+                row.price = values.get("price")
+                row.peg_type = peg_type
+                row.source_name = "defillama"
+                row.fetched_at = fetched_at
+                row.updated_at = datetime.now(timezone.utc)
 
         _upsert_source_status(
             db,
             status="ok",
             attempted_at=attempted_at,
-            successful_at=fetched_at,
+            successful_at=latest_fetch_time or attempted_at,
             last_error=None,
         )
     except (DefiLlamaError, Exception) as exc:

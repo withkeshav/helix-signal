@@ -32,22 +32,27 @@ def _extract_numeric(entry: object) -> float | None:
     return None
 
 
-def _find_usdt_asset(payload: dict) -> dict:
+def _find_asset(payload: dict, *, symbol: str) -> dict:
     assets = payload.get("peggedAssets", [])
     for asset in assets:
-        symbol = str(asset.get("symbol", "")).upper()
+        asset_symbol = str(asset.get("symbol", "")).upper()
         name = str(asset.get("name", "")).lower()
         gecko_id = str(asset.get("gecko_id", "")).lower()
-        if symbol == "USDT" or "tether" in name or gecko_id == "tether":
+        desired = symbol.upper()
+        if asset_symbol == desired or gecko_id == desired.lower() or desired.lower() in name:
             return asset
-    raise DefiLlamaError("USDT asset not found in DefiLlama payload")
+    raise DefiLlamaError(f"{symbol} asset not found in DefiLlama payload")
 
 
-def fetch_usdt_snapshot(chain_ids: list[str]) -> dict:
+def fetch_asset_snapshot(*, asset_config: dict, chain_ids: list[str]) -> dict:
+    symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
+    if not symbol:
+        raise DefiLlamaError("Invalid asset config: missing symbol")
+
     stablecoins_payload = _request_json(USDT_STABLECOINS_URL)
-    usdt_asset = _find_usdt_asset(stablecoins_payload)
+    selected_asset = _find_asset(stablecoins_payload, symbol=symbol)
 
-    chain_circulating = usdt_asset.get("chainCirculating", {})
+    chain_circulating = selected_asset.get("chainCirculating", {})
     current_map: dict[str, object] = {}
     prev_day_map: dict[str, object] = {}
     prev_week_map: dict[str, object] = {}
@@ -87,11 +92,11 @@ def fetch_usdt_snapshot(chain_ids: list[str]) -> dict:
         if prev_month_entry is None:
             prev_month_entry = prev_month_lowercase_lookup.get(chain_id.lower(), {})
         chain_data[chain_id] = {
-            "usdt_supply": _extract_numeric(current_entry) or 0.0,
-            "usdt_supply_prev_day": _extract_numeric(prev_day_entry),
-            "usdt_supply_prev_week": _extract_numeric(prev_week_entry),
-            "usdt_supply_prev_month": _extract_numeric(prev_month_entry),
-            "price": float(usdt_asset.get("price")) if isinstance(usdt_asset.get("price"), (int, float)) else None,
+            "supply_current": _extract_numeric(current_entry) or 0.0,
+            "supply_prev_day": _extract_numeric(prev_day_entry),
+            "supply_prev_week": _extract_numeric(prev_week_entry),
+            "supply_prev_month": _extract_numeric(prev_month_entry),
+            "price": float(selected_asset.get("price")) if isinstance(selected_asset.get("price"), (int, float)) else None,
             "tvl": None,
         }
 
@@ -111,6 +116,9 @@ def fetch_usdt_snapshot(chain_ids: list[str]) -> dict:
         pass
 
     return {
+        "asset_symbol": symbol,
+        "asset_name": selected_asset.get("name"),
+        "peg_type": asset_config.get("peg_type", "peggedUSD"),
         "fetched_at": datetime.now(timezone.utc),
         "chain_data": chain_data,
     }

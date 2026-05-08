@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import DateTime, Float, Integer, String, create_engine, text
+from sqlalchemy import DateTime, Float, Integer, String, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -22,17 +22,22 @@ class Base(DeclarativeBase):
     pass
 
 
-class ChainData(Base):
-    __tablename__ = "chain_data"
+class AssetChainSnapshot(Base):
+    __tablename__ = "asset_chain_snapshots"
+    __table_args__ = (UniqueConstraint("asset_symbol", "chain_name", name="uq_asset_chain_snapshot"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    chain_name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    usdt_supply: Mapped[float] = mapped_column(Float, default=0.0)
-    usdt_supply_prev_day: Mapped[float | None] = mapped_column(Float, nullable=True)
-    usdt_supply_prev_week: Mapped[float | None] = mapped_column(Float, nullable=True)
-    usdt_supply_prev_month: Mapped[float | None] = mapped_column(Float, nullable=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
+    asset_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_name: Mapped[str] = mapped_column(String(64), index=True)
+    supply_current: Mapped[float | None] = mapped_column(Float, nullable=True)
+    supply_prev_day: Mapped[float | None] = mapped_column(Float, nullable=True)
+    supply_prev_week: Mapped[float | None] = mapped_column(Float, nullable=True)
+    supply_prev_month: Mapped[float | None] = mapped_column(Float, nullable=True)
     tvl: Mapped[float | None] = mapped_column(Float, nullable=True)
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    peg_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    source_name: Mapped[str] = mapped_column(String(64), default="defillama")
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -60,24 +65,34 @@ class SourceStatus(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
-    _ensure_chain_data_columns()
+    _migrate_legacy_chain_data()
 
 
-def _ensure_chain_data_columns() -> None:
+def _migrate_legacy_chain_data() -> None:
     if not DATABASE_URL.startswith("sqlite"):
         return
 
-    expected = {
-        "usdt_supply_prev_day": "FLOAT",
-        "usdt_supply_prev_week": "FLOAT",
-        "usdt_supply_prev_month": "FLOAT",
-    }
     with engine.begin() as conn:
-        existing_columns = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info(chain_data)")).fetchall()
-            if len(row) > 1
-        }
-        for column_name, column_type in expected.items():
-            if column_name not in existing_columns:
-                conn.execute(text(f"ALTER TABLE chain_data ADD COLUMN {column_name} {column_type}"))
+        chain_table_exists = conn.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='chain_data'")
+        ).fetchone()
+        if not chain_table_exists:
+            return
+
+        conn.execute(
+            text(
+                """
+                INSERT OR IGNORE INTO asset_chain_snapshots
+                (
+                    asset_symbol, asset_name, chain_name, supply_current, supply_prev_day,
+                    supply_prev_week, supply_prev_month, tvl, price, peg_type,
+                    source_name, fetched_at, updated_at
+                )
+                SELECT
+                    'USDT', 'Tether', chain_name, usdt_supply, usdt_supply_prev_day,
+                    usdt_supply_prev_week, usdt_supply_prev_month, tvl, price, 'peggedUSD',
+                    'defillama', fetched_at, updated_at
+                FROM chain_data
+                """
+            )
+        )

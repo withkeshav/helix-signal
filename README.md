@@ -1,6 +1,6 @@
 # Helix-Signal
 
-Helix-Signal powers **Helix**, an open-source, self-hostable dashboard for chain-level USDT stablecoin signals.
+Helix-Signal powers **Helix**, an open-source, self-hostable dashboard for chain-level stablecoin signals.
 It turns public data into a clean monitoring surface for supply concentration, peg pressure, freshness, and source health.
 
 ## Why Helix
@@ -9,7 +9,7 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - Self-hostable: runs locally with Docker, no paid dependency required for core features
 - Focused: V1 is intentionally narrow and reliable (USDT + top chains)
 
-## V2.0 Highlights
+## V2.1 Highlights
 
 - Top 10 chains by configured USDT coverage
 - USDT circulating supply snapshot per chain
@@ -21,6 +21,8 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - Theme system (auto/light/dark) with saved preference
 - Manual refresh control with non-blocking error handling
 - Freshness confidence labels (Fresh, Aging, Stale)
+- Multi-asset-ready backend model (`asset_chain_snapshots`) with USDT as default enabled asset
+- Asset-aware dashboard contract (`/api/dashboard?asset=USDT`) with backward-friendly default behavior
 
 ## Quick Start
 
@@ -73,6 +75,7 @@ Copy values from `.env.example` as needed:
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
 
 Configured chains are pinned in `config/chains.json`.
+Configured assets are defined in `config/assets.json` (USDT enabled by default; other assets disabled by default).
 
 ## Project Structure
 

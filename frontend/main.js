@@ -7,6 +7,9 @@ const themeBtn = document.getElementById("theme-btn");
 const freshnessPill = document.getElementById("freshness-pill");
 const updatedPill = document.getElementById("updated-pill");
 const staleWarningEl = document.getElementById("stale-warning");
+const titleEl = document.getElementById("dashboard-title");
+const subtitleEl = document.getElementById("dashboard-subtitle");
+const supplyColHeaderEl = document.getElementById("supply-col-header");
 const charts = new Map();
 let isLoading = false;
 let lastData = null;
@@ -131,23 +134,36 @@ function renderSparkline(canvasId, points) {
 
 function renderRows(chains) {
   rowsEl.innerHTML = "";
-  const sorted = [...chains].sort((a, b) => Number(b.usdt_supply || 0) - Number(a.usdt_supply || 0));
+  const sorted = [...chains].sort(
+    (a, b) => Number((b.supply_current ?? b.usdt_supply) || 0) - Number((a.supply_current ?? a.usdt_supply) || 0)
+  );
   for (const chain of sorted) {
-    const change24h = calcPercent(chain.usdt_supply, chain.usdt_supply_prev_day);
+    const currentSupply = chain.supply_current ?? chain.usdt_supply;
+    const prevDay = chain.supply_prev_day ?? chain.usdt_supply_prev_day;
+    const prevWeek = chain.supply_prev_week ?? chain.usdt_supply_prev_week;
+    const change24h = calcPercent(currentSupply, prevDay);
     const sparkId = `spark-${chain.chain_name.replace(/\s+/g, "-").toLowerCase()}`;
     const peg = pegStatus(chain.price);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${chain.chain_name}</td>
-      <td class="num" title="$${formatUsdFull(chain.usdt_supply)}">${formatUsd(chain.usdt_supply)}</td>
+      <td class="num" title="$${formatUsdFull(currentSupply)}">${formatUsd(currentSupply)}</td>
       <td class="num ${deltaClass(change24h)}">${change24h === null ? "N/A" : `${change24h.toFixed(2)}%`}${signalBadge(change24h)}</td>
       <td class="num" title="$${formatUsdFull(chain.tvl)}">${formatUsd(chain.tvl)}</td>
       <td class="${peg.className}">${peg.label}</td>
       <td class="num"><div class="sparkline"><canvas id="${sparkId}"></canvas></div></td>
     `;
     rowsEl.appendChild(tr);
-    renderSparkline(sparkId, [chain.usdt_supply_prev_week, chain.usdt_supply_prev_day, chain.usdt_supply]);
+    renderSparkline(sparkId, [prevWeek, prevDay, currentSupply]);
   }
+}
+
+function renderAssetMeta(data) {
+  const symbol = data.asset?.symbol || "USDT";
+  const name = data.asset?.name || symbol;
+  titleEl.textContent = `Helix ${symbol} Signal Terminal`;
+  subtitleEl.textContent = `Transparent chain-level ${name} telemetry.`;
+  supplyColHeaderEl.textContent = `${symbol} Supply`;
 }
 
 function renderSourceFooter(data) {
@@ -219,6 +235,7 @@ async function loadDashboard({ manual = false } = {}) {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     lastData = data;
+    renderAssetMeta(data);
     renderRows(data.chains || []);
     renderSourceFooter(data);
     renderFreshness(data);

@@ -83,6 +83,31 @@ Guidelines:
 
 After updating config, restart backend (or full compose stack) and confirm the new chain appears in `/api/dashboard`.
 
+## Adding a New Stablecoin Asset (V2.1-ready)
+
+Edit `config/assets.json` and add or modify an asset entry:
+
+```json
+{
+  "symbol": "USDC",
+  "name": "USD Coin",
+  "defillama_symbol": "USDC",
+  "peg_type": "peggedUSD",
+  "enabled": false,
+  "default": false
+}
+```
+
+Guidelines:
+
+- Keep new assets `enabled: false` until parser + UI behavior is verified.
+- Ensure `defillama_symbol` matches DefiLlama stablecoin symbol metadata.
+- Keep exactly one default asset (`default: true`) for predictable `/api/dashboard` behavior.
+- Validate with:
+  - `/api/dashboard` (default asset)
+  - `/api/dashboard?asset=USDT` (explicit default)
+  - `/api/assets` (enabled assets list)
+
 ## Code Style
 
 - Keep changes focused and small

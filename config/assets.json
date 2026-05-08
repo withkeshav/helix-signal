@@ -1,0 +1,34 @@
+[
+  {
+    "symbol": "USDT",
+    "name": "Tether",
+    "defillama_symbol": "USDT",
+    "peg_type": "peggedUSD",
+    "enabled": true,
+    "default": true
+  },
+  {
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "defillama_symbol": "USDC",
+    "peg_type": "peggedUSD",
+    "enabled": false,
+    "default": false
+  },
+  {
+    "symbol": "DAI",
+    "name": "Dai",
+    "defillama_symbol": "DAI",
+    "peg_type": "peggedUSD",
+    "enabled": false,
+    "default": false
+  },
+  {
+    "symbol": "PYUSD",
+    "name": "PayPal USD",
+    "defillama_symbol": "PYUSD",
+    "peg_type": "peggedUSD",
+    "enabled": false,
+    "default": false
+  }
+]

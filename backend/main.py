@@ -3,12 +3,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import ChainData, SessionLocal, SourceStatus, init_db
-from schemas import DashboardResponse
-from signal_engine.core import refresh_chain_data
+from database import AssetChainSnapshot, SessionLocal, SourceStatus, init_db
+from schemas import AssetConfigOut, AssetMetadataOut, DashboardResponse
+from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol, load_enabled_assets, refresh_chain_data
 
 
 def _refresh_job() -> None:
@@ -53,18 +53,39 @@ def root() -> str:
 
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
-def dashboard() -> DashboardResponse:
+def dashboard(asset: str | None = None) -> DashboardResponse:
     db = SessionLocal()
     try:
-        chains = db.query(ChainData).order_by(ChainData.id.asc()).all()
+        selected_symbol = (asset or get_default_asset_symbol()).upper()
+        selected_asset = get_asset_by_symbol(selected_symbol)
+        if selected_asset is None or not bool(selected_asset.get("enabled")):
+            raise HTTPException(status_code=404, detail=f"Asset '{selected_symbol}' is not enabled")
+
+        chains = (
+            db.query(AssetChainSnapshot)
+            .filter(AssetChainSnapshot.asset_symbol == selected_symbol)
+            .order_by(AssetChainSnapshot.supply_current.desc().nullslast())
+            .all()
+        )
         sources = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
         return DashboardResponse(
+            asset=AssetMetadataOut(
+                symbol=selected_symbol,
+                name=selected_asset.get("name"),
+                peg_type=selected_asset.get("peg_type"),
+            ),
             generated_at=datetime.now(timezone.utc),
             chains=chains,
             sources=sources,
         )
     finally:
         db.close()
+
+
+@app.get("/api/assets", response_model=list[AssetConfigOut])
+def assets() -> list[AssetConfigOut]:
+    enabled_assets = load_enabled_assets()
+    return [AssetConfigOut(**asset) for asset in enabled_assets]
 
 
 if __name__ == "__main__":

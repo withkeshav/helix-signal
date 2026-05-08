@@ -1,18 +1,28 @@
-# Data Methodology (V1)
+# Data Methodology (V2.1)
 
-This document explains how Helix-Signal computes and presents USDT metrics in V1.
+This document explains how Helix-Signal computes and presents asset-chain stablecoin metrics in V2.1.
 
 ## Primary Source
 
 - Source: DefiLlama stablecoins API
-- Endpoint used for USDT chain circulating values:
+- Endpoint used for asset chain circulating values:
   - `https://stablecoins.llama.fi/stablecoins?includePrices=true`
 - Supplemental endpoint for chain context (TVL where available):
   - `https://stablecoins.llama.fi/stablecoinchains`
 
-## Chain Universe
+## Asset and Chain Universe
 
-Helix uses the pinned chain list in `config/chains.json`:
+Helix uses:
+
+- `config/chains.json` for chain universe
+- `config/assets.json` for stablecoin asset universe
+
+By default in V2.1:
+
+- USDT is enabled and default
+- USDC, DAI, and PYUSD are present as disabled draft entries
+
+Current pinned chains:
 
 - Tron
 - Ethereum
@@ -25,18 +35,18 @@ Helix uses the pinned chain list in `config/chains.json`:
 - TON
 - Avalanche
 
-The UI ordering follows this configured set, and frontend default sorting is by current USDT supply descending.
+The UI sorts by current supply descending for the selected asset.
 
 ## Metric Definitions
 
-### USDT Supply
+### Asset Supply
 
-Per chain, Helix reads USDT `chainCirculating` values from DefiLlama:
+For the selected asset symbol, Helix reads `chainCirculating` values from DefiLlama:
 
-- `current` -> `usdt_supply`
-- `circulatingPrevDay` -> `usdt_supply_prev_day`
-- `circulatingPrevWeek` -> `usdt_supply_prev_week`
-- `circulatingPrevMonth` -> `usdt_supply_prev_month`
+- `current` -> `supply_current`
+- `circulatingPrevDay` -> `supply_prev_day`
+- `circulatingPrevWeek` -> `supply_prev_week`
+- `circulatingPrevMonth` -> `supply_prev_month`
 
 Values are interpreted as USD-denominated circulating amount (`peggedUSD`) when available.
 
@@ -47,7 +57,7 @@ If unavailable or fetch fails, TVL is stored as `null` and rendered as `N/A`.
 
 ### Peg Price and Peg Status
 
-Peg uses DefiLlama's reported USDT price (`price`) as V1 baseline.
+Peg uses DefiLlama's reported selected-asset price (`price`) as baseline.
 
 Status thresholds:
 
@@ -59,13 +69,13 @@ Status thresholds:
 
 Stored values:
 
-- 1d baseline: `usdt_supply_prev_day`
-- 7d baseline: `usdt_supply_prev_week`
-- 30d baseline: `usdt_supply_prev_month`
+- 1d baseline: `supply_prev_day`
+- 7d baseline: `supply_prev_week`
+- 30d baseline: `supply_prev_month`
 
 Displayed 24h change (%):
 
-- `((usdt_supply - usdt_supply_prev_day) / usdt_supply_prev_day) * 100`
+- `((supply_current - supply_prev_day) / supply_prev_day) * 100`
 - If baseline is missing or zero, value is shown as `N/A`
 
 Sparklines:
@@ -77,16 +87,17 @@ Sparklines:
 
 - Scheduler interval: `REFRESH_INTERVAL_SECONDS` (default 300s)
 - On each refresh:
-  - attempt DefiLlama fetch
-  - upsert chain rows in SQLite
+  - attempt DefiLlama fetch for each enabled asset
+  - upsert asset-chain rows in SQLite
   - upsert source health in `source_status`
 - On fetch failure:
   - source status is marked `error`
   - last error is recorded
   - worker continues running (no crash)
 
-## Known V1 Limitations
+## Known V2.1 Limitations
 
 - Single-source baseline (DefiLlama)
 - No deep historical datastore beyond current/prev day/week/month fields
 - No trading execution, alerting, or predictive modeling
+- Multi-asset architecture is ready, but only USDT is enabled by default in current release posture

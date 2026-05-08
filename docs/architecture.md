@@ -8,16 +8,17 @@ Helix-Signal follows a backend-first architecture.
 DefiLlama stablecoins APIs
     |
     v
-FastAPI backend (scheduler + asset-aware signal engine)
+FastAPI backend (scheduler + multi-asset refresh loop)
     |
     v
 SQLite cache (asset_chain_snapshots, source_status)
     |
-    v
-/api/dashboard?asset=USDT (default asset fallback)
+    +--> /api/assets
     |
-    v
-Vanilla JS + Chart.js frontend
+    +--> /api/dashboard?asset=SYMBOL (USDT default fallback)
+            |
+            v
+Vanilla JS + Chart.js frontend with asset selector
 ```
 
 ## Components
@@ -29,7 +30,7 @@ Vanilla JS + Chart.js frontend
   - `/api/dashboard` with optional `asset` query parameter
   - `/api/assets` for enabled asset listing
 - APScheduler background job refreshes source data periodically
-- Signal engine parses and normalizes asset-chain snapshots
+- Signal engine parses and normalizes asset-chain snapshots for enabled assets
 - SQLAlchemy models persist latest snapshots in SQLite
 
 ### Data Store
@@ -42,7 +43,7 @@ Vanilla JS + Chart.js frontend
 ### Frontend (`frontend/`)
 
 - Static HTML/CSS/JS
-- Fetches a single dashboard payload from backend
+- Loads enabled assets and fetches selected-asset dashboard payloads
 - Renders:
   - asset-aware title and supply column
   - main chain table

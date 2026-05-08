@@ -91,50 +91,67 @@ def refresh_chain_data(db: Session) -> None:
 
     try:
         latest_fetch_time: datetime | None = None
+        errors: list[str] = []
+        success_count = 0
+
         for asset in enabled_assets:
-            snapshot = fetch_asset_snapshot(asset_config=asset, chain_ids=chain_ids)
-            fetched_at = snapshot["fetched_at"]
-            per_chain = snapshot["chain_data"]
-            asset_symbol = str(snapshot.get("asset_symbol", asset.get("symbol", ""))).upper()
-            asset_name = str(snapshot.get("asset_name") or asset.get("name") or asset_symbol)
-            peg_type = str(snapshot.get("peg_type") or asset.get("peg_type") or "peggedUSD")
-            latest_fetch_time = fetched_at
+            try:
+                snapshot = fetch_asset_snapshot(asset_config=asset, chain_ids=chain_ids)
+                fetched_at = snapshot["fetched_at"]
+                per_chain = snapshot["chain_data"]
+                asset_symbol = str(snapshot.get("asset_symbol", asset.get("symbol", ""))).upper()
+                asset_name = str(snapshot.get("asset_name") or asset.get("name") or asset_symbol)
+                peg_type = str(snapshot.get("peg_type") or asset.get("peg_type") or "peggedUSD")
+                latest_fetch_time = fetched_at
+                success_count += 1
 
-            for chain in configured:
-                chain_name = str(chain["name"])
-                key = str(chain["defillama_id"])
-                values = per_chain.get(key, {})
-                row = (
-                    db.query(AssetChainSnapshot)
-                    .filter(
-                        AssetChainSnapshot.asset_symbol == asset_symbol,
-                        AssetChainSnapshot.chain_name == chain_name,
+                for chain in configured:
+                    chain_name = str(chain["name"])
+                    key = str(chain["defillama_id"])
+                    values = per_chain.get(key, {})
+                    row = (
+                        db.query(AssetChainSnapshot)
+                        .filter(
+                            AssetChainSnapshot.asset_symbol == asset_symbol,
+                            AssetChainSnapshot.chain_name == chain_name,
+                        )
+                        .first()
                     )
-                    .first()
-                )
-                if row is None:
-                    row = AssetChainSnapshot(asset_symbol=asset_symbol, chain_name=chain_name)
-                    db.add(row)
+                    if row is None:
+                        row = AssetChainSnapshot(asset_symbol=asset_symbol, chain_name=chain_name)
+                        db.add(row)
 
-                row.asset_name = asset_name
-                row.supply_current = values.get("supply_current")
-                row.supply_prev_day = values.get("supply_prev_day")
-                row.supply_prev_week = values.get("supply_prev_week")
-                row.supply_prev_month = values.get("supply_prev_month")
-                row.tvl = values.get("tvl")
-                row.price = values.get("price")
-                row.peg_type = peg_type
-                row.source_name = "defillama"
-                row.fetched_at = fetched_at
-                row.updated_at = datetime.now(timezone.utc)
+                    row.asset_name = asset_name
+                    row.supply_current = values.get("supply_current")
+                    row.supply_prev_day = values.get("supply_prev_day")
+                    row.supply_prev_week = values.get("supply_prev_week")
+                    row.supply_prev_month = values.get("supply_prev_month")
+                    row.tvl = values.get("tvl")
+                    row.price = values.get("price")
+                    row.peg_type = peg_type
+                    row.source_name = "defillama"
+                    row.fetched_at = fetched_at
+                    row.updated_at = datetime.now(timezone.utc)
+            except (DefiLlamaError, Exception) as asset_exc:
+                symbol = str(asset.get("symbol", "UNKNOWN")).upper()
+                errors.append(f"{symbol}: {asset_exc}")
 
-        _upsert_source_status(
-            db,
-            status="ok",
-            attempted_at=attempted_at,
-            successful_at=latest_fetch_time or attempted_at,
-            last_error=None,
-        )
+        if success_count > 0:
+            _upsert_source_status(
+                db,
+                status="ok",
+                attempted_at=attempted_at,
+                successful_at=latest_fetch_time or attempted_at,
+                last_error="; ".join(errors) if errors else None,
+            )
+        else:
+            _upsert_source_status(
+                db,
+                status="error",
+                attempted_at=attempted_at,
+                successful_at=None,
+                last_error="; ".join(errors) if errors else "No asset refresh succeeded",
+            )
     except (DefiLlamaError, Exception) as exc:
         _upsert_source_status(
             db,

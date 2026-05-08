@@ -53,8 +53,8 @@ out/
 Thumbs.db
 desktop.ini
 
-# --- Internal Planning & AI Briefs ---
-CURSOR_BRIEF.md
+# --- Internal Planning Briefs ---
+initial_BRIEF.md
 helix_signal_strategy_playbook.md
 *internal_docs*
 *.plan
@@ -64,8 +64,11 @@ summarize_defillama_probe.*
 helix_signal_repo_findings.md
 helix_signal_research_findings.md
 helix_signal_defillama_probe_summary.md
-HELIX_V2_0_CURSOR_EXECUTION_BRIEF.md
-HELIX V2.0 CURSOR EXECUTION BRIEF.md
-HELIX_V2.1_CURSOR_EXECUTION_BRIEF.md
-HELIX_V2_1_CURSOR_EXECUTION_BRIEF.md
+HELIX_V2_0_EXECUTION_BRIEF.md
+HELIX V2.0 EXECUTION BRIEF.md
+HELIX_V2.1_EXECUTION_BRIEF.md
+HELIX_V2_1_EXECUTION_BRIEF.md
+Helix-Signal V2.1 Execution Brief.md
 Helix-Signal V2.1 Cursor Execution Brief.md
+Helix-Signal V2.2 Execution Brief.md
+HELIX_V2_2_EXECUTION_BRIEF.md

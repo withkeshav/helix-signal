@@ -1,7 +1,7 @@
 [
   {
     "symbol": "USDT",
-    "name": "Tether",
+    "name": "Tether USD",
     "defillama_symbol": "USDT",
     "peg_type": "peggedUSD",
     "enabled": true,
@@ -12,7 +12,7 @@
     "name": "USD Coin",
     "defillama_symbol": "USDC",
     "peg_type": "peggedUSD",
-    "enabled": false,
+    "enabled": true,
     "default": false
   },
   {
@@ -20,7 +20,7 @@
     "name": "Dai",
     "defillama_symbol": "DAI",
     "peg_type": "peggedUSD",
-    "enabled": false,
+    "enabled": true,
     "default": false
   },
   {
@@ -28,7 +28,7 @@
     "name": "PayPal USD",
     "defillama_symbol": "PYUSD",
     "peg_type": "peggedUSD",
-    "enabled": false,
+    "enabled": true,
     "default": false
   }
 ]

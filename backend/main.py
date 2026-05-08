@@ -64,17 +64,19 @@ def dashboard(asset: str | None = None) -> DashboardResponse:
         chains = (
             db.query(AssetChainSnapshot)
             .filter(AssetChainSnapshot.asset_symbol == selected_symbol)
-            .order_by(AssetChainSnapshot.supply_current.desc().nullslast())
+            .order_by(AssetChainSnapshot.supply_current.desc(), AssetChainSnapshot.chain_name.asc())
             .all()
         )
         sources = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
+        latest_snapshot_time = max((chain.fetched_at for chain in chains), default=datetime.now(timezone.utc))
         return DashboardResponse(
             asset=AssetMetadataOut(
                 symbol=selected_symbol,
                 name=selected_asset.get("name"),
                 peg_type=selected_asset.get("peg_type"),
             ),
-            generated_at=datetime.now(timezone.utc),
+            generated_at=latest_snapshot_time,
+            refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")),
             chains=chains,
             sources=sources,
         )

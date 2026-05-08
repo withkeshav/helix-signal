@@ -9,20 +9,22 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - Self-hostable: runs locally with Docker, no paid dependency required for core features
 - Focused: V1 is intentionally narrow and reliable (USDT + top chains)
 
-## V2.1 Highlights
+## V2.2 Highlights
 
 - Top 10 chains by configured USDT coverage
 - USDT circulating supply snapshot per chain
 - 24h change (%) using DefiLlama previous-day values
-- TVL context for each chain (when available)
+- Reliable per-asset chain liquidity metrics are not currently shown when source granularity is unavailable
 - Peg status classification around $1.00
 - Source health footer for DefiLlama status
 - Lightweight sparklines from current / previous day / previous week supply values
 - Theme system (auto/light/dark) with saved preference
 - Manual refresh control with non-blocking error handling
 - Freshness confidence labels (Fresh, Aging, Stale)
-- Multi-asset-ready backend model (`asset_chain_snapshots`) with USDT as default enabled asset
-- Asset-aware dashboard contract (`/api/dashboard?asset=USDT`) with backward-friendly default behavior
+- Controlled multi-stablecoin dashboard support (USDT, USDC, DAI, PYUSD)
+- Asset selector for switching assets without page reload
+- Generic backend model (`asset_chain_snapshots`) powering multi-asset snapshots
+- Asset-aware dashboard contract (`/api/dashboard?asset=SYMBOL`) with USDT default fallback
 
 ## Quick Start
 
@@ -75,7 +77,8 @@ Copy values from `.env.example` as needed:
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
 
 Configured chains are pinned in `config/chains.json`.
-Configured assets are defined in `config/assets.json` (USDT enabled by default; other assets disabled by default).
+Configured assets are defined in `config/assets.json` (USDT remains default).
+Use the dashboard asset selector to switch across enabled assets.
 
 ## Project Structure
 

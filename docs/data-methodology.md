@@ -17,10 +17,10 @@ Helix uses:
 - `config/chains.json` for chain universe
 - `config/assets.json` for stablecoin asset universe
 
-By default in V2.1:
+By default in V2.2:
 
 - USDT is enabled and default
-- USDC, DAI, and PYUSD are present as disabled draft entries
+- USDC, DAI, and PYUSD are enabled when parser/API checks pass
 
 Current pinned chains:
 
@@ -41,7 +41,7 @@ The UI sorts by current supply descending for the selected asset.
 
 ### Asset Supply
 
-For the selected asset symbol, Helix reads `chainCirculating` values from DefiLlama:
+For each selected asset symbol (USDT, USDC, DAI, PYUSD), Helix reads `chainCirculating` values from DefiLlama:
 
 - `current` -> `supply_current`
 - `circulatingPrevDay` -> `supply_prev_day`
@@ -52,8 +52,9 @@ Values are interpreted as USD-denominated circulating amount (`peggedUSD`) when 
 
 ### TVL
 
-TVL is context-only in V1 and read from DefiLlama chain metadata when present.
-If unavailable or fetch fails, TVL is stored as `null` and rendered as `N/A`.
+Reliable per-asset, per-chain TVL is not consistently available from the current DefiLlama public stablecoin payloads.
+To avoid implying precision where it is not guaranteed, the dashboard currently hides the TVL column for V2.2.1.
+Helix will only re-enable a visible liquidity column when the upstream data is consistently attributable to both asset and chain.
 
 ### Peg Price and Peg Status
 
@@ -82,6 +83,7 @@ Sparklines:
 
 - Sequence: `[prev_week, prev_day, current]`
 - Purpose: quick directional context, not full historical charting
+- Sparse-chain assets are supported; UI shows only available configured chain rows for the selected asset.
 
 ## Refresh and Freshness
 
@@ -95,9 +97,15 @@ Sparklines:
   - last error is recorded
   - worker continues running (no crash)
 
+Frontend freshness labels use the latest successful fetch timestamp from source status and newest available chain snapshot timestamp:
+
+- Fresh: within the configured recent threshold (derived from `REFRESH_INTERVAL_SECONDS`, minimum 15 minutes)
+- Aging: older than fresh threshold but still within warning threshold (minimum 60 minutes)
+- Stale: older than warning threshold or source status reports error
+
 ## Known V2.1 Limitations
 
 - Single-source baseline (DefiLlama)
 - No deep historical datastore beyond current/prev day/week/month fields
 - No trading execution, alerting, or predictive modeling
-- Multi-asset architecture is ready, but only USDT is enabled by default in current release posture
+- Multi-asset dashboard is active with controlled enabled assets through `config/assets.json`

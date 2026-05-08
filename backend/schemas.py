@@ -39,6 +39,7 @@ class SourceStatusOut(BaseModel):
 class DashboardResponse(BaseModel):
     asset: AssetMetadataOut
     generated_at: datetime
+    refresh_interval_seconds: int
     chains: list[AssetChainSnapshotOut]
     sources: list[SourceStatusOut]
 

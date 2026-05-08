@@ -103,6 +103,10 @@ Guidelines:
 - Keep new assets `enabled: false` until parser + UI behavior is verified.
 - Ensure `defillama_symbol` matches DefiLlama stablecoin symbol metadata.
 - Keep exactly one default asset (`default: true`) for predictable `/api/dashboard` behavior.
+- For production-facing activation, only set `enabled: true` after validating:
+  - parser extraction from DefiLlama `chainCirculating`
+  - `/api/dashboard?asset=SYMBOL` returns valid chains
+  - frontend selector can switch and render without regression
 - Validate with:
   - `/api/dashboard` (default asset)
   - `/api/dashboard?asset=USDT` (explicit default)

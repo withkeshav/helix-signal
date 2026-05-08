@@ -10,10 +10,14 @@ const staleWarningEl = document.getElementById("stale-warning");
 const titleEl = document.getElementById("dashboard-title");
 const subtitleEl = document.getElementById("dashboard-subtitle");
 const supplyColHeaderEl = document.getElementById("supply-col-header");
+const assetSelectorEl = document.getElementById("asset-selector");
+const chainCountPillEl = document.getElementById("chain-count-pill");
 const charts = new Map();
 let isLoading = false;
 let lastData = null;
 let currentTheme = "auto";
+let selectedAsset = "USDT";
+let enabledAssets = [];
 
 function formatUsd(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -149,13 +153,13 @@ function renderRows(chains) {
       <td>${chain.chain_name}</td>
       <td class="num" title="$${formatUsdFull(currentSupply)}">${formatUsd(currentSupply)}</td>
       <td class="num ${deltaClass(change24h)}">${change24h === null ? "N/A" : `${change24h.toFixed(2)}%`}${signalBadge(change24h)}</td>
-      <td class="num" title="$${formatUsdFull(chain.tvl)}">${formatUsd(chain.tvl)}</td>
       <td class="${peg.className}">${peg.label}</td>
       <td class="num"><div class="sparkline"><canvas id="${sparkId}"></canvas></div></td>
     `;
     rowsEl.appendChild(tr);
     renderSparkline(sparkId, [prevWeek, prevDay, currentSupply]);
   }
+  chainCountPillEl.textContent = `Chains: ${sorted.length}`;
 }
 
 function renderAssetMeta(data) {
@@ -164,6 +168,20 @@ function renderAssetMeta(data) {
   titleEl.textContent = `Helix ${symbol} Signal Terminal`;
   subtitleEl.textContent = `Transparent chain-level ${name} telemetry.`;
   supplyColHeaderEl.textContent = `${symbol} Supply`;
+}
+
+function renderAssetSelector(assets) {
+  enabledAssets = assets;
+  assetSelectorEl.innerHTML = "";
+  for (const asset of assets) {
+    const opt = document.createElement("option");
+    opt.value = asset.symbol;
+    opt.textContent = `${asset.symbol} (${asset.name || asset.symbol})`;
+    if (asset.symbol === selectedAsset) {
+      opt.selected = true;
+    }
+    assetSelectorEl.appendChild(opt);
+  }
 }
 
 function renderSourceFooter(data) {
@@ -189,24 +207,35 @@ function computeFreshness(data) {
   if (source.status === "error") {
     return { label: "Stale", className: "freshness-stale", message: "DefiLlama source is reporting an error." };
   }
-  const ts = source.last_successful_fetch || source.updated_at;
+  const latestChainTs = (data.chains || [])
+    .map((c) => c.fetched_at)
+    .filter(Boolean)
+    .map((v) => new Date(v).getTime())
+    .filter((v) => Number.isFinite(v));
+  const sourceTs = source.last_successful_fetch ? new Date(source.last_successful_fetch).getTime() : NaN;
+  const newestTs = Math.max(sourceTs || 0, ...(latestChainTs.length ? latestChainTs : [0]));
+  const ts = newestTs > 0 ? new Date(newestTs).toISOString() : null;
   if (!ts) {
     return { label: "Stale", className: "freshness-stale", message: "No successful source update timestamp found." };
   }
+  const refreshSeconds = Number(data.refresh_interval_seconds || 300);
+  const freshThresholdMins = Math.max(15, (refreshSeconds * 3) / 60);
+  const agingThresholdMins = Math.max(60, (refreshSeconds * 12) / 60);
   const ageMinutes = (Date.now() - new Date(ts).getTime()) / 60000;
-  if (ageMinutes <= 15) return { label: "Fresh", className: "freshness-fresh", message: "" };
-  if (ageMinutes <= 60) {
+  if (ageMinutes <= freshThresholdMins) return { label: "Fresh", className: "freshness-fresh", message: "", lastSuccess: ts };
+  if (ageMinutes <= agingThresholdMins) {
     return { label: "Aging", className: "freshness-aging", message: "Data is aging. Consider refreshing soon." };
   }
-  return { label: "Stale", className: "freshness-stale", message: "Data is stale (> 60 minutes old)." };
+  return { label: "Stale", className: "freshness-stale", message: "Data is stale and may not reflect current market conditions." };
 }
 
 function renderFreshness(data) {
   const freshness = computeFreshness(data);
   freshnessPill.className = `pill ${freshness.className}`;
   freshnessPill.textContent = `Freshness: ${freshness.label}`;
-  const generatedAt = data.generated_at ? new Date(data.generated_at).toLocaleString() : "Unknown";
-  updatedPill.textContent = `Last Updated: ${generatedAt}`;
+  const source = (data.sources || []).find((s) => s.source_name === "defillama");
+  const lastSuccess = source?.last_successful_fetch || data.generated_at;
+  updatedPill.textContent = `Last Successful Fetch: ${lastSuccess ? new Date(lastSuccess).toLocaleString() : "Unknown"}`;
 
   if (freshness.label === "Stale") {
     rowsEl.classList.add("stale");
@@ -231,7 +260,7 @@ async function loadDashboard({ manual = false } = {}) {
   stateEl.textContent = manual ? "Refreshing dashboard data..." : "Loading dashboard data...";
   stateEl.classList.remove("error");
   try {
-    const response = await fetch(API_URL);
+    const response = await fetch(`${API_URL}?asset=${encodeURIComponent(selectedAsset)}`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     lastData = data;
@@ -248,6 +277,12 @@ async function loadDashboard({ manual = false } = {}) {
     }
     staleWarningEl.textContent = "Using last known dashboard snapshot due to refresh failure.";
     staleWarningEl.classList.add("visible");
+    if (!lastData && selectedAsset !== "USDT") {
+      stateEl.textContent = `Unable to load ${selectedAsset}. Falling back to USDT.`;
+      selectedAsset = "USDT";
+      localStorage.setItem("helix-asset", selectedAsset);
+      assetSelectorEl.value = selectedAsset;
+    }
   } finally {
     isLoading = false;
     refreshBtn.disabled = false;
@@ -255,8 +290,36 @@ async function loadDashboard({ manual = false } = {}) {
   }
 }
 
+async function loadAssets() {
+  const response = await fetch("http://localhost:8000/api/assets");
+  if (!response.ok) {
+    throw new Error(`Assets endpoint failed: HTTP ${response.status}`);
+  }
+  const assets = await response.json();
+  if (!Array.isArray(assets) || assets.length === 0) {
+    throw new Error("No enabled assets returned by API");
+  }
+  const assetSymbols = assets.map((asset) => asset.symbol);
+  const defaultAsset = assets.find((asset) => asset.default)?.symbol || assets[0].symbol;
+  const saved = localStorage.getItem("helix-asset");
+  selectedAsset = assetSymbols.includes(saved) ? saved : defaultAsset;
+  localStorage.setItem("helix-asset", selectedAsset);
+  renderAssetSelector(assets);
+}
+
 initTheme();
 themeBtn.addEventListener("click", cycleTheme);
 refreshBtn.addEventListener("click", () => loadDashboard({ manual: true }));
-loadDashboard();
+assetSelectorEl.addEventListener("change", () => {
+  selectedAsset = assetSelectorEl.value;
+  localStorage.setItem("helix-asset", selectedAsset);
+  loadDashboard({ manual: false });
+});
+
+loadAssets()
+  .then(() => loadDashboard())
+  .catch((error) => {
+    stateEl.textContent = `Error loading assets: ${error.message}`;
+    stateEl.classList.add("error");
+  });
 setInterval(() => loadDashboard({ manual: false }), 60000);

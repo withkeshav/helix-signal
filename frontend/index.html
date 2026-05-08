@@ -81,6 +81,14 @@
         gap: 8px;
         align-items: center;
       }
+      .asset-select {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 8px 12px;
+        background: var(--panel);
+        color: var(--text);
+        font-weight: 600;
+      }
       .btn {
         border: 1px solid transparent;
         border-radius: 9px;
@@ -218,9 +226,11 @@
           <div class="status-row">
             <span id="freshness-pill" class="pill freshness-fresh">Freshness: Pending</span>
             <span id="updated-pill" class="pill">Last Updated: --</span>
+            <span id="chain-count-pill" class="pill">Chains: --</span>
           </div>
         </div>
         <div class="controls">
+          <select id="asset-selector" class="asset-select" aria-label="Select asset"></select>
           <button id="refresh-btn" class="btn btn-primary" type="button">Refresh</button>
           <button id="theme-btn" class="btn btn-muted" type="button">Theme: Auto</button>
         </div>
@@ -236,7 +246,6 @@
                 <th>Chain</th>
                 <th id="supply-col-header" class="num">Supply</th>
                 <th class="num">24h Change (%)</th>
-                <th class="num">TVL</th>
                 <th>Peg Status</th>
                 <th class="num">Trend</th>
               </tr>

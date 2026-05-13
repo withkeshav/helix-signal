@@ -7,7 +7,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, SourceStatus
-from sources.defillama import DefiLlamaError, fetch_asset_snapshot
+from sources.defillama import DefiLlamaError, fetch_asset_snapshot, fetch_chain_tvl_by_defillama_name
 
 CHAINS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "chains.json"
 ASSETS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "assets.json"
@@ -90,19 +90,22 @@ def refresh_chain_data(db: Session) -> None:
         return
 
     try:
-        latest_fetch_time: datetime | None = None
         errors: list[str] = []
         success_count = 0
+        chain_tvl_map = fetch_chain_tvl_by_defillama_name()
 
         for asset in enabled_assets:
             try:
-                snapshot = fetch_asset_snapshot(asset_config=asset, chain_ids=chain_ids)
+                snapshot = fetch_asset_snapshot(
+                    asset_config=asset,
+                    chain_ids=chain_ids,
+                    chain_tvl_by_name=chain_tvl_map,
+                )
                 fetched_at = snapshot["fetched_at"]
                 per_chain = snapshot["chain_data"]
                 asset_symbol = str(snapshot.get("asset_symbol", asset.get("symbol", ""))).upper()
                 asset_name = str(snapshot.get("asset_name") or asset.get("name") or asset_symbol)
                 peg_type = str(snapshot.get("peg_type") or asset.get("peg_type") or "peggedUSD")
-                latest_fetch_time = fetched_at
                 success_count += 1
 
                 for chain in configured:
@@ -137,11 +140,13 @@ def refresh_chain_data(db: Session) -> None:
                 errors.append(f"{symbol}: {asset_exc}")
 
         if success_count > 0:
+            # Record when our refresh pipeline finished successfully (UTC), not upstream snapshot labels.
+            completed_at = datetime.now(timezone.utc)
             _upsert_source_status(
                 db,
                 status="ok",
                 attempted_at=attempted_at,
-                successful_at=latest_fetch_time or attempted_at,
+                successful_at=completed_at,
                 last_error="; ".join(errors) if errors else None,
             )
         else:

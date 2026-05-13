@@ -9,22 +9,16 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - Self-hostable: runs locally with Docker, no paid dependency required for core features
 - Focused: V1 is intentionally narrow and reliable (USDT + top chains)
 
-## V2.2 Highlights
+## V2.3 Highlights
 
-- Top 10 chains by configured USDT coverage
-- USDT circulating supply snapshot per chain
-- 24h change (%) using DefiLlama previous-day values
-- Reliable per-asset chain liquidity metrics are not currently shown when source granularity is unavailable
-- Peg status classification around $1.00
-- Source health footer for DefiLlama status
-- Lightweight sparklines from current / previous day / previous week supply values
-- Theme system (auto/light/dark) with saved preference
-- Manual refresh control with non-blocking error handling
-- Freshness confidence labels (Fresh, Aging, Stale)
-- Controlled multi-stablecoin dashboard support (USDT, USDC, DAI, PYUSD)
-- Asset selector for switching assets without page reload
-- Generic backend model (`asset_chain_snapshots`) powering multi-asset snapshots
-- Asset-aware dashboard contract (`/api/dashboard?asset=SYMBOL`) with USDT default fallback
+- **Helix Signal Score**: transparent composite 0 to 100 (Normal, Watch, Risk) from peg pressure, supply momentum, chain concentration, and data confidence, with explicit weights in the API and UI
+- **Depeg Index**: asset-level peg stress score and deviation context from DefiLlama price (documented as not chain-specific oracle precision)
+- **Derived metrics**: aggregate total supply, aggregate 24h supply change, Herfindahl-style concentration (HHI), per-chain share, momentum labels, per-chain signal and data confidence
+- **Server-side freshness**: UTC-aware basis timestamp as `max(last_successful_fetch, newest_chain_snapshot)` with Fresh, Aging, and Stale windows aligned to `REFRESH_INTERVAL_SECONDS`
+- **Chain TVL (labeled)**: optional column sourced from DefiLlama `stablecoinchains` as **chain-level aggregate** stablecoin TVL, not per-asset TVL
+- Premium-style monitoring layout: KPI strip, methodology panel, Depeg and concentration cards, Chart.js share and component charts, expanded chain table
+- Multi-asset support unchanged (USDT default; USDC, DAI, PYUSD when enabled in `config/assets.json`)
+- Static Vanilla JS + Chart.js frontend (no framework migration)
 
 ## Quick Start
 
@@ -83,7 +77,7 @@ Use the dashboard asset selector to switch across enabled assets.
 ## Project Structure
 
 - `backend/` FastAPI app, scheduler, DefiLlama integration, SQLite models
-- `frontend/` static HTML/CSS/JS dashboard with Chart.js sparklines
+- `frontend/` static HTML/CSS/JS dashboard with Chart.js (sparklines, share bar, component bar)
 - `config/` chain/source configuration
 - `docs/` architecture and methodology documentation
 

@@ -13,10 +13,15 @@ class DefiLlamaError(Exception):
     """Raised when DefiLlama data cannot be fetched or parsed."""
 
 
-def _request_json(url: str) -> dict:
+def _request_json(url: str) -> dict | list:
     response = requests.get(url, timeout=DEFAULT_TIMEOUT_SECONDS)
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, list):
+        return data
+    raise DefiLlamaError(f"Unexpected JSON root type from {url!r}")
 
 
 def _extract_numeric(entry: object) -> float | None:
@@ -35,6 +40,8 @@ def _extract_numeric(entry: object) -> float | None:
 def _find_asset(payload: dict, *, symbol: str) -> dict:
     assets = payload.get("peggedAssets", [])
     for asset in assets:
+        if not isinstance(asset, dict):
+            continue
         asset_symbol = str(asset.get("symbol", "")).upper()
         name = str(asset.get("name", "")).lower()
         gecko_id = str(asset.get("gecko_id", "")).lower()
@@ -44,7 +51,47 @@ def _find_asset(payload: dict, *, symbol: str) -> dict:
     raise DefiLlamaError(f"{symbol} asset not found in DefiLlama payload")
 
 
-def fetch_asset_snapshot(*, asset_config: dict, chain_ids: list[str]) -> dict:
+def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
+    """
+    Chain-level aggregate stablecoin TVL from DefiLlama stablecoinchains.
+    Keyed by chain name as returned by DefiLlama (must match config chain `defillama_id` / name keys).
+    This is NOT per-asset TVL; use only as `Chain TVL` context.
+    """
+    try:
+        chains_payload = _request_json(STABLECOIN_CHAINS_URL)
+    except Exception:
+        return {}
+
+    if isinstance(chains_payload, list):
+        rows = chains_payload
+    elif isinstance(chains_payload, dict):
+        rows = chains_payload.get("peggedAssets") or chains_payload.get("chains") or []
+    else:
+        return {}
+    if not isinstance(rows, list):
+        return {}
+    if not isinstance(rows, list):
+        return {}
+
+    out: dict[str, float] = {}
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or item.get("chain") or item.get("id") or "").strip()
+        if not name:
+            continue
+        tvl_value = item.get("tvl")
+        if isinstance(tvl_value, (int, float)):
+            out[name] = float(tvl_value)
+    return out
+
+
+def fetch_asset_snapshot(
+    *,
+    asset_config: dict,
+    chain_ids: list[str],
+    chain_tvl_by_name: dict[str, float] | None = None,
+) -> dict:
     symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
     if not symbol:
         raise DefiLlamaError("Invalid asset config: missing symbol")
@@ -52,7 +99,9 @@ def fetch_asset_snapshot(*, asset_config: dict, chain_ids: list[str]) -> dict:
     stablecoins_payload = _request_json(USDT_STABLECOINS_URL)
     selected_asset = _find_asset(stablecoins_payload, symbol=symbol)
 
-    chain_circulating = selected_asset.get("chainCirculating", {})
+    raw_circulating = selected_asset.get("chainCirculating", {})
+    # API has returned both dict-shaped maps and empty lists; only dict supports .get().
+    chain_circulating: dict = raw_circulating if isinstance(raw_circulating, dict) else {}
     current_map: dict[str, object] = {}
     prev_day_map: dict[str, object] = {}
     prev_week_map: dict[str, object] = {}
@@ -100,20 +149,15 @@ def fetch_asset_snapshot(*, asset_config: dict, chain_ids: list[str]) -> dict:
             "tvl": None,
         }
 
-    # TVL is optional for this phase; populate if available.
-    try:
-        chains_payload = _request_json(STABLECOIN_CHAINS_URL)
-        chains = chains_payload.get("peggedAssets", [])
-        if isinstance(chains, list):
-            by_name = {str(item.get("name", "")): item for item in chains if isinstance(item, dict)}
-            for chain_id in chain_ids:
-                item = by_name.get(chain_id, {})
-                tvl_value = item.get("tvl")
-                if isinstance(tvl_value, (int, float)):
-                    chain_data[chain_id]["tvl"] = float(tvl_value)
-    except Exception:
-        # Keep TVL nullable if this supplemental fetch fails.
-        pass
+    tvl_map = chain_tvl_by_name or {}
+    for chain_id in chain_ids:
+        # Prefer exact key, then case-insensitive match on chain name.
+        tv = tvl_map.get(chain_id)
+        if tv is None:
+            lower = {k.lower(): v for k, v in tvl_map.items()}
+            tv = lower.get(str(chain_id).lower())
+        if tv is not None:
+            chain_data[chain_id]["tvl"] = float(tv)
 
     return {
         "asset_symbol": symbol,

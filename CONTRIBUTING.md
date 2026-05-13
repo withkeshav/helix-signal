@@ -61,7 +61,7 @@ uvicorn main:app --reload
 ### 4) Verify
 
 - API root: `http://localhost:8000`
-- Dashboard payload: `http://localhost:8000/api/dashboard`
+- Dashboard payload: `http://localhost:8000/api/dashboard` (V2.3 includes `freshness`, `asset_signal`, `depeg_index`, `chain_concentration`, and enriched `chains` rows)
 - Frontend: `http://localhost:3000`
 
 ## Adding a New Chain

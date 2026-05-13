@@ -75,6 +75,8 @@ def _upsert_source_status(
 
 def refresh_chain_data(db: Session) -> None:
     attempted_at = datetime.now(timezone.utc)
+    prior_row = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
+    prior_source_status = prior_row.status if prior_row else None
     configured = load_configured_chains()
     chain_ids = [str(item["defillama_id"]) for item in configured]
     enabled_assets = load_enabled_assets()
@@ -92,6 +94,7 @@ def refresh_chain_data(db: Session) -> None:
     try:
         errors: list[str] = []
         success_count = 0
+        successful_asset_symbols: list[str] = []
         chain_tvl_map = fetch_chain_tvl_by_defillama_name()
 
         for asset in enabled_assets:
@@ -107,6 +110,7 @@ def refresh_chain_data(db: Session) -> None:
                 asset_name = str(snapshot.get("asset_name") or asset.get("name") or asset_symbol)
                 peg_type = str(snapshot.get("peg_type") or asset.get("peg_type") or "peggedUSD")
                 success_count += 1
+                successful_asset_symbols.append(asset_symbol)
 
                 for chain in configured:
                     chain_name = str(chain["name"])
@@ -148,6 +152,14 @@ def refresh_chain_data(db: Session) -> None:
                 attempted_at=attempted_at,
                 successful_at=completed_at,
                 last_error="; ".join(errors) if errors else None,
+            )
+            from signal_engine.history import persist_trends_and_events
+
+            persist_trends_and_events(
+                db,
+                successful_asset_symbols=list(dict.fromkeys(successful_asset_symbols)),
+                completed_at=completed_at,
+                prior_source_status=prior_source_status,
             )
         else:
             _upsert_source_status(

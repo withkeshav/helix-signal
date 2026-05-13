@@ -20,10 +20,19 @@ const signalMethodEl = document.getElementById("signal-method");
 const depegPanelEl = document.getElementById("depeg-panel");
 const depegNoteEl = document.getElementById("depeg-note");
 const concentrationPanelEl = document.getElementById("concentration-panel");
+const trendLowDataEl = document.getElementById("trend-low-data");
+const trendWindowPillsEl = document.getElementById("trend-window-pills");
+const trendCoverageEl = document.getElementById("trend-coverage");
+const trendAxisCaptionEl = document.getElementById("trend-axis-caption");
+const eventFeedListEl = document.getElementById("event-feed-list");
+const eventShowSystemEl = document.getElementById("event-show-system");
 
 const charts = new Map();
 let isLoading = false;
 let lastData = null;
+let trendWindow = "7d";
+let lastTrendBundle = null;
+let lastRawEvents = [];
 let currentTheme = "auto";
 let selectedAsset = "USDT";
 let enabledAssets = [];
@@ -109,6 +118,10 @@ function cycleTheme() {
     renderRows(lastData.chains || []);
     renderCharts(lastData);
   }
+  if (lastTrendBundle && lastTrendBundle.points && lastTrendBundle.summary) {
+    destroyTrendCharts();
+    renderTrendCharts(lastTrendBundle.points, lastTrendBundle.summary);
+  }
 }
 
 function initTheme() {
@@ -121,6 +134,10 @@ function initTheme() {
       if (lastData) {
         renderRows(lastData.chains || []);
         renderCharts(lastData);
+      }
+      if (lastTrendBundle && lastTrendBundle.points && lastTrendBundle.summary) {
+        destroyTrendCharts();
+        renderTrendCharts(lastTrendBundle.points, lastTrendBundle.summary);
       }
     }
   });
@@ -458,6 +475,309 @@ function renderFreshness(data) {
   }
 }
 
+const TREND_CHART_IDS = ["trend-chart-signal", "trend-chart-depeg", "trend-chart-supply", "trend-chart-concentration"];
+
+function formatDurationFromMinutes(m) {
+  if (m == null || m === undefined || !Number.isFinite(Number(m))) return "N/A";
+  const n = Number(m);
+  if (n < 120) return `${Math.round(n)} min`;
+  const h = Math.floor(n / 60);
+  const r = Math.round(n % 60);
+  return r ? `${h}h ${r}m` : `${h}h`;
+}
+
+function destroyTrendCharts() {
+  for (const id of TREND_CHART_IDS) {
+    const c = charts.get(id);
+    if (c) c.destroy();
+    charts.delete(id);
+  }
+}
+
+function trendChartOptions({ yMax, yMin, xMinMs, xMaxMs, isSupply }) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    parsing: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        type: "linear",
+        min: xMinMs,
+        max: xMaxMs,
+        ticks: {
+          color: chartMutedColor(),
+          maxTicksLimit: 8,
+          callback(v) {
+            return new Date(v).toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          },
+        },
+        grid: { color: "rgba(128,128,128,0.12)" },
+      },
+      y: {
+        min: yMin != null ? yMin : undefined,
+        beginAtZero: !isSupply,
+        suggestedMax: yMax != null && !isSupply ? yMax : undefined,
+        ticks: { color: chartMutedColor() },
+        grid: { color: "rgba(128,128,128,0.12)" },
+      },
+    },
+  };
+}
+
+function renderTrendCoverage(summary) {
+  if (!trendCoverageEl) return;
+  if (!summary) {
+    trendCoverageEl.textContent = "";
+    return;
+  }
+  const w = summary.selected_window || trendWindow;
+  const spanH = summary.window_span_hours != null ? summary.window_span_hours : "";
+  const avail = formatDurationFromMinutes(summary.available_duration_minutes);
+  const pts = summary.point_count != null ? summary.point_count : 0;
+  const latest =
+    summary.latest_timestamp != null ? new Date(summary.latest_timestamp).toLocaleString() : "N/A";
+  trendCoverageEl.textContent = `Selected window: ${w} (${spanH}h axis span) · Available history: ${avail} · Points: ${pts} · Latest: ${latest}`;
+}
+
+function renderTrendAxisCaption(summary) {
+  if (!trendAxisCaptionEl || !summary) return;
+  const minL = summary.chart_axis_min_utc ? new Date(summary.chart_axis_min_utc).toLocaleString() : "";
+  const maxL = summary.chart_axis_max_utc ? new Date(summary.chart_axis_max_utc).toLocaleString() : "";
+  trendAxisCaptionEl.textContent = `X-axis: full selected window (${minL} to ${maxL}). Plotted points only cover the available history shown above.`;
+}
+
+function updateTrendLowDataBanner(points, summary) {
+  if (!trendLowDataEl) return;
+  const low = Boolean(summary?.low_data) || (points && points.length < 2);
+  if (!low) {
+    trendLowDataEl.classList.remove("visible");
+    return;
+  }
+  trendLowDataEl.classList.add("visible");
+  let msg = summary?.low_data_reason || "";
+  if ((!points || points.length < 2) && !msg) {
+    msg =
+      "Need at least two snapshots in this window before trend lines are meaningful. History collection started recently.";
+  }
+  trendLowDataEl.textContent = msg || "Limited trend data in the selected window.";
+}
+
+function renderTrendCharts(points, summary) {
+  if (!trendLowDataEl) return;
+  if (!summary || summary.chart_axis_min_utc == null || summary.chart_axis_max_utc == null) {
+    destroyTrendCharts();
+    if (trendCoverageEl) trendCoverageEl.textContent = "";
+    if (trendAxisCaptionEl) trendAxisCaptionEl.textContent = "";
+    updateTrendLowDataBanner(points || [], summary || {});
+    return;
+  }
+
+  const xMin = new Date(summary.chart_axis_min_utc).getTime();
+  const xMax = new Date(summary.chart_axis_max_utc).getTime();
+  const pts = points || [];
+
+  destroyTrendCharts();
+  updateTrendLowDataBanner(pts, summary);
+  renderTrendCoverage(summary);
+  renderTrendAxisCaption(summary);
+
+  if (typeof Chart === "undefined" || pts.length === 0) return;
+
+  const mk = (id, dataKey, yCap, isSupply) => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const existing = charts.get(id);
+    if (existing) existing.destroy();
+    const data = pts.map((p) => ({
+      x: new Date(p.timestamp).getTime(),
+      y: p[dataKey] == null ? null : Number(p[dataKey]),
+    }));
+    const ys = data.map((o) => o.y).filter((v) => typeof v === "number" && !Number.isNaN(v));
+    let yMin = undefined;
+    if (isSupply && ys.length) {
+      yMin = Math.min(...ys) * 0.9995;
+    }
+    const chart = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            data,
+            borderColor: chartPrimaryColor(),
+            backgroundColor: "rgba(59, 130, 246, 0.08)",
+            fill: isSupply,
+            tension: 0.25,
+            pointRadius: pts.length <= 3 ? 3 : 0,
+            borderWidth: 2,
+          },
+        ],
+      },
+      options: trendChartOptions({
+        yMax: yCap,
+        yMin,
+        xMinMs: xMin,
+        xMaxMs: xMax,
+        isSupply,
+      }),
+    });
+    charts.set(id, chart);
+  };
+
+  mk("trend-chart-signal", "signal_score", 100, false);
+  mk("trend-chart-depeg", "depeg_index", 100, false);
+  mk("trend-chart-supply", "total_supply", null, true);
+  mk("trend-chart-concentration", "concentration_score", 100, false);
+}
+
+function formatEventWhen(iso) {
+  const d = new Date(iso);
+  const sec = (Date.now() - d.getTime()) / 1000;
+  if (sec < 90) return "just now";
+  if (sec < 3600) return `${Math.round(sec / 60)} min ago`;
+  if (sec < 86400) return `${Math.round(sec / 3600)} h ago`;
+  return d.toLocaleString();
+}
+
+function severityClass(sev, { system = false } = {}) {
+  if (system) return "sev-system";
+  if (sev === "critical") return "sev-critical";
+  if (sev === "warning") return "sev-warning";
+  return "sev-info";
+}
+
+function isSystemEvent(e) {
+  const sym = String(e.asset_symbol || "").toUpperCase();
+  const typ = String(e.event_type || "");
+  const sev = String(e.severity || "").toLowerCase();
+  return sym === "ALL" || typ === "source_recovered" || sev === "system";
+}
+
+function eventCardHtml(ev, { system = false } = {}) {
+  const cls = system ? "event-card event-card--system" : "event-card";
+  const ctx =
+    ev.asset_symbol === "ALL"
+      ? "System"
+      : `${ev.asset_symbol}${ev.chain_key ? ` · ${ev.chain_key}` : ""}`;
+  const summaryText = system
+    ? "DefiLlama ingest succeeded again after a prior error. Use for diagnostics only."
+    : ev.summary;
+  const titleText = system ? "Source pipeline recovered" : ev.title;
+  return `
+      <article class="${cls}">
+        <div class="event-card-top">
+          <div class="event-title">${titleText}</div>
+          <span class="${severityClass(ev.severity, { system })}">${system ? "system" : ev.severity}</span>
+        </div>
+        <div class="event-meta">${formatEventWhen(ev.timestamp)} · ${ctx}</div>
+        <p class="event-summary">${summaryText}</p>
+      </article>`;
+}
+
+function renderEventFeed(events) {
+  if (!eventFeedListEl) return;
+  const list = Array.isArray(events) ? events : [];
+  const systemEvents = list.filter(isSystemEvent);
+  const assetEvents = list.filter((e) => !isSystemEvent(e) && e.asset_symbol === selectedAsset);
+  const showSystem = Boolean(eventShowSystemEl && eventShowSystemEl.checked);
+
+  if (assetEvents.length > 0) {
+    let html = assetEvents.map((e) => eventCardHtml(e, { system: false })).join("");
+    if (showSystem && systemEvents.length > 0) {
+      html += `<p class="kpi-sub" style="margin:12px 0 6px">System events</p>`;
+      html += systemEvents.map((e) => eventCardHtml(e, { system: true })).join("");
+    }
+    eventFeedListEl.innerHTML = html;
+    return;
+  }
+
+  if (showSystem && systemEvents.length > 0) {
+    eventFeedListEl.innerHTML =
+      `<p class="kpi-sub" style="margin:0 0 8px">System events</p>` +
+      systemEvents.map((e) => eventCardHtml(e, { system: true })).join("");
+    return;
+  }
+
+  eventFeedListEl.innerHTML =
+    '<p class="kpi-sub" style="margin:0">No major signal events yet. Events will appear when score, peg pressure, supply, concentration, or confidence changes materially.</p>';
+}
+
+async function loadTrendsAndEvents() {
+  if (!trendLowDataEl || !eventFeedListEl) return;
+  try {
+    const tr = await fetch(
+      `${API_ROOT}/api/trends?asset=${encodeURIComponent(selectedAsset)}&window=${encodeURIComponent(trendWindow)}`,
+      { cache: "no-store" }
+    );
+    const ev = await fetch(
+      `${API_ROOT}/api/events?asset=${encodeURIComponent(selectedAsset)}&limit=50`,
+      { cache: "no-store" }
+    );
+    if (tr.ok) {
+      const tjson = await tr.json();
+      lastTrendBundle = {
+        points: tjson.points || [],
+        summary: tjson.summary || null,
+        window: tjson.window || trendWindow,
+      };
+      renderTrendCharts(lastTrendBundle.points, lastTrendBundle.summary);
+    } else {
+      lastTrendBundle = null;
+      destroyTrendCharts();
+      if (trendCoverageEl) trendCoverageEl.textContent = "";
+      if (trendAxisCaptionEl) trendAxisCaptionEl.textContent = "";
+      updateTrendLowDataBanner([], {
+        low_data: true,
+        low_data_reason: "Could not load trends from the API.",
+      });
+    }
+    if (ev.ok) {
+      const ejson = await ev.json();
+      lastRawEvents = ejson.events || [];
+      renderEventFeed(lastRawEvents);
+    } else {
+      lastRawEvents = [];
+      renderEventFeed([]);
+    }
+  } catch {
+    lastTrendBundle = null;
+    destroyTrendCharts();
+    if (trendCoverageEl) trendCoverageEl.textContent = "";
+    if (trendAxisCaptionEl) trendAxisCaptionEl.textContent = "";
+    updateTrendLowDataBanner([], { low_data: true, low_data_reason: "Could not load trends (network error)." });
+  }
+}
+
+function syncTrendWindowPills() {
+  if (!trendWindowPillsEl) return;
+  trendWindowPillsEl.querySelectorAll(".window-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.window === trendWindow);
+  });
+}
+
+function initTrendWindowControls() {
+  if (!trendWindowPillsEl) return;
+  syncTrendWindowPills();
+  trendWindowPillsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest(".window-btn");
+    if (!btn || !btn.dataset.window) return;
+    trendWindow = btn.dataset.window;
+    syncTrendWindowPills();
+    loadTrendsAndEvents();
+  });
+  if (eventShowSystemEl) {
+    eventShowSystemEl.addEventListener("change", () => {
+      renderEventFeed(lastRawEvents);
+    });
+  }
+}
+
 async function loadDashboard({ manual = false } = {}) {
   if (isLoading) return;
   isLoading = true;
@@ -486,6 +806,7 @@ async function loadDashboard({ manual = false } = {}) {
     renderRows(data.chains || []);
     renderSourceFooter(data);
     renderFreshness(data);
+    await loadTrendsAndEvents();
     stateEl.textContent = manual ? "Refresh completed." : "Live snapshot loaded.";
   } catch (error) {
     stateEl.textContent = `Error loading dashboard: ${error.message}`;
@@ -540,4 +861,5 @@ loadAssets()
     stateEl.textContent = `Error loading assets: ${error.message}`;
     stateEl.classList.add("error");
   });
+initTrendWindowControls();
 setInterval(() => loadDashboard({ manual: false }), 60000);

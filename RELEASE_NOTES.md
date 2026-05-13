@@ -1,5 +1,17 @@
 # Release Notes
 
+## v2.4.0 - Historical Trends and Signal Feed
+
+Helix-Signal v2.4 adds **forward-collected historical trends**, **REST trend endpoints**, and a **local signal event feed** while keeping the V2.3 stack (FastAPI, SQLite, Vanilla JS + Chart.js) and the Helix Signal Score, Depeg Index, server freshness model, manual refresh endpoint, and labeled chain aggregate TVL behavior.
+
+### Highlights
+
+- Trend charts on the dashboard with 24h, 7d, and 30d windows and explicit low-data states for new installs
+- SQLite-backed `asset_trend_snapshots`, `chain_trend_snapshots`, and `signal_events` tables
+- `/api/trends`, `/api/trends/chains`, and `/api/events` for programmatic access
+
+See `CHANGELOG.md` for the full list of changes.
+
 ## v2.3.0 - Helix Signal Score
 
 Helix-Signal v2.3 adds a transparent **Helix Signal Score**, **Depeg Index**, derived aggregate metrics, **server-side freshness**, and a richer monitoring-style dashboard while keeping the same stack (FastAPI, SQLite, Vanilla JS + Chart.js).

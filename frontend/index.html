@@ -236,7 +236,171 @@
         position: relative;
         height: 200px;
       }
-      .panel {
+      .chart-canvas-wrap.trend-canvas {
+        height: 190px;
+      }
+      .trends-section,
+      .event-feed-section {
+        margin-bottom: 14px;
+      }
+      .trends-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .trends-head h2 {
+        margin: 0;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+      .window-pills {
+        display: flex;
+        gap: 6px;
+      }
+      .window-pills button {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-weight: 600;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .window-pills button.active {
+        border-color: var(--spark);
+        color: var(--spark);
+        background: var(--bg-accent);
+        outline: 2px solid color-mix(in srgb, var(--spark) 45%, transparent);
+        outline-offset: 1px;
+      }
+      .trend-coverage {
+        font-size: 12px;
+        color: var(--text);
+        line-height: 1.45;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--bg-accent);
+        margin-bottom: 8px;
+        font-family: "JetBrains Mono", "Roboto Mono", "HelixMonoFallback", monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      .trend-axis-caption {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 10px;
+        line-height: 1.45;
+      }
+      .trend-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .low-data-msg {
+        font-size: 13px;
+        color: var(--muted);
+        padding: 10px 12px;
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        margin-bottom: 10px;
+        display: none;
+      }
+      .low-data-msg.visible {
+        display: block;
+      }
+      .event-feed-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .event-toggle {
+        font-size: 12px;
+        color: var(--muted);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .event-toggle input {
+        accent-color: var(--spark);
+      }
+      .event-card--system {
+        opacity: 0.88;
+        border-style: dashed;
+      }
+      .event-card--system .event-title {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .event-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .event-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        box-shadow: var(--card-shadow);
+      }
+      .event-card-top {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 6px;
+      }
+      .event-title {
+        font-weight: 700;
+        font-size: 14px;
+        flex: 1 1 140px;
+      }
+      .sev-info {
+        color: var(--spark);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .sev-system {
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .sev-warning {
+        color: var(--neutral);
+        border-color: var(--neutral);
+      }
+      .sev-critical {
+        color: var(--down);
+        border-color: var(--down);
+      }
+      .event-meta {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .event-summary {
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0;
+      }
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 14px;
@@ -464,6 +628,51 @@
           <div class="chart-canvas-wrap"><canvas id="components-chart" aria-label="Signal components chart"></canvas></div>
         </div>
       </div>
+
+      <section class="trends-section" aria-label="Historical trends">
+        <div class="trends-head">
+          <h2>Historical trends</h2>
+          <div class="window-pills" id="trend-window-pills" role="group" aria-label="Trend time window">
+            <button type="button" class="window-btn" data-window="24h">24h</button>
+            <button type="button" class="window-btn active" data-window="7d">7d</button>
+            <button type="button" class="window-btn" data-window="30d">30d</button>
+          </div>
+        </div>
+        <div id="trend-coverage" class="trend-coverage" aria-live="polite"></div>
+        <p id="trend-axis-caption" class="trend-axis-caption"></p>
+        <p id="trend-low-data" class="low-data-msg">
+          History collection has just started. Charts need at least two refresh snapshots, typically a few minutes apart, before lines appear.
+        </p>
+        <div id="trend-grid" class="trend-grid">
+          <div class="chart-card">
+            <h2>Signal score</h2>
+            <div class="chart-canvas-wrap trend-canvas"><canvas id="trend-chart-signal" aria-label="Signal score trend"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h2>Depeg Index</h2>
+            <div class="chart-canvas-wrap trend-canvas"><canvas id="trend-chart-depeg" aria-label="Depeg index trend"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h2>Total supply</h2>
+            <div class="chart-canvas-wrap trend-canvas"><canvas id="trend-chart-supply" aria-label="Supply trend"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h2>Concentration score</h2>
+            <div class="chart-canvas-wrap trend-canvas"><canvas id="trend-chart-concentration" aria-label="Concentration trend"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="event-feed-section" aria-label="Signal event feed">
+        <h2>Signal feed</h2>
+        <div class="event-feed-toolbar">
+          <label class="event-toggle">
+            <input type="checkbox" id="event-show-system" />
+            Show system events
+          </label>
+        </div>
+        <div id="event-feed-list" class="event-list"></div>
+      </section>
 
       <section class="panel">
         <div id="app-state" class="state">Loading dashboard data...</div>

@@ -1,6 +1,6 @@
-# Data Methodology (V2.3)
+# Data Methodology (V2.4)
 
-This document explains how Helix-Signal computes and presents asset-chain stablecoin metrics and the Helix Signal Score in V2.3.
+This document explains how Helix-Signal computes and presents asset-chain stablecoin metrics, the Helix Signal Score, historical trends, and the local signal feed.
 
 ## Primary Source
 
@@ -17,7 +17,7 @@ Helix uses:
 - `config/chains.json` for chain universe
 - `config/assets.json` for stablecoin asset universe
 
-By default in V2.3:
+By default in V2.4:
 
 - USDT is enabled and default
 - USDC, DAI, and PYUSD are enabled when parser and API checks pass
@@ -129,24 +129,58 @@ Sparklines:
   - attempt DefiLlama fetch for each enabled asset
   - upsert asset-chain rows in SQLite
   - upsert source health in `source_status`
-  - refresh worker records `last_successful_fetch` using the **maximum** successful per-asset snapshot time in that pass (not only the last asset processed)
+  - on a successful pass, record `last_successful_fetch` as the **UTC completion time** of that ingest pass
+  - on a successful pass, write **trend snapshots** and evaluate **signal events** (V2.4, see below)
 - On fetch failure:
   - source status is marked `error`
   - last error is recorded
   - worker continues running (no crash)
+  - trend snapshots are **not** written for that pass (avoids misleading history)
 
-**Server-side freshness** (V2.3): the API returns a `freshness` object computed only on the server using UTC-aware timestamps:
+**Server-side freshness** (V2.3+): the API returns a `freshness` object computed only on the server using UTC-aware timestamps:
 
-- **Basis timestamp**: `max(last_successful_fetch, newest_chain_snapshot)` when both exist, otherwise whichever exists
+- **Basis timestamp**: primarily `last_successful_fetch` when the source is healthy, so a successful refresh does not read as stale solely because upstream chain labels are older
 - **Fresh**: age within `max(900s, 3 * REFRESH_INTERVAL_SECONDS)`
 - **Aging**: older than fresh window but within `max(3600s, 12 * REFRESH_INTERVAL_SECONDS)`
 - **Stale**: older than the warning window, or missing basis, or source status is `error`
 
+The `freshness.reason` field may reference the newest chain snapshot age as context only.
+
 The frontend displays this server payload to avoid client clock and parsing inconsistencies.
 
-## Known V2.3 Limitations
+## Historical trend snapshots (V2.4)
+
+After each **successful** multi-asset refresh (DefiLlama source status `ok`), Helix stores:
+
+- **Asset trend snapshots** (`asset_trend_snapshots`): one row per enabled asset per 5-minute UTC bucket (`floor(epoch_seconds / 300)`), including total supply, price, Depeg Index, Helix Signal Score and band, concentration subscore, aggregate data confidence label, and source status.
+- **Chain trend snapshots** (`chain_trend_snapshots`): one row per configured chain row per asset per bucket, including supply, share percent, labeled chain aggregate TVL, chain signal score and band, and chain data confidence score.
+
+**Timing**: timestamps use the same UTC completion instant as `last_successful_fetch` for that pass.
+
+**Duplicate control**: rows in the current bucket are replaced on re-entry within the same 5-minute window so manual refresh spam does not create parallel duplicates.
+
+**Limits**: there is **no long backfill**. History begins when V2.4 code is first deployed and successful refreshes run. Charts may show a low-data state until at least two buckets exist.
+
+**Interpretation**: trend lines mirror the same scoring definitions as the live dashboard. **Chain TVL** in stored chain trends remains **chain-level aggregate** stablecoin TVL from DefiLlama `stablecoinchains`, not asset-specific DeFi TVL.
+
+## Signal events (V2.4)
+
+The **signal feed** is a local SQLite timeline of meaningful deltas, not outbound alerts.
+
+**Event types** (examples):
+
+- `signal_band_change`: composite band changed (Normal, Watch, Risk) with severity by direction
+- `depeg_pressure_change`: Depeg Index crossed informational zones (low below 40, mid 40 to 69, high 70+)
+- `large_supply_change`: snapshot-to-snapshot total supply percent move exceeds about 1% (info) or 2% (warning)
+- `concentration_change`: top-chain share jump of about five percentage points, or concentration subscore jump of about ten points
+- `data_confidence_drop`: aggregate label fell from High to Medium or Low
+- `source_recovered`: DefiLlama status transitioned from `error` to `ok`
+
+**Deduplication**: the same event type, asset, chain scope, severity, and `new_value` is suppressed if an equal row exists within about 30 minutes.
+
+## Known limitations
 
 - Single-source baseline (DefiLlama)
-- No deep historical datastore beyond current and prev day, week, and month fields
-- No trading execution, alerting, or predictive modeling
+- Live dashboard still only exposes current and prev day, week, and month fields from DefiLlama; **trend charts** add forward-point storage but do not import long external history
+- No trading execution, outbound alerting, or predictive modeling
 - Chain TVL is chain aggregate context only, as labeled

@@ -14,11 +14,18 @@ It turns public data into a clean monitoring surface for supply concentration, p
 - **Helix Signal Score**: transparent composite 0 to 100 (Normal, Watch, Risk) from peg pressure, supply momentum, chain concentration, and data confidence, with explicit weights in the API and UI
 - **Depeg Index**: asset-level peg stress score and deviation context from DefiLlama price (documented as not chain-specific oracle precision)
 - **Derived metrics**: aggregate total supply, aggregate 24h supply change, Herfindahl-style concentration (HHI), per-chain share, momentum labels, per-chain signal and data confidence
-- **Server-side freshness**: UTC-aware basis timestamp as `max(last_successful_fetch, newest_chain_snapshot)` with Fresh, Aging, and Stale windows aligned to `REFRESH_INTERVAL_SECONDS`
+- **Server-side freshness**: UTC-aware basis anchored on successful refresh completion time when the source is healthy, with Fresh, Aging, and Stale windows aligned to `REFRESH_INTERVAL_SECONDS` (see methodology)
 - **Chain TVL (labeled)**: optional column sourced from DefiLlama `stablecoinchains` as **chain-level aggregate** stablecoin TVL, not per-asset TVL
 - Premium-style monitoring layout: KPI strip, methodology panel, Depeg and concentration cards, Chart.js share and component charts, expanded chain table
 - Multi-asset support unchanged (USDT default; USDC, DAI, PYUSD when enabled in `config/assets.json`)
 - Static Vanilla JS + Chart.js frontend (no framework migration)
+
+## V2.4 Highlights
+
+- **Historical trends**: SQLite snapshots after each successful refresh, bucketed in 5-minute UTC windows, exposed through `/api/trends` and `/api/trends/chains`
+- **Signal feed**: local, deduplicated `signal_events` timeline with `/api/events` and a dashboard analyst-style panel
+- **Dashboard**: time window selector (24h, 7d, 30d), four trend charts (signal score, Depeg Index, supply, concentration), low-data copy when fewer than two points exist
+- **APIs**: trend and event endpoints are cache-safe friendly; the UI uses `cache: no-store` alongside the existing manual `POST /api/refresh` flow
 
 ## Quick Start
 
@@ -60,6 +67,8 @@ python main.py
 
 - Backend API: [http://localhost:8000](http://localhost:8000)
 - Dashboard API payload: [http://localhost:8000/api/dashboard](http://localhost:8000/api/dashboard)
+- Trend APIs: [http://localhost:8000/api/trends?asset=USDT&window=7d](http://localhost:8000/api/trends?asset=USDT&window=7d) and `/api/trends/chains?asset=USDT&window=7d`
+- Events API: [http://localhost:8000/api/events?asset=USDT&limit=50](http://localhost:8000/api/events?asset=USDT&limit=50)
 - Frontend dashboard: [http://localhost:3000](http://localhost:3000)
 
 ## Configuration
@@ -76,7 +85,7 @@ Use the dashboard asset selector to switch across enabled assets.
 
 ## Project Structure
 
-- `backend/` FastAPI app, scheduler, DefiLlama integration, SQLite models
+- `backend/` FastAPI app, scheduler, DefiLlama integration, SQLite models, V2.4 trend and event writers
 - `frontend/` static HTML/CSS/JS dashboard with Chart.js (sparklines, share bar, component bar)
 - `config/` chain/source configuration
 - `docs/` architecture and methodology documentation

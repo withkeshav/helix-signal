@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -117,3 +118,100 @@ class AssetConfigOut(BaseModel):
     peg_type: str | None = None
     enabled: bool
     default: bool
+
+
+# --- V2.4 trends and events ---
+
+
+class TrendPointOut(BaseModel):
+    timestamp: datetime
+    total_supply: float | None = None
+    price: float | None = None
+    depeg_index: int
+    signal_score: int
+    signal_band: str
+    concentration_score: int
+    data_confidence: str = Field(description="Aggregate label: High, Medium, or Low.")
+
+
+class TrendSummaryOut(BaseModel):
+    point_count: int
+    supply_change_abs: float | None = None
+    supply_change_pct: float | None = None
+    score_change: float | None = None
+    max_depeg_index: int | None = None
+    latest_band: str | None = None
+    selected_window: str = Field(description="Requested window token, e.g. 24h, 7d, 30d.")
+    window_span_hours: float = Field(description="Width of the selected window in hours.")
+    first_timestamp: datetime | None = None
+    latest_timestamp: datetime | None = None
+    available_duration_minutes: float | None = Field(
+        default=None,
+        description="Span from first to last returned point, minutes.",
+    )
+    low_data: bool = Field(description="True when coverage of the window is short or points are sparse.")
+    low_data_reason: str | None = Field(
+        default=None,
+        description="Human-readable explanation for operators when low_data is true.",
+    )
+    chart_axis_min_utc: datetime | None = Field(
+        default=None,
+        description="Suggested chart x-axis minimum (UTC) for the full selected window.",
+    )
+    chart_axis_max_utc: datetime | None = Field(
+        default=None,
+        description="Suggested chart x-axis maximum (UTC), typically now.",
+    )
+
+
+class TrendResponseOut(BaseModel):
+    asset: str
+    window: str
+    generated_at: datetime
+    points: list[TrendPointOut]
+    summary: TrendSummaryOut
+
+
+class ChainTrendPointOut(BaseModel):
+    timestamp: datetime
+    supply: float | None = None
+    supply_share_pct: float | None = None
+    chain_tvl: float | None = None
+    chain_signal_score: int
+    chain_signal_band: str
+    data_confidence_score: int
+
+
+class ChainTrendSeriesOut(BaseModel):
+    chain_key: str
+    chain_name: str
+    points: list[ChainTrendPointOut]
+
+
+class ChainTrendResponseOut(BaseModel):
+    asset: str
+    window: str
+    generated_at: datetime
+    series: list[ChainTrendSeriesOut]
+    summary: dict[str, Any]
+
+
+class SignalEventOut(BaseModel):
+    id: int
+    asset_symbol: str
+    chain_key: str | None = None
+    event_type: str
+    severity: str
+    title: str
+    summary: str
+    old_value: str | None = None
+    new_value: str | None = None
+    delta: str | None = None
+    threshold: str | None = None
+    timestamp: datetime
+    metadata: dict | None = None
+
+
+class SignalEventsResponseOut(BaseModel):
+    generated_at: datetime
+    events: list[SignalEventOut]

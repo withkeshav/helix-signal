@@ -62,7 +62,18 @@ uvicorn main:app --reload
 
 - API root: `http://localhost:8000`
 - Dashboard payload: `http://localhost:8000/api/dashboard` (V2.3 includes `freshness`, `asset_signal`, `depeg_index`, `chain_concentration`, and enriched `chains` rows)
+- Trends: `http://localhost:8000/api/trends?asset=USDT&window=7d` and `http://localhost:8000/api/trends/chains?asset=USDT&window=7d`
+- Events: `http://localhost:8000/api/events?asset=USDT&limit=50` (omit `asset` for cross-asset feed)
 - Frontend: `http://localhost:3000`
+
+## Trends, windows, and events (V2.4)
+
+When changing behavior:
+
+- **Windows** are validated server-side (`24h`, `7d`, `30d`). Invalid values return HTTP 400 with a clear message.
+- **Trend buckets** are fixed at five minutes in UTC. If you change bucketing, update both `signal_engine/history.py` and methodology docs together.
+- **Event thresholds** live in `signal_engine/history.py` (depeg zones, supply percent moves, concentration deltas, dedup window). Tune carefully to avoid noisy feeds.
+- **New event types** should stay local (SQLite only), include human-readable `title` and `summary`, and respect deduplication rules.
 
 ## Adding a New Chain
 

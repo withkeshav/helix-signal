@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.4.0 - Historical Trends and Signal Feed
+
+### Added
+
+- Historical trend snapshot storage for asset-level and chain-level monitoring (5-minute UTC buckets, SQLite).
+- Trend APIs: `GET /api/trends`, `GET /api/trends/chains` with `window` in `24h`, `7d`, or `30d`.
+- Signal event feed stored locally with deduplication, plus `GET /api/events` (optional `asset` filter).
+- Dashboard trend charts for signal score, Depeg Index, total supply, and concentration score, plus a compact event feed panel with low-data messaging.
+- Shared metric bundle helper in `signal_engine/metrics.py` for consistent snapshot values.
+
+### Documentation
+
+- Updated `README.md`, `docs/data-methodology.md`, `docs/architecture.md`, `CONTRIBUTING.md`, and `RELEASE_NOTES.md` for V2.4.
+- Extended `.gitignore` for the V2.4 internal brief filename.
+
+### Out of scope (unchanged)
+
+- External alerts, webhooks, paid APIs, Moralis, auth, Postgres or dedicated time-series stores, framework migrations, plugins, GraphQL, hosted cloud tiers, long historical backfill.
+
 ## v2.3.0 - Helix Signal Score and monitoring dashboard
 
 ### Added

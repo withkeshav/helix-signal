@@ -1,25 +1,37 @@
+import json
 import os
+from collections import defaultdict
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import desc, or_
 
-from database import AssetChainSnapshot, SessionLocal, SourceStatus, init_db
+from database import AssetChainSnapshot, ChainTrendSnapshot, AssetTrendSnapshot, SessionLocal, SignalEvent, SourceStatus, init_db
 from schemas import (
     AssetConfigOut,
     AssetMetadataOut,
     AssetSignalOut,
     ChainConcentrationOut,
+    ChainTrendPointOut,
+    ChainTrendResponseOut,
+    ChainTrendSeriesOut,
     ChainSignalOut,
     DashboardChainRow,
     DashboardResponse,
     DataConfidenceOut,
     DepegIndexOut,
     FreshnessOut,
+    SignalEventOut,
+    SignalEventsResponseOut,
     SourceStatusOut,
     SupplyMomentumOut,
+    TrendPointOut,
+    TrendResponseOut,
+    TrendSummaryOut,
 )
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol, load_enabled_assets, refresh_chain_data
@@ -279,6 +291,314 @@ def dashboard(asset: str | None = None) -> DashboardResponse:
 def assets() -> list[AssetConfigOut]:
     enabled_assets = load_enabled_assets()
     return [AssetConfigOut(**asset) for asset in enabled_assets]
+
+
+_ALLOWED_TREND_WINDOWS = frozenset({"24h", "7d", "30d"})
+
+
+def _window_delta(window: str) -> timedelta:
+    if window == "24h":
+        return timedelta(hours=24)
+    if window == "7d":
+        return timedelta(days=7)
+    return timedelta(days=30)
+
+
+def _signal_event_rows_to_out(rows: list[SignalEvent]) -> list[SignalEventOut]:
+    out: list[SignalEventOut] = []
+    for r in rows:
+        meta: dict | None = None
+        if r.metadata_json:
+            try:
+                meta = json.loads(r.metadata_json)
+            except json.JSONDecodeError:
+                meta = None
+        out.append(
+            SignalEventOut(
+                id=r.id,
+                asset_symbol=r.asset_symbol,
+                chain_key=r.chain_key,
+                event_type=r.event_type,
+                severity=r.severity,
+                title=r.title,
+                summary=r.summary,
+                old_value=r.old_value,
+                new_value=r.new_value,
+                delta=r.delta,
+                threshold=r.threshold,
+                timestamp=r.timestamp,
+                metadata=meta,
+            )
+        )
+    return out
+
+
+def _build_trend_summary(points: list[TrendPointOut], *, window: str, now: datetime) -> TrendSummaryOut:
+    span_td = _window_delta(window)
+    window_seconds = max(span_td.total_seconds(), 1.0)
+    window_hours = window_seconds / 3600.0
+    axis_min = now - span_td
+    axis_max = now
+    wl = window.strip().lower()
+
+    n = len(points)
+    if n == 0:
+        return TrendSummaryOut(
+            point_count=0,
+            supply_change_abs=None,
+            supply_change_pct=None,
+            score_change=None,
+            max_depeg_index=None,
+            latest_band=None,
+            selected_window=wl,
+            window_span_hours=round(window_hours, 4),
+            first_timestamp=None,
+            latest_timestamp=None,
+            available_duration_minutes=None,
+            low_data=True,
+            low_data_reason="No trend snapshots in this window yet. Run refreshes to collect forward history.",
+            chart_axis_min_utc=axis_min,
+            chart_axis_max_utc=axis_max,
+        )
+
+    first, last = points[0], points[-1]
+    first_ts = first.timestamp
+    last_ts = last.timestamp
+    avail_seconds = max((last_ts - first_ts).total_seconds(), 0.0)
+    avail_minutes = avail_seconds / 60.0
+    coverage = avail_seconds / window_seconds
+
+    supply_abs = None
+    supply_pct = None
+    if first.total_supply is not None and last.total_supply is not None:
+        supply_abs = float(last.total_supply) - float(first.total_supply)
+        if first.total_supply:
+            supply_pct = (supply_abs / float(first.total_supply)) * 100.0
+    score_change = float(last.signal_score - first.signal_score) if n >= 2 else None
+    max_depeg = max((p.depeg_index for p in points), default=None)
+
+    low_data = n < 2 or coverage < 0.92
+    low_data_reason: str | None = None
+    if n < 2:
+        low_data_reason = (
+            "Need at least two snapshots to draw reliable trend lines. "
+            "History collection started recently inside the selected window."
+        )
+    elif coverage < 0.92:
+        hrs = int(avail_seconds // 3600)
+        mins = int((avail_seconds % 3600) // 60)
+        if hrs > 0:
+            dur_txt = f"{hrs}h {mins}m" if mins else f"{hrs}h"
+        else:
+            dur_txt = f"{mins} min" if mins else "under 1 min"
+        low_data_reason = (
+            f"History collection started recently. Showing about {dur_txt} of available data "
+            f"inside the selected {wl} window."
+        )
+
+    return TrendSummaryOut(
+        point_count=n,
+        supply_change_abs=supply_abs,
+        supply_change_pct=supply_pct,
+        score_change=score_change,
+        max_depeg_index=max_depeg,
+        latest_band=last.signal_band,
+        selected_window=wl,
+        window_span_hours=round(window_hours, 4),
+        first_timestamp=first_ts,
+        latest_timestamp=last_ts,
+        available_duration_minutes=round(avail_minutes, 3),
+        low_data=low_data,
+        low_data_reason=low_data_reason,
+        chart_axis_min_utc=axis_min,
+        chart_axis_max_utc=axis_max,
+    )
+
+
+@app.get("/api/trends", response_model=TrendResponseOut)
+def trends(asset: str, window: str = Query("7d")) -> TrendResponseOut:
+    w = window.strip().lower()
+    if w not in _ALLOWED_TREND_WINDOWS:
+        raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
+    sym = asset.strip().upper()
+    selected = get_asset_by_symbol(sym)
+    if selected is None or not bool(selected.get("enabled")):
+        raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff = now - _window_delta(w)
+        rows = (
+            db.query(AssetTrendSnapshot)
+            .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
+            .order_by(AssetTrendSnapshot.timestamp.asc())
+            .all()
+        )
+        points = [
+            TrendPointOut(
+                timestamp=r.timestamp,
+                total_supply=r.total_supply,
+                price=r.price,
+                depeg_index=int(r.depeg_index),
+                signal_score=int(r.signal_score),
+                signal_band=str(r.signal_band),
+                concentration_score=int(r.concentration_score),
+                data_confidence=str(r.data_confidence_label),
+            )
+            for r in rows
+        ]
+        summary = _build_trend_summary(points, window=w, now=now)
+        return TrendResponseOut(
+            asset=sym,
+            window=w,
+            generated_at=now,
+            points=points,
+            summary=summary,
+        )
+    finally:
+        db.close()
+
+
+def _chain_trend_summary_dict(
+    series: list[ChainTrendSeriesOut],
+    *,
+    window: str,
+    now: datetime,
+    total_points: int,
+) -> dict[str, Any]:
+    stamps: list[datetime] = []
+    for s in series:
+        for p in s.points:
+            stamps.append(p.timestamp)
+    stamps.sort()
+    span_td = _window_delta(window)
+    window_seconds = max(span_td.total_seconds(), 1.0)
+    window_hours = window_seconds / 3600.0
+    axis_min = now - span_td
+    axis_max = now
+    wl = window.strip().lower()
+    if not stamps:
+        return {
+            "series_count": len(series),
+            "total_points": total_points,
+            "selected_window": wl,
+            "window_span_hours": round(window_hours, 4),
+            "first_timestamp": None,
+            "latest_timestamp": None,
+            "available_duration_minutes": None,
+            "low_data": True,
+            "low_data_reason": "No chain trend snapshots in this window yet.",
+            "chart_axis_min_utc": axis_min,
+            "chart_axis_max_utc": axis_max,
+        }
+    first_ts, last_ts = stamps[0], stamps[-1]
+    avail_seconds = max((last_ts - first_ts).total_seconds(), 0.0)
+    avail_minutes = avail_seconds / 60.0
+    coverage = avail_seconds / window_seconds
+    low_data = total_points < 2 or coverage < 0.92
+    reason: str | None = None
+    if total_points < 2:
+        reason = (
+            "Need at least two chain snapshots to draw reliable trend lines. "
+            "History collection started recently inside the selected window."
+        )
+    elif coverage < 0.92:
+        hrs = int(avail_seconds // 3600)
+        mins = int((avail_seconds % 3600) // 60)
+        dur_txt = f"{hrs}h {mins}m" if hrs else (f"{mins} min" if mins else "under 1 min")
+        reason = (
+            f"History collection started recently. Showing about {dur_txt} of available data "
+            f"inside the selected {wl} window."
+        )
+    return {
+        "series_count": len(series),
+        "total_points": total_points,
+        "selected_window": wl,
+        "window_span_hours": round(window_hours, 4),
+        "first_timestamp": first_ts,
+        "latest_timestamp": last_ts,
+        "available_duration_minutes": round(avail_minutes, 3),
+        "low_data": low_data,
+        "low_data_reason": reason,
+        "chart_axis_min_utc": axis_min,
+        "chart_axis_max_utc": axis_max,
+    }
+
+
+@app.get("/api/trends/chains", response_model=ChainTrendResponseOut)
+def trends_chains(asset: str, window: str = Query("7d")) -> ChainTrendResponseOut:
+    w = window.strip().lower()
+    if w not in _ALLOWED_TREND_WINDOWS:
+        raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
+    sym = asset.strip().upper()
+    selected = get_asset_by_symbol(sym)
+    if selected is None or not bool(selected.get("enabled")):
+        raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
+
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        cutoff = now - _window_delta(w)
+        rows = (
+            db.query(ChainTrendSnapshot)
+            .filter(ChainTrendSnapshot.asset_symbol == sym, ChainTrendSnapshot.timestamp >= cutoff)
+            .order_by(ChainTrendSnapshot.timestamp.asc())
+            .all()
+        )
+        grouped: dict[str, dict] = defaultdict(lambda: {"chain_name": "", "points": []})
+        for r in rows:
+            g = grouped[r.chain_key]
+            if not g["chain_name"]:
+                g["chain_name"] = r.chain_name
+            g["points"].append(
+                ChainTrendPointOut(
+                    timestamp=r.timestamp,
+                    supply=r.supply,
+                    supply_share_pct=r.supply_share_pct,
+                    chain_tvl=r.chain_tvl,
+                    chain_signal_score=int(r.chain_signal_score),
+                    chain_signal_band=str(r.chain_signal_band),
+                    data_confidence_score=int(r.data_confidence_score),
+                )
+            )
+        series: list[ChainTrendSeriesOut] = []
+        for key in sorted(grouped.keys()):
+            blob = grouped[key]
+            pts = sorted(blob["points"], key=lambda p: p.timestamp)
+            series.append(ChainTrendSeriesOut(chain_key=key, chain_name=blob["chain_name"], points=pts))
+        total_points = sum(len(s.points) for s in series)
+        summary = _chain_trend_summary_dict(series, window=w, now=now, total_points=total_points)
+        return ChainTrendResponseOut(
+            asset=sym,
+            window=w,
+            generated_at=now,
+            series=series,
+            summary=summary,
+        )
+    finally:
+        db.close()
+
+
+@app.get("/api/events", response_model=SignalEventsResponseOut)
+def events(
+    limit: int = Query(50, ge=1, le=200),
+    asset: str | None = None,
+) -> SignalEventsResponseOut:
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        q = db.query(SignalEvent)
+        if asset:
+            sym = asset.strip().upper()
+            selected = get_asset_by_symbol(sym)
+            if selected is None or not bool(selected.get("enabled")):
+                raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
+            q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
+        rows = q.order_by(desc(SignalEvent.timestamp)).limit(limit).all()
+        return SignalEventsResponseOut(generated_at=now, events=_signal_event_rows_to_out(rows))
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

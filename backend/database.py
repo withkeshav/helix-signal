@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import DateTime, Float, Integer, String, UniqueConstraint, create_engine, text
+from sqlalchemy import DateTime, Float, Integer, String, Text, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 
@@ -58,6 +58,78 @@ class SourceStatus(Base):
     last_successful_fetch: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class AssetTrendSnapshot(Base):
+    """One asset-level aggregate row per successful refresh bucket (5-minute UTC bucket)."""
+
+    __tablename__ = "asset_trend_snapshots"
+    __table_args__ = (UniqueConstraint("asset_symbol", "bucket_id", name="uq_asset_trend_bucket"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    bucket_id: Mapped[int] = mapped_column(Integer, index=True)
+    total_supply: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    depeg_index: Mapped[int] = mapped_column(Integer, default=0)
+    signal_score: Mapped[int] = mapped_column(Integer, default=0)
+    signal_band: Mapped[str] = mapped_column(String(16), default="Normal")
+    concentration_score: Mapped[int] = mapped_column(Integer, default=0)
+    data_confidence_label: Mapped[str] = mapped_column(String(16), default="Unknown")
+    source_status: Mapped[str] = mapped_column(String(32), default="unknown")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class ChainTrendSnapshot(Base):
+    """One chain-level row per asset per refresh bucket."""
+
+    __tablename__ = "chain_trend_snapshots"
+    __table_args__ = (UniqueConstraint("asset_symbol", "chain_key", "bucket_id", name="uq_chain_trend_bucket"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
+    chain_key: Mapped[str] = mapped_column(String(64), index=True)
+    chain_name: Mapped[str] = mapped_column(String(64))
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    bucket_id: Mapped[int] = mapped_column(Integer, index=True)
+    supply: Mapped[float | None] = mapped_column(Float, nullable=True)
+    supply_share_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    chain_tvl: Mapped[float | None] = mapped_column(Float, nullable=True)
+    chain_signal_score: Mapped[int] = mapped_column(Integer, default=0)
+    chain_signal_band: Mapped[str] = mapped_column(String(16), default="Normal")
+    data_confidence_score: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class SignalEvent(Base):
+    """Local, explainable monitoring events (not external alerts)."""
+
+    __tablename__ = "signal_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
+    chain_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    summary: Mapped[str] = mapped_column(String(500))
+    old_value: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    delta: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    threshold: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
     )

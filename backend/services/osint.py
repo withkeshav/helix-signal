@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
 
-import requests
+import httpx
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -37,6 +37,76 @@ def _get_transformers_pipeline():
 
 
 _NLP_PIPELINE = None
+
+
+def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
+    try:
+        resp = httpx.get(url, timeout=15)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+        articles: list[dict[str, Any]] = []
+        for item in root.iter("item"):
+            title = item.findtext("title", "")
+            link = item.findtext("link", "")
+            desc = item.findtext("description", "")
+            pub_date = item.findtext("pubDate", "")
+            dt = _parse_rss_date(pub_date)
+            articles.append({"title": title, "url": link, "summary": desc, "published_at": dt, "source": source})
+        return articles
+    except Exception:
+        return []
+
+
+def _parse_rss_date(date_str: str) -> datetime | None:
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(date_str).replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _fetch_cryptopanic() -> list[dict[str, Any]]:
+    api_key = os.getenv("CRYPTOPANIC_API_KEY", "")
+    if not api_key:
+        return []
+    try:
+        params = {"auth_token": api_key, "public": "true", "kind": "news"}
+        resp = httpx.get(f"{CRYPTOPANIC_API}?{urlencode(params)}", timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        articles: list[dict[str, Any]] = []
+        for post in data.get("results", []):
+            title = post.get("title", "")
+            url = post.get("url", "")
+            published = post.get("published_at", "")
+            dt = None
+            if published:
+                try:
+                    dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            articles.append({
+                "title": title,
+                "url": url,
+                "summary": post.get("domain", ""),
+                "published_at": dt,
+                "source": "cryptopanic",
+            })
+        return articles
+    except Exception:
+        return []
+
+
+_STABLECOIN_KEYWORDS = {"USDT", "USDC", "DAI", "PYUSD", "TETHER", "CIRCLE", "MAKER", "PAYPAL"}
+
+
+def _classify_asset(text: str) -> list[str]:
+    upper = text.upper()
+    found: list[str] = []
+    for kw in _STABLECOIN_KEYWORDS:
+        if kw in upper:
+            found.append(kw)
+    return found
 
 
 def _ensure_nlp():

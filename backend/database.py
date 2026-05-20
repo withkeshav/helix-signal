@@ -166,6 +166,14 @@ class SignalEvent(Base):
     )
 
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _migrate_legacy_chain_data()

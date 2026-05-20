@@ -1,21 +1,133 @@
+"""Alert rule engine with a callable registry instead of fragile string matching."""
+
 from __future__ import annotations
 
 import json
 import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-import requests
+import httpx
 from sqlalchemy.orm import Session
 
 from database import SignalEvent, SourceStatus
-from signal_engine.core import load_configured_chains
 from structlog import get_logger
 
 log = get_logger(__name__)
 
 ALERTS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "alerts.json"
+
+
+# --- Callable evaluator registry ---
+# Maps condition patterns to (evaluator_fn, context_extractor_fn)
+_RULE_EVALUATORS: dict[str, Callable[[dict[str, Any], dict[str, Any]], bool]] = {}
+
+
+def _register_condition(pattern: str):
+    """Decorator that registers a callable evaluator for a condition key."""
+    def decorator(fn: Callable) -> Callable:
+        _RULE_EVALUATORS[pattern] = fn
+        return fn
+    return decorator
+
+
+@_register_condition("depeg_bps >")
+def _eval_depeg_bps(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    threshold = _extract_threshold(rule["condition"], "depeg_bps >")
+    price = bundle.get("price")
+    if not price:
+        return False
+    depeg_bps = abs(price - 1.0) * 10000
+    if depeg_bps > threshold:
+        bundle["_meta"]["depeg_bps"] = depeg_bps
+        return True
+    return False
+
+
+@_register_condition("supply_change_7d <")
+def _eval_supply_contraction(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    threshold = _extract_threshold(rule["condition"], "supply_change_7d <")
+    change = bundle.get("supply_change_7d_pct") or bundle.get("supply_change_7d")
+    if change is not None and change < threshold:
+        return True
+    return False
+
+
+@_register_condition("freshness_age_minutes >")
+def _eval_freshness(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    threshold = _extract_threshold(rule["condition"], "freshness_age_minutes >")
+    age = bundle.get("freshness_age_seconds")
+    if age is not None and age > threshold * 60:
+        bundle["_meta"]["age_minutes"] = round(age / 60, 1)
+        return True
+    return False
+
+
+@_register_condition("source_status = error")
+def _eval_source_error(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    sources = bundle.get("_sources", [])
+    for s in sources:
+        if s.status == "error":
+            bundle["_meta"]["source"] = s.source_name
+            return True
+    return False
+
+
+@_register_condition("slippage_100k >")
+def _eval_slippage(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    return False
+
+
+@_register_condition("source_status = error for")
+def _eval_source_error_persistent(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    return False
+
+
+@_register_condition("source transitions error")
+def _eval_source_recovered(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    sources = bundle.get("_sources", [])
+    for s in sources:
+        if s.status == "ok" and getattr(s, "previous_status", None) == "error":
+            bundle["_meta"]["source"] = s.source_name
+            return True
+    return False
+
+
+@_register_condition("top3_pool_share >")
+def _eval_concentration(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    threshold = _extract_threshold(rule["condition"], "top3_pool_share >")
+    share = bundle.get("top3_pool_share_pct")
+    if share is not None and share > threshold:
+        return True
+    return False
+
+
+@_register_condition("supply_age_hours >")
+def _eval_supply_age(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    threshold = _extract_threshold(rule["condition"], "supply_age_hours >")
+    age = bundle.get("supply_age_hours")
+    if age is not None and age > threshold:
+        return True
+    return False
+
+
+def _extract_threshold(condition: str, prefix: str) -> float:
+    """Extract numeric threshold from a condition string like 'depeg_bps > 50'."""
+    try:
+        return float(condition.replace(prefix, "").strip())
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _match_condition(condition: str) -> Callable | None:
+    """Find the best matching evaluator for a condition string (longest prefix wins)."""
+    matched: tuple[int, Callable] | None = None
+    for pattern, fn in _RULE_EVALUATORS.items():
+        if condition.startswith(pattern):
+            if matched is None or len(pattern) > matched[0]:
+                matched = (len(pattern), fn)
+    return matched[1] if matched else None
 
 
 def load_alert_rules() -> list[dict]:
@@ -28,33 +140,23 @@ def evaluate_alerts(db: Session, *, bundle: dict[str, Any], asset_symbol: str, n
     rules = load_alert_rules()
     fired: list[dict[str, Any]] = []
     sources_orm = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
-    supply = bundle.get("total_supply")
-    price = bundle.get("price")
-    depeg_bps = abs((price or 1.0) - 1.0) * 10000 if price else 0
+    bundle["_meta"] = {}
+    bundle["_sources"] = sources_orm
+
     for rule in rules:
         cond = rule["condition"]
-        matched = False
-        meta: dict[str, Any] = {"condition": cond}
-        if "depeg_bps > 50" in cond and depeg_bps > 50:
-            matched = True; meta["depeg_bps"] = depeg_bps
-        if "depeg_bps > 100" in cond and depeg_bps > 100:
-            matched = True; meta["depeg_bps"] = depeg_bps
-        if "supply_change_7d < -3" in cond:
-            pass
-        if "freshness_age_minutes > 10" in cond:
-            age = bundle.get("freshness_age_seconds")
-            if age is not None and age > 600:
-                matched = True; meta["age_minutes"] = round(age / 60, 1)
-        if "source_status = error" in cond:
-            for s in sources_orm:
-                if s.status == "error":
-                    matched = True; meta["source"] = s.source_name
+        evaluator = _match_condition(cond)
+        if evaluator is None:
+            log.warning("alert_no_evaluator", condition=cond)
+            continue
+        meta = bundle["_meta"]
+        matched = evaluator(bundle, rule)
         if matched:
             dedup_key = f"{asset_symbol}:{rule['type']}:{rule['severity']}"
             if not _recently_fired(db, dedup_key, rule.get("cooldown_minutes", 60), now):
-                _log_alert_fire(db, asset_symbol=asset_symbol, rule=rule, meta=meta, now=now)
-                _dispatch_alert(rule, asset_symbol=asset_symbol, meta=meta)
-                fired.append({"type": rule["type"], "severity": rule["severity"], "asset": asset_symbol, "meta": meta})
+                _log_alert_fire(db, asset_symbol=asset_symbol, rule=rule, meta=dict(meta), now=now)
+                _dispatch_alert(rule, asset_symbol=asset_symbol, meta=dict(meta))
+                fired.append({"type": rule["type"], "severity": rule["severity"], "asset": asset_symbol, "meta": dict(meta)})
     return fired
 
 
@@ -106,7 +208,7 @@ def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict) -> None:
     if not url:
         return
     try:
-        requests.post(url, json={"asset": asset_symbol, "type": rule["type"], "severity": rule["severity"], "meta": meta}, timeout=10)
+        httpx.post(url, json={"asset": asset_symbol, "type": rule["type"], "severity": rule["severity"], "meta": meta}, timeout=10)
     except Exception as exc:
         log.warning("webhook_failed", error=str(exc))
 
@@ -116,7 +218,7 @@ def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict) -> None:
     if not url:
         return
     try:
-        requests.post(url, json={"content": f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']} - {rule['condition']}"}, timeout=10)
+        httpx.post(url, json={"content": f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']} - {rule['condition']}"}, timeout=10)
     except Exception as exc:
         log.warning("discord_failed", error=str(exc))
 
@@ -128,7 +230,7 @@ def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict) -> None:
         return
     try:
         text = f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']}\n{rule['condition']}"
-        requests.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
+        httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
     except Exception as exc:
         log.warning("telegram_failed", error=str(exc))
 

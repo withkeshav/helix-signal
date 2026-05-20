@@ -69,6 +69,7 @@ def isolation_forest_detect(points: list[list[float]], contamination: float = 0.
     if len(points) < 10:
         return []
     try:
+        import numpy as np
         from sklearn.ensemble import IsolationForest
         model = IsolationForest(contamination=contamination, random_state=42)
         preds = model.fit_predict(np.array(points))
@@ -137,6 +138,7 @@ def train_models(db: Session, *, asset_symbol: str) -> dict[str, Any]:
         ]
         features.append(row)
     try:
+        import numpy as np
         from sklearn.ensemble import IsolationForest
         model = IsolationForest(contamination=0.05, random_state=42)
         model.fit(np.array(features))
@@ -153,6 +155,7 @@ def prophet_forecast(db: Session, *, asset_symbol: str, hours: int = 24) -> dict
     if len(history["timestamps"]) < 20:
         return {"asset": asset_symbol, "note": "Need >=20 historical points for forecast.", "forecast": []}
     try:
+        import pandas as pd
         from statsforecast import StatsForecast
         from statsforecast.models import AutoARIMA
         series: list[dict[str, Any]] = []

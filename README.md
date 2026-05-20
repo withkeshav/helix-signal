@@ -65,6 +65,19 @@ cd backend
 .venv/bin/pytest -q
 ```
 
+### Database migrations
+
+```bash
+cd backend
+.venv/bin/alembic upgrade head
+```
+
+Auto-generate a new migration after model changes:
+
+```bash
+.venv/bin/alembic revision --autogenerate -m "describe_change"
+```
+
 ## Configuration
 
 Copy `.env.example` to `.env` and adjust:
@@ -104,7 +117,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 
 ## Project Structure
 
-- `backend/` FastAPI app, multi-source ingestion, DuckDB analytics, alerts, OSINT, governance, ML anomaly detection, 15 tests
+- `backend/` FastAPI app, multi-source ingestion, DuckDB analytics, alerts, OSINT, governance, ML anomaly detection, Alembic migrations, 26 tests
 - `frontend/` Alpine.js + htmx + Chart.js dashboard with nginx API proxy in Docker
 - `config/` chain, asset, and alert configuration
 - `docs/` architecture and methodology

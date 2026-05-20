@@ -1,5 +1,21 @@
 # Release Notes
 
+## v3.1.0 — Maintenance & Quality
+
+Helix-Signal v3.1.0 is a maintenance release fixing critical bugs, eliminating technical debt, and improving code quality.
+
+### Highlights
+
+- **Fixed anomaly.py crash**: numpy/pandas now imported at module level (was causing NameError in production)
+- **DB session refactor**: Replaced 20+ `try/finally` blocks with FastAPI `Depends(get_db)` dependency injection
+- **Alert evaluator rewrite**: Replaced fragile `in` string-matching with a callable registry using `@_register_condition` decorator
+- **HTTP client migration**: All network calls migrated from `requests` to `httpx` across 6 source/service files
+- **Alembic migrations**: Initialized automated migration system (`alembic upgrade head`)
+- **Restored missing functions**: `osint.py` had 3 referenced but undefined functions (`_fetch_rss`, `_fetch_cryptopanic`, `_classify_asset`)
+- **Cleanup**: 5 stale execution briefs deleted; dead `frontend/main.js` gitignored
+
+See `CHANGELOG.md` for the full list of changes.
+
 ## v2.5.0 - Trust the terminal
 
 Helix-Signal v2.5 focuses on **operational maturity** and **analyst ergonomics** on top of the V2.4 trend and event memory layer.

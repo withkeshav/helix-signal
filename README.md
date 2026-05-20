@@ -1,33 +1,21 @@
 # Helix-Signal
 
-Helix-Signal powers **Helix**, an open-source, self-hostable dashboard for chain-level stablecoin signals.
-It turns public data into a clean monitoring surface for supply concentration, peg pressure, freshness, and source health.
+Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence platform for stablecoins and chains.
 
-## Why Helix
+One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-- Transparent: built on publicly accessible data sources
-- Self-hostable: runs locally with Docker, no paid dependency required for core features
-- Multi-asset monitoring (USDT default; USDC, DAI, PYUSD when enabled) with historical trends and a local signal feed
+## V3 Highlights
 
-## V2.5 Highlights
-
-- **CI and tests**: GitHub Actions plus pytest (scoring, history, API smoke) using in-memory SQLite
-- **Health**: `GET /api/health` with database reachability, last successful fetch, scheduler status, version `2.5.0`
-- **Retention**: configurable pruning for trend and event tables (`TREND_RETENTION_DAYS`, `EVENT_RETENTION_DAYS`)
-- **Deploy hygiene**: Compose loads `.env`; frontend nginx proxies `/api` to the backend; relative API URLs (no hardcoded localhost)
-- **Analyst workflows**: CSV/JSON export for trends and events, cross-asset compare chart, chain drill-down side panel
-- **Optional backfill**: env-gated `POST /api/admin/backfill` for coarse synthetic history on new installs
-
-## V2.4 Highlights
-
-- **Historical trends**: SQLite snapshots after each successful refresh, bucketed in 5-minute UTC windows, exposed through `/api/trends` and `/api/trends/chains`
-- **Signal feed**: local, deduplicated `signal_events` timeline with `/api/events` and a dashboard analyst-style panel
-- **Dashboard**: time window selector (24h, 7d, 30d), four trend charts (signal score, Depeg Index, supply, concentration), low-data copy when fewer than two points exist
-
-## V2.3 Highlights
-
-- **Helix Signal Score**: transparent composite 0 to 100 (Normal, Watch, Risk) from peg pressure, supply momentum, chain concentration, and data confidence
-- **Depeg Index**, chain concentration (HHI), server-side freshness, and labeled chain aggregate TVL from DefiLlama `stablecoinchains`
+- **V3 Risk Score**: 5-component composite (peg stability 35%, liquidity depth 25%, supply stability 15%, concentration 15%, observability 10%) with hard overrides
+- **Multi-source engine**: DefiLlama (supply, TVL, peg) + CoinGecko (price, market cap, volume) + DEX Screener (liquidity depth, pool concentration, slippage)
+- **Cross-source price validator**: flags discrepancies >0.5% between sources
+- **Alerting system**: 9 rule types with persistence tracking, dedup, 4 dispatch channels (dashboard, webhook, Discord, Telegram)
+- **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + CryptoPanic API + FinBERT sentiment scoring
+- **Governance monitoring**: contract upgrade tracking via Etherscan API
+- **AI anomaly detection** (gated): Z-score, Isolation Forest, Prophet forecast — enabled via `ENABLE_ANOMALY_DETECTION=true`
+- **DuckDB analytics**: embedded time-series queries on trend data
+- **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
+- **Alpine.js + htmx frontend**: 4-tab layout (Overview, Peg & Liquidity, Supply & Flows, Intelligence), no build step, CDN-loaded
 
 ## Quick Start
 
@@ -46,8 +34,6 @@ docker compose up --build
 - Backend API direct: [http://localhost:8000](http://localhost:8000)
 
 ### Local backend with Python venv
-
-All Python dependencies install into `backend/.venv` only:
 
 ```bash
 cd backend
@@ -75,36 +61,49 @@ Copy `.env.example` to `.env` and adjust:
 
 - `DATABASE_URL` — see comments in `.env.example` for local venv vs Docker paths
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
-- `TREND_RETENTION_DAYS` (default `90`), `EVENT_RETENTION_DAYS` (default `30`)
-- `ALLOW_BACKFILL` (default `false`) — enable optional historical seeding
-- `DEFILLAMA_API_KEY` — reserved for a future Pro API toggle; not required for core ingest today
+- `ENABLE_ANOMALY_DETECTION` (default `false`) — enables ML anomaly detection (requires scikit-learn, numpy, pandas, statsforecast)
+- `ENABLE_NLP` (default `false`) — enables FinBERT sentiment scoring (requires transformers + PyTorch)
+- `ENABLE_DYNAMIC_CHAINS` (default `false`) — auto-discovers chains from DefiLlama instead of static config
+- `ETHERSCAN_API_KEY` — for governance monitoring
+- `ALERT_WEBHOOK_URL`, `ALERT_DISCORD_WEBHOOK`, `ALERT_TELEGRAM_BOT_TOKEN` — alert dispatch channels
+- `CRYPTOPANIC_API_KEY` — for news feed
 
-Configured chains: `config/chains.json`. Assets: `config/assets.json`.
+Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `config/alerts.json`.
 
 ## API overview
 
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /api/health` | Operational health and version |
-| `GET /api/dashboard` | Live monitoring payload |
+| `GET /api/dashboard` | Live V3 risk monitoring payload |
 | `GET /api/trends`, `/api/trends/chains` | Historical windows |
 | `GET /api/trends/export`, `/api/events/export` | CSV/JSON export |
 | `GET /api/compare` | Cross-asset aligned series |
 | `GET /api/chains/{chain_key}` | Chain drill-down |
-| `GET /api/events` | Local signal feed |
+| `GET /api/events` | Signal feed |
 | `POST /api/admin/backfill` | Optional synthetic history (env-gated) |
+| `GET /api/alerts/config` | Alert rule definitions |
+| `GET /api/osint/feed` | Recent news articles with sentiment |
+| `GET /api/osint/sentiment` | Sentiment time-series |
+| `GET /api/osint/attestation` | Transparency report freshness |
+| `GET /api/osint/correlate` | Sentiment-depeg correlation |
+| `GET /api/governance` | Governance monitoring |
+| `GET /api/anomaly/detect` | Z-score + Isolation Forest anomaly flags |
+| `GET /api/anomaly/forecast` | Supply forecast (Prophet) |
 
 ## Project Structure
 
-- `backend/` FastAPI app, scheduler, DefiLlama integration, SQLite models, services, tests
-- `frontend/` static HTML/CSS/JS dashboard with Chart.js and nginx API proxy in Docker
-- `config/` chain and asset configuration
+- `backend/` FastAPI app, multi-source ingestion, DuckDB analytics, alerts, OSINT, governance, ML anomaly detection, 15 tests
+- `frontend/` Alpine.js + htmx + Chart.js dashboard with nginx API proxy in Docker
+- `config/` chain, asset, and alert configuration
 - `docs/` architecture and methodology
+- `research/` platform research artifacts
 
 ## Documentation
 
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Data methodology: [`docs/data-methodology.md`](docs/data-methodology.md)
+- Implementation plan: [`opencode-implementation-plan.md`](opencode-implementation-plan.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 - Release notes: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)

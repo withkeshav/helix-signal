@@ -312,17 +312,14 @@
             this.destroyCharts();
             if(typeof Chart==='undefined')return;
             const primary=getComputedStyle(document.documentElement).getPropertyValue('--spark').trim()||'#60a5fa';
-            if(data.charts?.[0]?.total_supply){
-              const labels=data.chains.map(c=>c.chain_name).slice(0,12);
-              const vals=data.chains.map(c=>c.chain_share_pct||0).slice(0,12);
+            const muted=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#9aa8c4';
+            const chains=data.chains||[];
+            if(chains.length){
+              const labels=chains.map(c=>c.chain_name).slice(0,12);
+              const vals=chains.map(c=>c.chain_share_pct||0).slice(0,12);
               this._makeBar('chart-distribution',labels,vals,primary);
+              this._makeBar('chart-supply-bar',labels,vals,primary);
             }
-          },
-          _makeBar(id,labels,vals,color){
-            const el=document.getElementById(id);
-            if(!el)return;
-            const c=new Chart(el.getContext('2d'),{type:'bar',data:{labels,datasets:[{data:vals,backgroundColor:color,borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
-            this._charts.set(id,c);
           },
           renderSentimentChart(series){
             if(!series||!series.length||typeof Chart==='undefined')return;

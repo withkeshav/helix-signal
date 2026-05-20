@@ -42,6 +42,7 @@ from services.dashboard import build_dashboard_response
 from services.exports import events_export, trends_export
 from services.governance import build_governance_payload
 from services.health import build_health_payload
+from services.osint import ingest_osint_feed, get_osint_feed, get_sentiment_timeseries, get_attestation_status, correlate_sentiment_depeg
 from services.retention import prune_old_history
 from signal_engine.core import get_asset_by_symbol, load_enabled_assets, refresh_chain_data
 from utils import utc_normalize, window_delta, signal_event_rows_to_out
@@ -72,6 +73,18 @@ def _retention_job() -> None:
         db.close()
 
 
+def _osint_job() -> None:
+    db = SessionLocal()
+    try:
+        count = ingest_osint_feed(db)
+        if count:
+            log.info("osint_job.complete", articles_ingested=count)
+    except Exception:
+        log.exception("osint_job.failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -93,6 +106,13 @@ async def lifespan(app: FastAPI):
         hour=3,
         minute=15,
         id="history-retention",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _osint_job,
+        "interval",
+        hours=1,
+        id="osint-ingest",
         replace_existing=True,
     )
     scheduler.start()
@@ -511,6 +531,51 @@ def api_governance(request: Request, asset: str = Query(...)) -> dict[str, Any]:
     db = SessionLocal()
     try:
         return build_governance_payload(db, asset=asset)
+    finally:
+        db.close()
+
+
+@app.get("/api/osint/feed")
+@limiter.limit("60/minute")
+def api_osint_feed(
+    request: Request,
+    asset: str | None = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+) -> list[dict[str, Any]]:
+    db = SessionLocal()
+    try:
+        return get_osint_feed(db, asset=asset, limit=limit)
+    finally:
+        db.close()
+
+
+@app.get("/api/osint/sentiment")
+def api_osint_sentiment(
+    request: Request,
+    asset: str | None = Query(None),
+    window_days: int = Query(7, ge=1, le=90),
+) -> list[dict[str, Any]]:
+    db = SessionLocal()
+    try:
+        return get_sentiment_timeseries(db, asset=asset, window_days=window_days)
+    finally:
+        db.close()
+
+
+@app.get("/api/osint/attestation")
+def api_osint_attestation(request: Request) -> dict[str, Any]:
+    return get_attestation_status()
+
+
+@app.get("/api/osint/correlate")
+def api_osint_correlate(
+    request: Request,
+    asset: str = Query(...),
+    window_hours: int = Query(24, ge=1, le=168),
+) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return correlate_sentiment_depeg(db, asset=asset, window_hours=window_hours)
     finally:
         db.close()
 

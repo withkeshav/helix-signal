@@ -122,6 +122,26 @@ class ChainTrendSnapshot(Base):
     )
 
 
+class OsintArticle(Base):
+    __tablename__ = "osint_articles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    asset_symbols: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(500))
+    url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    summary: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    entities: Mapped[str | None] = mapped_column(Text, nullable=True)
+    topics: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class SignalEvent(Base):
     """Local, explainable monitoring events (not external alerts)."""
 

@@ -1,106 +1,39 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from requests import Session
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
-
-USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
-STABLECOIN_CHAINS_URL = "https://stablecoins.llama.fi/stablecoinchains"
-STABLECOIN_CHARTS_URL = "https://stablecoins.llama.fi/stablecoincharts/all"
-DEFAULT_TIMEOUT_SECONDS = 20
-
-_HTTP_SESSION: Session | None = None
-
-
-def _get_http_session() -> Session:
-    global _HTTP_SESSION
-    if _HTTP_SESSION is None:
-        _HTTP_SESSION = Session()
-        retries = Retry(
-            total=3,
-            backoff_factor=1.0,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET"],
-        )
-        adapter = HTTPAdapter(max_retries=retries)
-        _HTTP_SESSION.mount("https://", adapter)
-        _HTTP_SESSION.mount("http://", adapter)
-    return _HTTP_SESSION
+from sources.base import AbstractSource, SourceError
 
 USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
 STABLECOIN_CHAINS_URL = "https://stablecoins.llama.fi/stablecoinchains"
 STABLECOIN_CHARTS_URL = "https://stablecoins.llama.fi/stablecoincharts/all"
 DEFAULT_TIMEOUT_SECONDS = 20
-
-# DEFILLAMA_API_KEY is reserved for a future Pro API toggle; the free stablecoins.llama.fi
-# endpoints above are used for all current ingest and optional backfill paths.
 
 
 class DefiLlamaError(Exception):
     """Raised when DefiLlama data cannot be fetched or parsed."""
 
 
-def _request_json(url: str) -> dict | list:
-    session = _get_http_session()
-    response = session.get(url, timeout=DEFAULT_TIMEOUT_SECONDS)
-    response.raise_for_status()
-    data = response.json()
-    if isinstance(data, dict):
-        return data
-    if isinstance(data, list):
-        return data
-    raise DefiLlamaError(f"Unexpected JSON root type from {url!r}")
-
-
-def _extract_numeric(entry: object) -> float | None:
-    if isinstance(entry, (int, float)):
-        return float(entry)
-    if not isinstance(entry, dict):
-        return None
-
-    for key in ("peggedUSD", "circulating", "usd", "value"):
-        value = entry.get(key)
-        if isinstance(value, (int, float)):
-            return float(value)
-    return None
-
-
-def _find_asset(payload: dict, *, symbol: str) -> dict:
-    assets = payload.get("peggedAssets", [])
-    for asset in assets:
-        if not isinstance(asset, dict):
-            continue
-        asset_symbol = str(asset.get("symbol", "")).upper()
-        name = str(asset.get("name", "")).lower()
-        gecko_id = str(asset.get("gecko_id", "")).lower()
-        desired = symbol.upper()
-        if asset_symbol == desired or gecko_id == desired.lower() or desired.lower() in name:
-            return asset
-    raise DefiLlamaError(f"{symbol} asset not found in DefiLlama payload")
+def _discover_chain_ids() -> list[str]:
+    session = _DefiLlamaSource._get_http_session()
+    try:
+        resp = session.get(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
+        payload = resp.json()
+        rows = payload if isinstance(payload, list) else payload.get("peggedAssets") or payload.get("chains") or []
+        return sorted({str(r["name"]) for r in rows if isinstance(r, dict) and r.get("name")})
+    except Exception:
+        return []
 
 
 def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
-    """
-    Chain-level aggregate stablecoin TVL from DefiLlama stablecoinchains.
-    Keyed by chain name as returned by DefiLlama (must match config chain `defillama_id` / name keys).
-    This is NOT per-asset TVL; use only as `Chain TVL` context.
-    """
     try:
-        chains_payload = _request_json(STABLECOIN_CHAINS_URL)
+        session = _DefiLlamaSource._get_http_session()
+        resp = session.get(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
+        chains_payload = resp.json()
     except Exception:
         return {}
-
-    if isinstance(chains_payload, list):
-        rows = chains_payload
-    elif isinstance(chains_payload, dict):
-        rows = chains_payload.get("peggedAssets") or chains_payload.get("chains") or []
-    else:
-        return {}
-    if not isinstance(rows, list):
-        return {}
-
+    rows = chains_payload if isinstance(chains_payload, list) else chains_payload.get("peggedAssets") or chains_payload.get("chains") or []
     out: dict[str, float] = {}
     for item in rows:
         if not isinstance(item, dict):
@@ -114,106 +47,22 @@ def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
     return out
 
 
-def fetch_asset_snapshot(
-    *,
-    asset_config: dict,
-    chain_ids: list[str],
-    chain_tvl_by_name: dict[str, float] | None = None,
-) -> dict:
-    symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
-    if not symbol:
-        raise DefiLlamaError("Invalid asset config: missing symbol")
-
-    stablecoins_payload = _request_json(USDT_STABLECOINS_URL)
-    selected_asset = _find_asset(stablecoins_payload, symbol=symbol)
-
-    raw_circulating = selected_asset.get("chainCirculating", {})
-    # API has returned both dict-shaped maps and empty lists; only dict supports .get().
-    chain_circulating: dict = raw_circulating if isinstance(raw_circulating, dict) else {}
-    current_map: dict[str, object] = {}
-    prev_day_map: dict[str, object] = {}
-    prev_week_map: dict[str, object] = {}
-    prev_month_map: dict[str, object] = {}
-
-    # Some payloads are shaped as {"current": {...}}, others as {"Ethereum": {"current": ...}}.
-    if isinstance(chain_circulating.get("current"), dict):
-        current_map = chain_circulating.get("current", {})
-        prev_day_map = chain_circulating.get("circulatingPrevDay", {})
-        prev_week_map = chain_circulating.get("circulatingPrevWeek", {})
-        prev_month_map = chain_circulating.get("circulatingPrevMonth", {})
-    elif isinstance(chain_circulating, dict):
-        for chain_name, entry in chain_circulating.items():
-            if isinstance(entry, dict):
-                current_map[str(chain_name)] = entry.get("current", entry)
-                prev_day_map[str(chain_name)] = entry.get("circulatingPrevDay", {})
-                prev_week_map[str(chain_name)] = entry.get("circulatingPrevWeek", {})
-                prev_month_map[str(chain_name)] = entry.get("circulatingPrevMonth", {})
-
-    lowercase_lookup = {key.lower(): value for key, value in current_map.items()}
-    prev_day_lowercase_lookup = {key.lower(): value for key, value in prev_day_map.items()}
-    prev_week_lowercase_lookup = {key.lower(): value for key, value in prev_week_map.items()}
-    prev_month_lowercase_lookup = {key.lower(): value for key, value in prev_month_map.items()}
-
-    chain_data: dict[str, dict] = {}
-    for chain_id in chain_ids:
-        current_entry = current_map.get(chain_id)
-        if current_entry is None:
-            current_entry = lowercase_lookup.get(chain_id.lower(), {})
-        prev_day_entry = prev_day_map.get(chain_id)
-        if prev_day_entry is None:
-            prev_day_entry = prev_day_lowercase_lookup.get(chain_id.lower(), {})
-        prev_week_entry = prev_week_map.get(chain_id)
-        if prev_week_entry is None:
-            prev_week_entry = prev_week_lowercase_lookup.get(chain_id.lower(), {})
-        prev_month_entry = prev_month_map.get(chain_id)
-        if prev_month_entry is None:
-            prev_month_entry = prev_month_lowercase_lookup.get(chain_id.lower(), {})
-        chain_data[chain_id] = {
-            "supply_current": _extract_numeric(current_entry) or 0.0,
-            "supply_prev_day": _extract_numeric(prev_day_entry),
-            "supply_prev_week": _extract_numeric(prev_week_entry),
-            "supply_prev_month": _extract_numeric(prev_month_entry),
-            "price": float(selected_asset.get("price")) if isinstance(selected_asset.get("price"), (int, float)) else None,
-            "tvl": None,
-        }
-
-    tvl_map = chain_tvl_by_name or {}
-    for chain_id in chain_ids:
-        # Prefer exact key, then case-insensitive match on chain name.
-        tv = tvl_map.get(chain_id)
-        if tv is None:
-            lower = {k.lower(): v for k, v in tvl_map.items()}
-            tv = lower.get(str(chain_id).lower())
-        if tv is not None:
-            chain_data[chain_id]["tvl"] = float(tv)
-
-    return {
-        "asset_symbol": symbol,
-        "asset_name": selected_asset.get("name"),
-        "peg_type": asset_config.get("peg_type", "peggedUSD"),
-        "fetched_at": datetime.now(timezone.utc),
-        "chain_data": chain_data,
-    }
-
-
-def _stablecoin_id_for_symbol(symbol: str) -> int:
-    payload = _request_json(USDT_STABLECOINS_URL)
+def fetch_stablecoin_chart_points(*, symbol: str, days: int) -> list[dict]:
+    session = _DefiLlamaSource._get_http_session()
+    payload = session.get(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
     if not isinstance(payload, dict):
         raise DefiLlamaError("Unexpected stablecoins list payload")
+    raw_id = None
     for asset in payload.get("peggedAssets", []):
         if not isinstance(asset, dict):
             continue
         if str(asset.get("symbol", "")).upper() == symbol.upper():
             raw_id = asset.get("id")
-            if isinstance(raw_id, int):
-                return raw_id
-            if isinstance(raw_id, str) and raw_id.isdigit():
-                return int(raw_id)
-    raise DefiLlamaError(f"{symbol} asset id not found for chart backfill")
-
-
-def _parse_chart_series(charts_payload: object) -> list[tuple[int, float]]:
-    """Extract (unix_seconds, total_supply) pairs from DefiLlama chart payloads."""
+            break
+    if raw_id is None:
+        raise DefiLlamaError(f"{symbol} asset id not found")
+    coin_id = int(raw_id) if isinstance(raw_id, int) else int(raw_id)
+    charts_payload = session.get(f"{STABLECOIN_CHARTS_URL}?stablecoin={coin_id}", timeout=DEFAULT_TIMEOUT_SECONDS).json()
     pairs: list[tuple[int, float]] = []
     if isinstance(charts_payload, dict):
         series = charts_payload.get("peggedUSD") or charts_payload.get("totalCirculatingUSD") or []
@@ -236,19 +85,8 @@ def _parse_chart_series(charts_payload: object) -> list[tuple[int, float]]:
                     if ts > 10_000_000_000:
                         ts = ts // 1000
                     pairs.append((ts, float(val)))
-    return pairs
-
-
-def fetch_stablecoin_chart_points(*, symbol: str, days: int) -> list[dict]:
-    """
-    Coarse daily circulating supply points for optional backfill (not live 5-minute buckets).
-    """
-    coin_id = _stablecoin_id_for_symbol(symbol)
-    charts_payload = _request_json(f"{STABLECOIN_CHARTS_URL}?stablecoin={coin_id}")
-    pairs = _parse_chart_series(charts_payload)
     if not pairs:
         raise DefiLlamaError(f"No chart history returned for {symbol}")
-
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     by_day: dict[datetime, float] = {}
     for ts, supply in pairs:
@@ -257,19 +95,111 @@ def fetch_stablecoin_chart_points(*, symbol: str, days: int) -> list[dict]:
             continue
         day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
         by_day[day] = supply
-
     out: list[dict] = []
     for day in sorted(by_day.keys()):
-        supply = by_day[day]
-        out.append(
-            {
-                "timestamp": day,
-                "total_supply": supply,
-                "price": 1.0,
-                "depeg_index": 0,
-                "signal_score": 0,
-                "signal_band": "Normal",
-                "concentration_score": 0,
-            }
-        )
+        out.append({"timestamp": day, "total_supply": by_day[day], "price": 1.0, "depeg_index": 0, "signal_score": 0, "signal_band": "Normal", "concentration_score": 0})
     return out
+
+
+class _DefiLlamaSource(AbstractSource):
+    name = "defillama"
+
+    @staticmethod
+    def _get_http_session() -> Any:
+        from requests import Session
+        from requests.adapters import HTTPAdapter
+        from urllib3.util import Retry
+        session = Session()
+        retries = Retry(total=3, backoff_factor=1.0, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET"])
+        adapter = HTTPAdapter(max_retries=retries)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
+
+    def fetch(self, **kwargs: Any) -> dict[str, Any]:
+        asset_config = kwargs.get("asset_config")
+        chain_ids = kwargs.get("chain_ids", [])
+        chain_tvl_by_name = kwargs.get("chain_tvl_by_name")
+        if not asset_config:
+            return {}
+        symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
+        session = self.get_http_session()
+        stablecoins_payload = session.get(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
+        if not isinstance(stablecoins_payload, dict):
+            raise DefiLlamaError("Unexpected payload")
+        selected_asset = None
+        for asset in stablecoins_payload.get("peggedAssets", []):
+            if not isinstance(asset, dict):
+                continue
+            asset_symbol = str(asset.get("symbol", "")).upper()
+            name = str(asset.get("name", "")).lower()
+            gecko_id = str(asset.get("gecko_id", "")).lower()
+            desired = symbol.upper()
+            if asset_symbol == desired or gecko_id == desired.lower() or desired.lower() in name:
+                selected_asset = asset
+                break
+        if selected_asset is None:
+            raise DefiLlamaError(f"{symbol} asset not found")
+        raw_circulating = selected_asset.get("chainCirculating", {})
+        chain_circulating: dict = raw_circulating if isinstance(raw_circulating, dict) else {}
+        current_map: dict[str, object] = {}
+        prev_day_map: dict[str, object] = {}
+        prev_week_map: dict[str, object] = {}
+        prev_month_map: dict[str, object] = {}
+        if isinstance(chain_circulating.get("current"), dict):
+            current_map = chain_circulating.get("current", {})
+            prev_day_map = chain_circulating.get("circulatingPrevDay", {})
+            prev_week_map = chain_circulating.get("circulatingPrevWeek", {})
+            prev_month_map = chain_circulating.get("circulatingPrevMonth", {})
+        elif isinstance(chain_circulating, dict):
+            for cn, entry in chain_circulating.items():
+                if isinstance(entry, dict):
+                    current_map[str(cn)] = entry.get("current", entry)
+                    prev_day_map[str(cn)] = entry.get("circulatingPrevDay", {})
+                    prev_week_map[str(cn)] = entry.get("circulatingPrevWeek", {})
+                    prev_month_map[str(cn)] = entry.get("circulatingPrevMonth", {})
+        lower = {k.lower(): v for k, v in current_map.items()}
+        prev_day_lower = {k.lower(): v for k, v in prev_day_map.items()}
+        prev_week_lower = {k.lower(): v for k, v in prev_week_map.items()}
+        prev_month_lower = {k.lower(): v for k, v in prev_month_map.items()}
+        chain_data: dict[str, dict] = {}
+        for chain_id in chain_ids:
+            def _extract(entry: object) -> float | None:
+                if isinstance(entry, (int, float)):
+                    return float(entry)
+                if not isinstance(entry, dict):
+                    return None
+                for key in ("peggedUSD", "circulating", "usd", "value"):
+                    v = entry.get(key)
+                    if isinstance(v, (int, float)):
+                        return float(v)
+                return None
+            cur = current_map.get(chain_id) or lower.get(chain_id.lower(), {})
+            pday = prev_day_map.get(chain_id) or prev_day_lower.get(chain_id.lower(), {})
+            pweek = prev_week_map.get(chain_id) or prev_week_lower.get(chain_id.lower(), {})
+            pmonth = prev_month_map.get(chain_id) or prev_month_lower.get(chain_id.lower(), {})
+            chain_data[chain_id] = {
+                "supply_current": _extract(cur) or 0.0,
+                "supply_prev_day": _extract(pday),
+                "supply_prev_week": _extract(pweek),
+                "supply_prev_month": _extract(pmonth),
+                "price": float(selected_asset.get("price")) if isinstance(selected_asset.get("price"), (int, float)) else None,
+                "tvl": None,
+            }
+        if chain_tvl_by_name:
+            for chain_id in chain_ids:
+                tv = chain_tvl_by_name.get(chain_id)
+                if tv is None:
+                    tv = {k.lower(): v for k, v in chain_tvl_by_name.items()}.get(str(chain_id).lower())
+                if tv is not None:
+                    chain_data[chain_id]["tvl"] = float(tv)
+        return {
+            "asset_symbol": symbol,
+            "asset_name": selected_asset.get("name"),
+            "peg_type": asset_config.get("peg_type", "peggedUSD"),
+            "fetched_at": datetime.now(timezone.utc),
+            "chain_data": chain_data,
+        }
+
+    def transform(self, raw: dict[str, Any]) -> dict[str, Any]:
+        return raw

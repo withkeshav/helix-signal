@@ -40,8 +40,15 @@ class AssetChainSnapshot(Base):
     supply_prev_month: Mapped[float | None] = mapped_column(Float, nullable=True)
     tvl: Mapped[float | None] = mapped_column(Float, nullable=True)
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_coingecko: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_dexscreener: Mapped[float | None] = mapped_column(Float, nullable=True)
+    market_cap: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume_24h: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_liquidity_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    top3_pool_share_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pool_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     peg_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    source_name: Mapped[str] = mapped_column(String(64), default="defillama")
+    source_name: Mapped[str] = mapped_column(String(64), default="multi")
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

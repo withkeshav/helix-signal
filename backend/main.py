@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -14,6 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from sqlalchemy import desc, or_
+from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import (
@@ -21,6 +22,7 @@ from database import (
     ChainTrendSnapshot,
     SessionLocal,
     SignalEvent,
+    get_db,
     init_db,
 )
 from logging_config import configure_logging
@@ -169,26 +171,23 @@ async def metrics_middleware(request: Request, call_next):
 
 @app.get("/metrics")
 def prometheus_metrics() -> Response:
-    db = SessionLocal()
-    try:
-        scheduler = getattr(app.state, "scheduler", None)
-        METRIC_SCHEDULER_RUNNING.set(1 if scheduler and scheduler.running else 0)
+    db = next(get_db())
+    scheduler = getattr(app.state, "scheduler", None)
+    METRIC_SCHEDULER_RUNNING.set(1 if scheduler and scheduler.running else 0)
 
-        if scheduler and scheduler.running:
-            jobs = scheduler.get_jobs()
-            for job in jobs:
-                if job.id == "defillama-refresh" and hasattr(job, "next_run_time"):
-                    if job.next_run_time:
-                        age = (datetime.now(timezone.utc) - job.next_run_time).total_seconds()
-                        METRIC_LAST_REFRESH_AGE.set(max(age, 0))
+    if scheduler and scheduler.running:
+        jobs = scheduler.get_jobs()
+        for job in jobs:
+            if job.id == "defillama-refresh" and hasattr(job, "next_run_time"):
+                if job.next_run_time:
+                    age = (datetime.now(timezone.utc) - job.next_run_time).total_seconds()
+                    METRIC_LAST_REFRESH_AGE.set(max(age, 0))
 
-        source_count = db.query(AssetTrendSnapshot).count()
-        METRIC_DB_CONNECTIONS.set(source_count)
+    source_count = db.query(AssetTrendSnapshot).count()
+    METRIC_DB_CONNECTIONS.set(source_count)
 
-        for src in ("defillama", "coingecko", "dexscreener"):
-            METRIC_SOURCE_HEALTH.labels(source=src).set(1)
-    finally:
-        db.close()
+    for src in ("defillama", "coingecko", "dexscreener"):
+        METRIC_SOURCE_HEALTH.labels(source=src).set(1)
 
     return Response(content=generate_latest(), media_type="text/plain; charset=utf-8")
 
@@ -201,35 +200,23 @@ def root(request: Request) -> str:
 
 @app.get("/api/health")
 @limiter.limit("60/minute")
-def api_health(request: Request) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        scheduler = getattr(app.state, "scheduler", None)
-        return build_health_payload(db, scheduler=scheduler)
-    finally:
-        db.close()
+def api_health(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    scheduler = getattr(app.state, "scheduler", None)
+    return build_health_payload(db, scheduler=scheduler)
 
 
 @app.post("/api/refresh")
 @limiter.limit("10/minute")
-def api_refresh(request: Request) -> dict[str, bool]:
+def api_refresh(request: Request, db: Session = Depends(get_db)) -> dict[str, bool]:
     """Run the DefiLlama ingest pipeline once (same as the scheduler job)."""
-    db = SessionLocal()
-    try:
-        refresh_chain_data(db)
-        return {"ok": True}
-    finally:
-        db.close()
+    refresh_chain_data(db)
+    return {"ok": True}
 
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 @limiter.limit("60/minute")
-def dashboard(request: Request, asset: str | None = None) -> DashboardResponse:
-    db = SessionLocal()
-    try:
-        return build_dashboard_response(db, asset)
-    finally:
-        db.close()
+def dashboard(request: Request, asset: str | None = None, db: Session = Depends(get_db)) -> DashboardResponse:
+    return build_dashboard_response(db, asset)
 
 
 @app.get("/api/assets", response_model=list[AssetConfigOut])
@@ -326,7 +313,7 @@ def _build_trend_summary(points: list[TrendPointOut], *, window: str, now: datet
 
 @app.get("/api/trends", response_model=TrendResponseOut)
 @limiter.limit("60/minute")
-def trends(request: Request, asset: str, window: str = Query("7d")) -> TrendResponseOut:
+def trends(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> TrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
         raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
@@ -335,39 +322,35 @@ def trends(request: Request, asset: str, window: str = Query("7d")) -> TrendResp
     if selected is None or not bool(selected.get("enabled")):
         raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
 
-    db = SessionLocal()
-    try:
-        now = datetime.now(timezone.utc)
-        cutoff = now - window_delta(w)
-        rows = (
-            db.query(AssetTrendSnapshot)
-            .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
-            .order_by(AssetTrendSnapshot.timestamp.asc())
-            .all()
+    now = datetime.now(timezone.utc)
+    cutoff = now - window_delta(w)
+    rows = (
+        db.query(AssetTrendSnapshot)
+        .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
+        .order_by(AssetTrendSnapshot.timestamp.asc())
+        .all()
+    )
+    points = [
+        TrendPointOut(
+            timestamp=r.timestamp,
+            total_supply=r.total_supply,
+            price=r.price,
+            depeg_index=int(r.depeg_index),
+            signal_score=int(r.signal_score),
+            signal_band=str(r.signal_band),
+            concentration_score=int(r.concentration_score),
+            data_confidence=str(r.data_confidence_label),
         )
-        points = [
-            TrendPointOut(
-                timestamp=r.timestamp,
-                total_supply=r.total_supply,
-                price=r.price,
-                depeg_index=int(r.depeg_index),
-                signal_score=int(r.signal_score),
-                signal_band=str(r.signal_band),
-                concentration_score=int(r.concentration_score),
-                data_confidence=str(r.data_confidence_label),
-            )
-            for r in rows
-        ]
-        summary = _build_trend_summary(points, window=w, now=now)
-        return TrendResponseOut(
-            asset=sym,
-            window=w,
-            generated_at=now,
-            points=points,
-            summary=summary,
-        )
-    finally:
-        db.close()
+        for r in rows
+    ]
+    summary = _build_trend_summary(points, window=w, now=now)
+    return TrendResponseOut(
+        asset=sym,
+        window=w,
+        generated_at=now,
+        points=points,
+        summary=summary,
+    )
 
 
 @app.get("/api/trends/export")
@@ -377,12 +360,9 @@ def trends_export_route(
     asset: str,
     window: str = Query("7d"),
     format: str = Query("csv", alias="format"),
+    db: Session = Depends(get_db),
 ):
-    db = SessionLocal()
-    try:
-        return trends_export(db, asset=asset, window=window, fmt=format)
-    finally:
-        db.close()
+    return trends_export(db, asset=asset, window=window, fmt=format)
 
 
 def _chain_trend_summary_dict(
@@ -453,7 +433,7 @@ def _chain_trend_summary_dict(
 
 @app.get("/api/trends/chains", response_model=ChainTrendResponseOut)
 @limiter.limit("60/minute")
-def trends_chains(request: Request, asset: str, window: str = Query("7d")) -> ChainTrendResponseOut:
+def trends_chains(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> ChainTrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
         raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
@@ -462,48 +442,44 @@ def trends_chains(request: Request, asset: str, window: str = Query("7d")) -> Ch
     if selected is None or not bool(selected.get("enabled")):
         raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
 
-    db = SessionLocal()
-    try:
-        now = datetime.now(timezone.utc)
-        cutoff = now - window_delta(w)
-        rows = (
-            db.query(ChainTrendSnapshot)
-            .filter(ChainTrendSnapshot.asset_symbol == sym, ChainTrendSnapshot.timestamp >= cutoff)
-            .order_by(ChainTrendSnapshot.timestamp.asc())
-            .all()
-        )
-        grouped: dict[str, dict] = defaultdict(lambda: {"chain_name": "", "points": []})
-        for r in rows:
-            g = grouped[r.chain_key]
-            if not g["chain_name"]:
-                g["chain_name"] = r.chain_name
-            g["points"].append(
-                ChainTrendPointOut(
-                    timestamp=r.timestamp,
-                    supply=r.supply,
-                    supply_share_pct=r.supply_share_pct,
-                    chain_tvl=r.chain_tvl,
-                    chain_signal_score=int(r.chain_signal_score),
-                    chain_signal_band=str(r.chain_signal_band),
-                    data_confidence_score=int(r.data_confidence_score),
-                )
+    now = datetime.now(timezone.utc)
+    cutoff = now - window_delta(w)
+    rows = (
+        db.query(ChainTrendSnapshot)
+        .filter(ChainTrendSnapshot.asset_symbol == sym, ChainTrendSnapshot.timestamp >= cutoff)
+        .order_by(ChainTrendSnapshot.timestamp.asc())
+        .all()
+    )
+    grouped: dict[str, dict] = defaultdict(lambda: {"chain_name": "", "points": []})
+    for r in rows:
+        g = grouped[r.chain_key]
+        if not g["chain_name"]:
+            g["chain_name"] = r.chain_name
+        g["points"].append(
+            ChainTrendPointOut(
+                timestamp=r.timestamp,
+                supply=r.supply,
+                supply_share_pct=r.supply_share_pct,
+                chain_tvl=r.chain_tvl,
+                chain_signal_score=int(r.chain_signal_score),
+                chain_signal_band=str(r.chain_signal_band),
+                data_confidence_score=int(r.data_confidence_score),
             )
-        series: list[ChainTrendSeriesOut] = []
-        for key in sorted(grouped.keys()):
-            blob = grouped[key]
-            pts = sorted(blob["points"], key=lambda p: p.timestamp)
-            series.append(ChainTrendSeriesOut(chain_key=key, chain_name=blob["chain_name"], points=pts))
-        total_points = sum(len(s.points) for s in series)
-        summary = _chain_trend_summary_dict(series, window=w, now=now, total_points=total_points)
-        return ChainTrendResponseOut(
-            asset=sym,
-            window=w,
-            generated_at=now,
-            series=series,
-            summary=summary,
         )
-    finally:
-        db.close()
+    series: list[ChainTrendSeriesOut] = []
+    for key in sorted(grouped.keys()):
+        blob = grouped[key]
+        pts = sorted(blob["points"], key=lambda p: p.timestamp)
+        series.append(ChainTrendSeriesOut(chain_key=key, chain_name=blob["chain_name"], points=pts))
+    total_points = sum(len(s.points) for s in series)
+    summary = _chain_trend_summary_dict(series, window=w, now=now, total_points=total_points)
+    return ChainTrendResponseOut(
+        asset=sym,
+        window=w,
+        generated_at=now,
+        series=series,
+        summary=summary,
+    )
 
 
 @app.get("/api/events", response_model=SignalEventsResponseOut)
@@ -512,21 +488,18 @@ def events(
     request: Request,
     limit: int = Query(50, ge=1, le=200),
     asset: str | None = None,
+    db: Session = Depends(get_db),
 ) -> SignalEventsResponseOut:
-    db = SessionLocal()
-    try:
-        now = datetime.now(timezone.utc)
-        q = db.query(SignalEvent)
-        if asset:
-            sym = asset.strip().upper()
-            selected = get_asset_by_symbol(sym)
-            if selected is None or not bool(selected.get("enabled")):
-                raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
-            q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
-        rows = q.order_by(desc(SignalEvent.timestamp)).limit(limit).all()
-        return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
-    finally:
-        db.close()
+    now = datetime.now(timezone.utc)
+    q = db.query(SignalEvent)
+    if asset:
+        sym = asset.strip().upper()
+        selected = get_asset_by_symbol(sym)
+        if selected is None or not bool(selected.get("enabled")):
+            raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
+        q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
+    rows = q.order_by(desc(SignalEvent.timestamp)).limit(limit).all()
+    return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
 
 
 @app.get("/api/events/export")
@@ -536,42 +509,27 @@ def events_export_route(
     limit: int = Query(500, ge=1, le=10000),
     asset: str | None = None,
     format: str = Query("csv", alias="format"),
+    db: Session = Depends(get_db),
 ):
-    db = SessionLocal()
-    try:
-        return events_export(db, asset=asset, limit=limit, fmt=format)
-    finally:
-        db.close()
+    return events_export(db, asset=asset, limit=limit, fmt=format)
 
 
 @app.get("/api/compare")
 @limiter.limit("60/minute")
-def compare(request: Request, assets: str, window: str = Query("7d")) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return build_compare_payload(db, assets_csv=assets, window=window)
-    finally:
-        db.close()
+def compare(request: Request, assets: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return build_compare_payload(db, assets_csv=assets, window=window)
 
 
 @app.get("/api/chains/{chain_key}")
 @limiter.limit("60/minute")
-def chain_detail(request: Request, chain_key: str, asset: str = Query(...)) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return build_chain_detail(db, chain_key=chain_key, asset=asset)
-    finally:
-        db.close()
+def chain_detail(request: Request, chain_key: str, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return build_chain_detail(db, chain_key=chain_key, asset=asset)
 
 
 @app.post("/api/admin/backfill")
 @limiter.limit("5/minute")
-def admin_backfill(request: Request, asset: str, days: int = Query(7, ge=7, le=30)) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return run_backfill(db, asset=asset, days=days)
-    finally:
-        db.close()
+def admin_backfill(request: Request, asset: str, days: int = Query(7, ge=7, le=30), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return run_backfill(db, asset=asset, days=days)
 
 
 @app.get("/api/alerts/config")
@@ -580,12 +538,8 @@ def get_alert_config(request: Request) -> list[dict[str, Any]]:
 
 
 @app.get("/api/governance")
-def api_governance(request: Request, asset: str = Query(...)) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return build_governance_payload(db, asset=asset)
-    finally:
-        db.close()
+def api_governance(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return build_governance_payload(db, asset=asset)
 
 
 @app.get("/api/osint/feed")
@@ -594,12 +548,9 @@ def api_osint_feed(
     request: Request,
     asset: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    db = SessionLocal()
-    try:
-        return get_osint_feed(db, asset=asset, limit=limit)
-    finally:
-        db.close()
+    return get_osint_feed(db, asset=asset, limit=limit)
 
 
 @app.get("/api/osint/sentiment")
@@ -607,12 +558,9 @@ def api_osint_sentiment(
     request: Request,
     asset: str | None = Query(None),
     window_days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    db = SessionLocal()
-    try:
-        return get_sentiment_timeseries(db, asset=asset, window_days=window_days)
-    finally:
-        db.close()
+    return get_sentiment_timeseries(db, asset=asset, window_days=window_days)
 
 
 @app.get("/api/osint/attestation")
@@ -625,21 +573,14 @@ def api_osint_correlate(
     request: Request,
     asset: str = Query(...),
     window_hours: int = Query(24, ge=1, le=168),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return correlate_sentiment_depeg(db, asset=asset, window_hours=window_hours)
-    finally:
-        db.close()
+    return correlate_sentiment_depeg(db, asset=asset, window_hours=window_hours)
 
 
 @app.get("/api/anomaly/detect")
-def api_anomaly_detect(request: Request, asset: str = Query(...)) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return detect_anomalies(db, asset_symbol=asset)
-    finally:
-        db.close()
+def api_anomaly_detect(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return detect_anomalies(db, asset_symbol=asset)
 
 
 @app.get("/api/anomaly/forecast")
@@ -647,12 +588,9 @@ def api_anomaly_forecast(
     request: Request,
     asset: str = Query(...),
     hours: int = Query(24, ge=1, le=168),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    db = SessionLocal()
-    try:
-        return forecast_supply(db, asset_symbol=asset, hours=hours)
-    finally:
-        db.close()
+    return forecast_supply(db, asset_symbol=asset, hours=hours)
 
 
 if __name__ == "__main__":

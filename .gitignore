@@ -62,7 +62,7 @@ grafana/data/
 Thumbs.db
 desktop.ini
 
-# --- Internal Planning Briefs ---
+# --- Internal planning briefs ---
 initial_BRIEF.md
 helix_signal_strategy_playbook.md
 *internal_docs*
@@ -75,7 +75,7 @@ helix_signal_research_findings.md
 helix_signal_defillama_probe_summary.md
 HELIX_V2_0_EXECUTION_BRIEF.md
 HELIX V2.0 EXECUTION BRIEF.md
-HELIX_V2.1_EXECUTION_BRIEF.md
+HELIX_V2_1_EXECUTION_BRIEF.md
 HELIX_V2_1_EXECUTION_BRIEF.md
 Helix-Signal V2.1 Execution Brief.md
 Helix-Signal V2.1 Execution Brief.md
@@ -89,6 +89,9 @@ HELIX_V2_4_EXECUTION_BRIEF.md
 HELIX V2.4 Execution Brief_ Historical Trends and Signal Feed.md
 opencode-implementation-plan.md
 oc-implementation-plan.md
+
+# --- Dead frontend code ---
+frontend/main.js
 
 # --- Internal tracking & research ---
 .progress

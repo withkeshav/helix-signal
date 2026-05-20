@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 from sources.base import AbstractSource, SourceError
 
 USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
@@ -105,16 +106,10 @@ class _DefiLlamaSource(AbstractSource):
     name = "defillama"
 
     @staticmethod
-    def _get_http_session() -> Any:
-        from requests import Session
-        from requests.adapters import HTTPAdapter
-        from urllib3.util import Retry
-        session = Session()
-        retries = Retry(total=3, backoff_factor=1.0, status_forcelist=[429, 500, 502, 503, 504], allowed_methods=["GET"])
-        adapter = HTTPAdapter(max_retries=retries)
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
-        return session
+    def _get_http_session() -> httpx.Client:
+        transport = httpx.HTTPTransport()
+        client = httpx.Client(transport=transport, timeout=httpx.Timeout(DEFAULT_TIMEOUT_SECONDS))
+        return client
 
     def fetch(self, **kwargs: Any) -> dict[str, Any]:
         asset_config = kwargs.get("asset_config")

@@ -7,6 +7,9 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import pandas as pd
+
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -54,7 +57,6 @@ def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 3
 def zscore_detect(values: list[float], threshold: float = 3.0) -> list[dict[str, Any]]:
     if len(values) < 10:
         return []
-    import numpy as np
     arr = np.array(values)
     mean = np.mean(arr)
     std = np.std(arr)

@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any
 
-from requests import Session
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
+import httpx
 
 
 class SourceError(Exception):
@@ -17,20 +15,15 @@ class AbstractSource(ABC):
     name: str = "abstract"
 
     def __init__(self) -> None:
-        self._session: Session | None = None
+        self._session: httpx.Client | None = None
 
-    def get_http_session(self) -> Session:
+    def get_http_session(self) -> httpx.Client:
         if self._session is None:
-            self._session = Session()
-            retries = Retry(
-                total=3,
-                backoff_factor=1.0,
-                status_forcelist=[429, 500, 502, 503, 504],
-                allowed_methods=["GET"],
+            transport = httpx.HTTPTransport()
+            self._session = httpx.Client(
+                transport=transport,
+                timeout=httpx.Timeout(20),
             )
-            adapter = HTTPAdapter(max_retries=retries)
-            self._session.mount("https://", adapter)
-            self._session.mount("http://", adapter)
         return self._session
 
     @abstractmethod

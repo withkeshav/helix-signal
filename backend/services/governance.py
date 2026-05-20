@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
-import requests
+import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,7 @@ def build_governance_payload(db: Session, *, asset: str) -> dict[str, Any]:
     if not addr:
         return result
     try:
-        resp = requests.get(ETHERSCAN_API, params={"module": "account", "action": "txlist", "address": addr, "startblock": 0, "endblock": 99999999, "page": 1, "offset": 10, "sort": "desc", "apikey": api_key}, timeout=15)
+        resp = httpx.get(ETHERSCAN_API, params={"module": "account", "action": "txlist", "address": addr, "startblock": 0, "endblock": 99999999, "page": 1, "offset": 10, "sort": "desc", "apikey": api_key}, timeout=15)
         data = resp.json()
         if data.get("status") == "1":
             events = []

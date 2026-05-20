@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from requests import Session
+import httpx
 
 from sources.base import AbstractSource
 
@@ -19,14 +19,14 @@ def _load_coin_ids() -> dict[str, str]:
     global _COINGECKO_IDS
     if _COINGECKO_IDS:
         return _COINGECKO_IDS
-    session = Session()
-    resp = session.get(COINGECKO_ASSET_URL, timeout=DEFAULT_TIMEOUT)
-    resp.raise_for_status()
-    for coin in resp.json():
-        sym = str(coin.get("symbol", "")).upper()
-        cid = str(coin.get("id", ""))
-        if sym and cid:
-            _COINGECKO_IDS[sym] = cid
+    with httpx.Client(timeout=httpx.Timeout(DEFAULT_TIMEOUT)) as client:
+        resp = client.get(COINGECKO_ASSET_URL)
+        resp.raise_for_status()
+        for coin in resp.json():
+            sym = str(coin.get("symbol", "")).upper()
+            cid = str(coin.get("id", ""))
+            if sym and cid:
+                _COINGECKO_IDS[sym] = cid
     return _COINGECKO_IDS
 
 

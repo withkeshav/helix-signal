@@ -105,7 +105,7 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         label=scoring.composite_band(conc_s),
     )
 
-    asset_signal_dict = scoring.compute_asset_signal(
+    asset_signal_dict = scoring.compute_risk_score(
         price=price,
         supply_current=float(total_supply or 0.0),
         supply_prev_day=total_prev_day if total_prev_day > 0 else None,
@@ -116,6 +116,10 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         source_error=source_error,
         age_seconds=freshness_dict.get("age_seconds"),
         refresh_interval_seconds=refresh_interval,
+        slippage_10k_bps=0.0,
+        slippage_100k_bps=0.0,
+        top3_pool_share_pct=None,
+        tvl_change_24h_pct=total_change_24h_pct,
     )
     asset_signal = AssetSignalOut(
         score=int(asset_signal_dict["score"]),

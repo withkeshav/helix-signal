@@ -97,7 +97,7 @@ def compute_asset_metric_bundle(
     price = next((c.price for c in chains_orm if c.price is not None), None)
     depeg_index = scoring.depeg_index_score(price)
 
-    asset_signal_dict = scoring.compute_asset_signal(
+    asset_signal_dict = scoring.compute_risk_score(
         price=price,
         supply_current=float(total_supply or 0.0),
         supply_prev_day=total_prev_day if total_prev_day > 0 else None,
@@ -109,7 +109,7 @@ def compute_asset_metric_bundle(
         age_seconds=age_seconds,
         refresh_interval_seconds=refresh_interval_seconds,
     )
-    conc_s, conc_detail = scoring.concentration_component(chain_shares)
+    conc_s, conc_detail = scoring.concentration_component(chain_shares, top3_dex_pool_share=None)
     dc_block = (asset_signal_dict.get("components") or {}).get("data_confidence") or {}
     dc_label = str(dc_block.get("label") or "Unknown")
     dc_score = int(dc_block.get("score") or 0)

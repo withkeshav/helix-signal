@@ -1,4 +1,22 @@
 services:
+  traefik:
+    image: traefik:v3.3
+    container_name: helix-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - acme_data:/acme.json
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.helix.local`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+
   backend:
     build:
       context: ./backend
@@ -13,16 +31,62 @@ services:
       DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
     volumes:
       - helix_data:/data
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
 
   frontend:
     build:
       context: ./frontend
-    ports:
-      - "3000:80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`helix.local`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    expose:
+      - "80"
     depends_on:
       - backend
 
+  prometheus:
+    image: prom/prometheus:v3.2
+    container_name: helix-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.helix.local`)"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    expose:
+      - "9090"
+
+  grafana:
+    image: grafana/grafana:11.5
+    container_name: helix-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.helix.local`)"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    expose:
+      - "3000"
+    secrets:
+      - grafana_admin_password
+
 volumes:
   helix_data:
+  acme_data:
+  prometheus_data:
+  grafana_data:
+
+secrets:
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt

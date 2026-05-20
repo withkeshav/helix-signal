@@ -1,5 +1,34 @@
 # Changelog
 
+## v3.0.0 - OSINT Intelligence Terminal
+
+### Added
+- **V3 Risk Score**: 5-component composite (peg stability 35%, liquidity depth 25%, supply stability 15%, concentration 15%, observability 10%) with hard overrides for depeg >200bps and data staleness
+- **Multi-source engine**: AbstractSource base class + CoinGecko (price, market cap, volume), DEX Screener (liquidity depth, pool concentration, slippage), Chainlink (optional on-chain oracle)
+- **Cross-source price validator**: flags discrepancies >0.5% between DefiLlama and CoinGecko
+- **Alerting system**: 9 rule types (peg deviation, slippage spike, supply contraction, concentration spike, data staleness, source failure/recovery) with persistence tracking, dedup, 4 dispatch channels (dashboard, webhook, Discord, Telegram)
+- **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + CryptoPanic API + FinBERT sentiment scoring
+- **Governance monitoring**: contract upgrade tracking via Etherscan API
+- **AI anomaly detection** (gated): Z-score rolling 3σ, Isolation Forest multi-metric anomaly, Prophet 24h supply/depeg forecast — enabled via `ENABLE_ANOMALY_DETECTION=true`
+- **DuckDB analytics**: embedded time-series queries on trend data
+- **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
+- **Alpine.js + htmx frontend**: 4-tab layout (Overview, Peg & Liquidity, Supply & Flows, Intelligence), CDN-loaded, zero build step
+- **Chart.js wiring**: distribution + supply bar charts, sentiment overlay, attestation status
+
+### Phase 6 — Production Hardening
+- **Traefik reverse proxy**: auto-TLS via Let's Encrypt, Docker provider, dashboard
+- **Prometheus `/metrics` endpoint**: request count, latency histogram, scheduler health, source health gauges, DB connection count
+- **Prometheus + Grafana stack**: managed via docker-compose, pre-provisioned datasource and dashboard
+- **CI/CD pipeline**: GitHub Actions → lint → test → Docker build → push to GHCR on tags
+- **Integration tests**: vcr.py for recorded API responses (DefiLlama, CoinGecko, DEX Screener)
+- **docker-compose.override.yml**: dev mode with hot-reload, debug logging
+- **Secrets management**: Docker secrets for Grafana admin password
+- **Version**: bumped to 3.0.0
+
+### Documentation
+- Updated README, .env.example for V3 endpoints and monitoring stack
+- Updated CHANGELOG for full V3 history
+
 ## v2.5.0 - Trust the terminal
 
 ### Added

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, ChainTrendSnapshot, SignalEvent
 
-HELIX_VERSION = "2.5.1"
+HELIX_VERSION = "3.0.0"
 
 
 def _retention_days(env_key: str, default: int) -> int:

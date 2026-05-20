@@ -27,11 +27,21 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 
 ```bash
 cp .env.example .env
+mkdir -p secrets && echo "admin" > secrets/grafana_admin_password.txt
 docker compose up --build
 ```
 
-- Dashboard: [http://localhost:3000](http://localhost:3000) (API proxied at `/api`)
+- Dashboard: [http://helix.local](http://helix.local) (via Traefik, API proxied at `/api`)
 - Backend API direct: [http://localhost:8000](http://localhost:8000)
+- Prometheus: [http://prometheus.helix.local](http://prometheus.helix.local)
+- Grafana: [http://grafana.helix.local](http://grafana.helix.local) (default: admin / admin)
+- Traefik dashboard: [http://localhost:8080](http://localhost:8080) (dev only)
+
+### Dev mode with hot-reload
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up --build
+```
 
 ### Local backend with Python venv
 
@@ -90,6 +100,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/governance` | Governance monitoring |
 | `GET /api/anomaly/detect` | Z-score + Isolation Forest anomaly flags |
 | `GET /api/anomaly/forecast` | Supply forecast (Prophet) |
+| `GET /metrics` | Prometheus metrics (request count, latency, scheduler, source health) |
 
 ## Project Structure
 

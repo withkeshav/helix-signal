@@ -40,6 +40,15 @@ out/
 
 # --- Docker ---
 .docker/
+secrets/
+!.env.example
+
+# --- Test Artifacts ---
+backend/tests/cassettes/
+
+# --- Monitoring ---
+prometheus/data/
+grafana/data/
 
 # --- IDEs and OS Metadata ---
 .vscode/

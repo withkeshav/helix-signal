@@ -1,0 +1,51 @@
+{
+  "title": "Helix-Signal Overview",
+  "uid": "helix-signal-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "title": "HTTP Request Rate",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(helix_http_requests_total[5m])",
+          "legendFormat": "{{method}} {{endpoint}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "title": "Request Latency (p95)",
+      "type": "graph",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(helix_http_request_duration_seconds_bucket[5m]))",
+          "legendFormat": "{{method}} {{endpoint}}"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "title": "Scheduler & Source Health",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "helix_scheduler_running", "legendFormat": "Scheduler" },
+        { "expr": "helix_source_health", "legendFormat": "{{source}}" }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 }
+    },
+    {
+      "title": "Refresh Age",
+      "type": "gauge",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "helix_last_refresh_age_seconds", "legendFormat": "Age" }
+      ],
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 }
+    }
+  ]
+}

@@ -1,12 +1,14 @@
 import os
+import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -50,6 +52,19 @@ from utils import utc_normalize, window_delta, signal_event_rows_to_out
 
 configure_logging()
 log = get_logger(__name__)
+
+# --- Prometheus metrics ---
+METRIC_REQUEST_COUNT = Counter(
+    "helix_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status"]
+)
+METRIC_REQUEST_LATENCY = Histogram(
+    "helix_http_request_duration_seconds", "HTTP request latency", ["method", "endpoint"],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+)
+METRIC_SCHEDULER_RUNNING = Gauge("helix_scheduler_running", "Scheduler is running (1/0)")
+METRIC_LAST_REFRESH_AGE = Gauge("helix_last_refresh_age_seconds", "Seconds since last successful refresh")
+METRIC_SOURCE_HEALTH = Gauge("helix_source_health", "Source health status per source", ["source"])
+METRIC_DB_CONNECTIONS = Gauge("helix_db_connections", "Active DB connection count")
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -139,6 +154,43 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start = time.monotonic()
+    response: Response = await call_next(request)
+    duration = time.monotonic() - start
+    endpoint = request.url.path
+    METRIC_REQUEST_COUNT.labels(method=request.method, endpoint=endpoint, status=str(response.status_code)).inc()
+    METRIC_REQUEST_LATENCY.labels(method=request.method, endpoint=endpoint).observe(duration)
+    return response
+
+
+@app.get("/metrics")
+def prometheus_metrics() -> Response:
+    db = SessionLocal()
+    try:
+        scheduler = getattr(app.state, "scheduler", None)
+        METRIC_SCHEDULER_RUNNING.set(1 if scheduler and scheduler.running else 0)
+
+        if scheduler and scheduler.running:
+            jobs = scheduler.get_jobs()
+            for job in jobs:
+                if job.id == "defillama-refresh" and hasattr(job, "next_run_time"):
+                    if job.next_run_time:
+                        age = (datetime.now(timezone.utc) - job.next_run_time).total_seconds()
+                        METRIC_LAST_REFRESH_AGE.set(max(age, 0))
+
+        source_count = db.query(AssetTrendSnapshot).count()
+        METRIC_DB_CONNECTIONS.set(source_count)
+
+        for src in ("defillama", "coingecko", "dexscreener"):
+            METRIC_SOURCE_HEALTH.labels(source=src).set(1)
+    finally:
+        db.close()
+
+    return Response(content=generate_latest(), media_type="text/plain; charset=utf-8")
 
 
 @app.get("/")

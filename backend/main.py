@@ -581,6 +581,28 @@ def api_osint_correlate(
         db.close()
 
 
+@app.get("/api/anomaly/detect")
+def api_anomaly_detect(request: Request, asset: str = Query(...)) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return detect_anomalies(db, asset_symbol=asset)
+    finally:
+        db.close()
+
+
+@app.get("/api/anomaly/forecast")
+def api_anomaly_forecast(
+    request: Request,
+    asset: str = Query(...),
+    hours: int = Query(24, ge=1, le=168),
+) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return forecast_supply(db, asset_symbol=asset, hours=hours)
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     import uvicorn
 

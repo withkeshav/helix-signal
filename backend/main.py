@@ -35,6 +35,7 @@ from schemas import (
     TrendSummaryOut,
 )
 from services.alerts import load_alert_rules, evaluate_alerts
+from services.anomaly import detect_anomalies, train_models, forecast_supply
 from services.backfill import run_backfill
 from services.chain_detail import build_chain_detail
 from services.compare import build_compare_payload

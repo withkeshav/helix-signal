@@ -34,11 +34,13 @@ from schemas import (
     TrendResponseOut,
     TrendSummaryOut,
 )
+from services.alerts import load_alert_rules, evaluate_alerts
 from services.backfill import run_backfill
 from services.chain_detail import build_chain_detail
 from services.compare import build_compare_payload
 from services.dashboard import build_dashboard_response
 from services.exports import events_export, trends_export
+from services.governance import build_governance_payload
 from services.health import build_health_payload
 from services.retention import prune_old_history
 from signal_engine.core import get_asset_by_symbol, load_enabled_assets, refresh_chain_data
@@ -495,6 +497,20 @@ def admin_backfill(request: Request, asset: str, days: int = Query(7, ge=7, le=3
     db = SessionLocal()
     try:
         return run_backfill(db, asset=asset, days=days)
+    finally:
+        db.close()
+
+
+@app.get("/api/alerts/config")
+def get_alert_config(request: Request) -> list[dict[str, Any]]:
+    return load_alert_rules()
+
+
+@app.get("/api/governance")
+def api_governance(request: Request, asset: str = Query(...)) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return build_governance_payload(db, asset=asset)
     finally:
         db.close()
 

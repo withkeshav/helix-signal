@@ -11,6 +11,7 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, ChainTrendSnapshot, SignalEvent, SourceStatus
+from services.alerts import evaluate_alerts
 from signal_engine.metrics import compute_asset_metric_bundle
 from utils import utc_now
 
@@ -419,3 +420,16 @@ def persist_trends_and_events(
             new_label=bundle.data_confidence_label,
             ts=ts,
         )
+
+        bundle_dict = {
+            "total_supply": bundle.total_supply,
+            "price": bundle.price,
+            "depeg_index": bundle.depeg_index,
+            "signal_score": bundle.signal_score,
+            "signal_band": bundle.signal_band,
+            "concentration_score": bundle.concentration_score,
+            "data_confidence_label": bundle.data_confidence_label,
+            "freshness_age_seconds": bundle.freshness_age_seconds,
+        }
+        evaluate_alerts(db, bundle=bundle_dict, asset_symbol=u, now=ts)
+

@@ -43,6 +43,13 @@ class DashboardChainRow(BaseModel):
         description="Chain-level aggregate stablecoin TVL from DefiLlama stablecoinchains, not asset-specific TVL.",
     )
     price: float | None = None
+    price_coingecko: float | None = None
+    price_dexscreener: float | None = None
+    market_cap: float | None = None
+    volume_24h: float | None = None
+    total_liquidity_usd: float | None = None
+    top3_pool_share_pct: float | None = None
+    pool_count: int | None = None
     peg_type: str | None = None
     fetched_at: datetime
     supply_momentum: SupplyMomentumOut

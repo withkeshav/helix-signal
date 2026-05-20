@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import DateTime, Float, Integer, String, Text, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 def _default_database_url() -> str:
@@ -14,7 +15,10 @@ def _default_database_url() -> str:
 DATABASE_URL = os.getenv("DATABASE_URL", _default_database_url())
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+_pool_kw: dict = {}
+if DATABASE_URL in ("sqlite:///:memory:", "sqlite://"):
+    _pool_kw["poolclass"] = StaticPool
+engine = create_engine(DATABASE_URL, connect_args=connect_args, **_pool_kw)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

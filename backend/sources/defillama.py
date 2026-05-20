@@ -1,12 +1,41 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-import requests
+from requests import Session
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
 USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
 STABLECOIN_CHAINS_URL = "https://stablecoins.llama.fi/stablecoinchains"
+STABLECOIN_CHARTS_URL = "https://stablecoins.llama.fi/stablecoincharts/all"
 DEFAULT_TIMEOUT_SECONDS = 20
+
+_HTTP_SESSION: Session | None = None
+
+
+def _get_http_session() -> Session:
+    global _HTTP_SESSION
+    if _HTTP_SESSION is None:
+        _HTTP_SESSION = Session()
+        retries = Retry(
+            total=3,
+            backoff_factor=1.0,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        _HTTP_SESSION.mount("https://", adapter)
+        _HTTP_SESSION.mount("http://", adapter)
+    return _HTTP_SESSION
+
+USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
+STABLECOIN_CHAINS_URL = "https://stablecoins.llama.fi/stablecoinchains"
+STABLECOIN_CHARTS_URL = "https://stablecoins.llama.fi/stablecoincharts/all"
+DEFAULT_TIMEOUT_SECONDS = 20
+
+# DEFILLAMA_API_KEY is reserved for a future Pro API toggle; the free stablecoins.llama.fi
+# endpoints above are used for all current ingest and optional backfill paths.
 
 
 class DefiLlamaError(Exception):
@@ -14,7 +43,8 @@ class DefiLlamaError(Exception):
 
 
 def _request_json(url: str) -> dict | list:
-    response = requests.get(url, timeout=DEFAULT_TIMEOUT_SECONDS)
+    session = _get_http_session()
+    response = session.get(url, timeout=DEFAULT_TIMEOUT_SECONDS)
     response.raise_for_status()
     data = response.json()
     if isinstance(data, dict):
@@ -67,8 +97,6 @@ def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
     elif isinstance(chains_payload, dict):
         rows = chains_payload.get("peggedAssets") or chains_payload.get("chains") or []
     else:
-        return {}
-    if not isinstance(rows, list):
         return {}
     if not isinstance(rows, list):
         return {}
@@ -166,3 +194,82 @@ def fetch_asset_snapshot(
         "fetched_at": datetime.now(timezone.utc),
         "chain_data": chain_data,
     }
+
+
+def _stablecoin_id_for_symbol(symbol: str) -> int:
+    payload = _request_json(USDT_STABLECOINS_URL)
+    if not isinstance(payload, dict):
+        raise DefiLlamaError("Unexpected stablecoins list payload")
+    for asset in payload.get("peggedAssets", []):
+        if not isinstance(asset, dict):
+            continue
+        if str(asset.get("symbol", "")).upper() == symbol.upper():
+            raw_id = asset.get("id")
+            if isinstance(raw_id, int):
+                return raw_id
+            if isinstance(raw_id, str) and raw_id.isdigit():
+                return int(raw_id)
+    raise DefiLlamaError(f"{symbol} asset id not found for chart backfill")
+
+
+def _parse_chart_series(charts_payload: object) -> list[tuple[int, float]]:
+    """Extract (unix_seconds, total_supply) pairs from DefiLlama chart payloads."""
+    pairs: list[tuple[int, float]] = []
+    if isinstance(charts_payload, dict):
+        series = charts_payload.get("peggedUSD") or charts_payload.get("totalCirculatingUSD") or []
+        if isinstance(series, list):
+            for entry in series:
+                if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                    ts_raw, val = entry[0], entry[1]
+                    if isinstance(ts_raw, (int, float)) and isinstance(val, (int, float)):
+                        ts = int(ts_raw)
+                        if ts > 10_000_000_000:
+                            ts = ts // 1000
+                        pairs.append((ts, float(val)))
+    elif isinstance(charts_payload, list):
+        for entry in charts_payload:
+            if isinstance(entry, dict):
+                ts_raw = entry.get("date") or entry.get("timestamp")
+                val = entry.get("totalCirculating") or entry.get("peggedUSD") or entry.get("circulating")
+                if isinstance(ts_raw, (int, float)) and isinstance(val, (int, float)):
+                    ts = int(ts_raw)
+                    if ts > 10_000_000_000:
+                        ts = ts // 1000
+                    pairs.append((ts, float(val)))
+    return pairs
+
+
+def fetch_stablecoin_chart_points(*, symbol: str, days: int) -> list[dict]:
+    """
+    Coarse daily circulating supply points for optional backfill (not live 5-minute buckets).
+    """
+    coin_id = _stablecoin_id_for_symbol(symbol)
+    charts_payload = _request_json(f"{STABLECOIN_CHARTS_URL}?stablecoin={coin_id}")
+    pairs = _parse_chart_series(charts_payload)
+    if not pairs:
+        raise DefiLlamaError(f"No chart history returned for {symbol}")
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    by_day: dict[datetime, float] = {}
+    for ts, supply in pairs:
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        if dt < cutoff:
+            continue
+        day = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        by_day[day] = supply
+
+    out: list[dict] = []
+    for day in sorted(by_day.keys()):
+        supply = by_day[day]
+        out.append(
+            {
+                "timestamp": day,
+                "total_supply": supply,
+                "price": 1.0,
+                "depeg_index": 0,
+                "signal_score": 0,
+                "signal_band": "Normal",
+                "concentration_score": 0,
+            }
+        )
+    return out

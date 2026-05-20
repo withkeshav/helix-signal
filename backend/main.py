@@ -1,69 +1,103 @@
-import json
 import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from sqlalchemy import desc, or_
+from structlog import get_logger
 
-from database import AssetChainSnapshot, ChainTrendSnapshot, AssetTrendSnapshot, SessionLocal, SignalEvent, SourceStatus, init_db
+from database import (
+    AssetTrendSnapshot,
+    ChainTrendSnapshot,
+    SessionLocal,
+    SignalEvent,
+    init_db,
+)
+from logging_config import configure_logging
 from schemas import (
     AssetConfigOut,
-    AssetMetadataOut,
-    AssetSignalOut,
-    ChainConcentrationOut,
     ChainTrendPointOut,
     ChainTrendResponseOut,
     ChainTrendSeriesOut,
-    ChainSignalOut,
-    DashboardChainRow,
     DashboardResponse,
-    DataConfidenceOut,
-    DepegIndexOut,
-    FreshnessOut,
     SignalEventOut,
     SignalEventsResponseOut,
-    SourceStatusOut,
-    SupplyMomentumOut,
     TrendPointOut,
     TrendResponseOut,
     TrendSummaryOut,
 )
-from signal_engine import scoring
-from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol, load_enabled_assets, refresh_chain_data
+from services.backfill import run_backfill
+from services.chain_detail import build_chain_detail
+from services.compare import build_compare_payload
+from services.dashboard import build_dashboard_response
+from services.exports import events_export, trends_export
+from services.health import build_health_payload
+from services.retention import prune_old_history
+from signal_engine.core import get_asset_by_symbol, load_enabled_assets, refresh_chain_data
+from utils import utc_normalize, window_delta, signal_event_rows_to_out
+
+configure_logging()
+log = get_logger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _refresh_job() -> None:
+    log.info("refresh_job.start")
     db = SessionLocal()
     try:
         refresh_chain_data(db)
+        log.info("refresh_job.complete")
+    except Exception:
+        log.exception("refresh_job.failed")
     finally:
         db.close()
 
 
-def _utc(dt: datetime | None) -> datetime | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+def _retention_job() -> None:
+    db = SessionLocal()
+    try:
+        prune_old_history(db)
+    finally:
+        db.close()
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     init_db()
 
     scheduler = BackgroundScheduler()
-    interval_seconds = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
-    scheduler.add_job(_refresh_job, "interval", seconds=interval_seconds, id="defillama-refresh", replace_existing=True)
+    skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
+    if not skip_refresh:
+        interval_seconds = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
+        scheduler.add_job(
+            _refresh_job,
+            "interval",
+            seconds=interval_seconds,
+            id="defillama-refresh",
+            replace_existing=True,
+        )
+    scheduler.add_job(
+        _retention_job,
+        "cron",
+        hour=3,
+        minute=15,
+        id="history-retention",
+        replace_existing=True,
+    )
     scheduler.start()
+    app.state.scheduler = scheduler
 
-    # Trigger one immediate refresh at startup.
-    _refresh_job()
+    if not skip_refresh:
+        _refresh_job()
 
     try:
         yield
@@ -72,6 +106,9 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Helix-Signal API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -82,12 +119,25 @@ app.add_middleware(
 
 
 @app.get("/")
-def root() -> str:
+@limiter.limit("60/minute")
+def root(request: Request) -> str:
     return "Hello Helix-Signal!"
 
 
+@app.get("/api/health")
+@limiter.limit("60/minute")
+def api_health(request: Request) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        scheduler = getattr(app.state, "scheduler", None)
+        return build_health_payload(db, scheduler=scheduler)
+    finally:
+        db.close()
+
+
 @app.post("/api/refresh")
-def api_refresh() -> dict[str, bool]:
+@limiter.limit("10/minute")
+def api_refresh(request: Request) -> dict[str, bool]:
     """Run the DefiLlama ingest pipeline once (same as the scheduler job)."""
     db = SessionLocal()
     try:
@@ -98,197 +148,18 @@ def api_refresh() -> dict[str, bool]:
 
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
-def dashboard(asset: str | None = None) -> DashboardResponse:
+@limiter.limit("60/minute")
+def dashboard(request: Request, asset: str | None = None) -> DashboardResponse:
     db = SessionLocal()
     try:
-        selected_symbol = (asset or get_default_asset_symbol()).upper()
-        selected_asset = get_asset_by_symbol(selected_symbol)
-        if selected_asset is None or not bool(selected_asset.get("enabled")):
-            raise HTTPException(status_code=404, detail=f"Asset '{selected_symbol}' is not enabled")
-
-        refresh_interval = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
-
-        chains_orm = (
-            db.query(AssetChainSnapshot)
-            .filter(AssetChainSnapshot.asset_symbol == selected_symbol)
-            .order_by(AssetChainSnapshot.supply_current.desc(), AssetChainSnapshot.chain_name.asc())
-            .all()
-        )
-        sources_orm = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
-        sources = [SourceStatusOut.model_validate(s) for s in sources_orm]
-
-        defillama = next((s for s in sources_orm if s.source_name == "defillama"), None)
-        source_status = defillama.status if defillama else "unknown"
-
-        newest_chain_snapshot = max((_utc(c.fetched_at) for c in chains_orm), default=None) if chains_orm else None
-
-        freshness_dict = scoring.compute_freshness(
-            source_status=source_status,
-            last_successful_fetch=_utc(defillama.last_successful_fetch) if defillama else None,
-            newest_chain_snapshot=newest_chain_snapshot,
-            refresh_interval_seconds=refresh_interval,
-        )
-        freshness = FreshnessOut(**freshness_dict)
-
-        raw_total = sum((c.supply_current or 0.0) for c in chains_orm)
-        total_supply = raw_total if raw_total > 0 else None
-
-        total_prev_day = sum((c.supply_prev_day or 0.0) for c in chains_orm)
-        total_prev_week = sum((c.supply_prev_week or 0.0) for c in chains_orm)
-        total_prev_month = sum((c.supply_prev_month or 0.0) for c in chains_orm)
-
-        total_change_24h_pct: float | None = None
-        if total_supply is not None and total_prev_day > 0:
-            total_change_24h_pct = ((total_supply - total_prev_day) / total_prev_day) * 100.0
-
-        chain_shares: list[float] = []
-        if total_supply and total_supply > 0:
-            for c in chains_orm:
-                if c.supply_current is not None and c.supply_current > 0:
-                    chain_shares.append(float(c.supply_current) / float(total_supply))
-
-        source_ok = defillama is not None and defillama.status == "ok"
-        source_error = defillama.last_error if defillama else None
-
-        price = next((c.price for c in chains_orm if c.price is not None), None)
-
-        if price is not None:
-            dev_abs, dev_pct = scoring.peg_deviation(price)
-        else:
-            dev_abs, dev_pct = None, None
-        depeg_index = DepegIndexOut(
-            score=scoring.depeg_index_score(price),
-            current_price=price,
-            deviation_abs=dev_abs,
-            deviation_pct=dev_pct,
-            peg_status=scoring.peg_status_label(price),
-        )
-
-        conc_s, conc_detail = scoring.concentration_component(chain_shares)
-        top_chain_name: str | None = None
-        if total_supply and total_supply > 0 and chains_orm:
-            top_row = max(chains_orm, key=lambda c: (c.supply_current or 0.0))
-            if (top_row.supply_current or 0.0) > 0:
-                top_chain_name = top_row.chain_name
-
-        chain_concentration = ChainConcentrationOut(
-            top_chain=top_chain_name,
-            top_chain_share_pct=conc_detail.get("top_chain_share_pct"),
-            hhi=conc_detail.get("hhi"),
-            label=scoring.composite_band(conc_s),
-        )
-
-        asset_signal_dict = scoring.compute_asset_signal(
-            price=price,
-            supply_current=float(total_supply or 0.0),
-            supply_prev_day=total_prev_day if total_prev_day > 0 else None,
-            supply_prev_week=total_prev_week if total_prev_week > 0 else None,
-            supply_prev_month=total_prev_month if total_prev_month > 0 else None,
-            chain_shares=chain_shares,
-            source_ok=source_ok,
-            source_error=source_error,
-            age_seconds=freshness_dict.get("age_seconds"),
-            refresh_interval_seconds=refresh_interval,
-        )
-        asset_signal = AssetSignalOut(
-            score=int(asset_signal_dict["score"]),
-            band=str(asset_signal_dict["band"]),
-            components=dict(asset_signal_dict["components"]),
-        )
-
-        now = datetime.now(timezone.utc)
-        dashboard_chains: list[DashboardChainRow] = []
-        asset_name = selected_asset.get("name")
-
-        for c in chains_orm:
-            fetched = _utc(c.fetched_at)
-            age_s = (now - fetched).total_seconds() if fetched else None
-
-            sm_raw = scoring.chain_supply_momentum(
-                supply_current=c.supply_current,
-                supply_prev_day=c.supply_prev_day,
-                supply_prev_week=c.supply_prev_week,
-                supply_prev_month=c.supply_prev_month,
-            )
-            supply_momentum = SupplyMomentumOut(**sm_raw)
-
-            share_pct = (
-                (float(c.supply_current) / float(total_supply)) * 100.0
-                if total_supply and c.supply_current is not None and total_supply > 0
-                else None
-            )
-
-            cur_supply = float(c.supply_current or 0.0)
-            mom_hint, _ = scoring.supply_momentum_component(
-                supply_current=cur_supply,
-                supply_prev_day=c.supply_prev_day,
-                supply_prev_week=c.supply_prev_week,
-                supply_prev_month=c.supply_prev_month,
-            )
-
-            cs_raw = scoring.chain_row_signal(
-                chain_share_pct=share_pct,
-                peg_price=c.price,
-                momentum_score_hint=mom_hint,
-            )
-            chain_signal = ChainSignalOut(score=int(cs_raw["score"]), band=str(cs_raw["band"]))
-
-            dc_raw = scoring.chain_data_confidence(
-                source_ok=source_ok,
-                chain_snapshot_age_seconds=age_s,
-                refresh_interval_seconds=refresh_interval,
-            )
-            data_confidence = DataConfidenceOut(
-                score=int(dc_raw["score"]),
-                label=str(dc_raw["label"]),
-                reason=str(dc_raw["reason"]),
-            )
-
-            dashboard_chains.append(
-                DashboardChainRow(
-                    asset_symbol=selected_symbol,
-                    asset_name=asset_name,
-                    chain_name=c.chain_name,
-                    supply_current=c.supply_current,
-                    supply_prev_day=c.supply_prev_day,
-                    supply_prev_week=c.supply_prev_week,
-                    supply_prev_month=c.supply_prev_month,
-                    chain_tvl=c.tvl,
-                    price=c.price,
-                    peg_type=c.peg_type,
-                    fetched_at=c.fetched_at,
-                    supply_momentum=supply_momentum,
-                    chain_share_pct=round(share_pct, 4) if share_pct is not None else None,
-                    chain_signal=chain_signal,
-                    data_confidence=data_confidence,
-                )
-            )
-
-        generated_at = datetime.now(timezone.utc)
-
-        return DashboardResponse(
-            asset=AssetMetadataOut(
-                symbol=selected_symbol,
-                name=selected_asset.get("name"),
-                peg_type=selected_asset.get("peg_type"),
-            ),
-            generated_at=generated_at,
-            refresh_interval_seconds=refresh_interval,
-            freshness=freshness,
-            asset_signal=asset_signal,
-            depeg_index=depeg_index,
-            chain_concentration=chain_concentration,
-            total_supply_current=total_supply,
-            total_supply_change_24h_pct=total_change_24h_pct,
-            chains=dashboard_chains,
-            sources=sources,
-        )
+        return build_dashboard_response(db, asset)
     finally:
         db.close()
 
 
 @app.get("/api/assets", response_model=list[AssetConfigOut])
-def assets() -> list[AssetConfigOut]:
+@limiter.limit("60/minute")
+def assets(request: Request) -> list[AssetConfigOut]:
     enabled_assets = load_enabled_assets()
     return [AssetConfigOut(**asset) for asset in enabled_assets]
 
@@ -296,45 +167,8 @@ def assets() -> list[AssetConfigOut]:
 _ALLOWED_TREND_WINDOWS = frozenset({"24h", "7d", "30d"})
 
 
-def _window_delta(window: str) -> timedelta:
-    if window == "24h":
-        return timedelta(hours=24)
-    if window == "7d":
-        return timedelta(days=7)
-    return timedelta(days=30)
-
-
-def _signal_event_rows_to_out(rows: list[SignalEvent]) -> list[SignalEventOut]:
-    out: list[SignalEventOut] = []
-    for r in rows:
-        meta: dict | None = None
-        if r.metadata_json:
-            try:
-                meta = json.loads(r.metadata_json)
-            except json.JSONDecodeError:
-                meta = None
-        out.append(
-            SignalEventOut(
-                id=r.id,
-                asset_symbol=r.asset_symbol,
-                chain_key=r.chain_key,
-                event_type=r.event_type,
-                severity=r.severity,
-                title=r.title,
-                summary=r.summary,
-                old_value=r.old_value,
-                new_value=r.new_value,
-                delta=r.delta,
-                threshold=r.threshold,
-                timestamp=r.timestamp,
-                metadata=meta,
-            )
-        )
-    return out
-
-
 def _build_trend_summary(points: list[TrendPointOut], *, window: str, now: datetime) -> TrendSummaryOut:
-    span_td = _window_delta(window)
+    span_td = window_delta(window)
     window_seconds = max(span_td.total_seconds(), 1.0)
     window_hours = window_seconds / 3600.0
     axis_min = now - span_td
@@ -416,7 +250,8 @@ def _build_trend_summary(points: list[TrendPointOut], *, window: str, now: datet
 
 
 @app.get("/api/trends", response_model=TrendResponseOut)
-def trends(asset: str, window: str = Query("7d")) -> TrendResponseOut:
+@limiter.limit("60/minute")
+def trends(request: Request, asset: str, window: str = Query("7d")) -> TrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
         raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
@@ -428,7 +263,7 @@ def trends(asset: str, window: str = Query("7d")) -> TrendResponseOut:
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
-        cutoff = now - _window_delta(w)
+        cutoff = now - window_delta(w)
         rows = (
             db.query(AssetTrendSnapshot)
             .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
@@ -460,6 +295,21 @@ def trends(asset: str, window: str = Query("7d")) -> TrendResponseOut:
         db.close()
 
 
+@app.get("/api/trends/export")
+@limiter.limit("30/minute")
+def trends_export_route(
+    request: Request,
+    asset: str,
+    window: str = Query("7d"),
+    format: str = Query("csv", alias="format"),
+):
+    db = SessionLocal()
+    try:
+        return trends_export(db, asset=asset, window=window, fmt=format)
+    finally:
+        db.close()
+
+
 def _chain_trend_summary_dict(
     series: list[ChainTrendSeriesOut],
     *,
@@ -472,7 +322,7 @@ def _chain_trend_summary_dict(
         for p in s.points:
             stamps.append(p.timestamp)
     stamps.sort()
-    span_td = _window_delta(window)
+    span_td = window_delta(window)
     window_seconds = max(span_td.total_seconds(), 1.0)
     window_hours = window_seconds / 3600.0
     axis_min = now - span_td
@@ -527,7 +377,8 @@ def _chain_trend_summary_dict(
 
 
 @app.get("/api/trends/chains", response_model=ChainTrendResponseOut)
-def trends_chains(asset: str, window: str = Query("7d")) -> ChainTrendResponseOut:
+@limiter.limit("60/minute")
+def trends_chains(request: Request, asset: str, window: str = Query("7d")) -> ChainTrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
         raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
@@ -539,7 +390,7 @@ def trends_chains(asset: str, window: str = Query("7d")) -> ChainTrendResponseOu
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
-        cutoff = now - _window_delta(w)
+        cutoff = now - window_delta(w)
         rows = (
             db.query(ChainTrendSnapshot)
             .filter(ChainTrendSnapshot.asset_symbol == sym, ChainTrendSnapshot.timestamp >= cutoff)
@@ -581,7 +432,9 @@ def trends_chains(asset: str, window: str = Query("7d")) -> ChainTrendResponseOu
 
 
 @app.get("/api/events", response_model=SignalEventsResponseOut)
+@limiter.limit("60/minute")
 def events(
+    request: Request,
     limit: int = Query(50, ge=1, le=200),
     asset: str | None = None,
 ) -> SignalEventsResponseOut:
@@ -596,7 +449,52 @@ def events(
                 raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
             q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
         rows = q.order_by(desc(SignalEvent.timestamp)).limit(limit).all()
-        return SignalEventsResponseOut(generated_at=now, events=_signal_event_rows_to_out(rows))
+        return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
+    finally:
+        db.close()
+
+
+@app.get("/api/events/export")
+@limiter.limit("30/minute")
+def events_export_route(
+    request: Request,
+    limit: int = Query(500, ge=1, le=10000),
+    asset: str | None = None,
+    format: str = Query("csv", alias="format"),
+):
+    db = SessionLocal()
+    try:
+        return events_export(db, asset=asset, limit=limit, fmt=format)
+    finally:
+        db.close()
+
+
+@app.get("/api/compare")
+@limiter.limit("60/minute")
+def compare(request: Request, assets: str, window: str = Query("7d")) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return build_compare_payload(db, assets_csv=assets, window=window)
+    finally:
+        db.close()
+
+
+@app.get("/api/chains/{chain_key}")
+@limiter.limit("60/minute")
+def chain_detail(request: Request, chain_key: str, asset: str = Query(...)) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return build_chain_detail(db, chain_key=chain_key, asset=asset)
+    finally:
+        db.close()
+
+
+@app.post("/api/admin/backfill")
+@limiter.limit("5/minute")
+def admin_backfill(request: Request, asset: str, days: int = Query(7, ge=7, le=30)) -> dict[str, Any]:
+    db = SessionLocal()
+    try:
+        return run_backfill(db, asset=asset, days=days)
     finally:
         db.close()
 

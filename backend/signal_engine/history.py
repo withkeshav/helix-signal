@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, ChainTrendSnapshot, SignalEvent, SourceStatus
 from signal_engine.metrics import compute_asset_metric_bundle
+from utils import utc_now
 
 BUCKET_SECONDS = 300
 EVENT_DEDUP_MINUTES = 30
@@ -21,10 +22,6 @@ SUPPLY_WARN_PCT = 2.0
 SUPPLY_INFO_PCT = 1.0
 CONC_SHARE_DELTA_WARN = 5.0
 CONC_SCORE_DELTA_WARN = 10
-
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def _depeg_zone(score: int) -> str:
@@ -67,7 +64,7 @@ def _duplicate_event(
     severity: str,
     new_value: str | None,
 ) -> bool:
-    cutoff = _utc_now() - timedelta(minutes=EVENT_DEDUP_MINUTES)
+    cutoff = utc_now() - timedelta(minutes=EVENT_DEDUP_MINUTES)
     q = (
         db.query(SignalEvent)
         .filter(

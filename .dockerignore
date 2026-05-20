@@ -1,0 +1,15 @@
+.git/
+.gitignore
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+node_modules/
+research/
+*.md
+helm/
+k8s/

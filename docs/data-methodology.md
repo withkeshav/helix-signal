@@ -178,6 +178,19 @@ The **signal feed** is a local SQLite timeline of meaningful deltas, not outboun
 
 **Deduplication**: the same event type, asset, chain scope, severity, and `new_value` is suppressed if an equal row exists within about 30 minutes.
 
+## Retention (V2.5)
+
+A daily scheduler job deletes rows older than configured thresholds:
+
+- `TREND_RETENTION_DAYS` (default **90**) — `asset_trend_snapshots` and `chain_trend_snapshots`
+- `EVENT_RETENTION_DAYS` (default **30**) — `signal_events`
+
+Fresh installs with little history are unaffected beyond normal low-data messaging.
+
+## Optional synthetic backfill (V2.5)
+
+When `ALLOW_BACKFILL=true`, `POST /api/admin/backfill?asset=SYMBOL&days=7` may insert **coarse daily** points from DefiLlama circulating charts. Rows use `source_status=synthetic_backfill` and do not overwrite calendar days that already have live ingest snapshots. Compare and export consumers may exclude synthetic rows where noted. This is for faster chart context on new installs, not a full historical re-score.
+
 ## Known limitations
 
 - Single-source baseline (DefiLlama)

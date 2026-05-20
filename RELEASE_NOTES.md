@@ -1,5 +1,19 @@
 # Release Notes
 
+## v2.5.0 - Trust the terminal
+
+Helix-Signal v2.5 focuses on **operational maturity** and **analyst ergonomics** on top of the V2.4 trend and event memory layer.
+
+### Highlights
+
+- GitHub Actions CI and pytest (`backend/.venv` locally; venv in CI workflow)
+- `GET /api/health` for deploy and uptime checks
+- SQLite retention job and Compose/nginx deploy fixes
+- Trend and event CSV/JSON export, cross-asset compare, chain drill-down
+- Optional env-gated backfill for synthetic daily seed points
+
+See `CHANGELOG.md` for the full list.
+
 ## v2.4.0 - Historical Trends and Signal Feed
 
 Helix-Signal v2.4 adds **forward-collected historical trends**, **REST trend endpoints**, and a **local signal event feed** while keeping the V2.3 stack (FastAPI, SQLite, Vanilla JS + Chart.js) and the Helix Signal Score, Depeg Index, server freshness model, manual refresh endpoint, and labeled chain aggregate TVL behavior.
@@ -27,20 +41,3 @@ See `CHANGELOG.md` for the full list of changes and fixes.
 ## v1.0.0 - Initial Release
 
 Helix-Signal v1.0.0 introduces the first public version of Helix: a self-hostable USDT chain signal dashboard powered by FastAPI, SQLite, and a static Vanilla JS + Chart.js frontend.
-
-### Highlights
-
-- Backend data engine with scheduled DefiLlama refresh and graceful failure handling
-- SQLite-backed cache for chain metrics and source health
-- Dashboard API payload (`/api/dashboard`) for frontend consumption
-- Frontend terminal-style dashboard with:
-  - USDT supply and 24h delta
-  - Peg status classification
-  - TVL context
-  - Chain trend sparklines
-  - Source health footer
-- Core documentation suite for architecture, methodology, contributing, and security reporting
-
-### Scope
-
-This release focuses on a stable V1 baseline for USDT monitoring across configured top chains, with transparent methodology and local reproducibility via Docker Compose.

@@ -4,25 +4,14 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, SourceStatus
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol
-
-
-def _utc(dt: datetime | None) -> datetime | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def _chain_key(name: str) -> str:
-    return str(name).strip().lower().replace(" ", "-")
+from utils import utc_normalize, chain_key_from_name
 
 
 @dataclass
@@ -84,10 +73,10 @@ def compute_asset_metric_bundle(
     source_ok = defillama is not None and defillama.status == "ok"
     source_error = defillama.last_error if defillama else None
 
-    newest_chain_snapshot = max((_utc(c.fetched_at) for c in chains_orm), default=None) if chains_orm else None
+    newest_chain_snapshot = max((utc_normalize(c.fetched_at) for c in chains_orm), default=None) if chains_orm else None
     freshness_dict = scoring.compute_freshness(
         source_status=source_status,
-        last_successful_fetch=_utc(defillama.last_successful_fetch) if defillama else None,
+        last_successful_fetch=utc_normalize(defillama.last_successful_fetch) if defillama else None,
         newest_chain_snapshot=newest_chain_snapshot,
         refresh_interval_seconds=refresh_interval_seconds,
     )
@@ -128,7 +117,7 @@ def compute_asset_metric_bundle(
     now = datetime.now(timezone.utc)
     chain_rows: list[ChainMetricRow] = []
     for c in chains_orm:
-        fetched = _utc(c.fetched_at)
+        fetched = utc_normalize(c.fetched_at)
         age_s = (now - fetched).total_seconds() if fetched else None
         share_pct = (
             (float(c.supply_current) / float(total_supply)) * 100.0
@@ -156,7 +145,7 @@ def compute_asset_metric_bundle(
         chain_rows.append(
             ChainMetricRow(
                 chain_name=name,
-                chain_key=_chain_key(name),
+                chain_key=chain_key_from_name(name),
                 supply_current=c.supply_current,
                 supply_share_pct=round(share_pct, 4) if share_pct is not None else None,
                 chain_tvl=c.tvl,

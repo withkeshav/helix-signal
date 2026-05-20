@@ -43,25 +43,36 @@ uvicorn main:app --reload
 
 ### 3c) Local backend setup with Python `venv`
 
+Install dependencies **only** into `backend/.venv`:
+
+```bash
+cd backend
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python main.py
+```
+
+Or:
+
+```bash
+.venv/bin/uvicorn main:app --reload
+```
+
+### 3d) Run tests
+
 From `backend/`:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows PowerShell: .\.venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
+.venv/bin/pytest -q
 ```
 
-You can also use:
-
-```bash
-uvicorn main:app --reload
-```
+CI runs the same checks (import smoke + pytest) on push and pull requests. Set `HELIX_SKIP_STARTUP_REFRESH=1` is applied automatically in tests to avoid network ingest during pytest.
 
 ### 4) Verify
 
 - API root: `http://localhost:8000`
-- Dashboard payload: `http://localhost:8000/api/dashboard` (V2.3 includes `freshness`, `asset_signal`, `depeg_index`, `chain_concentration`, and enriched `chains` rows)
+- Health: `http://localhost:8000/api/health`
+- Dashboard payload: `http://localhost:8000/api/dashboard`
 - Trends: `http://localhost:8000/api/trends?asset=USDT&window=7d` and `http://localhost:8000/api/trends/chains?asset=USDT&window=7d`
 - Events: `http://localhost:8000/api/events?asset=USDT&limit=50` (omit `asset` for cross-asset feed)
 - Frontend: `http://localhost:3000`
@@ -135,5 +146,7 @@ Guidelines:
 
 - Explain what changed and why
 - Include manual verification steps
+- Run `cd backend && .venv/bin/pytest -q` before opening a PR
 - Confirm no secrets were added
 - Keep docs in sync when behavior or thresholds change
+- Do not commit internal execution briefs (see `.gitignore` patterns)

@@ -240,8 +240,38 @@
         height: 190px;
       }
       .trends-section,
-      .event-feed-section {
+      .event-feed-section,
+      .compare-section {
         margin-bottom: 14px;
+      }
+      .chain-row-clickable {
+        cursor: pointer;
+      }
+      .chain-row-clickable:hover td {
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+      .chain-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: min(420px, 100vw);
+        height: 100vh;
+        overflow-y: auto;
+        padding: 16px;
+        background: var(--panel);
+        border-left: 1px solid var(--border);
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+        z-index: 20;
+      }
+      .chain-panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .chain-panel[hidden] {
+        display: none;
       }
       .trends-head {
         display: flex;
@@ -400,12 +430,6 @@
         font-size: 13px;
         line-height: 1.45;
         margin: 0;
-      }
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: var(--card-shadow);
       }
       .state {
         padding: 14px 16px;
@@ -618,6 +642,31 @@
         </div>
       </section>
 
+      <section class="compare-section" aria-label="Cross-asset comparison">
+        <div class="trends-head">
+          <h2>Cross-asset compare</h2>
+          <button type="button" id="compare-refresh-btn" class="btn btn-muted">Compare enabled stables</button>
+        </div>
+        <p id="compare-note" class="kpi-sub" style="margin: 0 0 8px"></p>
+        <div class="chart-card">
+          <div class="chart-canvas-wrap trend-canvas">
+            <canvas id="compare-chart" aria-label="Cross-asset signal score comparison"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <aside class="chain-panel" id="chain-panel" hidden>
+        <div class="chain-panel-head">
+          <h2 id="chain-panel-title">Chain detail</h2>
+          <button type="button" id="chain-panel-close" class="btn btn-muted">Close</button>
+        </div>
+        <p id="chain-panel-meta" class="kpi-sub"></p>
+        <div class="chart-canvas-wrap trend-canvas">
+          <canvas id="chain-panel-chart" aria-label="Chain 7d supply trend"></canvas>
+        </div>
+        <div id="chain-panel-events" class="event-list"></div>
+      </aside>
+
       <div class="chart-row">
         <div class="chart-card">
           <h2>Supply share by chain</h2>
@@ -637,6 +686,7 @@
             <button type="button" class="window-btn active" data-window="7d">7d</button>
             <button type="button" class="window-btn" data-window="30d">30d</button>
           </div>
+          <button type="button" id="trend-export-btn" class="btn btn-muted">Export trends</button>
         </div>
         <div id="trend-coverage" class="trend-coverage" aria-live="polite"></div>
         <p id="trend-axis-caption" class="trend-axis-caption"></p>
@@ -670,6 +720,7 @@
             <input type="checkbox" id="event-show-system" />
             Show system events
           </label>
+          <button type="button" id="event-export-btn" class="btn btn-muted">Export events</button>
         </div>
         <div id="event-feed-list" class="event-list"></div>
       </section>

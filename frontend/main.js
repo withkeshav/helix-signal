@@ -1,6 +1,15 @@
-const API_ROOT = "http://localhost:8000";
+const API_ROOT =
+  typeof window.HELIX_API_ROOT === "string" ? window.HELIX_API_ROOT.replace(/\/$/, "") : "";
 const API_URL = `${API_ROOT}/api/dashboard`;
 const REFRESH_URL = `${API_ROOT}/api/refresh`;
+
+function chainKeyFromName(name) {
+  return String(name).trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function exportUrl(path) {
+  return `${API_ROOT}${path}`;
+}
 const stateEl = document.getElementById("app-state");
 const rowsEl = document.getElementById("chain-rows");
 const sourceFooterEl = document.getElementById("source-footer");
@@ -208,6 +217,9 @@ function renderRows(chains) {
     const dc = chain.data_confidence || {};
     const signalBand = cs.band || "Normal";
     const tr = document.createElement("tr");
+    tr.className = "chain-row-clickable";
+    tr.dataset.chainKey = chainKeyFromName(chain.chain_name);
+    tr.title = "Click for chain drill-down";
     tr.innerHTML = `
       <td>${chain.chain_name}</td>
       <td class="num" title="$${formatUsdFull(currentSupply)}">${formatUsd(currentSupply)}</td>
@@ -220,6 +232,7 @@ function renderRows(chains) {
       <td>${dc.label || "Unknown"} (${dc.score ?? "--"})</td>
       <td class="num"><div class="sparkline"><canvas id="${sparkId}"></canvas></div></td>
     `;
+    tr.addEventListener("click", () => openChainPanel(tr.dataset.chainKey, chain.chain_name));
     rowsEl.appendChild(tr);
     renderSparkline(sparkId, [prevWeek, prevDay, currentSupply]);
   }
@@ -846,9 +859,152 @@ async function loadAssets() {
   renderAssetSelector(assets);
 }
 
+const compareRefreshBtn = document.getElementById("compare-refresh-btn");
+const compareNoteEl = document.getElementById("compare-note");
+const chainPanelEl = document.getElementById("chain-panel");
+const chainPanelCloseBtn = document.getElementById("chain-panel-close");
+const chainPanelTitleEl = document.getElementById("chain-panel-title");
+const chainPanelMetaEl = document.getElementById("chain-panel-meta");
+const chainPanelEventsEl = document.getElementById("chain-panel-events");
+const trendExportBtn = document.getElementById("trend-export-btn");
+const eventExportBtn = document.getElementById("event-export-btn");
+
+function downloadExport(path) {
+  window.location.href = exportUrl(path);
+}
+
+async function loadCompareChart() {
+  if (!compareNoteEl) return;
+  const symbols = (enabledAssets.length ? enabledAssets : [{ symbol: "USDT" }, { symbol: "USDC" }])
+    .map((a) => a.symbol)
+    .slice(0, 4);
+  if (symbols.length < 2) {
+    compareNoteEl.textContent = "Need at least two enabled assets to compare.";
+    return;
+  }
+  compareNoteEl.textContent = "Loading comparison…";
+  try {
+    const res = await fetch(
+      exportUrl(`/api/compare?assets=${encodeURIComponent(symbols.join(","))}&window=${encodeURIComponent(trendWindow)}`),
+      { cache: "no-store" }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    compareNoteEl.textContent = data.alignment_note || "";
+    const palette = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444"];
+    const datasets = symbols.map((sym, idx) => {
+      const pts = (data.series && data.series[sym]) || [];
+      return {
+        label: sym,
+        data: pts.map((p) => p.signal_score),
+        borderColor: palette[idx % palette.length],
+        tension: 0.25,
+        pointRadius: 0,
+      };
+    });
+    const maxLen = Math.max(...datasets.map((d) => d.data.length), 1);
+    const labels = Array.from({ length: maxLen }, (_, i) => i + 1);
+    const canvas = document.getElementById("compare-chart");
+    if (!canvas) return;
+    if (charts.has("compare-chart")) charts.get("compare-chart").destroy();
+    charts.set(
+      "compare-chart",
+      new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { min: 0, max: 100, title: { display: true, text: "Signal score" } },
+          },
+        },
+      })
+    );
+  } catch (err) {
+    compareNoteEl.textContent = `Compare unavailable: ${err.message}`;
+  }
+}
+
+async function openChainPanel(chainKey, chainName) {
+  if (!chainPanelEl) return;
+  chainPanelEl.hidden = false;
+  if (chainPanelTitleEl) chainPanelTitleEl.textContent = `${chainName} · ${selectedAsset}`;
+  if (chainPanelMetaEl) chainPanelMetaEl.textContent = "Loading chain detail…";
+  if (chainPanelEventsEl) chainPanelEventsEl.innerHTML = "";
+  try {
+    const res = await fetch(
+      exportUrl(`/api/chains/${encodeURIComponent(chainKey)}?asset=${encodeURIComponent(selectedAsset)}`),
+      { cache: "no-store" }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const snap = data.snapshot || {};
+    if (chainPanelMetaEl) {
+      chainPanelMetaEl.textContent = `Supply: ${formatUsd(snap.supply_current)} · TVL (chain aggregate): ${formatUsd(snap.chain_tvl)}`;
+    }
+    const pts = data.trend_7d || [];
+    const canvas = document.getElementById("chain-panel-chart");
+    if (canvas) {
+      if (charts.has("chain-panel-chart")) charts.get("chain-panel-chart").destroy();
+      charts.set(
+        "chain-panel-chart",
+        new Chart(canvas.getContext("2d"), {
+          type: "line",
+          data: {
+            labels: pts.map((p) => formatEventWhen(p.timestamp)),
+            datasets: [
+              {
+                label: "Supply",
+                data: pts.map((p) => p.supply),
+                borderColor: "#3b82f6",
+                tension: 0.25,
+                pointRadius: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { display: false }, y: { ticks: { callback: (v) => formatUsd(v) } } },
+          },
+        })
+      );
+    }
+    if (chainPanelEventsEl) {
+      const evs = data.events || [];
+      chainPanelEventsEl.innerHTML = evs.length
+        ? evs.slice(0, 8).map((e) => eventCardHtml(e, { system: isSystemEvent(e) })).join("")
+        : '<p class="kpi-sub">No recent events for this chain.</p>';
+    }
+  } catch (err) {
+    if (chainPanelMetaEl) chainPanelMetaEl.textContent = `Could not load chain detail: ${err.message}`;
+  }
+}
+
+function closeChainPanel() {
+  if (chainPanelEl) chainPanelEl.hidden = true;
+}
+
 initTheme();
 themeBtn.addEventListener("click", cycleTheme);
 refreshBtn.addEventListener("click", () => loadDashboard({ manual: true }));
+if (compareRefreshBtn) compareRefreshBtn.addEventListener("click", loadCompareChart);
+if (chainPanelCloseBtn) chainPanelCloseBtn.addEventListener("click", closeChainPanel);
+if (trendExportBtn) {
+  trendExportBtn.addEventListener("click", () => {
+    downloadExport(
+      `/api/trends/export?asset=${encodeURIComponent(selectedAsset)}&window=${encodeURIComponent(trendWindow)}&format=csv`
+    );
+  });
+}
+if (eventExportBtn) {
+  eventExportBtn.addEventListener("click", () => {
+    downloadExport(
+      `/api/events/export?asset=${encodeURIComponent(selectedAsset)}&limit=500&format=csv`
+    );
+  });
+}
 assetSelectorEl.addEventListener("change", () => {
   selectedAsset = assetSelectorEl.value;
   localStorage.setItem("helix-asset", selectedAsset);
@@ -857,6 +1013,7 @@ assetSelectorEl.addEventListener("change", () => {
 
 loadAssets()
   .then(() => loadDashboard())
+  .then(() => loadCompareChart())
   .catch((error) => {
     stateEl.textContent = `Error loading assets: ${error.message}`;
     stateEl.classList.add("error");

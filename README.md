@@ -7,25 +7,27 @@ It turns public data into a clean monitoring surface for supply concentration, p
 
 - Transparent: built on publicly accessible data sources
 - Self-hostable: runs locally with Docker, no paid dependency required for core features
-- Focused: V1 is intentionally narrow and reliable (USDT + top chains)
+- Multi-asset monitoring (USDT default; USDC, DAI, PYUSD when enabled) with historical trends and a local signal feed
 
-## V2.3 Highlights
+## V2.5 Highlights
 
-- **Helix Signal Score**: transparent composite 0 to 100 (Normal, Watch, Risk) from peg pressure, supply momentum, chain concentration, and data confidence, with explicit weights in the API and UI
-- **Depeg Index**: asset-level peg stress score and deviation context from DefiLlama price (documented as not chain-specific oracle precision)
-- **Derived metrics**: aggregate total supply, aggregate 24h supply change, Herfindahl-style concentration (HHI), per-chain share, momentum labels, per-chain signal and data confidence
-- **Server-side freshness**: UTC-aware basis anchored on successful refresh completion time when the source is healthy, with Fresh, Aging, and Stale windows aligned to `REFRESH_INTERVAL_SECONDS` (see methodology)
-- **Chain TVL (labeled)**: optional column sourced from DefiLlama `stablecoinchains` as **chain-level aggregate** stablecoin TVL, not per-asset TVL
-- Premium-style monitoring layout: KPI strip, methodology panel, Depeg and concentration cards, Chart.js share and component charts, expanded chain table
-- Multi-asset support unchanged (USDT default; USDC, DAI, PYUSD when enabled in `config/assets.json`)
-- Static Vanilla JS + Chart.js frontend (no framework migration)
+- **CI and tests**: GitHub Actions plus pytest (scoring, history, API smoke) using in-memory SQLite
+- **Health**: `GET /api/health` with database reachability, last successful fetch, scheduler status, version `2.5.0`
+- **Retention**: configurable pruning for trend and event tables (`TREND_RETENTION_DAYS`, `EVENT_RETENTION_DAYS`)
+- **Deploy hygiene**: Compose loads `.env`; frontend nginx proxies `/api` to the backend; relative API URLs (no hardcoded localhost)
+- **Analyst workflows**: CSV/JSON export for trends and events, cross-asset compare chart, chain drill-down side panel
+- **Optional backfill**: env-gated `POST /api/admin/backfill` for coarse synthetic history on new installs
 
 ## V2.4 Highlights
 
 - **Historical trends**: SQLite snapshots after each successful refresh, bucketed in 5-minute UTC windows, exposed through `/api/trends` and `/api/trends/chains`
 - **Signal feed**: local, deduplicated `signal_events` timeline with `/api/events` and a dashboard analyst-style panel
 - **Dashboard**: time window selector (24h, 7d, 30d), four trend charts (signal score, Depeg Index, supply, concentration), low-data copy when fewer than two points exist
-- **APIs**: trend and event endpoints are cache-safe friendly; the UI uses `cache: no-store` alongside the existing manual `POST /api/refresh` flow
+
+## V2.3 Highlights
+
+- **Helix Signal Score**: transparent composite 0 to 100 (Normal, Watch, Risk) from peg pressure, supply momentum, chain concentration, and data confidence
+- **Depeg Index**, chain concentration (HHI), server-side freshness, and labeled chain aggregate TVL from DefiLlama `stablecoinchains`
 
 ## Quick Start
 
@@ -33,69 +35,78 @@ It turns public data into a clean monitoring surface for supply concentration, p
 
 - Docker Desktop (or Docker Engine + Compose)
 
-### Run
+### Run (recommended)
 
 ```bash
+cp .env.example .env
 docker compose up --build
 ```
 
-### Backend-only (without Docker)
+- Dashboard: [http://localhost:3000](http://localhost:3000) (API proxied at `/api`)
+- Backend API direct: [http://localhost:8000](http://localhost:8000)
 
-From `backend/`:
+### Local backend with Python venv
+
+All Python dependencies install into `backend/.venv` only:
 
 ```bash
-python main.py
+cd backend
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python main.py
 ```
 
 Or:
 
 ```bash
-uvicorn main:app --reload
+.venv/bin/uvicorn main:app --reload
 ```
 
-### Local development with Python `venv`
+Run tests:
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows PowerShell: .\.venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
+.venv/bin/pytest -q
 ```
-
-### Open
-
-- Backend API: [http://localhost:8000](http://localhost:8000)
-- Dashboard API payload: [http://localhost:8000/api/dashboard](http://localhost:8000/api/dashboard)
-- Trend APIs: [http://localhost:8000/api/trends?asset=USDT&window=7d](http://localhost:8000/api/trends?asset=USDT&window=7d) and `/api/trends/chains?asset=USDT&window=7d`
-- Events API: [http://localhost:8000/api/events?asset=USDT&limit=50](http://localhost:8000/api/events?asset=USDT&limit=50)
-- Frontend dashboard: [http://localhost:3000](http://localhost:3000)
 
 ## Configuration
 
-Copy values from `.env.example` as needed:
+Copy `.env.example` to `.env` and adjust:
 
-- `DEFILLAMA_API_KEY` (optional; not required for core V1)
-- `DATABASE_URL` (SQLite path)
+- `DATABASE_URL` — see comments in `.env.example` for local venv vs Docker paths
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
+- `TREND_RETENTION_DAYS` (default `90`), `EVENT_RETENTION_DAYS` (default `30`)
+- `ALLOW_BACKFILL` (default `false`) — enable optional historical seeding
+- `DEFILLAMA_API_KEY` — reserved for a future Pro API toggle; not required for core ingest today
 
-Configured chains are pinned in `config/chains.json`.
-Configured assets are defined in `config/assets.json` (USDT remains default).
-Use the dashboard asset selector to switch across enabled assets.
+Configured chains: `config/chains.json`. Assets: `config/assets.json`.
+
+## API overview
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/health` | Operational health and version |
+| `GET /api/dashboard` | Live monitoring payload |
+| `GET /api/trends`, `/api/trends/chains` | Historical windows |
+| `GET /api/trends/export`, `/api/events/export` | CSV/JSON export |
+| `GET /api/compare` | Cross-asset aligned series |
+| `GET /api/chains/{chain_key}` | Chain drill-down |
+| `GET /api/events` | Local signal feed |
+| `POST /api/admin/backfill` | Optional synthetic history (env-gated) |
 
 ## Project Structure
 
-- `backend/` FastAPI app, scheduler, DefiLlama integration, SQLite models, V2.4 trend and event writers
-- `frontend/` static HTML/CSS/JS dashboard with Chart.js (sparklines, share bar, component bar)
-- `config/` chain/source configuration
-- `docs/` architecture and methodology documentation
+- `backend/` FastAPI app, scheduler, DefiLlama integration, SQLite models, services, tests
+- `frontend/` static HTML/CSS/JS dashboard with Chart.js and nginx API proxy in Docker
+- `config/` chain and asset configuration
+- `docs/` architecture and methodology
 
 ## Documentation
 
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Data methodology: [`docs/data-methodology.md`](docs/data-methodology.md)
-- Contributing guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Security policy: [`SECURITY.md`](SECURITY.md)
+- Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Security: [`SECURITY.md`](SECURITY.md)
 - Release notes: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)
 
 ## Not Investment Advice

@@ -13,20 +13,9 @@ Bands: 0-39 Normal, 40-69 Watch, 70-100 Risk
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any
 
-
-def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _ensure_utc(dt: datetime | None) -> datetime | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+from utils import utc_normalize, utc_now
 
 
 def peg_deviation(price: float | None) -> tuple[float, float]:
@@ -227,8 +216,8 @@ def compute_freshness(
     successful refresh as stale. ``newest_chain_snapshot`` is referenced in ``reason``
     for upstream data-age context only.
     """
-    lsf = _ensure_utc(last_successful_fetch)
-    ncs = _ensure_utc(newest_chain_snapshot)
+    lsf = utc_normalize(last_successful_fetch)
+    ncs = utc_normalize(newest_chain_snapshot)
 
     if source_status == "error":
         basis_ts: datetime | None = None
@@ -247,7 +236,7 @@ def compute_freshness(
         basis = "none"
         reason = "No freshness basis: missing last successful fetch and chain snapshots."
 
-    now = _utc_now()
+    now = utc_now()
     age_seconds: float | None = None
     if basis_ts is not None:
         age_seconds = max(0.0, (now - basis_ts).total_seconds())

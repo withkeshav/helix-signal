@@ -4,9 +4,16 @@
   {"name": "BSC", "defillama_id": "BSC"},
   {"name": "Solana", "defillama_id": "Solana"},
   {"name": "Arbitrum", "defillama_id": "Arbitrum"},
-  {"name": "Plasma", "defillama_id": "Plasma"},
   {"name": "Polygon", "defillama_id": "Polygon"},
+  {"name": "Avalanche", "defillama_id": "Avalanche"},
+  {"name": "Optimism", "defillama_id": "Optimism"},
+  {"name": "Base", "defillama_id": "Base"},
+  {"name": "Celo", "defillama_id": "Celo"},
+  {"name": "Fantom", "defillama_id": "Fantom"},
+  {"name": "Gnosis", "defillama_id": "Gnosis"},
+  {"name": "zkSync Era", "defillama_id": "zkSync Era"},
   {"name": "Aptos", "defillama_id": "Aptos"},
   {"name": "TON", "defillama_id": "TON"},
-  {"name": "Avalanche", "defillama_id": "Avalanche"}
+  {"name": "Plasma", "defillama_id": "Plasma"},
+  {"name": "NEAR", "defillama_id": "NEAR"}
 ]

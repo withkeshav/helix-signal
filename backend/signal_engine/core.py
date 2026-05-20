@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,7 +45,6 @@ def build_default_registry() -> SourceRegistry:
     r.register(_DefiLlamaSource())
     r.register(CoinGeckoSource())
     r.register(DexScreenerSource())
-    return r
     if ENABLE_CHAINLINK:
         from sources.chainlink import ChainlinkSource
         r.register(ChainlinkSource())
@@ -67,6 +67,11 @@ def cross_source_price_check(prices: dict[str, float | None]) -> dict[str, Any]:
 
 
 def load_configured_chains() -> list[dict]:
+    use_dynamic = os.getenv("ENABLE_DYNAMIC_CHAINS", "").strip().lower() in ("1", "true", "yes")
+    if use_dynamic:
+        discovered = _discover_chain_ids()
+        if discovered:
+            return [{"name": name, "defillama_id": name} for name in discovered]
     with CHAINS_CONFIG_PATH.open("r", encoding="utf-8") as file:
         chains = json.load(file)
     if not isinstance(chains, list):

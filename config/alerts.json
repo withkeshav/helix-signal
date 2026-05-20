@@ -1,0 +1,83 @@
+[
+  {
+    "type": "peg_deviation",
+    "condition": "depeg_bps > 50",
+    "persistence_minutes": 30,
+    "severity": "warning",
+    "channels": ["dashboard", "webhook"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "peg_deviation",
+    "condition": "depeg_bps > 100",
+    "persistence_minutes": 15,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord", "telegram"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "slippage_spike",
+    "condition": "slippage_100k > 2 * 7d_median",
+    "persistence_minutes": 0,
+    "severity": "warning",
+    "channels": ["dashboard"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "supply_contraction",
+    "condition": "supply_change_7d < -3",
+    "persistence_minutes": 0,
+    "severity": "info",
+    "channels": ["dashboard"],
+    "cooldown_minutes": 1440,
+    "enabled": true
+  },
+  {
+    "type": "concentration_spike",
+    "condition": "top3_pool_share > 80",
+    "persistence_minutes": 0,
+    "severity": "warning",
+    "channels": ["dashboard"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "data_staleness",
+    "condition": "freshness_age_minutes > 10",
+    "persistence_minutes": 0,
+    "severity": "warning",
+    "channels": ["dashboard", "webhook"],
+    "cooldown_minutes": 5,
+    "enabled": true
+  },
+  {
+    "type": "data_staleness",
+    "condition": "supply_age_hours > 24",
+    "persistence_minutes": 0,
+    "severity": "warning",
+    "channels": ["dashboard"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "source_failure",
+    "condition": "source_status = error for > 5 min",
+    "persistence_minutes": 5,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord"],
+    "cooldown_minutes": 15,
+    "enabled": true
+  },
+  {
+    "type": "source_recovered",
+    "condition": "source transitions error -> ok",
+    "persistence_minutes": 0,
+    "severity": "info",
+    "channels": ["dashboard"],
+    "cooldown_minutes": 0,
+    "enabled": true
+  }
+]

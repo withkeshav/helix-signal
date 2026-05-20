@@ -114,7 +114,6 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Data methodology: [`docs/data-methodology.md`](docs/data-methodology.md)
-- Implementation plan: [`opencode-implementation-plan.md`](opencode-implementation-plan.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 - Release notes: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)

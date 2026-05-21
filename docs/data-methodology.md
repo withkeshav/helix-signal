@@ -191,6 +191,32 @@ Fresh installs with little history are unaffected beyond normal low-data messagi
 
 When `ALLOW_BACKFILL=true`, `POST /api/admin/backfill?asset=SYMBOL&days=7` may insert **coarse daily** points from DefiLlama circulating charts. Rows use `source_status=synthetic_backfill` and do not overwrite calendar days that already have live ingest snapshots. Compare and export consumers may exclude synthetic rows where noted. This is for faster chart context on new installs, not a full historical re-score.
 
+## Attestation and supply feed (OSINT)
+
+`/api/osint/attestation` returns **two independent signals** per asset:
+
+### Issuer attestation report age
+
+Parsed only from issuer transparency pages when a report date can be proven (e.g. Circle USDC). Thresholds:
+
+- **fresh**: report age &lt; 90 days
+- **aging**: 90–179 days
+- **stale**: 180+ days
+- **unknown**: issuer page not parseable (USDT, PYUSD today)
+- **n/a**: on-chain-only assets (DAI) — no issuer attestation model
+
+Helix does **not** use DefiLlama refresh time as a proxy for attestation dates.
+
+### DefiLlama supply feed freshness
+
+Derived from `SourceStatus.last_successful_fetch` for the `defillama` source (same ingest pipeline as dashboard supply). Thresholds align with dashboard freshness windows:
+
+- **fresh**: ≤ 15 minutes
+- **aging**: ≤ 60 minutes
+- **stale**: &gt; 60 minutes
+
+This reflects how recently on-chain supply data was ingested, not audit report recency.
+
 ## Known limitations
 
 - Single-source baseline (DefiLlama)

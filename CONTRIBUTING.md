@@ -7,8 +7,8 @@ Thanks for helping improve Helix-Signal.
 ### 1) Clone
 
 ```bash
-git clone <your-fork-or-repo-url>
-cd Helix-Signal
+git clone https://github.com/withkeshav/helix-signal.git
+cd helix-signal
 ```
 
 ### 2) Configure environment
@@ -139,7 +139,7 @@ Guidelines:
 - Keep changes focused and small
 - Prefer explicit, readable logic over clever abstractions
 - Preserve graceful error handling in source fetchers
-- Keep frontend dependency-light (Vanilla JS + Chart.js)
+- Keep frontend dependency-light (Alpine.js + `app.js` + Chart.js; no build step)
 - Follow existing naming patterns and file organization
 
 ## Pull Request Expectations
@@ -147,6 +147,7 @@ Guidelines:
 - Explain what changed and why
 - Include manual verification steps
 - Run `cd backend && .venv/bin/pytest -q` before opening a PR
-- Confirm no secrets were added
+- For deploy-related UI/API changes, run `./scripts/smoke-check.sh https://your-host` when applicable
+- Confirm no secrets were added (`.env`, `secrets/`, `acme.json`, internal briefs)
 - Keep docs in sync when behavior or thresholds change
 - Do not commit internal execution briefs (see `.gitignore` patterns)

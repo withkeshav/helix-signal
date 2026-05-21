@@ -59,6 +59,17 @@ def test_osint_attestation(client):
     data = response.json()
     assert isinstance(data, dict)
     assert len(data) > 0
+    sample = next(iter(data.values()))
+    for key in (
+        "attestation_status",
+        "attestation_last_report",
+        "attestation_age_days",
+        "supply_feed_status",
+        "supply_feed_updated_at",
+        "supply_feed_age_minutes",
+        "supply_feed_source",
+    ):
+        assert key in sample
 
 
 def test_anomaly_detect_disabled(client):

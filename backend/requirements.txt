@@ -6,7 +6,7 @@ requests==2.34.2
 httpx>=0.28.0
 APScheduler==3.11.2
 slowapi==0.1.9
-structlog==25.1.0
+structlog==24.4.0
 urllib3>=2.0.0
 duckdb>=1.2.0
 prometheus-client>=0.21.0

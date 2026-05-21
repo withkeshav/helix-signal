@@ -1,0 +1,8 @@
+http:
+  middlewares:
+    auth:
+      basicAuth:
+        # Default credentials: admin / changeme — replace before any public deployment.
+        # Generate: htpasswd -nbB admin 'your-strong-password'
+        users:
+          - "admin:$apr1$knyEVJ.8$o5HfIGwND7ldm3ptXWcqF."

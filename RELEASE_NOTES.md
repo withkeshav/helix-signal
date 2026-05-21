@@ -1,5 +1,18 @@
 # Release Notes
 
+## Unreleased — Production fixes
+
+Follow-up fixes on top of v3.1.0 for the public demo deployment. No version bump.
+
+### Highlights
+
+- **Dashboard restored**: Alpine.js terminal shell and external `app.js` load correctly; trend chart and tab navigation work again
+- **Data pipeline stabilized**: DefiLlama refresh no longer crashes on missing `timezone` import; trend buckets populate after refresh
+- **Attestation clarity**: UI and API now show **issuer report age** separately from **DefiLlama supply feed freshness** — unknown stays unknown when issuer dates cannot be parsed
+- **Deploy guardrails**: smoke-check script, Traefik basic-auth middleware file, nginx blocks public `/metrics`, `acme.json` excluded from git
+
+See `CHANGELOG.md` for the full list.
+
 ## v3.1.0 — Maintenance & Quality
 
 Helix-Signal v3.1.0 is a maintenance release fixing critical bugs, eliminating technical debt, and improving code quality.

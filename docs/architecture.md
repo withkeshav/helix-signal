@@ -1,53 +1,65 @@
-# Architecture (V2.5)
+# Architecture (V3)
 
 Helix-Signal follows a backend-first architecture with a thin static frontend.
 
 ## High-Level Flow
 
 ```text
-DefiLlama stablecoins APIs (+ stablecoinchains for chain TVL context)
+DefiLlama (+ CoinGecko, DEX Screener, optional Chainlink)
     |
     v
-FastAPI backend (scheduler: ingest + daily retention)
+FastAPI backend (scheduler: ingest + OSINT + retention)
     |
     v
-SQLite cache (snapshots, trends, events)
+SQLite cache (snapshots, trends, events, OSINT)
     |
     +--> /api/health, /api/assets, /api/dashboard
-    +--> /api/trends (+ export), /api/trends/chains
-    +--> /api/events (+ export), /api/compare
-    +--> /api/chains/{chain_key}, POST /api/admin/backfill (optional)
+    +--> /api/trends (+ export), /api/events (+ export), /api/compare
+    +--> /api/chains/{chain_key}, /api/osint/*, /api/governance
     +--> POST /api/refresh
             |
             +--> signal_engine (scoring, metrics, history)
             +--> services/dashboard.py (dashboard assembly)
             v
-Vanilla JS + Chart.js frontend
+Alpine.js + Chart.js frontend (index.html + app.js)
     |
     +-- Docker: nginx proxies /api -> backend:8000 (same-origin relative URLs)
+    +-- /metrics blocked at nginx; Prometheus scrapes backend internally
 ```
 
-## Deploy topology (Docker Compose)
+## Deploy topology (production)
 
 ```text
-Browser -> frontend:80 (/api/* proxied) -> backend:8000
-                \-> static dashboard assets
-Backend -> SQLite at /data/helix.db (volume helix_data)
+Internet
+    |
+    v
+Traefik (TLS, HTTPS redirect, basic-auth on admin paths)
+    |
+    +--> frontend:80  (/api/* proxied to backend:8000, static assets)
+    +--> prometheus:9090  (/prometheus, auth)
+    +--> grafana:3000     (/grafana, auth)
+    |
+    v
+backend:8000 (internal network only)
+    |
+    v
+SQLite at /data/helix.db (volume helix_data)
 ```
 
-Environment is loaded from `.env` (copy from `.env.example`).
+Reference deployment: [https://helix.withkeshav.com](https://helix.withkeshav.com)
+
+Environment is loaded from `.env` (copy from `.env.example`). TLS material (`acme.json`) and secrets (`secrets/`, `.env`) stay out of git.
 
 ## Components
 
 ### Backend (`backend/`)
 
 - **Routes** in `main.py`; dashboard assembly in `services/dashboard.py`
-- **Health** (`GET /api/health`): DB ping, last successful fetch, scheduler running, version `2.5.0`
-- **Retention**: daily cron job in `services/retention.py` (`TREND_RETENTION_DAYS`, `EVENT_RETENTION_DAYS`)
-- **Exports**: `services/exports.py` — CSV/JSON, max 10k rows
-- **Compare / chain detail / backfill**: `services/compare.py`, `chain_detail.py`, `backfill.py`
-- APScheduler: interval ingest (unless `HELIX_SKIP_STARTUP_REFRESH` for tests) + retention
-- Signal engine unchanged in role: ingest, scoring, 5-minute buckets, deduplicated events
+- **Health** (`GET /api/health`): DB ping, scheduler status, version
+- **OSINT** (`services/osint.py`): RSS/CryptoPanic ingestion, sentiment, attestation report parsing, supply feed freshness from DefiLlama source status
+- **Retention**: daily cron job in `services/retention.py`
+- APScheduler: interval ingest + hourly OSINT + retention
+- Signal engine: ingest, V3 scoring, 5-minute buckets, deduplicated events
 
 ### Data Store
 
@@ -56,9 +68,15 @@ Environment is loaded from `.env` (copy from `.env.example`).
 
 ### Frontend (`frontend/`)
 
-- Same-origin `/api` when served behind nginx in Compose
-- `window.HELIX_API_ROOT` optional override for split-host dev
-- V2.5 UI: export buttons, compare chart, chain drill-down side panel
+- `index.html` — dashboard shell, Alpine.js bindings, CDN Chart.js/htmx
+- `app.js` — Alpine component (`helixApp`), chart wiring, Intel tab loaders
+- nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
+- Legacy `frontend/main.js` is superseded and gitignored
+
+### Edge (`traefik/`)
+
+- Static config: `traefik.yml` (entrypoints, ACME DNS challenge, file provider)
+- Dynamic config: `dynamic/middlewares.yml` (basic-auth for Traefik dashboard, Prometheus, Grafana routes)
 
 ## Local development
 
@@ -70,8 +88,15 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev
 
 CI mirrors this pattern (venv created in the workflow job).
 
+Post-deploy validation:
+
+```bash
+./scripts/smoke-check.sh https://your-host.example
+```
+
 ## Design Intent
 
 - Keep frontend thin; centralize logic on the backend
 - Self-hosted reproducibility via Docker Compose and pytest regression checks
 - Fail gracefully on upstream errors; label chain TVL as chain aggregate context
+- Do not fabricate attestation dates — show issuer report age and supply feed freshness separately

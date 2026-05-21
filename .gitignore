@@ -5,6 +5,12 @@
 .env.*.local
 !.env.example
 
+# --- TLS / ACME ---
+acme.json
+*.pem
+*.key
+*.p12
+
 # --- Databases and Local Data ---
 *.sqlite
 *.sqlite3
@@ -41,7 +47,6 @@ out/
 # --- Docker ---
 .docker/
 secrets/
-!.env.example
 
 # --- Test Artifacts ---
 backend/tests/cassettes/
@@ -62,7 +67,7 @@ grafana/data/
 Thumbs.db
 desktop.ini
 
-# --- Internal planning briefs ---
+# --- Internal planning briefs (never commit) ---
 initial_BRIEF.md
 helix_signal_strategy_playbook.md
 *internal_docs*
@@ -93,6 +98,10 @@ oc-implementation-plan.md
 # --- Dead frontend code ---
 frontend/main.js
 
-# --- Internal tracking & research ---
+# --- AI/Dev tool artifacts ---
+.antigravitycli/
+.code-review-graph/
+
+# --- Internal tracking & research (local only) ---
 .progress
 research/

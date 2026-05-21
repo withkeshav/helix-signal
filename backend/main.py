@@ -47,7 +47,7 @@ from services.dashboard import build_dashboard_response
 from services.exports import events_export, trends_export
 from services.governance import build_governance_payload
 from services.health import build_health_payload
-from services.osint import ingest_osint_feed, get_osint_feed, get_sentiment_timeseries, get_attestation_status, correlate_sentiment_depeg
+from services.osint import ingest_osint_feed, get_osint_feed, get_sentiment_timeseries, get_attestation_status, correlate_sentiment_depeg, refresh_attestation_reports
 from services.retention import prune_old_history
 from signal_engine.core import get_asset_by_symbol, load_enabled_assets, refresh_chain_data
 from utils import utc_normalize, window_delta, signal_event_rows_to_out
@@ -95,6 +95,7 @@ def _osint_job() -> None:
     db = SessionLocal()
     try:
         count = ingest_osint_feed(db)
+        refresh_attestation_reports(force=True)
         if count:
             log.info("osint_job.complete", articles_ingested=count)
     except Exception:
@@ -564,8 +565,8 @@ def api_osint_sentiment(
 
 
 @app.get("/api/osint/attestation")
-def api_osint_attestation(request: Request) -> dict[str, Any]:
-    return get_attestation_status()
+def api_osint_attestation(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    return get_attestation_status(db=db)
 
 
 @app.get("/api/osint/correlate")

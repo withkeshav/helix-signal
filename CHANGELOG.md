@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+Production hardening and dashboard fixes (no version bump).
+
+### Fixed
+
+- **Dashboard blank page**: restored full Alpine.js shell in `frontend/index.html`; moved app logic to `frontend/app.js`; fixed Chart.js trend syntax error blocking Alpine init
+- **`metrics.py` crash**: added missing `timezone` import that broke DefiLlama source status updates and trend persistence
+- **Attestation conflation**: split issuer report age from DefiLlama supply feed freshness in `/api/osint/attestation` and UI (no synthetic attestation dates)
+- **Overview attestation panel**: loads on dashboard init, not only after visiting Intel tab
+
+### Added
+
+- **`scripts/smoke-check.sh`**: post-deploy checks for frontend shell markers, API health, basic-auth on admin routes, and blocked public `/metrics`
+- **`traefik/dynamic/middlewares.yml`**: file-provider basic-auth middleware for Traefik admin surfaces
+- **Hourly attestation refresh**: OSINT scheduler job calls `refresh_attestation_reports(force=True)`
+
+### Changed
+
+- **Production Compose**: Traefik v3.7, Let's Encrypt via Cloudflare DNS challenge, HTTPS redirect, path-based Prometheus/Grafana under configurable `HELIX_DOMAIN`
+- **Frontend nginx**: return 404 for `/metrics` at the edge
+- **Security hygiene**: `acme.json` gitignored; rotate Traefik basic-auth hash before deploying your own instance
+
 ## v3.1.0 — Maintenance & Quality
 
 ### Changed

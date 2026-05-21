@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Helix Signal Terminal</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script data-cfasync="false" src="app.js?v=10"></script>
+    <script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script data-cfasync="false" src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script defer data-cfasync="false" src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
     <style>
       :root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06)}
       :root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35)}
@@ -108,10 +109,17 @@
             </ul>
           </div>
           <div class="insight-card">
-            <h2>Attestation Status</h2>
-            <div style="font-size:13px;line-height:1.6">
+            <h2>Attestation &amp; Supply Feed</h2>
+            <div style="font-size:13px;line-height:1.7">
               <template x-for="(a, sym) in attestation" :key="sym">
-                <div><strong x-text="sym"></strong>: <span :class="`band-${a.status === 'fresh' ? 'normal' : a.status === 'aging' ? 'watch' : 'risk'}`" x-text="a.status ?? 'unknown'"></span> <span x-text="a.age_days != null ? `(${a.age_days}d)` : ''"></span></div>
+                <div style="margin-bottom:8px">
+                  <strong x-text="sym"></strong>
+                  <div x-show="a.attestation_status !== 'n/a'">
+                    <span :class="`band-${statusBand(a.attestation_status)}`" x-text="attestationSummary(a)"></span>
+                  </div>
+                  <div x-show="a.attestation_status === 'n/a'" class="kpi-sub" x-text="attestationSummary(a)"></div>
+                  <div :class="`band-${statusBand(a.supply_feed_status)}`" x-text="supplyFeedSummary(a)"></div>
+                </div>
               </template>
             </div>
           </div>
@@ -201,13 +209,18 @@
           <div class="chart-wrap"><canvas id="chart-sentiment"></canvas></div>
         </div>
         <div class="chart-card">
-          <h2>Attestation Status</h2>
+          <h2>Attestation &amp; Supply Feed</h2>
           <div class="kpi-grid">
             <template x-for="(a, sym) in attestation" :key="sym">
               <div class="kpi-card">
                 <div class="kpi-label" x-text="sym"></div>
-                <div class="kpi-value" :class="`band-${a.status === 'fresh' ? 'normal' : a.status === 'aging' ? 'watch' : 'risk'}`" x-text="a.status ?? 'unknown'"></div>
-                <div class="kpi-sub" x-text="a.age_days != null ? `${a.age_days}d since report` : 'No data'"></div>
+                <div x-show="a.attestation_status !== 'n/a'">
+                  <div class="kpi-value" :class="`band-${statusBand(a.attestation_status)}`" x-text="a.attestation_status ?? 'unknown'"></div>
+                  <div class="kpi-sub" x-text="a.attestation_age_days != null ? `${a.attestation_age_days}d since issuer report` : 'Issuer report not available'"></div>
+                </div>
+                <div x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only — no issuer attestation</div>
+                <div class="kpi-value" style="font-size:1.1rem;margin-top:6px" :class="`band-${statusBand(a.supply_feed_status)}`" x-text="a.supply_feed_status ?? 'unknown'"></div>
+                <div class="kpi-sub" x-text="`DefiLlama supply feed · ${formatFeedAge(a.supply_feed_age_minutes)}`"></div>
               </div>
             </template>
           </div>
@@ -221,119 +234,5 @@
         </template>
       </footer>
     </main>
-    <script>
-      function formatUsd(v) {
-        if (v == null || Number.isNaN(Number(v))) return 'N/A';
-        const n=Number(v);
-        if(Math.abs(n)>=1e9) return `$${(n/1e9).toFixed(2)}B`;
-        if(Math.abs(n)>=1e6) return `$${(n/1e6).toFixed(2)}M`;
-        return `$${n.toLocaleString(undefined,{maximumFractionDigits:2})}`;
-      }
-      function formatWhen(iso) {
-        if(!iso)return'';const d=new Date(iso);const s=(Date.now()-d.getTime())/1e3;
-        if(s<90)return'just now';if(s<3600)return`${Math.round(s/60)} min ago`;
-        if(s<86400)return`${Math.round(s/3600)}h ago`;return d.toLocaleString();
-      }
-      function pegLabel(p) {
-        const d=Math.abs(p-1);if(d<=.001)return'Healthy';if(d<=.005)return'Watch';return'Alert';
-      }
-      function helixApp() {
-        return {
-          tab: 'overview', asset: 'USDT', assetName: 'Tether USD', enabledAssets: ['USDT','USDC','DAI','PYUSD'],
-          chains: [], signal: {}, depeg: {}, concentration: {}, freshness: {}, sources: [],
-          attestation: {}, osintArticles: [], events: [], totalSupply: null, supplyChange: null,
-          crossSource: {}, staleWarning: '', generatedAt: '', _charts: new Map(), _timer: null,
-          async init() {
-            await this.loadAssets();
-            await this.loadDashboard();
-            this._timer=setInterval(()=>this.loadDashboard(),60000);
-          },
-          async loadAssets() {
-            try{
-              const r=await fetch('/api/assets',{cache:'no-store'});
-              if(r.ok){const a=await r.json();this.enabledAssets=a.map(x=>x.symbol);}
-            }catch(e){}
-          },
-          async loadDashboard() {
-            try{
-              const r=await fetch(`/api/dashboard?asset=${this.asset}`,{cache:'no-store'});
-              if(!r.ok)throw Error(`HTTP ${r.status}`);
-              const d=await r.json();
-              this.assetName=d.asset?.name||this.asset;
-              this.chains=d.chains||[];
-              this.signal=d.asset_signal||{};
-              this.depeg=d.depeg_index||{};
-              this.concentration=d.chain_concentration||{};
-              this.freshness=d.freshness||{};
-              this.sources=d.sources||[];
-              this.totalSupply=d.total_supply_current;
-              this.supplyChange=d.total_supply_change_24h_pct;
-              this.generatedAt=new Date().toLocaleTimeString();
-              this.staleWarning=this.freshness.status==='Stale'?'Data is stale. Metrics may not reflect current conditions.':'';
-              this.renderCharts(d);
-              if(this.tab==='intel')this.loadIntel();
-            }catch(e){this.staleWarning=`Dashboard error: ${e.message}`;}
-          },
-          async loadTab() {
-            if(this.tab==='intel')this.loadIntel();
-          },
-          async loadIntel() {
-            try{
-              const r=await fetch(`/api/osint/feed?asset=${this.asset}&limit=10`,{cache:'no-store'});
-              if(r.ok)this.osintArticles=await r.json();
-            }catch(e){}
-            try{
-              const r=await fetch(`/api/osint/attestation`,{cache:'no-store'});
-              if(r.ok)this.attestation=await r.json();
-            }catch(e){}
-            try{
-              const ev=await fetch(`/api/events?asset=${this.asset}&limit=20`,{cache:'no-store'});
-              if(ev.ok){const j=await ev.json();this.events=j.events||[];}
-            }catch(e){}
-            try{
-              const s=await fetch(`/api/osint/sentiment?asset=${this.asset}&window_days=7`,{cache:'no-store'});
-              if(s.ok)this.renderSentimentChart(await s.json());
-            }catch(e){}
-          },
-          async refresh() {
-            try{await fetch('/api/refresh',{method:'POST',cache:'no-store'});}catch(e){}
-            await this.loadDashboard();
-          },
-          cycleTheme() {
-            const root=document.documentElement;
-            const cur=root.getAttribute('data-theme')||'light';
-            root.setAttribute('data-theme',cur==='light'?'dark':'light');
-          },
-          destroyCharts(){
-            for(const[_,c]of this._charts)c.destroy();
-            this._charts.clear();
-          },
-          renderCharts(data){
-            this.destroyCharts();
-            if(typeof Chart==='undefined')return;
-            const primary=getComputedStyle(document.documentElement).getPropertyValue('--spark').trim()||'#60a5fa';
-            const muted=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#9aa8c4';
-            const chains=data.chains||[];
-            if(chains.length){
-              const labels=chains.map(c=>c.chain_name).slice(0,12);
-              const vals=chains.map(c=>c.chain_share_pct||0).slice(0,12);
-              this._makeBar('chart-distribution',labels,vals,primary);
-              this._makeBar('chart-supply-bar',labels,vals,primary);
-            }
-          },
-          renderSentimentChart(series){
-            if(!series||!series.length||typeof Chart==='undefined')return;
-            if(this._charts.has('chart-sentiment'))this._charts.get('chart-sentiment').destroy();
-            const el=document.getElementById('chart-sentiment');
-            if(!el)return;
-            const primary=getComputedStyle(document.documentElement).getPropertyValue('--spark').trim()||'#60a5fa';
-            this._charts.set('chart-sentiment',new Chart(el.getContext('2d'),{type:'line',data:{labels:series.map(s=>s.date),datasets:[{label:'Avg Sentiment',data:series.map(s=>s.avg_sentiment),borderColor:primary,fill:false,tension:.25}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:-1,max:1}}}}));
-          },
-          async switchAsset() {
-            await this.loadDashboard();
-          }
-        };
-      }
-    </script>
   </body>
 </html>

@@ -1,8 +1,11 @@
 services:
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.7
     container_name: helix-traefik
     restart: unless-stopped
+    networks:
+      - web_gateway
+      - internal
     ports:
       - "80:80"
       - "443:443"
@@ -10,12 +13,24 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
-      - acme_data:/acme.json
+      - ./acme.json:/acme.json
+    environment:
+      CF_DNS_API_TOKEN_FILE: /run/secrets/cloudflare_token
+    secrets:
+      - cloudflare_token
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`traefik.helix.local`)"
+      - "traefik.http.routers.dashboard.rule=Host(`${HELIX_DOMAIN:-helix.local}`) && PathPrefix(`/dashboard`)"
       - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dashboard.middlewares=auth@file"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
+      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.entrypoints=web"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      - "traefik.http.routers.http-catchall.priority=1"
 
   backend:
     build:
@@ -29,7 +44,10 @@ services:
       EVENT_RETENTION_DAYS: ${EVENT_RETENTION_DAYS:-30}
       ALLOW_BACKFILL: ${ALLOW_BACKFILL:-false}
       DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
+    networks:
+      - internal
     volumes:
+      - ./config:/config:ro
       - helix_data:/data
     expose:
       - "8000"
@@ -37,9 +55,13 @@ services:
   frontend:
     build:
       context: ./frontend
+    networks:
+      - internal
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`helix.local`)"
+      - "traefik.http.routers.frontend.rule=Host(`${HELIX_DOMAIN:-helix.local}`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
     expose:
       - "80"
@@ -47,15 +69,26 @@ services:
       - backend
 
   prometheus:
-    image: prom/prometheus:v3.2
+    image: prom/prometheus:v3.2.0
     container_name: helix-prometheus
     restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.external-url=https://${HELIX_DOMAIN:-helix.local}/prometheus'
+      - '--web.route-prefix=/'
+    networks:
+      - internal
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.helix.local`)"
+      - "traefik.http.routers.prometheus.rule=Host(`${HELIX_DOMAIN:-helix.local}`) && PathPrefix(`/prometheus`)"
+      - "traefik.http.routers.prometheus.middlewares=prometheus-stripprefix,auth@file"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.prometheus-stripprefix.stripprefix.prefixes=/prometheus"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
     expose:
       - "9090"
@@ -67,6 +100,10 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
       GF_INSTALL_PLUGINS: grafana-piechart-panel
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana"
+    networks:
+      - internal
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -74,19 +111,30 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.helix.local`)"
+      - "traefik.http.routers.grafana.rule=Host(`${HELIX_DOMAIN:-helix.local}`) && PathPrefix(`/grafana`)"
+      - "traefik.http.routers.grafana.middlewares=grafana-stripprefix,auth@file"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.grafana-stripprefix.stripprefix.prefixes=/grafana"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
     expose:
       - "3000"
     secrets:
       - grafana_admin_password
 
+networks:
+  web_gateway:
+    external: true
+  internal:
+    driver: bridge
+
 volumes:
   helix_data:
-  acme_data:
   prometheus_data:
   grafana_data:
 
 secrets:
   grafana_admin_password:
     file: ./secrets/grafana_admin_password.txt
+  cloudflare_token:
+    file: ./secrets/cloudflare_token.txt

@@ -18,7 +18,8 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: admin@helix-signal.local
+      email: admin@example.com
       storage: /acme.json
-      httpChallenge:
-        entryPoint: web
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: 10

@@ -22,10 +22,30 @@ def _is_postgres() -> bool:
     return bind.dialect.name == "postgresql"
 
 
+def _prepare_hypertable(table: str, unique_constraint: str, unique_cols: str) -> None:
+    """Timescale requires partition column in PK and unique constraints."""
+    op.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_pkey")
+    op.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {unique_constraint}")
+    op.execute(f"ALTER TABLE {table} ADD PRIMARY KEY (timestamp, id)")
+    op.execute(
+        f"ALTER TABLE {table} ADD CONSTRAINT {unique_constraint} UNIQUE (timestamp, {unique_cols})"
+    )
+
+
 def upgrade() -> None:
     if not _is_postgres():
         return
     op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE")
+    _prepare_hypertable(
+        "asset_trend_snapshots",
+        "uq_asset_trend_bucket",
+        "asset_symbol, bucket_id",
+    )
+    _prepare_hypertable(
+        "chain_trend_snapshots",
+        "uq_chain_trend_bucket",
+        "asset_symbol, chain_key, bucket_id",
+    )
     for table in ("asset_trend_snapshots", "chain_trend_snapshots"):
         op.execute(
             f"""

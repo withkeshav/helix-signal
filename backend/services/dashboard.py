@@ -24,6 +24,7 @@ from schemas import (
 )
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol
+from signal_engine.risk_inputs import build_risk_score_kwargs
 from utils import utc_normalize
 
 
@@ -91,7 +92,19 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         peg_status=scoring.peg_status_label(price),
     )
 
-    conc_s, conc_detail = scoring.concentration_component(chain_shares)
+    risk_kwargs = build_risk_score_kwargs(
+        chains_orm,
+        source_ok=source_ok,
+        source_error=source_error,
+        age_seconds=freshness_dict.get("age_seconds"),
+        refresh_interval_seconds=refresh_interval,
+    )
+    conc_s, conc_detail = scoring.concentration_component(
+        chain_shares,
+        top3_dex_pool_share=risk_kwargs.get("top3_dex_pool_share"),
+    )
+    asset_signal_dict = scoring.compute_risk_score(**risk_kwargs)
+
     top_chain_name: str | None = None
     if total_supply and total_supply > 0 and chains_orm:
         top_row = max(chains_orm, key=lambda c: (c.supply_current or 0.0))
@@ -103,23 +116,6 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         top_chain_share_pct=conc_detail.get("top_chain_share_pct"),
         hhi=conc_detail.get("hhi"),
         label=scoring.composite_band(conc_s),
-    )
-
-    asset_signal_dict = scoring.compute_risk_score(
-        price=price,
-        supply_current=float(total_supply or 0.0),
-        supply_prev_day=total_prev_day if total_prev_day > 0 else None,
-        supply_prev_week=total_prev_week if total_prev_week > 0 else None,
-        supply_prev_month=total_prev_month if total_prev_month > 0 else None,
-        chain_shares=chain_shares,
-        source_ok=source_ok,
-        source_error=source_error,
-        age_seconds=freshness_dict.get("age_seconds"),
-        refresh_interval_seconds=refresh_interval,
-        slippage_10k_bps=0.0,
-        slippage_100k_bps=0.0,
-        top3_pool_share_pct=None,
-        tvl_change_24h_pct=total_change_24h_pct,
     )
     asset_signal = AssetSignalOut(
         score=int(asset_signal_dict["score"]),

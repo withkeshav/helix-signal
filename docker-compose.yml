@@ -32,6 +32,60 @@ services:
       - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
       - "traefik.http.routers.http-catchall.priority=1"
 
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: helix-postgres
+    restart: unless-stopped
+    profiles: ["data"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-helix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helix}
+      POSTGRES_DB: ${POSTGRES_DB:-helix}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-helix} -d ${POSTGRES_DB:-helix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: helix-redis
+    restart: unless-stopped
+    profiles: ["data"]
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    networks:
+      - internal
+    volumes:
+      - redis_data:/data
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.20.1
+    container_name: helix-mlflow
+    restart: unless-stopped
+    profiles: ["data"]
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    networks:
+      - internal
+    expose:
+      - "5000"
+
   backend:
     build:
       context: ./backend
@@ -39,11 +93,15 @@ services:
       - .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-sqlite:///data/helix.db}
+      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-false}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
       REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}
       TREND_RETENTION_DAYS: ${TREND_RETENTION_DAYS:-90}
       EVENT_RETENTION_DAYS: ${EVENT_RETENTION_DAYS:-30}
       ALLOW_BACKFILL: ${ALLOW_BACKFILL:-false}
       DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
+      AI_MODE: ${AI_MODE:-ai_off}
     networks:
       - internal
     volumes:
@@ -51,6 +109,28 @@ services:
       - helix_data:/data
     expose:
       - "8000"
+
+  celery-worker:
+    build:
+      context: ./backend
+    profiles: ["data"]
+    command: celery -A celery_app worker --loglevel=info --concurrency=1
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://helix:helix@postgres:5432/helix}
+      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
+      AI_MODE: ${AI_MODE:-ai_lite}
+    networks:
+      - internal
+    volumes:
+      - ./config:/config:ro
+      - helix_data:/data
+    depends_on:
+      - redis
+      - postgres
 
   frontend:
     build:
@@ -130,6 +210,9 @@ networks:
 
 volumes:
   helix_data:
+  postgres_data:
+  redis_data:
+  mlflow_data:
   prometheus_data:
   grafana_data:
 

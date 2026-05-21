@@ -1,15 +1,17 @@
 # Release Notes
 
-## Unreleased — Production fixes
+## Unreleased — Next-level platform
 
-Follow-up fixes on top of v3.1.0 for the public demo deployment. No version bump.
+Reliability, VPS-ready data plane, predictive intelligence, and optional AI — core risk engine runs with `AI_MODE=ai_off`.
 
 ### Highlights
 
-- **Dashboard restored**: Alpine.js terminal shell and external `app.js` load correctly; trend chart and tab navigation work again
-- **Data pipeline stabilized**: DefiLlama refresh no longer crashes on missing `timezone` import; trend buckets populate after refresh
-- **Attestation clarity**: UI and API now show **issuer report age** separately from **DefiLlama supply feed freshness** — unknown stays unknown when issuer dates cannot be parsed
-- **Deploy guardrails**: smoke-check script, Traefik basic-auth middleware file, nginx blocks public `/metrics`, `acme.json` excluded from git
+- **Unified risk scoring** across dashboard and historical trends; liquidity metrics wired from DEX data
+- **Single-node Compose profile**: TimescaleDB + Redis + Celery + MLflow (`docker compose --profile data up`)
+- **Predictive layer** (`/api/predictive`): regime, depeg probability, ES — no external LLM dependency
+- **AI-lite router** (`/api/ai/explain`): OpenRouter-lite / Ollama / Groq with token budget and graceful fallback
+- **Risk terminal UI**: glass panels, animated gauge, event ticker, predictive readout
+- **Contributor handoff**: local `.progress/PHASE_LOG.md` only (gitignored)
 
 See `CHANGELOG.md` for the full list.
 

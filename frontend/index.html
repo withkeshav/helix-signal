@@ -4,14 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Helix Signal Terminal</title>
-    <script data-cfasync="false" src="app.js?v=10"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Sora:wght@500;700&display=swap" rel="stylesheet" />
+    <script data-cfasync="false" src="app.js?v=11"></script>
     <script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script data-cfasync="false" src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script defer data-cfasync="false" src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
     <style>
       :root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06)}
       :root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35)}
-      *{box-sizing:border-box}body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh}
+      *{box-sizing:border-box}body{margin:0;font-family:Outfit,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh}
+      .title{font-family:Sora,Outfit,sans-serif}
+      .glass{background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+      .risk-gauge-wrap{display:flex;align-items:center;gap:16px}
+      .risk-gauge{width:120px;height:120px;flex-shrink:0}
+      .risk-gauge-track{fill:none;stroke:var(--line);stroke-width:10}
+      .risk-gauge-value{fill:none;stroke:var(--spark);stroke-width:10;stroke-linecap:round;transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset .4s ease}
+      .event-ticker{overflow:hidden;border-radius:10px;border:1px solid var(--line);background:var(--bg-accent);margin-bottom:12px}
+      .event-ticker-inner{display:flex;gap:24px;white-space:nowrap;padding:8px 12px;font-size:12px;animation:ticker 40s linear infinite}
+      @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+      .predictive-badge{font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--ok-bg);color:var(--up);display:inline-block;margin-left:6px}
       .container{width:min(1280px,98vw);margin:20px auto 40px}
       .header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
       .title{margin:0;font-size:clamp(20px,2.4vw,30px)}
@@ -27,7 +40,7 @@
       .tab:hover{color:var(--text)}
       .tab-content{display:none}.tab-content.active{display:block}
       .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
-      .kpi-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--card-shadow)}
+      .kpi-card{background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--card-shadow);backdrop-filter:blur(8px)}
       .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)}
       .kpi-value{font-size:1.25rem;font-weight:700;font-family:"JetBrains Mono","Roboto Mono",monospace;font-variant-numeric:tabular-nums}
       .kpi-sub{font-size:12px;color:var(--muted);margin-top:4px}
@@ -90,7 +103,32 @@
         <button class="tab" :class="tab === 'intel' ? 'active' : ''" @click="tab='intel';loadTab()">Intelligence</button>
       </div>
 
+      <div id="event-ticker" class="event-ticker glass" x-show="tickerItems.length">
+        <div class="event-ticker-inner">
+          <template x-for="(t, i) in tickerItems" :key="`t-${i}`">
+            <span x-text="t"></span>
+          </template>
+        </div>
+      </div>
+
       <div id="tab-overview" class="tab-content" :class="tab === 'overview' ? 'active' : ''">
+        <div class="insight-card glass" style="margin-bottom:12px">
+          <div class="risk-gauge-wrap">
+            <svg class="risk-gauge" viewBox="0 0 120 120" aria-label="Risk gauge">
+              <circle class="risk-gauge-track" cx="60" cy="60" r="48"></circle>
+              <circle class="risk-gauge-value" cx="60" cy="60" r="48"
+                :style="`stroke-dasharray:${gaugeArc} 301;stroke-dashoffset:0;stroke:${gaugeColor}`"></circle>
+              <text x="60" y="58" text-anchor="middle" font-size="22" font-weight="700" fill="currentColor" x-text="signal.score ?? '--'"></text>
+              <text x="60" y="76" text-anchor="middle" font-size="10" fill="var(--muted)" x-text="signal.band || ''"></text>
+            </svg>
+            <div>
+              <h2 style="margin:0 0 6px;font-size:14px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
+              <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
+              <p class="kpi-sub" style="margin-top:8px" x-show="aiSummary" x-text="aiSummary"></p>
+              <span class="predictive-badge" x-text="predictive.available ? 'ML Core' : 'ML Off'"></span>
+            </div>
+          </div>
+        </div>
         <div class="kpi-grid">
           <div class="kpi-card"><div class="kpi-label">Signal Score</div><div class="kpi-value" :class="`band-${signal.band?.toLowerCase()}`" x-text="`${signal.score ?? '--'}/100`"></div><div class="kpi-sub" x-text="signal.band || ''"></div></div>
           <div class="kpi-card"><div class="kpi-label">Depeg Index</div><div class="kpi-value" x-text="`${depeg.score ?? '--'}/100`"></div><div class="kpi-sub" x-text="depeg.peg_status || ''"></div></div>

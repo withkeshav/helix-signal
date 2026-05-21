@@ -166,7 +166,8 @@ def prophet_forecast(db: Session, *, asset_symbol: str, hours: int = 24) -> dict
         if len(series) < 20:
             return {"asset": asset_symbol, "note": "Insufficient supply data.", "forecast": []}
         df = pd.DataFrame(series)
-        sf = StatsForecast(models=[AutoARIMA(season_length=24)], freq="5min", n_jobs=1)
+        # 5-minute buckets: 288 steps per day for daily seasonality
+        sf = StatsForecast(models=[AutoARIMA(season_length=288)], freq="5min", n_jobs=1)
         sf.fit(df)
         fcast = sf.forecast(h=min(hours * 12, 288))
         forecast_points: list[dict[str, Any]] = []

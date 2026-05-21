@@ -16,3 +16,13 @@ def client():
     init_db()
     with TestClient(main.app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+def db_session():
+    init_db()
+    db = main.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

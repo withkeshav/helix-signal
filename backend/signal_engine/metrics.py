@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from database import AssetChainSnapshot, SourceStatus
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol
+from signal_engine.risk_inputs import build_risk_score_kwargs, compute_unified_risk_score
 from utils import utc_normalize, chain_key_from_name
 
 
@@ -84,32 +85,29 @@ def compute_asset_metric_bundle(
 
     raw_total = sum((c.supply_current or 0.0) for c in chains_orm)
     total_supply = raw_total if raw_total > 0 else None
-    total_prev_day = sum((c.supply_prev_day or 0.0) for c in chains_orm)
-    total_prev_week = sum((c.supply_prev_week or 0.0) for c in chains_orm)
-    total_prev_month = sum((c.supply_prev_month or 0.0) for c in chains_orm)
 
-    chain_shares: list[float] = []
-    if total_supply and total_supply > 0:
-        for c in chains_orm:
-            if c.supply_current is not None and c.supply_current > 0:
-                chain_shares.append(float(c.supply_current) / float(total_supply))
-
-    price = next((c.price for c in chains_orm if c.price is not None), None)
-    depeg_index = scoring.depeg_index_score(price)
-
-    asset_signal_dict = scoring.compute_risk_score(
-        price=price,
-        supply_current=float(total_supply or 0.0),
-        supply_prev_day=total_prev_day if total_prev_day > 0 else None,
-        supply_prev_week=total_prev_week if total_prev_week > 0 else None,
-        supply_prev_month=total_prev_month if total_prev_month > 0 else None,
-        chain_shares=chain_shares,
+    risk_kwargs = build_risk_score_kwargs(
+        chains_orm,
         source_ok=source_ok,
         source_error=source_error,
         age_seconds=age_seconds,
         refresh_interval_seconds=refresh_interval_seconds,
     )
-    conc_s, conc_detail = scoring.concentration_component(chain_shares, top3_dex_pool_share=None)
+    price = risk_kwargs.get("price")
+    chain_shares = risk_kwargs.get("chain_shares") or []
+    depeg_index = scoring.depeg_index_score(price)
+
+    asset_signal_dict = compute_unified_risk_score(
+        chains_orm,
+        source_ok=source_ok,
+        source_error=source_error,
+        age_seconds=age_seconds,
+        refresh_interval_seconds=refresh_interval_seconds,
+    )
+    conc_s, conc_detail = scoring.concentration_component(
+        chain_shares,
+        top3_dex_pool_share=risk_kwargs.get("top3_dex_pool_share"),
+    )
     dc_block = (asset_signal_dict.get("components") or {}).get("data_confidence") or {}
     dc_label = str(dc_block.get("label") or "Unknown")
     dc_score = int(dc_block.get("score") or 0)

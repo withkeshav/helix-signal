@@ -102,6 +102,17 @@ frontend/main.js
 .antigravitycli/
 .code-review-graph/
 
-# --- Internal tracking & research (local only) ---
-.progress
+# --- Internal / local docs and tracking (never commit) ---
+.progress/
+.progress/**
 research/
+docs/phase-tracking.md
+docs/vps-tuning.md
+**/PHASE_LOG.md
+**/SERVER_MIGRATION.md
+.progress/SERVER_MIGRATION.md
+*strategic_report*
+*STRATEGIC_REPORT*
+helix_signal_strategic_report.md
+*.plan.md
+.cursor/

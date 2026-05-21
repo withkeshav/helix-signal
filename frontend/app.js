@@ -46,11 +46,50 @@
           chains: [], signal: {}, depeg: {}, concentration: {}, freshness: {}, sources: [],
           attestation: {}, osintArticles: [], events: [], totalSupply: null, supplyChange: null,
           crossSource: {}, staleWarning: '', generatedAt: '', _charts: new Map(), _timer: null,
+          predictive: {}, aiSummary: '', tickerItems: [],
+          get gaugeArc() {
+            const s = Number(this.signal.score);
+            if (Number.isNaN(s)) return 0;
+            return Math.max(0, Math.min(301, (s / 100) * 301));
+          },
+          get gaugeColor() {
+            const b = (this.signal.band || '').toLowerCase();
+            if (b === 'risk') return 'var(--down)';
+            if (b === 'watch') return 'var(--neutral)';
+            return 'var(--up)';
+          },
           async init() {
             await this.loadAssets();
             await this.loadDashboard();
             await this.loadAttestation();
-            this._timer=setInterval(()=>this.loadDashboard(),60000);
+            this._timer = setInterval(() => {
+              this.loadDashboard();
+            }, 60000);
+          },
+          async loadPredictive() {
+            try{
+              const r=await fetch(`/api/predictive?asset=${this.asset}`,{cache:'no-store'});
+              if(r.ok)this.predictive=await r.json();
+            }catch(e){this.predictive={available:false};}
+          },
+          async loadAiExplain() {
+            try{
+              const r=await fetch(`/api/ai/explain?asset=${this.asset}`,{cache:'no-store'});
+              if(r.ok){
+                const j=await r.json();
+                this.aiSummary=j.available?j.summary:(j.reason||'');
+              }
+            }catch(e){this.aiSummary='';}
+          },
+          async loadTicker() {
+            try{
+              const r=await fetch(`/api/events?asset=${this.asset}&limit=12`,{cache:'no-store'});
+              if(!r.ok)return;
+              const j=await r.json();
+              const evs=j.events||[];
+              const items=evs.map(e=>`${e.severity?.toUpperCase()||'INFO'} · ${e.title||'event'} · ${formatWhen(e.timestamp)}`);
+              this.tickerItems=items.length?items.concat(items):[];
+            }catch(e){this.tickerItems=[];}
           },
           async loadAttestation() {
             try{
@@ -81,8 +120,24 @@
               this.generatedAt=new Date().toLocaleTimeString();
               this.staleWarning=this.freshness.status==='Stale'?'Data is stale. Metrics may not reflect current conditions.':'';
               this.renderCharts(d);
+              this._updateCrossSource();
+              await this.loadPredictive();
+              await this.loadTicker();
+              await this.loadAiExplain();
               if(this.tab==='intel')this.loadIntel();
             }catch(e){this.staleWarning=`Dashboard error: ${e.message}`;}
+          },
+          _updateCrossSource() {
+            const prices=[];
+            for(const c of this.chains){
+              if(c.price>0)prices.push(c.price);
+              if(c.price_coingecko>0)prices.push(c.price_coingecko);
+              if(c.price_dexscreener>0)prices.push(c.price_dexscreener);
+            }
+            if(prices.length<2){this.crossSource={sources_agreeing:prices.length,discrepancy_flag:false,max_discrepancy_pct:0};return;}
+            const mean=prices.reduce((a,b)=>a+b,0)/prices.length;
+            const maxDisc=Math.max(...prices.map(v=>Math.abs(v-mean)/mean*100));
+            this.crossSource={sources_agreeing:prices.length,max_discrepancy_pct:maxDisc,discrepancy_flag:maxDisc>0.5};
           },
           async loadTab() {
             if(this.tab==='intel')this.loadIntel();

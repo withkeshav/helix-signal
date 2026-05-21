@@ -154,13 +154,15 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/` — FastAPI app, multi-source ingestion, DuckDB analytics, alerts, OSINT, governance, ML anomaly detection, Alembic migrations
 - `frontend/` — Alpine.js dashboard (`index.html` + `app.js`), Chart.js, nginx API proxy in Docker
 - `config/` — chain, asset, and alert configuration
-- `docs/` — architecture and methodology (public)
+- `docs/` — architecture and data methodology only (public)
 - `scripts/` — deployment smoke checks
 - `traefik/` — reverse proxy static config + `dynamic/middlewares.yml` for basic auth
 
-Internal planning briefs, `.progress`, and local `research/` artifacts are gitignored and not part of the public repo.
+Phase logs and server runbooks live under `.progress/` (gitignored). Planning briefs and `research/` are local only too.
 
-## Documentation
+**SQLite → Postgres on a server:** run [`scripts/migrate_sqlite_to_postgres.py`](scripts/migrate_sqlite_to_postgres.py) with backups and `--verify-only` before cutover. Full no-data-loss steps are in `.progress/SERVER_MIGRATION.md` (local).
+
+## Documentation (in repo)
 
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Data methodology: [`docs/data-methodology.md`](docs/data-methodology.md)

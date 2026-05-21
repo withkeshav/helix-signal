@@ -142,6 +142,12 @@ Guidelines:
 - Keep frontend dependency-light (Alpine.js + `app.js` + Chart.js; no build step)
 - Follow existing naming patterns and file organization
 
+## Local-only notes (do not commit)
+
+- Handoff / phase status: `.progress/PHASE_LOG.md` (gitignored)
+- Planning, briefs, research: anything matching `.gitignore` internal patterns
+- **Core** features (scoring, ingest, trends, alerts) must work with AI disabled; LLM providers are optional add-ons only
+
 ## Pull Request Expectations
 
 - Explain what changed and why
@@ -150,4 +156,4 @@ Guidelines:
 - For deploy-related UI/API changes, run `./scripts/smoke-check.sh https://your-host` when applicable
 - Confirm no secrets were added (`.env`, `secrets/`, `acme.json`, internal briefs)
 - Keep docs in sync when behavior or thresholds change
-- Do not commit internal execution briefs (see `.gitignore` patterns)
+- Do not commit internal or local docs (`.progress/`, briefs, phase logs — see `.gitignore`)

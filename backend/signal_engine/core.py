@@ -154,6 +154,10 @@ def refresh_chain_data(db: Session) -> None:
         errors: list[str] = []
         success_count = 0
         successful_asset_symbols: list[str] = []
+        cg_ok = False
+        dx_ok = False
+        cg_error: str | None = None
+        dx_error: str | None = None
         chain_tvl_map = fetch_chain_tvl_by_defillama_name()
 
         for asset in enabled_assets:
@@ -167,13 +171,25 @@ def refresh_chain_data(db: Session) -> None:
                 success_count += 1
                 successful_asset_symbols.append(asset_symbol)
 
-                cg_data = coingecko_src.fetch(symbols=[asset_symbol]) if coingecko_src else {}
-                cg_transformed = coingecko_src.transform(cg_data) if coingecko_src else {}
-                cg_asset = cg_transformed.get(asset_symbol, {})
+                try:
+                    cg_data = coingecko_src.fetch(symbols=[asset_symbol]) if coingecko_src else {}
+                    cg_transformed = coingecko_src.transform(cg_data) if coingecko_src else {}
+                    cg_asset = cg_transformed.get(asset_symbol, {})
+                    if cg_asset:
+                        cg_ok = True
+                except Exception as cg_exc:
+                    cg_error = str(cg_exc)
+                    cg_asset = {}
 
-                dx_data = dexscreener_src.fetch(symbols=[asset_symbol]) if dexscreener_src else []
-                dx_transformed = dexscreener_src.transform(dx_data) if dexscreener_src else {}
-                dx_asset = dx_transformed.get(asset_symbol, {})
+                try:
+                    dx_data = dexscreener_src.fetch(symbols=[asset_symbol]) if dexscreener_src else []
+                    dx_transformed = dexscreener_src.transform(dx_data) if dexscreener_src else {}
+                    dx_asset = dx_transformed.get(asset_symbol, {})
+                    if dx_asset:
+                        dx_ok = True
+                except Exception as dx_exc:
+                    dx_error = str(dx_exc)
+                    dx_asset = {}
 
                 for chain in configured:
                     chain_name = str(chain["name"])
@@ -211,10 +227,29 @@ def refresh_chain_data(db: Session) -> None:
         if success_count > 0:
             completed_at = datetime.now(timezone.utc)
             _upsert_source_status(db, source_name="defillama", status="ok", attempted_at=attempted_at, successful_at=completed_at, last_error="; ".join(errors) if errors else None)
-            _upsert_source_status(db, source_name="coingecko", status="ok", attempted_at=attempted_at, successful_at=completed_at, last_error=None)
-            _upsert_source_status(db, source_name="dexscreener", status="ok", attempted_at=attempted_at, successful_at=completed_at, last_error=None)
+            _upsert_source_status(
+                db,
+                source_name="coingecko",
+                status="ok" if cg_ok else "error",
+                attempted_at=attempted_at,
+                successful_at=completed_at if cg_ok else None,
+                last_error=cg_error,
+            )
+            _upsert_source_status(
+                db,
+                source_name="dexscreener",
+                status="ok" if dx_ok else "error",
+                attempted_at=attempted_at,
+                successful_at=completed_at if dx_ok else None,
+                last_error=dx_error,
+            )
             from signal_engine.history import persist_trends_and_events
-            persist_trends_and_events(db, successful_asset_symbols=list(dict.fromkeys(successful_asset_symbols)), completed_at=completed_at, prior_source_status=prior_source_status)
+            from services.cache import invalidate_dashboard
+
+            symbols = list(dict.fromkeys(successful_asset_symbols))
+            persist_trends_and_events(db, successful_asset_symbols=symbols, completed_at=completed_at, prior_source_status=prior_source_status)
+            for sym in symbols:
+                invalidate_dashboard(sym)
         else:
             _upsert_source_status(db, source_name="defillama", status="error", attempted_at=attempted_at, successful_at=None, last_error="; ".join(errors) if errors else "No asset refresh succeeded")
 

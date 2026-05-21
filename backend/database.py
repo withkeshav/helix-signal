@@ -174,8 +174,27 @@ def get_db():
         db.close()
 
 
+def upgrade_db() -> None:
+    """Apply Alembic migrations (required for PostgreSQL/Timescale deployments)."""
+    from alembic import command
+    from alembic.config import Config
+
+    ini_path = Path(__file__).resolve().parent / "alembic.ini"
+    cfg = Config(str(ini_path))
+    cfg.set_main_option("sqlalchemy.url", DATABASE_URL)
+    command.upgrade(cfg, "head")
+
+
+def _should_use_alembic() -> bool:
+    explicit = os.getenv("HELIX_USE_ALEMBIC", "").strip().lower() in ("1", "true", "yes")
+    return explicit or DATABASE_URL.startswith("postgresql")
+
+
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    if _should_use_alembic():
+        upgrade_db()
+    else:
+        Base.metadata.create_all(bind=engine)
     _migrate_legacy_chain_data()
 
 

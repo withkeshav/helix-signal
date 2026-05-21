@@ -2,9 +2,29 @@
 
 ## Unreleased
 
-Production hardening and dashboard fixes (no version bump).
+Next-level platform: reliability, VPS data plane, predictive core, optional AI router, terminal UI.
 
 ### Fixed
+
+- **Scoring parity**: unified `signal_engine/risk_inputs.py` so dashboard and trend bundles use identical `compute_risk_score` inputs
+- **Liquidity wiring**: forward DEX liquidity estimates (slippage, top-3 pool share) instead of hardcoded zeros; stop mapping supply 24h delta into TVL change
+- **Source health**: per-source CoinGecko/DexScreener status; Prometheus `helix_source_health` reads DB instead of hardcoded `1`
+- **AutoARIMA seasonality**: `season_length=288` for 5-minute buckets (daily cycle)
+
+### Added
+
+- **SQLite→Postgres migration**: `scripts/migrate_sqlite_to_postgres.py` with backup, row-level copy, and `--verify-only`; server runbook in gitignored `.progress/SERVER_MIGRATION.md`
+- **Redis dashboard cache** (`ENABLE_REDIS_CACHE`), MLflow predictive logging, ONNX inference hook with heuristic fallback
+- **Local handoff only**: `.progress/PHASE_LOG.md` (gitignored; not in repo)
+- **VPS data profile** (`docker compose --profile data`): TimescaleDB, Redis (cache + Celery), Celery worker, MLflow
+- **Alembic Timescale migration**: hypertables + `asset_signal_1h` continuous aggregate on PostgreSQL
+- **Predictive API** (`GET /api/predictive`): regime, depeg probability horizons, expected shortfall — core ML, no LLM required
+- **AI router** (`GET /api/ai/explain`): optional OpenRouter-lite → Ollama Cloud → Groq with `AI_MODE=ai_off|ai_lite|ai_full`
+- **Celery tasks**: `worker_tasks.py` for refresh, predictive inference, AI enrichment
+- **Terminal UI**: Outfit/Sora fonts, glass panels, SVG risk gauge, event ticker, predictive readout
+- **VPS deploy notes** inlined in `docs/architecture.md` (no separate internal ops doc in git)
+
+### Fixed (prior unreleased)
 
 - **Dashboard blank page**: restored full Alpine.js shell in `frontend/index.html`; moved app logic to `frontend/app.js`; fixed Chart.js trend syntax error blocking Alpine init
 - **`metrics.py` crash**: added missing `timezone` import that broke DefiLlama source status updates and trend persistence

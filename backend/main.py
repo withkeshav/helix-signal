@@ -22,6 +22,7 @@ from database import (
     ChainTrendSnapshot,
     SessionLocal,
     SignalEvent,
+    SourceStatus,
     get_db,
     init_db,
 )
@@ -172,25 +173,30 @@ async def metrics_middleware(request: Request, call_next):
 
 @app.get("/metrics")
 def prometheus_metrics() -> Response:
-    db = next(get_db())
-    scheduler = getattr(app.state, "scheduler", None)
-    METRIC_SCHEDULER_RUNNING.set(1 if scheduler and scheduler.running else 0)
+    db = SessionLocal()
+    try:
+        scheduler = getattr(app.state, "scheduler", None)
+        METRIC_SCHEDULER_RUNNING.set(1 if scheduler and scheduler.running else 0)
 
-    if scheduler and scheduler.running:
-        jobs = scheduler.get_jobs()
-        for job in jobs:
-            if job.id == "defillama-refresh" and hasattr(job, "next_run_time"):
-                if job.next_run_time:
-                    age = (datetime.now(timezone.utc) - job.next_run_time).total_seconds()
-                    METRIC_LAST_REFRESH_AGE.set(max(age, 0))
+        if scheduler and scheduler.running:
+            jobs = scheduler.get_jobs()
+            for job in jobs:
+                if job.id == "defillama-refresh" and hasattr(job, "next_run_time"):
+                    if job.next_run_time:
+                        age = (datetime.now(timezone.utc) - job.next_run_time).total_seconds()
+                        METRIC_LAST_REFRESH_AGE.set(max(age, 0))
 
-    source_count = db.query(AssetTrendSnapshot).count()
-    METRIC_DB_CONNECTIONS.set(source_count)
+        source_count = db.query(AssetTrendSnapshot).count()
+        METRIC_DB_CONNECTIONS.set(source_count)
 
-    for src in ("defillama", "coingecko", "dexscreener"):
-        METRIC_SOURCE_HEALTH.labels(source=src).set(1)
+        for src in ("defillama", "coingecko", "dexscreener"):
+            row = db.query(SourceStatus).filter(SourceStatus.source_name == src).first()
+            healthy = 1 if row and row.status == "ok" else 0
+            METRIC_SOURCE_HEALTH.labels(source=src).set(healthy)
 
-    return Response(content=generate_latest(), media_type="text/plain; charset=utf-8")
+        return Response(content=generate_latest(), media_type="text/plain; charset=utf-8")
+    finally:
+        db.close()
 
 
 @app.get("/")
@@ -217,7 +223,14 @@ def api_refresh(request: Request, db: Session = Depends(get_db)) -> dict[str, bo
 @app.get("/api/dashboard", response_model=DashboardResponse)
 @limiter.limit("60/minute")
 def dashboard(request: Request, asset: str | None = None, db: Session = Depends(get_db)) -> DashboardResponse:
-    return build_dashboard_response(db, asset)
+    from services.cache import get_or_build_dashboard
+
+    def _build() -> dict[str, Any]:
+        return build_dashboard_response(db, asset).model_dump(mode="json")
+
+    payload = get_or_build_dashboard(asset, _build)
+    payload.pop("_cache", None)
+    return DashboardResponse.model_validate(payload)
 
 
 @app.get("/api/assets", response_model=list[AssetConfigOut])
@@ -592,6 +605,38 @@ def api_anomaly_forecast(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     return forecast_supply(db, asset_symbol=asset, hours=hours)
+
+
+@app.get("/api/predictive")
+@limiter.limit("60/minute")
+def api_predictive(
+    request: Request,
+    asset: str = Query("USDT"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.predictive import run_predictive_bundle
+
+    return run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
+
+
+@app.get("/api/ai/explain")
+@limiter.limit("30/minute")
+def api_ai_explain(
+    request: Request,
+    asset: str = Query("USDT"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.ai_router import enrich_with_ai
+    from services.predictive import run_predictive_bundle
+
+    pred = run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
+    context = {
+        "asset_symbol": asset.upper(),
+        "signal_score": pred.get("signal_score"),
+        "signal_band": "Risk" if (pred.get("signal_score") or 0) >= 70 else "Watch" if (pred.get("signal_score") or 0) >= 40 else "Normal",
+        "regime": pred.get("regime"),
+    }
+    return enrich_with_ai(feature="risk_explain", context=context)
 
 
 if __name__ == "__main__":

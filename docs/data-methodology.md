@@ -1,8 +1,14 @@
-# Data Methodology (V2.4)
+# Data Methodology (V3)
 
-This document explains how Helix-Signal computes and presents asset-chain stablecoin metrics, the Helix Signal Score, historical trends, and the local signal feed.
+This document explains how Helix-Signal computes and presents asset-chain stablecoin metrics, the **V3 Risk Score**, historical trends, predictive outputs, and the local signal feed.
 
-## Primary Source
+## Primary and supplemental sources
+
+- **DefiLlama** stablecoins API (supply, peg price, chain TVL)
+- **CoinGecko** (price, market cap, volume) — optional enrichment
+- **DEX Screener** (pool liquidity, top-3 pool concentration) — used for liquidity depth scoring
+
+## Primary Source (DefiLlama)
 
 - Source: DefiLlama stablecoins API
 - Endpoint used for asset chain circulating values:
@@ -77,9 +83,9 @@ Status thresholds (same as prior releases):
 
 The **Depeg Index** is a 0 to 100 score derived from absolute percent deviation of the asset-level price from the USD peg anchor (1.0). It is documented as **not** chain-specific oracle precision.
 
-### Helix Signal Score (composite)
+### V3 Risk Score (composite)
 
-The composite **Helix Signal Score** is 0 to 100 with bands:
+The composite **V3 Risk Score** is 0 to 100 with bands:
 
 - **Normal**: 0 to 39
 - **Watch**: 40 to 69
@@ -87,19 +93,23 @@ The composite **Helix Signal Score** is 0 to 100 with bands:
 
 Higher scores mean more suggested monitoring attention (stress across dimensions), not a prediction of failure.
 
-**Weights** (documented in code and API `components`):
+**Weights** (see `signal_engine/scoring.py` and API `components`):
 
-- Peg pressure: 35%
-- Supply momentum: 25%
-- Chain concentration: 20%
-- Data confidence: 20%
+- Peg stability: 35%
+- Liquidity depth: 25% (DEX slippage estimates, top-3 pool share; TVL change when historical TVL delta is available)
+- Supply stability: 15%
+- Concentration: 15%
+- Observability: 10%
 
-Subscore notes:
+Dashboard and trend pipelines share inputs via `signal_engine/risk_inputs.py`.
 
-- **Peg pressure**: maps from the same peg stress logic as the Depeg Index
-- **Supply momentum**: uses aggregate current supply versus prior day, week, and month sums when available
-- **Chain concentration**: Herfindahl-style HHI on normalized chain supply shares plus top-chain share context
-- **Data confidence**: combines DefiLlama source status and recency of the combined freshness basis versus refresh interval
+### Predictive layer (optional API)
+
+`GET /api/predictive` exposes regime (`stable` / `volatile` / `crisis`), depeg probability horizons, and liquidity expected shortfall. This path uses internal statistical/ML logic and does **not** require external LLM APIs.
+
+### AI explanations (optional add-on)
+
+`GET /api/ai/explain` uses `AI_MODE` (`ai_off`, `ai_lite`, `ai_full`) and provider routing (OpenRouter-lite, Ollama Cloud, Groq). When disabled or providers fail, core risk metrics are unchanged.
 
 Per-chain rows expose simplified **chain signal** and **data confidence** hints for table scanning; the authoritative composite remains asset-level.
 

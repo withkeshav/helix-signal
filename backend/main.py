@@ -111,7 +111,8 @@ async def lifespan(app: FastAPI):
 
     scheduler = BackgroundScheduler()
     skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
-    if not skip_refresh:
+    use_celery_refresh = os.getenv("HELIX_USE_CELERY_REFRESH", "").strip().lower() in ("1", "true", "yes")
+    if not skip_refresh and not use_celery_refresh:
         interval_seconds = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
         scheduler.add_job(
             _refresh_job,
@@ -138,7 +139,7 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     app.state.scheduler = scheduler
 
-    if not skip_refresh:
+    if not skip_refresh and not use_celery_refresh:
         _refresh_job()
 
     try:

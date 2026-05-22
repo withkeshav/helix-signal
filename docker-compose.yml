@@ -110,6 +110,23 @@ services:
     expose:
       - "8000"
 
+  celery-beat:
+    build:
+      context: ./backend
+    profiles: ["data"]
+    command: celery -A celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://helix:helix@postgres:5432/helix}
+      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-true}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}
+    networks:
+      - internal
+    depends_on:
+      - redis
+
   celery-worker:
     build:
       context: ./backend

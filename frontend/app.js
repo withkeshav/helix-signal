@@ -45,7 +45,7 @@
           tab: 'overview', asset: 'USDT', assetName: 'Tether USD', enabledAssets: ['USDT','USDC','DAI','PYUSD'],
           chains: [], signal: {}, depeg: {}, concentration: {}, freshness: {}, sources: [],
           attestation: {}, osintArticles: [], events: [], totalSupply: null, supplyChange: null,
-          crossSource: {}, staleWarning: '', generatedAt: '', _charts: new Map(), _timer: null,
+          crossSource: {}, staleWarning: '', generatedAt: '', _charts: new Map(), _timer: null, _refreshingStale: false,
           predictive: {}, aiSummary: '', tickerItems: [],
           get gaugeArc() {
             const s = Number(this.signal.score);
@@ -119,6 +119,10 @@
               this.supplyChange=d.total_supply_change_24h_pct;
               this.generatedAt=new Date().toLocaleTimeString();
               this.staleWarning=this.freshness.status==='Stale'?'Data is stale. Metrics may not reflect current conditions.':'';
+              if(this.freshness.status==='Stale'&&!this._refreshingStale){
+                this._refreshingStale=true;
+                this.refresh().finally(()=>{this._refreshingStale=false;});
+              }
               this.renderCharts(d);
               this._updateCrossSource();
               await this.loadPredictive();

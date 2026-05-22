@@ -15,6 +15,8 @@ celery_app = Celery(
     include=["worker_tasks"],
 )
 
+_refresh_seconds = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
+
 celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
@@ -24,4 +26,10 @@ celery_app.conf.update(
     task_track_started=True,
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
+    beat_schedule={
+        "refresh-chain-data": {
+            "task": "helix.refresh_chain_data",
+            "schedule": float(_refresh_seconds),
+        },
+    },
 )

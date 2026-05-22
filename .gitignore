@@ -103,6 +103,10 @@ frontend/main.js
 .code-review-graph/
 
 # --- Internal / local docs and tracking (never commit) ---
+internal reserach/
+internal reserach/**
+internal research/
+internal research/**
 .progress/
 .progress/**
 research/

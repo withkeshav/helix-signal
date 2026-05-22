@@ -89,6 +89,7 @@ services:
   backend:
     build:
       context: ./backend
+    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -114,6 +115,7 @@ services:
     build:
       context: ./backend
     profiles: ["data"]
+    restart: unless-stopped
     command: celery -A celery_app beat --loglevel=info
     env_file:
       - .env
@@ -131,6 +133,7 @@ services:
     build:
       context: ./backend
     profiles: ["data"]
+    restart: unless-stopped
     command: celery -A celery_app worker --loglevel=info --concurrency=1
     env_file:
       - .env
@@ -152,6 +155,7 @@ services:
   frontend:
     build:
       context: ./frontend
+    restart: unless-stopped
     networks:
       - internal
     labels:

@@ -10,7 +10,8 @@
 *.sqlite3
 backend/helix.db
 backend/*.db
-data/
+data/*
+!data/clickhouse/schema.sql
 
 # --- Python Environment ---
 __pycache__/

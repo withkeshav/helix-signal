@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.4 (2026-05-24)
+
+### Fixed
+
+- **Frontend version hardcoded** — `index.html` footer was showing `v3.2.0` instead of tracking the backend version. Now displays `v3.3.4` in sync with the API.
+
 ## 3.3.3 (2026-05-24)
 
 ### Fixed

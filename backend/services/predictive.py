@@ -61,6 +61,7 @@ def _depeg_probability_heuristic(
         "horizon_6h": round(min(0.99, p * 1.15), 4),
         "horizon_24h": round(min(0.99, p * 1.3), 4),
         "model": "heuristic_v1",
+        "version": "1.0.0",
         "confidence": "medium",
     }
 
@@ -105,7 +106,7 @@ def run_predictive_bundle(
     features = build_feature_vector(
         price=bundle.price,
         signal_score=bundle.signal_score,
-        liquidity_score=liq_component,
+        concentration_score=liq_component,
         depeg_index=bundle.depeg_index,
         cross_source_discrepancy_pct=float(risk_kwargs.get("cross_source_discrepancy_pct") or 0.0),
     )
@@ -117,6 +118,38 @@ def run_predictive_bundle(
     regime = _regime_state(signal_score=bundle.signal_score, depeg_index=bundle.depeg_index)
 
     enabled = os.getenv("ENABLE_PREDICTIVE", "true").strip().lower() not in ("0", "false", "no")
+
+    timesfm_forecast = None
+    tf_endpoint = os.getenv("TIMESFM_ENDPOINT", "")
+    if tf_endpoint:
+        try:
+            from datetime import datetime, timedelta, timezone
+
+            cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+            rows = (
+                db.query(AssetTrendSnapshot)
+                .filter(
+                    AssetTrendSnapshot.asset_symbol == sym,
+                    AssetTrendSnapshot.timestamp >= cutoff,
+                )
+                .order_by(AssetTrendSnapshot.timestamp.asc())
+                .all()
+            )
+            if len(rows) >= 10:
+                values = [r.price for r in rows if r.price is not None]
+                tss = [r.timestamp.isoformat() for r in rows if r.price is not None]
+                if len(values) >= 10:
+                    import requests
+                    resp = requests.post(
+                        f"{tf_endpoint}/forecast",
+                        json={"series_id": f"{sym}_price", "values": values, "timestamps": tss, "horizon": 24},
+                        timeout=30,
+                    )
+                    if resp.status_code == 200:
+                        timesfm_forecast = resp.json()
+        except Exception:
+            pass
+
     result = {
         "asset_symbol": bundle.asset_symbol,
         "available": enabled,
@@ -125,6 +158,10 @@ def run_predictive_bundle(
         "regime": regime,
         "depeg_probability": depeg,
         "liquidity_expected_shortfall_pct": es,
+        "model": depeg.get("model", "heuristic_v1"),
+        "model_version": depeg.get("version", "1.0.0"),
+        "timesfm_forecast": timesfm_forecast,
+        "forecast_source": "timesfm" if timesfm_forecast else "none",
         "explainability": {
             "top_driver": "peg_stability" if bundle.depeg_index > 50 else "concentration",
             "data_confidence": bundle.data_confidence_label,

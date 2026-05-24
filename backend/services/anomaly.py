@@ -42,12 +42,13 @@ def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 3
     )
     if len(rows) < 10:
         return {"prices": [], "supplies": [], "depeg_indices": [], "concentration_scores": [], "timestamps": []}
+    valid = [r for r in rows if r.price is not None and r.total_supply is not None]
     return {
-        "prices": [r.price for r in rows if r.price is not None],
-        "supplies": [float(r.total_supply) for r in rows if r.total_supply is not None],
-        "depeg_indices": [r.depeg_index for r in rows],
-        "concentration_scores": [r.concentration_score for r in rows],
-        "timestamps": [r.timestamp for r in rows],
+        "prices": [r.price for r in valid],
+        "supplies": [float(r.total_supply) for r in valid],
+        "depeg_indices": [r.depeg_index for r in valid],
+        "concentration_scores": [r.concentration_score for r in valid],
+        "timestamps": [r.timestamp for r in valid],
     }
 
 
@@ -148,7 +149,7 @@ def train_models(db: Session, *, asset_symbol: str) -> dict[str, Any]:
         return {"asset": asset_symbol, "trained": False, "error": str(exc)}
 
 
-def prophet_forecast(db: Session, *, asset_symbol: str, hours: int = 24) -> dict[str, Any]:
+def statsforecast_supply(db: Session, *, asset_symbol: str, hours: int = 24) -> dict[str, Any]:
     if not ENABLED:
         return {"enabled": False}
     history = _fetch_trend_history(db, asset_symbol=asset_symbol, window_days=30)
@@ -178,7 +179,7 @@ def prophet_forecast(db: Session, *, asset_symbol: str, hours: int = 24) -> dict
             })
         return {"asset": asset_symbol, "forecast_hours": hours, "forecast": forecast_points}
     except Exception as exc:
-        log.warning("prophet_forecast_failed", error=str(exc))
+        log.warning("statsforecast_failed", error=str(exc))
         return {"asset": asset_symbol, "note": f"Forecast failed: {exc}", "forecast": []}
 
 
@@ -207,4 +208,4 @@ def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, 
 
 
 def forecast_supply(db: Session, *, asset_symbol: str, hours: int = 24) -> dict[str, Any]:
-    return prophet_forecast(db, asset_symbol=asset_symbol, hours=hours)
+    return statsforecast_supply(db, asset_symbol=asset_symbol, hours=hours)

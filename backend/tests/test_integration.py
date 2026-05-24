@@ -9,13 +9,33 @@ os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
 import pytest
 import vcr as vcr_lib
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
-from database import init_db
+from database import Base, engine, init_db
 import main
+
+_TABLES = [
+    "asset_chain_snapshots",
+    "source_status",
+    "asset_trend_snapshots",
+    "chain_trend_snapshots",
+    "osint_articles",
+    "signal_events",
+    "forecast_runs",
+    "forecast_points",
+]
+
+
+@pytest.fixture(autouse=True)
+def _clean_tables():
+    yield
+    with engine.begin() as conn:
+        for t in _TABLES:
+            conn.execute(text(f"DELETE FROM {t}"))
 
 
 vcr = vcr_lib.VCR(
-    cassette_library_dir="tests/cassettes",
+    cassette_library_dir="../tests/cassettes",
     record_mode="once",
     match_on=["uri", "method"],
     filter_headers=["authorization"],
@@ -35,7 +55,7 @@ def test_metrics_endpoint(client):
     body = response.text
     assert "helix_http_requests_total" in body
     assert "helix_scheduler_running" in body
-    assert "helix_db_connections" in body
+    assert "helix_trend_snapshot_rows" in body
 
 
 def test_metrics_gauge_values(client):

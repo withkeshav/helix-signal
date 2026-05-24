@@ -1,6 +1,82 @@
 # Changelog
 
-## Unreleased
+## 3.3.0 (2026-05-24)
+
+### Removed
+
+- **Traefik reverse proxy removed** — entire `traefik/` directory deleted, Traefik service block removed from compose
+- **Prometheus scraper + Grafana removed** — `prometheus/` and `grafana/` directories deleted; services, volumes, secrets removed from compose
+- **`web_gateway` external network removed** — all services now use `internal` network only
+- **No secrets required for Quick Start** — `cloudflare_token`, `acme.json`, `grafana_admin_password` no longer needed
+- **Dead `frontend/main.js` removed** — 1022-line vanilla JS file, superseded by Alpine.js rewrite
+
+### Frontend
+
+- **Forecast charts wired to API** — `renderForecastCharts()` now fetches real `ForecastRun`/`ForecastPoint` data instead of mock arrays
+- **Theme toggle rebuilds charts** — `cycleTheme()` now redraws Chart.js/ECHarts after switching dark/light
+- **dataQualityHistory populated** — wired from `dashboardResponse.data_quality`
+- **Stale response guard** — trend chart discards responses from stale asset selections
+- **`loadCorrelations` properly awaited** — no longer fires-and-forgets before render
+- **Refresh error handling** — checks `r.ok` before proceeding after POST `/api/refresh`
+
+### Hardening
+
+- **`LOG_LEVEL` filtering wired** — `structlog.stdlib.filter_by_level` + `logging.basicConfig(level=...)`; `PrintLoggerFactory` replaced with `LoggerFactory`
+- **Celery inspect timeout** — `inspect(timeout=2.0)` prevents health endpoint hangs
+- **`previous_status` column on `SourceStatus`** — persisted in `_upsert_source_status` so recovery alerts fire correctly; Alembic migration `da39a3ee5e6b` added
+- **Postgres pool hardening** — `pool_pre_ping=True`, `pool_recycle=3600` when `DATABASE_URL` is postgresql
+- **SQLAlchemy pool_pre_ping/recycle** for Postgres reliability
+- **Compose health conditions** — `frontend` depends on `backend` with `condition: service_healthy`; redis healthcheck via `redis-cli ping`
+- **Celery `AI_MODE` default** aligned to `ai_off` (was `ai_lite`)
+- **`depends_on` removed from default backend** — compose validates without `--profile data`
+- **Structured logging on plugin failures** — `registry.py` logs `ml_plugin_import_failed` and `rss_fetch_failed` warnings with error context
+- **`window_delta()` supports 90d** — aligns middleware, utils, and compare service
+- **Sources routes rate-limited** — `@limiter.limit("60/minute")` on `/sources/status` and `/sources/{name}/config`
+- **Flaky test fixed** — `test_event_dedup_window_positive` asserts exact `EVENT_DEDUP_MINUTES == 30`
+- **numpy/sklearn pinned** in `requirements-dev.txt`
+- **`prophet_forecast` renamed** to `statsforecast_supply` — accurate name for underlying StatsForecast/AutoARIMA implementation
+
+### Config & Cleanup
+
+- **`.env.example` cleaned** — `GRAFANA_ADMIN_PASSWORD`, `PROMETHEUS_RETENTION`, and Traefik TLS section removed
+- **`.gitignore` cleaned** — `acme.json`, `prometheus/data/`, `grafana/data/` entries removed
+- **`SECURITY.md` cleaned** — Traefik basic-auth and acme.json references removed
+- **Dead imports removed** — unused `get_logger` in `routes/events.py`, `routes/trends.py`, `routes/dashboard.py`; unused `build_governance_payload` in `routes/analytics.py`
+- **Forecast API key rename** — `"price"` → `"peg"` for historical data (mapped to depeg_index, not USD price)
+- **`sys.path` fix** — repo root added to path so local `uvicorn backend.main:app` works from both repo root and `backend/` directory
+
+### Developer Experience
+
+- **Auto-backfill on first run** — when DB has fewer than 24 trend rows, automatically seeds 7 days of synthetic history per enabled asset; gated by `HELIX_SKIP_STARTUP_REFRESH` (same env var used in tests)
+- **Dev compose no longer skips refresh** — `HELIX_SKIP_STARTUP_REFRESH` replaced with `ALLOW_BACKFILL: "true"` in override
+- **`_internal` param on `run_backfill`** — bypasses `ALLOW_BACKFILL` env check for startup auto-backfill
+
+## 3.2.0 (2026-05-23)
+
+### Added
+
+- **FinBERT sentiment plugin** (`ml_models/finbert/`) — registered `@register_model("finbert")`, `predict()`/`predict_batch()` with graceful fallback
+- **Analytics engine** (`services/analytics.py`) — `compute_correlations()` (Pearson matrix + pair ranking), `detect_patterns()` (trend slope, volatility, day-of-week seasonality), `_pearson()` with edge case handling
+- **Analytics routes** — `GET /analytics/correlations`, `GET /analytics/patterns`, `GET /analytics/finbert/sentiment`
+- **Anomaly detector guard** — `predict()` returns safe fallback when `self.trained=False` (was crashing on sklearn `NotFittedError`)
+- **ClickHouse schema** (`data/clickhouse/schema.sql`) — `ReplacingMergeTree` tables for asset/chain snapshots and forecast points
+- **DatabaseManager** (`core/database_manager.py`) — lazy `clickhouse_connect` client with LZ4, `get_trend_history()` OLAP→OLTP fallback, batch writes
+- **Data retention** — 6-table pruning with per-table env TTLs, ClickHouse `ALTER TABLE DELETE` path
+- **Docker Compose ClickHouse service** — `clickhouse/clickhouse-server:24-alpine`, `data` profile, 1GB limit, initdb schema auto-load
+- **Security middleware** — `SecurityValidationMiddleware` validates `asset` (A-Z0-9, 2-16 chars) and `window` (24h/7d/30d/90d), `sanitize_query_params()` redacts secrets
+- **Observability middleware** — 5 Prometheus metrics (`helix_http_requests_total`, `helix_http_request_duration_seconds`, `helix_source_health`, `helix_model_inference_seconds`, `helix_cache_hit_ratio`), structlog structured request logging
+- **Container hardening** — `no-new-privileges:true`, `cap_drop: ALL`, `read_only: true`, `tmpfs` on backend, celery-beat, celery-worker, timesfm
+- **6-tab terminal UI** — Market, Forecast, Supply, Events, Intel, Health tabs with ECharts confidence bands, evidence drawer, command bar with search
+- **Grant strategy** — 5 funding tracks identified (Alchemy, EF ESP, Optimism, Uniswap, Gitcoin) with application materials
+- **Documentation** — `docs/adding-asset.md`, `docs/adding-chain.md`, `docs/plugins.md`, `docs/api.md`, `docs/grant-strategy.md`, `scripts/backup.sh`
+
+### Fixed
+
+- **Anomaly detector** no longer crashes on `NotFittedError` when called before training
+
+### Tests
+
+- **106 total tests** (was 53 at Phase 2, was 35 at Phase 1)
 
 Next-level platform: reliability, VPS data plane, predictive core, optional AI router, terminal UI.
 
@@ -33,15 +109,12 @@ Next-level platform: reliability, VPS data plane, predictive core, optional AI r
 
 ### Added
 
-- **`scripts/smoke-check.sh`**: post-deploy checks for frontend shell markers, API health, basic-auth on admin routes, and blocked public `/metrics`
-- **`traefik/dynamic/middlewares.yml`**: file-provider basic-auth middleware for Traefik admin surfaces
+- **`scripts/smoke-check.sh`**: post-deploy checks for frontend shell markers, API health, and blocked public `/metrics`
 - **Hourly attestation refresh**: OSINT scheduler job calls `refresh_attestation_reports(force=True)`
 
 ### Changed
 
-- **Production Compose**: Traefik v3.7, Let's Encrypt via Cloudflare DNS challenge, HTTPS redirect, path-based Prometheus/Grafana under configurable `HELIX_DOMAIN`
 - **Frontend nginx**: return 404 for `/metrics` at the edge
-- **Security hygiene**: `acme.json` gitignored; rotate Traefik basic-auth hash before deploying your own instance
 
 ## v3.1.0 — Maintenance & Quality
 

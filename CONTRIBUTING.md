@@ -154,6 +154,6 @@ Guidelines:
 - Include manual verification steps
 - Run `cd backend && .venv/bin/pytest -q` before opening a PR
 - For deploy-related UI/API changes, run `./scripts/smoke-check.sh https://your-host` when applicable
-- Confirm no secrets were added (`.env`, `secrets/`, `acme.json`, internal briefs)
+- Confirm no secrets were added (`.env`, `secrets/`, internal briefs)
 - Keep docs in sync when behavior or thresholds change
 - Do not commit internal or local docs (`.progress/`, briefs, phase logs — see `.gitignore`)

@@ -5,12 +5,6 @@
 .env.*.local
 !.env.example
 
-# --- TLS / ACME ---
-acme.json
-*.pem
-*.key
-*.p12
-
 # --- Databases and Local Data ---
 *.sqlite
 *.sqlite3
@@ -49,11 +43,8 @@ out/
 secrets/
 
 # --- Test Artifacts ---
+tests/cassettes/
 backend/tests/cassettes/
-
-# --- Monitoring ---
-prometheus/data/
-grafana/data/
 
 # --- IDEs and OS Metadata ---
 .vscode/
@@ -109,6 +100,7 @@ internal research/
 internal research/**
 .progress/
 .progress/**
+.progress/AUDIT_FINDINGS.md
 research/
 docs/phase-tracking.md
 docs/vps-tuning.md
@@ -120,3 +112,5 @@ docs/vps-tuning.md
 helix_signal_strategic_report.md
 *.plan.md
 .cursor/
+.code-review-graph/
+**/NEXT_SESSION.md

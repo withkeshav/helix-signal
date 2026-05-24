@@ -115,11 +115,13 @@ def _within_budget(additional_tokens: int) -> bool:
     redis_url = os.getenv("REDIS_URL", "").strip()
     if redis_url:
         try:
-            from services.cache import _client
+            from backend.core.cache_manager import cache
 
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             key = f"helix:ai:daily_tokens:{today}"
-            client = _client()
+            client = cache._redis
+            if client is None:
+                raise RuntimeError("redis_unavailable")
             current = client.get(key)
             current_count = int(current) if current else 0
             if current_count + additional_tokens > budget:

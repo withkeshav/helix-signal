@@ -7,7 +7,9 @@ from sources.base import AbstractSource, SourceError
 
 DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
 DEXSCREENER_PAIRS_URL = "https://api.dexscreener.com/latest/dex/pairs"
+DEXSCREENER_TOKEN_URL = "https://api.dexscreener.com/token-pairs/v1/{chain}/{address}"
 DEFAULT_TIMEOUT = 15
+MAX_RETRIES = 2
 
 STABLECOIN_ADDRESSES: dict[str, list[tuple[str, str, str]]] = {
     "ethereum": [
@@ -45,24 +47,35 @@ class DexScreenerSource(AbstractSource):
         session = self.get_http_session()
         all_pairs: list[dict[str, Any]] = []
         seen: set[str] = set()
+
         for chain, tokens in STABLECOIN_ADDRESSES.items():
             for sym, addr in tokens:
                 if sym not in symbols:
                     continue
-                url = f"{DEXSCREENER_PAIRS_URL}/{chain}/{addr}"
-                try:
-                    resp = session.get(url, timeout=DEFAULT_TIMEOUT)
-                    if resp.status_code != 200:
+
+                urls = [
+                    f"{DEXSCREENER_TOKEN_URL.format(chain=chain, address=addr)}",
+                    f"{DEXSCREENER_PAIRS_URL}/{chain}/{addr}",
+                    f"{DEXSCREENER_SEARCH_URL}?q={addr}",
+                ]
+
+                for attempt, url in enumerate(urls):
+                    try:
+                        resp = session.get(url, timeout=DEFAULT_TIMEOUT)
+                        if resp.status_code != 200:
+                            continue
+                        data = resp.json()
+                        pairs = data.get("pairs") or []
+                        if pairs and isinstance(pairs, list):
+                            for pair in pairs:
+                                pid = pair.get("pairAddress", "")
+                                if pid and pid not in seen:
+                                    seen.add(pid)
+                                    all_pairs.append(pair)
+                            break
+                    except Exception:
                         continue
-                    data = resp.json()
-                    pairs = data.get("pairs") or []
-                    for pair in pairs:
-                        pid = pair.get("pairAddress", "")
-                        if pid and pid not in seen:
-                            seen.add(pid)
-                            all_pairs.append(pair)
-                except Exception:
-                    continue
+
         return all_pairs
 
     def transform(self, raw: list[dict[str, Any]]) -> dict[str, Any]:

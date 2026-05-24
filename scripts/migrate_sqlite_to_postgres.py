@@ -36,6 +36,8 @@ from database import (
     AssetChainSnapshot,
     AssetTrendSnapshot,
     ChainTrendSnapshot,
+    ForecastPoint,
+    ForecastRun,
     OsintArticle,
     SignalEvent,
     SourceStatus,
@@ -47,6 +49,8 @@ MODELS_IN_ORDER = [
     AssetChainSnapshot,
     AssetTrendSnapshot,
     ChainTrendSnapshot,
+    ForecastRun,
+    ForecastPoint,
     SignalEvent,
     OsintArticle,
 ]

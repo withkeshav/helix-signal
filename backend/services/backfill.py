@@ -27,8 +27,8 @@ def _day_start(dt: datetime) -> datetime:
     return u.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def run_backfill(db: Session, *, asset: str, days: int) -> dict[str, Any]:
-    if not _backfill_allowed():
+def run_backfill(db: Session, *, asset: str, days: int, _internal: bool = False) -> dict[str, Any]:
+    if not _internal and not _backfill_allowed():
         raise HTTPException(status_code=403, detail="Backfill is disabled. Set ALLOW_BACKFILL=true to enable.")
 
     sym = asset.strip().upper()

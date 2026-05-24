@@ -1,276 +1,467 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Helix Signal Terminal</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Sora:wght@500;700&display=swap" rel="stylesheet" />
-    <script data-cfasync="false" src="app.js?v=11"></script>
-    <script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script data-cfasync="false" src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script defer data-cfasync="false" src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-    <style>
-      :root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06)}
-      :root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35)}
-      *{box-sizing:border-box}body{margin:0;font-family:Outfit,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh}
-      .title{font-family:Sora,Outfit,sans-serif}
-      .glass{background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
-      .risk-gauge-wrap{display:flex;align-items:center;gap:16px}
-      .risk-gauge{width:120px;height:120px;flex-shrink:0}
-      .risk-gauge-track{fill:none;stroke:var(--line);stroke-width:10}
-      .risk-gauge-value{fill:none;stroke:var(--spark);stroke-width:10;stroke-linecap:round;transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dashoffset .4s ease}
-      .event-ticker{overflow:hidden;border-radius:10px;border:1px solid var(--line);background:var(--bg-accent);margin-bottom:12px}
-      .event-ticker-inner{display:flex;gap:24px;white-space:nowrap;padding:8px 12px;font-size:12px;animation:ticker 40s linear infinite}
-      @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-      .predictive-badge{font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;background:var(--ok-bg);color:var(--up);display:inline-block;margin-left:6px}
-      .container{width:min(1280px,98vw);margin:20px auto 40px}
-      .header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
-      .title{margin:0;font-size:clamp(20px,2.4vw,30px)}
-      .subtitle{margin:4px 0 0;color:var(--muted)}
-      .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-      .asset-select{border:1px solid var(--line);border-radius:9px;padding:8px 12px;background:var(--panel);color:var(--text);font-weight:600}
-      .btn{border:1px solid transparent;border-radius:9px;padding:8px 12px;font-weight:600;cursor:pointer}
-      .btn-primary{background:var(--btn-bg);color:var(--btn-text)}
-      .btn-muted{background:var(--bg-accent);color:var(--text);border-color:var(--line)}
-      .tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid var(--line);padding-bottom:0}
-      .tab{padding:10px 18px;font-weight:600;cursor:pointer;border-radius:8px 8px 0 0;color:var(--muted);background:transparent;border:none;font-size:14px}
-      .tab.active{color:var(--text);background:var(--panel);border:1px solid var(--line);border-bottom:2px solid var(--panel);margin-bottom:-2px}
-      .tab:hover{color:var(--text)}
-      .tab-content{display:none}.tab-content.active{display:block}
-      .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
-      .kpi-card{background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--card-shadow);backdrop-filter:blur(8px)}
-      .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)}
-      .kpi-value{font-size:1.25rem;font-weight:700;font-family:"JetBrains Mono","Roboto Mono",monospace;font-variant-numeric:tabular-nums}
-      .kpi-sub{font-size:12px;color:var(--muted);margin-top:4px}
-      .band-normal{color:var(--up)}.band-watch{color:var(--neutral)}.band-risk{color:var(--down)}
-      .insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px}
-      .insight-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--card-shadow)}
-      .insight-card h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;color:var(--muted)}
-      .chart-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--card-shadow);min-height:200px;margin-bottom:12px}
-      .chart-card h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;color:var(--muted)}
-      .chart-wrap{position:relative;height:180px}
-      .chart-wrap.tall{height:220px}
-      .event-list{display:flex;flex-direction:column;gap:6px}
-      .event-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-      .event-meta{font-size:11px;color:var(--muted)}
-      .event-title{font-weight:700;font-size:13px}.event-summary{font-size:12px;line-height:1.4;margin:4px 0 0}
-      .sev-info{color:var(--spark)}.sev-warning{color:var(--neutral)}.sev-critical{color:var(--down)}
-      .pill{border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-block}
-      .freshness-fresh{color:var(--up);background:var(--ok-bg)}
-      .freshness-aging{color:var(--neutral);background:var(--warn-bg)}
-      .freshness-stale{color:var(--down);background:var(--alert-bg)}
-      .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:1000px}
-      th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:13px}
-      th{font-size:11px;text-transform:uppercase;color:var(--muted)}
-      .num{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
-      .state{padding:12px;color:var(--muted)}.error{color:var(--down)}
-      .warning-banner{padding:10px;background:var(--warn-bg);display:none;margin-bottom:10px;border-radius:8px}
-      .warning-banner.visible{display:block}
-      .footer{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;padding:12px 0}
-    </style>
-  </head>
-  <body x-data="helixApp()" x-init="init()">
-    <main class="container">
-      <header class="header">
-        <div>
-          <h1 class="title" x-text="`Helix ${asset} Signal Terminal`"></h1>
-          <p class="subtitle" x-text="`${assetName} telemetry with V3 risk scoring, multi-source, and OSINT.`"></p>
-          <div class="status-row" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-            <span class="pill" :class="`freshness-${freshness.status?.toLowerCase()}`" x-text="`Freshness: ${freshness.status || '...'}`"></span>
-            <span class="pill" x-text="`Chains: ${(chains || []).length}`"></span>
-            <span class="pill" x-text="`Version: 3.0.0`"></span>
-          </div>
-        </div>
-        <div class="controls">
-          <select class="asset-select" x-model="asset" @change="switchAsset">
-            <template x-for="a in enabledAssets" :key="a">
-              <option x-text="a" :value="a"></option>
-            </template>
-          </select>
-          <button class="btn btn-primary" @click="refresh">Refresh</button>
-          <button class="btn btn-muted" @click="cycleTheme">Theme</button>
-        </div>
-      </header>
-
-      <div id="stale-warning" class="warning-banner" :class="staleWarning ? 'visible' : ''" x-text="staleWarning"></div>
-
-      <div class="tabs">
-        <button class="tab" :class="tab === 'overview' ? 'active' : ''" @click="tab='overview';loadTab()">Overview</button>
-        <button class="tab" :class="tab === 'peg' ? 'active' : ''" @click="tab='peg';loadTab()">Peg & Liquidity</button>
-        <button class="tab" :class="tab === 'supply' ? 'active' : ''" @click="tab='supply';loadTab()">Supply & Flows</button>
-        <button class="tab" :class="tab === 'intel' ? 'active' : ''" @click="tab='intel';loadTab()">Intelligence</button>
-      </div>
-
-      <div id="event-ticker" class="event-ticker glass" x-show="tickerItems.length">
-        <div class="event-ticker-inner">
-          <template x-for="(t, i) in tickerItems" :key="`t-${i}`">
-            <span x-text="t"></span>
+<html lang="en" x-data="helixApp()" x-init="init()">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title x-text="`Helix Signal · ${asset}`">Helix Signal Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <script data-cfasync="false" src="app.js?v=13"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    :root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06)}
+    :root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35)}
+    *{box-sizing:border-box}body{margin:0;font-family:Inter,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh}
+    .glass{background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+    .container{width:min(1280px,98vw);margin:16px auto 40px}
+    .btn{border:1px solid transparent;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-size:13px;font-family:Inter,sans-serif}
+    .btn-primary{background:var(--btn-bg);color:var(--btn-text)}
+    .btn-muted{background:var(--bg-accent);color:var(--text);border-color:var(--line)}
+    /* Command Bar */
+    .command-bar{display:flex;gap:12px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+    .search-wrapper{position:relative;flex:1;min-width:200px;max-width:400px}
+    .search-input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 12px 9px 36px;background:var(--panel);color:var(--text);font-size:14px;font-family:Inter,sans-serif}
+    .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
+    .search-results{position:absolute;top:calc(100%+4px);left:0;right:0;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:var(--card-shadow);z-index:100;max-height:280px;overflow-y:auto}
+    .search-item{display:flex;justify-content:space-between;padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
+    .search-item:hover{background:var(--bg-accent)}
+    .search-type{font-size:11px;color:var(--muted)}
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .asset-select{border:1px solid var(--line);border-radius:9px;padding:8px 12px;background:var(--panel);color:var(--text);font-weight:600;font-size:13px;font-family:Inter,sans-serif}
+    /* Intel Header */
+    .intel-header{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+    .intel-item{background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:10px;padding:10px 14px;backdrop-filter:blur(8px);cursor:pointer;text-align:center}
+    .intel-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:2px}
+    .intel-value{font-size:1.2rem;font-weight:700;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;display:block}
+    .band-normal{color:var(--up)}.band-watch{color:var(--neutral)}.band-risk{color:var(--down)}
+    .text-green{color:var(--up)}.text-muted{color:var(--muted)}.text-red{color:var(--down)}
+    /* Evidence Drawer */
+    .evidence-drawer{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:90vw;background:var(--panel);border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,0.15);z-index:200;padding:20px;overflow-y:auto}
+    .evidence-content h3{margin:0 0 16px;font-size:16px}
+    .evidence-section{margin-bottom:16px}
+    .evidence-section h4{font-size:12px;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+    .evidence-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--line)}
+    code{background:var(--bg-accent);padding:4px 8px;border-radius:4px;font-size:12px;display:inline-block}
+    /* Tabs */
+    .tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid var(--line);padding-bottom:0;overflow-x:auto}
+    .tab{padding:10px 18px;font-weight:600;cursor:pointer;border-radius:8px 8px 0 0;color:var(--muted);background:transparent;border:none;font-size:13px;white-space:nowrap;font-family:Inter,sans-serif}
+    .tab.active{color:var(--text);background:var(--panel);border:1px solid var(--line);border-bottom:2px solid var(--panel);margin-bottom:-2px}
+    .tab:hover{color:var(--text)}
+    .tab-content{display:none}.tab-content.active{display:block}
+    /* KPI Cards */
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+    .kpi-card{background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:10px;padding:10px 14px;backdrop-filter:blur(8px)}
+    .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px}
+    .kpi-value{font-size:1.1rem;font-weight:700;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+    .kpi-sub{font-size:11px;color:var(--muted);margin-top:4px}
+    .insight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px}
+    .insight-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--card-shadow)}
+    .insight-card h2{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}
+    /* Charts */
+    .chart-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--card-shadow);min-height:200px;margin-bottom:12px}
+    .chart-card h2{margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}
+    .chart-wrap{position:relative;height:180px}
+    .chart-wrap.tall{height:220px}
+    .chart-wrap.xl{height:300px}
+    /* Risk Gauge */
+    .risk-gauge-wrap{display:flex;align-items:center;gap:16px}
+    .risk-gauge{width:100px;height:100px;flex-shrink:0}
+    .risk-gauge-track{fill:none;stroke:var(--line);stroke-width:10}
+    .risk-gauge-value{fill:none;stroke:var(--spark);stroke-width:10;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50px 50px;transition:stroke-dashoffset .4s ease}
+    .model-badge{font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:5px;background:var(--ok-bg);color:var(--up);display:inline-block;margin-left:6px;vertical-align:middle}
+    /* Event Ticker */
+    .event-ticker{overflow:hidden;border-radius:10px;border:1px solid var(--line);background:var(--bg-accent);margin-bottom:12px}
+    .event-ticker-inner{display:flex;gap:24px;white-space:nowrap;padding:7px 12px;font-size:12px;animation:ticker 40s linear infinite}
+    @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+    /* Events & Signals */
+    .event-list{display:flex;flex-direction:column;gap:6px}
+    .event-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+    .event-meta{font-size:11px;color:var(--muted)}
+    .event-title{font-weight:600;font-size:13px}.event-summary{font-size:12px;line-height:1.4;margin:4px 0 0}
+    .sev-info{color:var(--spark)}.sev-warning{color:var(--neutral)}.sev-critical{color:var(--down)}
+    .signal-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+    .signal-meta{font-size:11px;color:var(--muted)}
+    .pill{border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:11px;display:inline-block}
+    .source-ok{color:var(--up);background:var(--ok-bg)}.source-error{color:var(--down);background:var(--alert-bg)}
+    .freshness-fresh{color:var(--up);background:var(--ok-bg)}
+    .freshness-aging{color:var(--neutral);background:var(--warn-bg)}
+    .freshness-stale{color:var(--down);background:var(--alert-bg)}
+    .warning-banner{padding:10px;background:var(--warn-bg);display:none;margin-bottom:10px;border-radius:8px}
+    .warning-banner.visible{display:block}
+    /* Tables */
+    .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:1000px}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;font-size:12px}
+    th{font-size:10px;text-transform:uppercase;color:var(--muted)}
+    .num{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+    .footer{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;padding:12px 0;align-items:center}
+  </style>
+</head>
+<body>
+  <main class="container">
+    <!-- Command Bar -->
+    <header class="command-bar">
+      <div class="search-wrapper">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" class="search-input" placeholder="Search assets, chains, events..."
+               x-model="searchQuery" @input.debounce.300ms="search">
+        <div class="search-results" x-show="searchResults.length > 0" @click.outside="searchResults=[]">
+          <template x-for="r in searchResults" :key="r.id">
+            <div class="search-item" @click="selectSearchResult(r)" style="cursor:pointer">
+              <span x-text="r.label"></span>
+              <span class="search-type" x-text="r.type"></span>
+            </div>
           </template>
         </div>
       </div>
+      <div class="controls">
+        <select class="asset-select" x-model="asset" @change="switchAsset">
+          <template x-for="a in enabledAssets" :key="a">
+            <option x-text="a" :value="a"></option>
+          </template>
+        </select>
+        <button class="btn btn-primary" @click="refresh" :disabled="refreshing">
+          <span x-show="!refreshing">Refresh</span>
+          <span x-show="refreshing">&#x27F3;</span>
+        </button>
+        <button class="btn btn-muted" @click="cycleTheme" x-text="theme"></button>
+      </div>
+    </header>
 
-      <div id="tab-overview" class="tab-content" :class="tab === 'overview' ? 'active' : ''">
-        <div class="insight-card glass" style="margin-bottom:12px">
-          <div class="risk-gauge-wrap">
-            <svg class="risk-gauge" viewBox="0 0 120 120" aria-label="Risk gauge">
-              <circle class="risk-gauge-track" cx="60" cy="60" r="48"></circle>
-              <circle class="risk-gauge-value" cx="60" cy="60" r="48"
-                :style="`stroke-dasharray:${gaugeArc} 301;stroke-dashoffset:0;stroke:${gaugeColor}`"></circle>
-              <text x="60" y="58" text-anchor="middle" font-size="22" font-weight="700" fill="currentColor" x-text="signal.score ?? '--'"></text>
-              <text x="60" y="76" text-anchor="middle" font-size="10" fill="var(--muted)" x-text="signal.band || ''"></text>
-            </svg>
-            <div>
-              <h2 style="margin:0 0 6px;font-size:14px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
-              <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
-              <p class="kpi-sub" style="margin-top:8px" x-show="aiSummary" x-text="aiSummary"></p>
-              <span class="predictive-badge" x-text="predictive.available ? 'ML Core' : 'ML Off'"></span>
-            </div>
+    <!-- Intel Header -->
+    <div class="intel-header">
+      <div class="intel-item" @click="showEvidence('score')">
+        <span class="intel-label">Score</span>
+        <span class="intel-value" :class="`band-${signal.band?.toLowerCase()}`" x-text="`${signal.score ?? '--'}/100`"></span>
+      </div>
+      <div class="intel-item" @click="showEvidence('peg')">
+        <span class="intel-label">Peg</span>
+        <span class="intel-value" x-text="depeg.current_price?.toFixed(4) ?? '--'"></span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-label">Supply</span>
+        <span class="intel-value" x-text="formatUsd(totalSupply)"></span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-label">Fresh</span>
+        <span class="intel-value" x-text="freshness.age_minutes != null ? `${freshness.age_minutes.toFixed(0)}m` : '--'"></span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-label">Model</span>
+        <span class="intel-value" :class="predictive.available ? 'text-green' : 'text-muted'" x-text="predictive.available ? 'ON' : 'OFF'"></span>
+      </div>
+    </div>
+
+    <!-- Evidence Drawer -->
+    <div class="evidence-drawer" x-show="evidenceOpen" @click.outside="evidenceOpen=false">
+      <div class="evidence-content">
+        <h3 x-text="evidenceTitle"></h3>
+        <div class="evidence-body">
+          <div class="evidence-section" x-show="evidenceFormula">
+            <h4>Formula</h4>
+            <code x-text="evidenceFormula"></code>
           </div>
-        </div>
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-label">Signal Score</div><div class="kpi-value" :class="`band-${signal.band?.toLowerCase()}`" x-text="`${signal.score ?? '--'}/100`"></div><div class="kpi-sub" x-text="signal.band || ''"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Depeg Index</div><div class="kpi-value" x-text="`${depeg.score ?? '--'}/100`"></div><div class="kpi-sub" x-text="depeg.peg_status || ''"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Total Supply</div><div class="kpi-value" x-text="formatUsd(totalSupply)"></div><div class="kpi-sub" x-text="supplyChange != null ? `${supplyChange >= 0 ? '+' : ''}${supplyChange.toFixed(3)}% 24h` : ''"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Data Freshness</div><div class="kpi-value" x-text="freshness.status || '...'"></div><div class="kpi-sub" x-text="freshness.age_minutes != null ? `${freshness.age_minutes.toFixed(1)} min old` : ''"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Concentration</div><div class="kpi-value" x-text="concentration.hhi != null ? concentration.hhi.toFixed(3) : '--'"></div><div class="kpi-sub" x-text="concentration.top_chain || ''"></div></div>
-        </div>
-
-        <div class="insight-grid">
-          <div class="insight-card">
-            <h2>Risk Components</h2>
-            <ul style="margin:0;padding-left:16px;font-size:13px;line-height:1.6">
-              <template x-for="(c, name) in signal.components || {}" :key="name">
-                <li><span x-text="name.replace(/_/g,' ')"></span>: <code x-text="`${c.score ?? '--'} (${Math.round((c.weight || 0) * 100)}%)`"></code></li>
-              </template>
-            </ul>
-          </div>
-          <div class="insight-card">
-            <h2>Attestation &amp; Supply Feed</h2>
-            <div style="font-size:13px;line-height:1.7">
-              <template x-for="(a, sym) in attestation" :key="sym">
-                <div style="margin-bottom:8px">
-                  <strong x-text="sym"></strong>
-                  <div x-show="a.attestation_status !== 'n/a'">
-                    <span :class="`band-${statusBand(a.attestation_status)}`" x-text="attestationSummary(a)"></span>
-                  </div>
-                  <div x-show="a.attestation_status === 'n/a'" class="kpi-sub" x-text="attestationSummary(a)"></div>
-                  <div :class="`band-${statusBand(a.supply_feed_status)}`" x-text="supplyFeedSummary(a)"></div>
-                </div>
-              </template>
-            </div>
-          </div>
-        </div>
-
-        <div class="chart-card">
-          <h2>Signal Score Trend</h2>
-          <div class="chart-wrap"><canvas id="chart-trend-signal"></canvas></div>
-        </div>
-
-        <div class="chart-card" x-show="(chains || []).length > 0">
-          <h2>Chain Supply Distribution</h2>
-          <div class="chart-wrap tall"><canvas id="chart-distribution"></canvas></div>
-        </div>
-
-        <div class="table-wrap" x-show="(chains || []).length > 0">
-          <table><thead><tr>
-            <th>Chain</th><th class="num">Supply</th><th class="num">Share</th><th class="num">TVL</th><th>Peg</th><th>Signal</th><th>Confidence</th>
-          </tr></thead><tbody>
-            <template x-for="c in chains" :key="c.chain_name">
-              <tr>
-                <td x-text="c.chain_name"></td>
-                <td class="num" x-text="formatUsd(c.supply_current)"></td>
-                <td class="num" x-text="c.chain_share_pct != null ? `${c.chain_share_pct.toFixed(2)}%` : 'N/A'"></td>
-                <td class="num" x-text="formatUsd(c.chain_tvl)"></td>
-                <td x-text="c.price != null ? pegLabel(c.price) : ''"></td>
-                <td><span :class="`band-${(c.chain_signal?.band || 'normal').toLowerCase()}`" x-text="`${c.chain_signal?.score ?? ''} ${c.chain_signal?.band || ''}`"></span></td>
-                <td x-text="`${c.data_confidence?.label || ''} (${c.data_confidence?.score ?? ''})`"></td>
-              </tr>
+          <div class="evidence-section" x-show="Object.keys(evidenceComponents).length">
+            <h4>Components</h4>
+            <template x-for="(v, k) in evidenceComponents" :key="k">
+              <div class="evidence-row">
+                <span x-text="k.replace(/_/g,' ')"></span>
+                <span x-text="typeof v === 'number' ? v.toFixed(4) : v"></span>
+              </div>
             </template>
-          </tbody></table>
-        </div>
-      </div>
-
-      <div id="tab-peg" class="tab-content" :class="tab === 'peg' ? 'active' : ''">
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-label">Current Price</div><div class="kpi-value" x-text="depeg.current_price?.toFixed(6) ?? 'N/A'"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Deviation (bps)</div><div class="kpi-value" x-text="depeg.deviation_abs != null ? (depeg.deviation_abs * 10000).toFixed(2) : 'N/A'"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Peg Status</div><div class="kpi-value" x-text="depeg.peg_status || 'N/A'"></div></div>
-          <div class="kpi-card"><div class="kpi-label">Venue Agreement</div><div class="kpi-value" x-text="crossSource.sources_agreeing ?? 0"></div></div>
-        </div>
-        <div x-show="crossSource.discrepancy_flag" style="padding:10px;background:var(--warn-bg);border-radius:8px;margin-bottom:10px">
-          Cross-source price discrepancy detected: <strong x-text="`${crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong>
-        </div>
-      </div>
-
-      <div id="tab-supply" class="tab-content" :class="tab === 'supply' ? 'active' : ''">
-        <div class="kpi-grid">
-          <div class="kpi-card"><div class="kpi-label">Total Supply</div><div class="kpi-value" x-text="formatUsd(totalSupply)"></div></div>
-          <div class="kpi-card"><div class="kpi-label">24h Change</div><div class="kpi-value" x-text="supplyChange != null ? `${supplyChange >= 0 ? '+' : ''}${supplyChange.toFixed(3)}%` : 'N/A'"></div></div>
-        </div>
-        <div class="chart-card">
-          <h2>Supply by Chain</h2>
-          <div class="chart-wrap tall"><canvas id="chart-supply-bar"></canvas></div>
-        </div>
-      </div>
-
-      <div id="tab-intel" class="tab-content" :class="tab === 'intel' ? 'active' : ''">
-        <div class="insight-grid">
-          <div class="insight-card">
-            <h2>Recent OSINT Articles</h2>
-            <div id="osint-feed" style="font-size:13px;line-height:1.5">
-              <template x-for="art in osintArticles" :key="art.id">
-                <div style="padding:6px 0;border-bottom:1px solid var(--line)">
-                  <div><strong x-text="art.title"></strong></div>
-                  <div class="kpi-sub" x-text="`${art.source} · sentiment: ${art.sentiment_label ?? 'neutral'} (${art.sentiment_score?.toFixed(2) ?? '0.0'})`"></div>
-                </div>
-              </template>
-              <div x-show="osintArticles.length === 0" class="kpi-sub">No articles yet. OSINT ingestion runs hourly.</div>
-            </div>
           </div>
-          <div class="insight-card">
-            <h2>Recent Events</h2>
-            <div id="event-feed">
-              <template x-for="ev in events" :key="ev.id">
-                <div class="event-card">
-                  <div class="event-title"><span :class="`sev-${ev.severity}`" x-text="ev.severity"></span> <span x-text="ev.title"></span></div>
-                  <div class="event-meta" x-text="formatWhen(ev.timestamp)"></div>
-                  <div class="event-summary" x-text="ev.summary"></div>
-                </div>
-              </template>
-            </div>
+          <div class="evidence-section" x-show="Object.keys(evidenceSources).length">
+            <h4>Data Sources</h4>
+            <template x-for="(s, name) in evidenceSources" :key="name">
+              <div class="evidence-row">
+                <span x-text="name"></span>
+                <span :class="s.status === 'ok' ? 'text-green' : 'text-red'" x-text="s.status"></span>
+              </div>
+            </template>
+          </div>
+          <button class="btn btn-muted" @click="copyEvidence" style="margin-top:12px">Copy Evidence</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stale Warning -->
+    <div class="warning-banner" :class="staleWarning ? 'visible' : ''" x-text="staleWarning"></div>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab" :class="tab === 'market' && 'active'" @click="tab='market';loadTab()">Market</button>
+      <button class="tab" :class="tab === 'forecast' && 'active'" @click="tab='forecast';loadTab()">Forecast</button>
+      <button class="tab" :class="tab === 'supply' && 'active'" @click="tab='supply';loadTab()">Supply</button>
+      <button class="tab" :class="tab === 'events' && 'active'" @click="tab='events';loadTab()">Events</button>
+      <button class="tab" :class="tab === 'intel' && 'active'" @click="tab='intel';loadTab()">Intel</button>
+      <button class="tab" :class="tab === 'health' && 'active'" @click="tab='health';loadTab()">Health</button>
+    </nav>
+
+    <!-- Event Ticker -->
+    <div class="event-ticker glass" x-show="tickerItems.length">
+      <div class="event-ticker-inner">
+        <template x-for="(t, i) in tickerItems" :key="`t-${i}`">
+          <span x-text="t"></span>
+        </template>
+      </div>
+    </div>
+
+    <!-- Tab: Market -->
+    <div class="tab-content" :class="tab === 'market' && 'active'">
+      <div class="insight-card glass" style="margin-bottom:12px">
+        <div class="risk-gauge-wrap">
+          <svg class="risk-gauge" viewBox="0 0 100 100" aria-label="Risk gauge">
+            <circle class="risk-gauge-track" cx="50" cy="50" r="40"></circle>
+            <circle class="risk-gauge-value" cx="50" cy="50" r="40"
+              :style="`stroke-dasharray:${gaugeArc} 251;stroke-dashoffset:0;stroke:${gaugeColor}`"></circle>
+            <text x="50" y="48" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor" x-text="signal.score ?? '--'"></text>
+            <text x="50" y="64" text-anchor="middle" font-size="9" fill="var(--muted)" x-text="signal.band || ''"></text>
+          </svg>
+          <div>
+            <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
+            <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
+            <p class="kpi-sub" style="margin-top:8px" x-show="aiSummary" x-text="aiSummary"></p>
+            <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} · v${predictive.version ?? '1.0'}`"></span>
           </div>
         </div>
-        <div class="chart-card">
-          <h2>Sentiment Timeseries (7d)</h2>
-          <div class="chart-wrap"><canvas id="chart-sentiment"></canvas></div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Signal Score</div><div class="kpi-value" :class="`band-${signal.band?.toLowerCase()}`" x-text="`${signal.score ?? '--'}/100`"></div><div class="kpi-sub" x-text="signal.band || ''"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Depeg Index</div><div class="kpi-value" x-text="depeg.score != null ? `${depeg.score}/100` : '--'"></div><div class="kpi-sub" x-text="depeg.peg_status || ''"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Supply</div><div class="kpi-value" x-text="formatUsd(totalSupply)"></div><div class="kpi-sub" x-text="supplyChange != null ? `${supplyChange >= 0 ? '+' : ''}${supplyChange.toFixed(3)}% 24h` : ''"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Concentration</div><div class="kpi-value" x-text="concentration.hhi != null ? concentration.hhi.toFixed(3) : '--'"></div><div class="kpi-sub" x-text="concentration.top_chain || ''"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Venues</div><div class="kpi-value" x-text="crossSource.sources_agreeing ?? 0"></div><div class="kpi-sub" x-show="crossSource.max_discrepancy_pct > 0.5" style="color:var(--down)" x-text="`${crossSource.max_discrepancy_pct?.toFixed(2)}% disc.`"></div></div>
+      </div>
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Risk Components</h2>
+          <ul style="margin:0;padding-left:16px;font-size:13px;line-height:1.6">
+            <template x-for="(c, name) in signal.components || {}" :key="name">
+              <li><span x-text="name.replace(/_/g,' ')"></span>: <code x-text="`${c.score ?? '--'} (${Math.round((c.weight || 0) * 100)}%)`"></code></li>
+            </template>
+          </ul>
         </div>
-        <div class="chart-card">
+        <div class="insight-card">
           <h2>Attestation &amp; Supply Feed</h2>
-          <div class="kpi-grid">
+          <div style="font-size:13px;line-height:1.7">
             <template x-for="(a, sym) in attestation" :key="sym">
-              <div class="kpi-card">
-                <div class="kpi-label" x-text="sym"></div>
+              <div style="margin-bottom:8px">
+                <strong x-text="sym"></strong>
                 <div x-show="a.attestation_status !== 'n/a'">
-                  <div class="kpi-value" :class="`band-${statusBand(a.attestation_status)}`" x-text="a.attestation_status ?? 'unknown'"></div>
-                  <div class="kpi-sub" x-text="a.attestation_age_days != null ? `${a.attestation_age_days}d since issuer report` : 'Issuer report not available'"></div>
+                  <span :class="`band-${statusBand(a.attestation_status)}`" x-text="attestationSummary(a)"></span>
                 </div>
-                <div x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only — no issuer attestation</div>
-                <div class="kpi-value" style="font-size:1.1rem;margin-top:6px" :class="`band-${statusBand(a.supply_feed_status)}`" x-text="a.supply_feed_status ?? 'unknown'"></div>
-                <div class="kpi-sub" x-text="`DefiLlama supply feed · ${formatFeedAge(a.supply_feed_age_minutes)}`"></div>
+                <div x-show="a.attestation_status === 'n/a'" class="kpi-sub" x-text="attestationSummary(a)"></div>
+                <div :class="`band-${statusBand(a.supply_feed_status)}`" x-text="supplyFeedSummary(a)"></div>
               </div>
             </template>
           </div>
         </div>
       </div>
+      <div class="chart-card">
+        <h2>Signal Score Trend (7d)</h2>
+        <div class="chart-wrap"><canvas id="chart-trend-signal"></canvas></div>
+      </div>
+      <div class="chart-card" x-show="(chains || []).length > 0">
+        <h2>Chain Supply Distribution</h2>
+        <div class="chart-wrap tall"><canvas id="chart-distribution"></canvas></div>
+      </div>
+      <div class="table-wrap" x-show="(chains || []).length > 0">
+        <table><thead><tr>
+          <th>Chain</th><th class="num">Supply</th><th class="num">Share</th><th class="num">TVL</th><th>Peg</th><th>Signal</th><th>Confidence</th>
+        </tr></thead><tbody>
+          <template x-for="c in chains" :key="c.chain_name">
+            <tr>
+              <td x-text="c.chain_name"></td>
+              <td class="num" x-text="formatUsd(c.supply_current)"></td>
+              <td class="num" x-text="c.chain_share_pct != null ? `${c.chain_share_pct.toFixed(2)}%` : 'N/A'"></td>
+              <td class="num" x-text="formatUsd(c.chain_tvl)"></td>
+              <td x-text="c.price != null ? pegLabel(c.price) : ''"></td>
+              <td><span :class="`band-${(c.chain_signal?.band || 'normal').toLowerCase()}`" x-text="`${c.chain_signal?.score ?? ''} ${c.chain_signal?.band || ''}`"></span></td>
+              <td x-text="`${c.data_confidence?.label || ''} (${c.data_confidence?.score ?? ''})`"></td>
+            </tr>
+          </template>
+        </tbody></table>
+      </div>
+    </div>
 
-      <footer class="footer">
-        <span x-text="`Generated at ${generatedAt}`"></span>
-        <template x-for="s in sources" :key="s.source_name">
-          <span class="pill" x-text="`${s.source_name}: ${s.status}`"></span>
-        </template>
-      </footer>
-    </main>
-  </body>
+    <!-- Tab: Forecast -->
+    <div class="tab-content" :class="tab === 'forecast' && 'active'"
+         x-init="$watch('tab', val => { if(val === 'forecast') $nextTick(() => renderForecastCharts()); })">
+      <div class="chart-card">
+        <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
+        <div class="chart-wrap xl" id="chart-peg-forecast"></div>
+      </div>
+      <div class="chart-card">
+        <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
+        <div class="chart-wrap xl" id="chart-supply-forecast"></div>
+      </div>
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Forecast Risk Signals</h2>
+          <div id="forecast-signals">
+            <template x-for="sig in forecastSignals" :key="sig.id">
+              <div class="signal-item" :class="`sev-${sig.severity}`">
+                <span><strong x-text="sig.severity.toUpperCase()"></strong> <span x-text="sig.title"></span></span>
+                <span class="signal-meta" x-text="`q10: ${sig.forecast_value?.toFixed(4) ?? '--'}`"></span>
+              </div>
+            </template>
+            <div x-show="!forecastSignals.length" class="kpi-sub" style="padding:8px 0">No forecast risk signals</div>
+          </div>
+        </div>
+        <div class="insight-card">
+          <h2>Correlations</h2>
+          <div id="correlations-preview">
+            <template x-for="pair in correlations.slice(0, 5)" :key="`${pair.metric_a}-${pair.metric_b}`">
+              <div class="signal-item">
+                <span x-text="`${pair.metric_a} ↔ ${pair.metric_b}`"></span>
+                <span :class="pair.direction === 'positive' ? 'text-green' : 'text-red'" x-text="`${pair.coefficient > 0 ? '+' : ''}${pair.coefficient}`"></span>
+              </div>
+            </template>
+            <div x-show="!correlations.length" class="kpi-sub" style="padding:8px 0">No data</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Supply -->
+    <div class="tab-content" :class="tab === 'supply' && 'active'">
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Total Supply</div><div class="kpi-value" x-text="formatUsd(totalSupply)"></div></div>
+        <div class="kpi-card"><div class="kpi-label">24h Change</div><div class="kpi-value" x-text="supplyChange != null ? `${supplyChange >= 0 ? '+' : ''}${supplyChange.toFixed(3)}%` : 'N/A'"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Chain Count</div><div class="kpi-value" x-text="chains?.length || 0"></div></div>
+        <div class="kpi-card"><div class="kpi-label">Top Chain Share</div><div class="kpi-value" x-text="concentration.top_chain_share_pct != null ? `${concentration.top_chain_share_pct.toFixed(1)}%` : '--'"></div></div>
+      </div>
+      <div class="chart-card">
+        <h2>Supply by Chain</h2>
+        <div class="chart-wrap tall"><canvas id="chart-supply-bar"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2>Supply Trend (30d)</h2>
+        <div class="chart-wrap tall"><canvas id="chart-supply-trend"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Tab: Events -->
+    <div class="tab-content" :class="tab === 'events' && 'active'">
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Signal Events</h2>
+          <div style="max-height:400px;overflow-y:auto">
+            <template x-for="ev in events" :key="ev.id">
+              <div class="event-card" style="margin-bottom:6px">
+                <div class="event-title"><span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span> <span x-text="ev.title"></span></div>
+                <div class="event-meta" x-text="formatWhen(ev.timestamp)"></div>
+                <div class="event-summary" x-text="ev.summary"></div>
+              </div>
+            </template>
+            <div x-show="!events.length" class="kpi-sub" style="padding:12px">No events in window</div>
+          </div>
+        </div>
+        <div class="insight-card">
+          <h2>OSINT Feed</h2>
+          <div style="max-height:400px;overflow-y:auto">
+            <template x-for="art in osintArticles" :key="art.id">
+              <div style="padding:6px 0;border-bottom:1px solid var(--line)">
+                <div><strong x-text="art.title"></strong></div>
+                <div class="kpi-sub" x-text="`${art.source} · sentiment: ${art.sentiment_label ?? 'neutral'} (${art.sentiment_score?.toFixed(2) ?? '0.0'})`"></div>
+              </div>
+            </template>
+            <div x-show="osintArticles.length === 0" class="kpi-sub" style="padding:12px">No articles yet</div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h2>Sentiment Timeseries (7d)</h2>
+        <div class="chart-wrap"><canvas id="chart-sentiment"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Tab: Intel -->
+    <div class="tab-content" :class="tab === 'intel' && 'active'">
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Attestation Reports</h2>
+          <template x-for="(a, sym) in attestation" :key="sym">
+            <div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px">
+              <strong x-text="sym"></strong>
+              <div style="font-size:13px;margin-top:4px">
+                <div x-show="a.attestation_status !== 'n/a'">
+                  <span :class="`band-${statusBand(a.attestation_status)}`" x-text="a.attestation_status ?? 'unknown'"></span>
+                  <span class="kpi-sub"> &middot; <span x-text="a.attestation_age_days != null ? `${a.attestation_age_days}d since report` : 'No report date'"></span></span>
+                </div>
+                <div x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only</div>
+                <div style="margin-top:4px">
+                  <span :class="`band-${statusBand(a.supply_feed_status)}`" x-text="a.supply_feed_status ?? 'unknown'"></span>
+                  <span class="kpi-sub"> &middot; DefiLlama &middot; <span x-text="formatFeedAge(a.supply_feed_age_minutes)"></span></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="insight-card">
+          <h2>Cross-Source Price</h2>
+          <template x-for="c in chains" :key="c.chain_name">
+            <div class="signal-item">
+              <span x-text="c.chain_name"></span>
+              <span x-text="c.price != null ? `$${c.price.toFixed(6)}` : 'N/A'" :class="c.price && Math.abs(c.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
+            </div>
+          </template>
+          <div x-show="!chains.length" class="kpi-sub" style="padding:8px 0">No chain data</div>
+          <div x-show="crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
+            Discrepancy: <strong x-text="`${crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Health -->
+    <div class="tab-content" :class="tab === 'health' && 'active'">
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Source Health</h2>
+          <template x-for="s in sources" :key="s.source_name">
+            <div class="signal-item">
+              <span x-text="s.source_name"></span>
+              <span :class="s.status === 'ok' ? 'text-green' : 'text-red'" x-text="s.status"></span>
+            </div>
+          </template>
+          <div x-show="!sources.length" class="kpi-sub" style="padding:8px 0">No source data</div>
+        </div>
+        <div class="insight-card">
+          <h2>Data Freshness</h2>
+          <div class="kpi-card" style="text-align:center;margin-bottom:8px">
+            <div class="kpi-label">Overall Status</div>
+            <div class="kpi-value" :class="freshness.status === 'Fresh' ? 'text-green' : freshness.status === 'Aging' ? 'band-watch' : 'text-red'" x-text="freshness.status || 'Unknown'"></div>
+          </div>
+          <div style="font-size:13px;line-height:1.7">
+            <div><span class="kpi-label">Age:</span> <span x-text="freshness.age_minutes != null ? `${freshness.age_minutes.toFixed(1)} min` : 'N/A'"></span></div>
+            <div><span class="kpi-label">Window:</span> <span x-text="freshness.fresh_window_minutes != null ? `${freshness.fresh_window_minutes.toFixed(1)} min fresh` : ''"></span></div>
+            <div><span class="kpi-label">Stale at:</span> <span x-text="freshness.stale_window_minutes != null ? `${freshness.stale_window_minutes.toFixed(1)} min` : ''"></span></div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted)" x-text="freshness.reason || ''"></div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-card" x-show="forecastSignals.length">
+        <h2>Data Quality</h2>
+        <div style="font-size:13px">
+          <template x-for="(dq, i) in dataQualityHistory" :key="i">
+            <div class="signal-item" x-text="`${dq.label}: ${dq.value}`"></div>
+          </template>
+          <div x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span x-text="`Generated ${generatedAt}`"></span>
+      <template x-for="s in sources" :key="s.source_name">
+        <span class="pill" :class="`source-${s.status}`" x-text="`${s.source_name}: ${s.status}`"></span>
+      </template>
+      <span class="pill">v3.2.0</span>
+    </footer>
+  </main>
+</body>
 </html>

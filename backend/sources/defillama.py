@@ -17,10 +17,10 @@ class DefiLlamaError(Exception):
 
 
 def _discover_chain_ids() -> list[str]:
-    session = _DefiLlamaSource._get_http_session()
     try:
-        resp = session.get(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
-        payload = resp.json()
+        with httpx.Client(timeout=DEFAULT_TIMEOUT_SECONDS) as session:
+            resp = session.get(STABLECOIN_CHAINS_URL)
+            payload = resp.json()
         rows = payload if isinstance(payload, list) else payload.get("peggedAssets") or payload.get("chains") or []
         return sorted({str(r["name"]) for r in rows if isinstance(r, dict) and r.get("name")})
     except Exception:
@@ -29,9 +29,9 @@ def _discover_chain_ids() -> list[str]:
 
 def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
     try:
-        session = _DefiLlamaSource._get_http_session()
-        resp = session.get(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
-        chains_payload = resp.json()
+        with httpx.Client(timeout=DEFAULT_TIMEOUT_SECONDS) as session:
+            resp = session.get(STABLECOIN_CHAINS_URL)
+            chains_payload = resp.json()
     except Exception:
         return {}
     rows = chains_payload if isinstance(chains_payload, list) else chains_payload.get("peggedAssets") or chains_payload.get("chains") or []
@@ -49,21 +49,21 @@ def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
 
 
 def fetch_stablecoin_chart_points(*, symbol: str, days: int) -> list[dict]:
-    session = _DefiLlamaSource._get_http_session()
-    payload = session.get(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
-    if not isinstance(payload, dict):
-        raise DefiLlamaError("Unexpected stablecoins list payload")
-    raw_id = None
-    for asset in payload.get("peggedAssets", []):
-        if not isinstance(asset, dict):
-            continue
-        if str(asset.get("symbol", "")).upper() == symbol.upper():
-            raw_id = asset.get("id")
-            break
-    if raw_id is None:
-        raise DefiLlamaError(f"{symbol} asset id not found")
-    coin_id = int(raw_id) if isinstance(raw_id, int) else int(raw_id)
-    charts_payload = session.get(f"{STABLECOIN_CHARTS_URL}?stablecoin={coin_id}", timeout=DEFAULT_TIMEOUT_SECONDS).json()
+    with httpx.Client(timeout=DEFAULT_TIMEOUT_SECONDS) as session:
+        payload = session.get(USDT_STABLECOINS_URL).json()
+        if not isinstance(payload, dict):
+            raise DefiLlamaError("Unexpected stablecoins list payload")
+        raw_id = None
+        for asset in payload.get("peggedAssets", []):
+            if not isinstance(asset, dict):
+                continue
+            if str(asset.get("symbol", "")).upper() == symbol.upper():
+                raw_id = asset.get("id")
+                break
+        if raw_id is None:
+            raise DefiLlamaError(f"{symbol} asset id not found")
+        coin_id = int(raw_id) if isinstance(raw_id, int) else int(raw_id)
+        charts_payload = session.get(f"{STABLECOIN_CHARTS_URL}?stablecoin={coin_id}").json()
     pairs: list[tuple[int, float]] = []
     if isinstance(charts_payload, dict):
         series = charts_payload.get("peggedUSD") or charts_payload.get("totalCirculatingUSD") or []
@@ -104,12 +104,6 @@ def fetch_stablecoin_chart_points(*, symbol: str, days: int) -> list[dict]:
 
 class _DefiLlamaSource(AbstractSource):
     name = "defillama"
-
-    @staticmethod
-    def _get_http_session() -> httpx.Client:
-        transport = httpx.HTTPTransport()
-        client = httpx.Client(transport=transport, timeout=httpx.Timeout(DEFAULT_TIMEOUT_SECONDS))
-        return client
 
     def fetch(self, **kwargs: Any) -> dict[str, Any]:
         asset_config = kwargs.get("asset_config")

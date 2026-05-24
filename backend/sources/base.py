@@ -30,6 +30,11 @@ class AbstractSource(ABC):
     def fetch(self, **kwargs: Any) -> Any:
         ...
 
+    def close(self) -> None:
+        if self._session is not None:
+            self._session.close()
+            self._session = None
+
     def validate(self, raw: Any) -> bool:
         return raw is not None
 

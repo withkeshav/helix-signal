@@ -108,7 +108,7 @@ def compute_asset_metric_bundle(
         chain_shares,
         top3_dex_pool_share=risk_kwargs.get("top3_dex_pool_share"),
     )
-    dc_block = (asset_signal_dict.get("components") or {}).get("data_confidence") or {}
+    dc_block = (asset_signal_dict.get("components") or {}).get("observability") or {}
     dc_label = str(dc_block.get("label") or "Unknown")
     dc_score = int(dc_block.get("score") or 0)
 

@@ -5,7 +5,7 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      HELIX_SKIP_STARTUP_REFRESH: "1"
+      ALLOW_BACKFILL: "true"
       LOG_LEVEL: DEBUG
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     ports:
@@ -17,11 +17,3 @@ services:
     ports:
       - "3000:80"
 
-  traefik:
-    ports:
-      - "8080:8080"
-    command:
-      - "--api.insecure=true"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"

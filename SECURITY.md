@@ -26,10 +26,9 @@ Security priorities still include:
 
 ### Files that must never be committed
 
-- `.env` and `secrets/` (API keys, Grafana password, Cloudflare token)
-- `acme.json` (Let's Encrypt account + certificate private material)
+- `.env` and `secrets/` (API keys)
 - Internal execution briefs and local research (see `.gitignore`)
 
 ### Production edge auth
 
-Traefik basic-auth users live in `traefik/dynamic/middlewares.yml`. The committed default is `admin` / `changeme` — replace before any public deployment (`htpasswd -nbB admin 'your-strong-password'`).
+Helix-Signal does not include built-in authentication. If deploying publicly, place a reverse proxy with basic-auth or OAuth in front of the frontend and backend.

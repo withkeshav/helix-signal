@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from database import AssetTrendSnapshot, ChainTrendSnapshot, SignalEvent, SourceStatus
 from services.alerts import evaluate_alerts
 from signal_engine.metrics import compute_asset_metric_bundle
+from signal_engine.risk_inputs import build_risk_score_kwargs
 from utils import utc_now
 
 BUCKET_SECONDS = 300
@@ -421,6 +422,11 @@ def persist_trends_and_events(
             ts=ts,
         )
 
+        total_prev_week = sum((c.supply_prev_week or 0.0) for c in bundle.chains) if bundle.chains else 0
+        supply_7d_pct = None
+        if bundle.total_supply and total_prev_week > 0:
+            supply_7d_pct = ((bundle.total_supply - total_prev_week) / total_prev_week) * 100.0
+
         bundle_dict = {
             "total_supply": bundle.total_supply,
             "price": bundle.price,
@@ -430,6 +436,18 @@ def persist_trends_and_events(
             "concentration_score": bundle.concentration_score,
             "data_confidence_label": bundle.data_confidence_label,
             "freshness_age_seconds": bundle.freshness_age_seconds,
+            "supply_change_7d_pct": supply_7d_pct,
+            "top3_pool_share_pct": bundle.top_chain_share_pct,
         }
+        # Enrich with risk_kwargs fields needed by alert evaluators
+        risk_kwargs = build_risk_score_kwargs(
+            bundle.chains,
+            source_ok=bundle.source_ok,
+            source_error=bundle.source_error,
+            age_seconds=bundle.freshness_age_seconds,
+        )
+        bundle_dict["slippage_100k"] = risk_kwargs.get("slippage_100k")
+        bundle_dict["slippage_7d_median"] = risk_kwargs.get("slippage_7d_median")
+        bundle_dict["supply_age_hours"] = risk_kwargs.get("supply_age_hours")
         evaluate_alerts(db, bundle=bundle_dict, asset_symbol=u, now=ts)
 

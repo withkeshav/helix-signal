@@ -12,13 +12,13 @@ from database import AssetTrendSnapshot
 from signal_engine.core import get_asset_by_symbol
 from utils import window_delta
 
-_ALLOWED_WINDOWS = frozenset({"24h", "7d", "30d"})
+_ALLOWED_WINDOWS = frozenset({"24h", "7d", "30d", "90d"})
 
 
 def build_compare_payload(db: Session, *, assets_csv: str, window: str) -> dict[str, Any]:
     w = window.strip().lower()
     if w not in _ALLOWED_WINDOWS:
-        raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
+        raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, 30d, or 90d.")
 
     symbols = [s.strip().upper() for s in assets_csv.split(",") if s.strip()]
     if len(symbols) < 2:

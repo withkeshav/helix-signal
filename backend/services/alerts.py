@@ -18,6 +18,9 @@ log = get_logger(__name__)
 
 ALERTS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "alerts.json"
 
+# In-memory condition-first-seen tracker for persistence_minutes enforcement
+_CONDTION_PERSISTENCE: dict[str, datetime] = {}
+
 
 # --- Callable evaluator registry ---
 # Maps condition patterns to (evaluator_fn, context_extractor_fn)
@@ -76,11 +79,23 @@ def _eval_source_error(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
 
 @_register_condition("slippage_100k >")
 def _eval_slippage(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    med_7d = bundle.get("slippage_7d_median")
+    cur = bundle.get("slippage_100k")
+    if cur is not None and med_7d is not None and med_7d > 0:
+        return cur > 2 * med_7d
     return False
 
 
 @_register_condition("source_status = error for")
 def _eval_source_error_persistent(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    sources = bundle.get("_sources", [])
+    for s in sources:
+        if s.status == "error" and hasattr(s, "last_attempted_fetch") and s.last_attempted_fetch:
+            mins = (datetime.now(timezone.utc) - s.last_attempted_fetch).total_seconds() / 60
+            if mins > 5:
+                bundle["_meta"]["source"] = s.source_name
+                bundle["_meta"]["error_minutes"] = round(mins, 1)
+                return True
     return False
 
 
@@ -151,12 +166,25 @@ def evaluate_alerts(db: Session, *, bundle: dict[str, Any], asset_symbol: str, n
             continue
         meta = bundle["_meta"]
         matched = evaluator(bundle, rule)
+
+        persist_key = f"{asset_symbol}:{cond}"
+        persist_min = rule.get("persistence_minutes", 0)
+
         if matched:
+            if persist_min > 0 and persist_key not in _CONDTION_PERSISTENCE:
+                _CONDTION_PERSISTENCE[persist_key] = now
+                continue
+            if persist_min > 0:
+                elapsed = (now - _CONDTION_PERSISTENCE[persist_key]).total_seconds() / 60
+                if elapsed < persist_min:
+                    continue
             dedup_key = f"{asset_symbol}:{rule['type']}:{rule['severity']}"
             if not _recently_fired(db, dedup_key, rule.get("cooldown_minutes", 60), now):
-                _log_alert_fire(db, asset_symbol=asset_symbol, rule=rule, meta=dict(meta), now=now)
+                _log_alert_fire(db, asset_symbol=asset_symbol, rule=rule, meta=dict(meta), now=now, dedup_key=dedup_key)
                 _dispatch_alert(rule, asset_symbol=asset_symbol, meta=dict(meta))
                 fired.append({"type": rule["type"], "severity": rule["severity"], "asset": asset_symbol, "meta": dict(meta)})
+        else:
+            _CONDTION_PERSISTENCE.pop(persist_key, None)
     return fired
 
 
@@ -171,11 +199,11 @@ def _recently_fired(db: Session, dedup_key: str, cooldown_minutes: int, now: dat
     return existing is not None
 
 
-def _log_alert_fire(db: Session, *, asset_symbol: str, rule: dict, meta: dict, now: datetime) -> None:
+def _log_alert_fire(db: Session, *, asset_symbol: str, rule: dict, meta: dict, now: datetime, dedup_key: str = "") -> None:
     row = SignalEvent(
         asset_symbol=asset_symbol,
         chain_key=None,
-        event_type=rule["type"],
+        event_type=dedup_key or f"{asset_symbol}:{rule['type']}:{rule['severity']}",
         severity=rule["severity"],
         title=f"{asset_symbol} {rule['type'].replace('_', ' ').title()}",
         summary=f"Alert fired: {rule['condition']}",
@@ -187,7 +215,7 @@ def _log_alert_fire(db: Session, *, asset_symbol: str, rule: dict, meta: dict, n
         metadata_json=json.dumps(meta),
     )
     db.add(row)
-    db.commit()
+    db.flush()
 
 
 def _dispatch_alert(rule: dict, *, asset_symbol: str, meta: dict) -> None:

@@ -55,7 +55,8 @@ def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
             dt = _parse_rss_date(pub_date)
             articles.append({"title": title, "url": link, "summary": desc, "published_at": dt, "source": source})
         return articles
-    except Exception:
+    except Exception as exc:
+        log.warning("rss_fetch_failed", source=source, error=str(exc))
         return []
 
 
@@ -465,13 +466,16 @@ def get_attestation_status(db: Session | None = None) -> dict[str, Any]:
 def correlate_sentiment_depeg(db: Session, *, asset: str, window_hours: int = 24) -> dict[str, Any]:
     from datetime import timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+    sym = asset.strip().upper()
     articles = db.query(OsintArticle).filter(
         OsintArticle.published_at >= cutoff,
         OsintArticle.sentiment_score < -0.3,
+        OsintArticle.asset_symbols.contains(sym),
     ).order_by(OsintArticle.published_at.desc()).all()
     depeg_events = db.query(SignalEvent).filter(
         SignalEvent.event_type.like("%depeg%"),
         SignalEvent.timestamp >= cutoff,
+        SignalEvent.asset_symbol == sym,
     ).order_by(SignalEvent.timestamp.desc()).all()
     negative_count = len(articles)
     depeg_count = len(depeg_events)

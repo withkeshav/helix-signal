@@ -253,11 +253,7 @@ def compute_freshness(
     lsf = utc_normalize(last_successful_fetch)
     ncs = utc_normalize(newest_chain_snapshot)
 
-    if source_status == "error":
-        basis_ts: datetime | None = None
-        basis = "none"
-        reason = "DefiLlama source status is error; freshness cannot be trusted."
-    elif lsf is not None:
+    if lsf is not None:
         basis_ts = lsf
         basis = "last_successful_fetch"
         reason = "Age measured from last successful source refresh completion (UTC)."
@@ -277,20 +273,26 @@ def compute_freshness(
 
     fresh_window = max(900.0, float(refresh_interval_seconds) * 3.0)
     warn_window = max(3600.0, float(refresh_interval_seconds) * 12.0)
+    stale_window = warn_window * 2.0
 
-    if source_status == "error":
+    if basis_ts is None:
         status = "Stale"
-    elif basis_ts is None:
+        reason = "No freshness basis: missing last successful fetch and chain snapshots."
+    elif source_status == "error" and age_seconds is not None and age_seconds > stale_window:
         status = "Stale"
+        reason = "DefiLlama source is in error state and data is past stale window."
     elif age_seconds is not None and age_seconds <= fresh_window:
         status = "Fresh"
         reason = f"{reason} Within fresh window."
     elif age_seconds is not None and age_seconds <= warn_window:
         status = "Aging"
         reason = f"{reason} Past fresh window but within aging window."
+    elif age_seconds is not None and age_seconds <= stale_window:
+        status = "Aging"
+        reason = f"{reason} Past aging window but within extended stale buffer. Data may be delayed."
     else:
         status = "Stale"
-        reason = f"{reason} Past aging window (data refresh is overdue)."
+        reason = f"{reason} Past stale window (data refresh is overdue)."
 
     if lsf and ncs and basis == "last_successful_fetch":
         snap_age = max(0.0, (now - ncs).total_seconds())
@@ -307,7 +309,7 @@ def compute_freshness(
         "fresh_window_seconds": int(fresh_window),
         "warning_window_seconds": int(warn_window),
         "fresh_window_minutes": round(fresh_window / 60.0, 2),
-        "stale_window_minutes": round(warn_window / 60.0, 2),
+        "stale_window_minutes": round(stale_window / 60.0, 2),
         "reason": reason,
     }
 

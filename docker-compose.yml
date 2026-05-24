@@ -1,37 +1,4 @@
 services:
-  traefik:
-    image: traefik:v3.7
-    container_name: helix-traefik
-    restart: unless-stopped
-    networks:
-      - web_gateway
-      - internal
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./traefik/dynamic:/etc/traefik/dynamic:ro
-      - ./acme.json:/acme.json
-    environment:
-      CF_DNS_API_TOKEN_FILE: /run/secrets/cloudflare_token
-    secrets:
-      - cloudflare_token
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`${HELIX_DOMAIN:-helix.local}`) && PathPrefix(`/dashboard`)"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.dashboard.middlewares=auth@file"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
-      - "traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)"
-      - "traefik.http.routers.http-catchall.entrypoints=web"
-      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
-      - "traefik.http.routers.http-catchall.priority=1"
-
   postgres:
     image: timescale/timescaledb:latest-pg16
     container_name: helix-postgres
@@ -62,6 +29,28 @@ services:
       timeout: 5s
       retries: 5
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    container_name: helix-clickhouse
+    restart: unless-stopped
+    profiles: ["data"]
+    environment:
+      CLICKHOUSE_DB: helix
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./data/clickhouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - internal
+    ports:
+      - "8123:8123"
+    mem_limit: 1g
+
   redis:
     image: redis:7-alpine
     container_name: helix-redis
@@ -72,6 +61,11 @@ services:
       - internal
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.20.1
@@ -90,6 +84,15 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
     env_file:
       - .env
     environment:
@@ -103,6 +106,7 @@ services:
       ALLOW_BACKFILL: ${ALLOW_BACKFILL:-false}
       DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
       AI_MODE: ${AI_MODE:-ai_off}
+      HELIX_USE_CELERY_REFRESH: ${HELIX_USE_CELERY_REFRESH:-false}
     networks:
       - internal
     volumes:
@@ -110,12 +114,25 @@ services:
       - helix_data:/data
     expose:
       - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
 
   celery-beat:
     build:
       context: ./backend
     profiles: ["data"]
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16M
     command: celery -A celery_app beat --loglevel=info
     env_file:
       - .env
@@ -134,6 +151,13 @@ services:
       context: ./backend
     profiles: ["data"]
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32M
     command: celery -A celery_app worker --loglevel=info --concurrency=1
     env_file:
       - .env
@@ -142,7 +166,7 @@ services:
       HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-true}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
-      AI_MODE: ${AI_MODE:-ai_lite}
+      AI_MODE: ${AI_MODE:-ai_off}
     networks:
       - internal
     volumes:
@@ -152,93 +176,61 @@ services:
       - redis
       - postgres
 
+  timesfm:
+    build:
+      context: ./backend/ml_models/timesfm
+    container_name: helix-timesfm
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:size=256M
+    profiles: ["data"]
+    environment:
+      MODEL_NAME: google/timesfm-2.5-200m-pytorch
+      MAX_CONTEXT: ${TIMESFM_MAX_CONTEXT:-1024}
+      MAX_HORIZON: ${TIMESFM_MAX_HORIZON:-256}
+    networks:
+      - internal
+    expose:
+      - "8100"
+    mem_limit: 3g
+    deploy:
+      resources:
+        reservations:
+          memory: 2g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+
   frontend:
     build:
       context: ./frontend
     restart: unless-stopped
+    ports:
+      - "80:80"
     networks:
       - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`${HELIX_DOMAIN:-helix.local}`)"
-      - "traefik.http.routers.frontend.tls=true"
-      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
-    expose:
-      - "80"
     depends_on:
-      - backend
-
-  prometheus:
-    image: prom/prometheus:v3.2.0
-    container_name: helix-prometheus
-    restart: unless-stopped
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.external-url=https://${HELIX_DOMAIN:-helix.local}/prometheus'
-      - '--web.route-prefix=/'
-    networks:
-      - internal
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`${HELIX_DOMAIN:-helix.local}`) && PathPrefix(`/prometheus`)"
-      - "traefik.http.routers.prometheus.middlewares=prometheus-stripprefix,auth@file"
-      - "traefik.http.routers.prometheus.tls=true"
-      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
-      - "traefik.http.middlewares.prometheus-stripprefix.stripprefix.prefixes=/prometheus"
-      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
-    expose:
-      - "9090"
-
-  grafana:
-    image: grafana/grafana:11.5
-    container_name: helix-grafana
-    restart: unless-stopped
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
-      GF_INSTALL_PLUGINS: grafana-piechart-panel
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana"
-    networks:
-      - internal
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`${HELIX_DOMAIN:-helix.local}`) && PathPrefix(`/grafana`)"
-      - "traefik.http.routers.grafana.middlewares=grafana-stripprefix,auth@file"
-      - "traefik.http.routers.grafana.tls=true"
-      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
-      - "traefik.http.middlewares.grafana-stripprefix.stripprefix.prefixes=/grafana"
-      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-    expose:
-      - "3000"
-    secrets:
-      - grafana_admin_password
+      backend:
+        condition: service_healthy
 
 networks:
-  web_gateway:
-    external: true
   internal:
     driver: bridge
 
 volumes:
   helix_data:
   postgres_data:
+  clickhouse_data:
   redis_data:
   mlflow_data:
-  prometheus_data:
-  grafana_data:
 
-secrets:
-  grafana_admin_password:
-    file: ./secrets/grafana_admin_password.txt
-  cloudflare_token:
-    file: ./secrets/cloudflare_token.txt

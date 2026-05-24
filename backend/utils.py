@@ -22,6 +22,8 @@ def window_delta(window: str) -> timedelta:
         return timedelta(hours=24)
     if window == "7d":
         return timedelta(days=7)
+    if window == "90d":
+        return timedelta(days=90)
     return timedelta(days=30)
 
 

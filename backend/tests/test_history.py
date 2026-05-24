@@ -16,4 +16,4 @@ def test_depeg_zones():
 
 
 def test_event_dedup_window_positive():
-    assert EVENT_DEDUP_MINUTES >= 1
+    assert EVENT_DEDUP_MINUTES == 30

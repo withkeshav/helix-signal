@@ -24,7 +24,7 @@ SQLite or PostgreSQL/Timescale (snapshots, trends, events, OSINT)
 Alpine.js + Chart.js frontend (index.html + app.js)
     |
     +-- Docker: nginx proxies /api -> backend:8000 (same-origin relative URLs)
-    +-- /metrics blocked at nginx; Prometheus scrapes backend internally
+    +-- /metrics blocked at nginx
 ```
 
 ## Deploy topology (production)
@@ -33,11 +33,7 @@ Alpine.js + Chart.js frontend (index.html + app.js)
 Internet
     |
     v
-Traefik (TLS, HTTPS redirect, basic-auth on admin paths)
-    |
-    +--> frontend:80  (/api/* proxied to backend:8000, static assets)
-    +--> prometheus:9090  (/prometheus, auth)
-    +--> grafana:3000     (/grafana, auth)
+frontend:80  (/api/* proxied to backend:8000, static assets)
     |
     v
 backend:8000 (internal network only)
@@ -61,7 +57,7 @@ postgres (TimescaleDB)  redis (cache + Celery broker)
 
 Reference deployment: [https://helix.withkeshav.com](https://helix.withkeshav.com)
 
-Environment is loaded from `.env` (copy from `.env.example`). TLS material (`acme.json`) and secrets (`secrets/`, `.env`) stay out of git.
+Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/`, `.env`) stay out of git.
 
 ## Components
 
@@ -84,15 +80,9 @@ Environment is loaded from `.env` (copy from `.env.example`). TLS material (`acm
 
 ### Frontend (`frontend/`)
 
-- `index.html` — dashboard shell, Alpine.js bindings, CDN Chart.js/htmx
-- `app.js` — Alpine component (`helixApp`), chart wiring, Intel tab loaders
+- `index.html` — dashboard shell, Alpine.js bindings, CDN Chart.js + ECharts
+- `app.js` — Alpine component (`helixApp`), chart wiring, tab loaders
 - nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
-- Legacy `frontend/main.js` is superseded and gitignored
-
-### Edge (`traefik/`)
-
-- Static config: `traefik.yml` (entrypoints, ACME DNS challenge, file provider)
-- Dynamic config: `dynamic/middlewares.yml` (basic-auth for Traefik dashboard, Prometheus, Grafana routes)
 
 ## Local development
 

@@ -1,11 +1,26 @@
 # Helix-Signal
 
 **Live:** [https://helix.withkeshav.com](https://helix.withkeshav.com)  
-**Repository:** [github.com/withkeshav/helix-signal](https://github.com/withkeshav/helix-signal)
+**Repository:** [github.com/withkeshav/helix-signal](https://github.com/withkeshav/helix-signal)  
+**License:** MIT
 
 Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence platform for stablecoins and chains.
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
+
+**106 regression tests pass.** Zero paid API dependencies for core operation.
+
+## v3.3 Highlights
+
+- **Traefik/Prometheus/Grafana removed** — lighter stack, no TLS secrets or Cloudflare token needed
+- **Forecast charts wired to API** — `renderForecastCharts()` uses real `ForecastRun`/`ForecastPoint` data, mock arrays removed
+- **Auto-backfill on first run** — fresh databases get 7 days of historical data seeded automatically
+- **`LOG_LEVEL` filtering** — `LOG_LEVEL=ERROR` now actually suppresses debug output
+- **`previous_status` for source recovery** — alert rule `source transitions error` now fires correctly
+- **Compose health conditions** — `frontend` waits for `backend: service_healthy`, redis has `redis-cli ping` healthcheck
+- **90d window support** — `window_delta()`, middleware, and compare service all accept `90d`
+- **Alembic migration for `previous_status`** — Postgres users don't hit column-missing errors on refresh
+- **P0–P3 audit fixes** — 15+ items across behavior, hardening, and cleanup (see CHANGELOG for full list)
 
 ## V3 Highlights
 
@@ -16,10 +31,10 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + CryptoPanic API + FinBERT sentiment scoring
 - **Attestation & supply feed**: issuer report age (when parseable) plus DefiLlama on-chain supply feed freshness — no synthetic dates
 - **Governance monitoring**: contract upgrade tracking via Etherscan API
-- **AI anomaly detection** (gated): Z-score, Isolation Forest, Prophet forecast — enabled via `ENABLE_ANOMALY_DETECTION=true`
+- **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enabled via `ENABLE_ANOMALY_DETECTION=true`
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
-- **Alpine.js + htmx frontend**: 4-tab layout (Overview, Peg & Liquidity, Supply & Flows, Intelligence), no build step, CDN-loaded
+- **Alpine.js + Chart.js + ECharts frontend**: 6-tab layout (Market, Forecast, Supply, Events, Intel, Health), no build step, CDN-loaded
 
 ## Quick Start
 
@@ -33,11 +48,8 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 git clone https://github.com/withkeshav/helix-signal.git
 cd helix-signal
 cp .env.example .env
-mkdir -p secrets
-echo "set-a-strong-password" > secrets/grafana_admin_password.txt
-docker network create web_gateway || true
 docker compose up --build -d
-./scripts/smoke-check.sh http://localhost:3000
+./scripts/smoke-check.sh http://localhost:80
 ```
 
 ### Public demo
@@ -47,17 +59,13 @@ A reference deployment is live at [helix.withkeshav.com](https://helix.withkesha
 | Route | Access |
 |-------|--------|
 | [Dashboard](https://helix.withkeshav.com/) | Public UI + `/api/*` |
-| Admin surfaces (`/dashboard/`, `/prometheus/`, `/grafana/`) | Basic-auth protected on a full Traefik deploy |
 
 Before deploying your own instance, set in `.env`:
 
-- `HELIX_DOMAIN` — hostname Traefik routes to (default `helix.local`)
-- Replace the Traefik basic-auth user in `traefik/dynamic/middlewares.yml` (default `admin` / `changeme`)
-- Set ACME contact email in `traefik/traefik.yml`
-- Create `secrets/cloudflare_token.txt` if using Cloudflare DNS challenge (see `docker-compose.yml`)
-- Keep `acme.json`, `.env`, and `secrets/` out of git (already in `.gitignore`)
+- `HELIX_DOMAIN` — public hostname (default `helix.local`)
+- Keep `.env` and `secrets/` out of git (already in `.gitignore`)
 
-Full-stack smoke test (Traefik + TLS + admin auth):
+Full-stack smoke test:
 
 ```bash
 ./scripts/smoke-check.sh https://your-domain.example
@@ -93,7 +101,7 @@ cd backend
 .venv/bin/pytest -q
 ```
 
-Post-deploy smoke test (checks frontend shell, API health, auth on admin routes, `/metrics` not public):
+Post-deploy smoke test (checks frontend shell, API health, `/metrics` not public):
 
 ```bash
 ./scripts/smoke-check.sh https://your-host.example
@@ -116,7 +124,7 @@ Auto-generate a new migration after model changes:
 
 Copy `.env.example` to `.env` and adjust:
 
-- `HELIX_DOMAIN` — public hostname for Traefik routing (default `helix.local`; required for TLS production deploy)
+- `HELIX_DOMAIN` — public hostname (default `helix.local`)
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
 - `ENABLE_ANOMALY_DETECTION` (default `false`) — enables ML anomaly detection (requires scikit-learn, numpy, pandas, statsforecast)
 - `ENABLE_NLP` (default `false`) — enables FinBERT sentiment scoring (requires transformers + PyTorch)
@@ -124,6 +132,8 @@ Copy `.env.example` to `.env` and adjust:
 - `ETHERSCAN_API_KEY` — for governance monitoring
 - `ALERT_WEBHOOK_URL`, `ALERT_DISCORD_WEBHOOK`, `ALERT_TELEGRAM_BOT_TOKEN` — alert dispatch channels
 - `CRYPTOPANIC_API_KEY` — for news feed
+- `LOG_LEVEL` (default `INFO`) — set to `DEBUG` for verbose logging
+- `LOG_FORMAT` (default `dev`) — set to `json` for structured JSON logs in production
 
 Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `config/alerts.json`.
 
@@ -138,6 +148,13 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/compare` | Cross-asset aligned series |
 | `GET /api/chains/{chain_key}` | Chain drill-down |
 | `GET /api/events` | Signal feed |
+| `GET /api/forecasts` | Latest forecast runs |
+| `GET /api/predictive` | Predictive bundle (depeg probability, regime, TimesFM) |
+| `GET /api/analytics/correlations` | Pearson correlation matrix (5 metrics, ranked pairs) |
+| `GET /api/analytics/patterns` | Trend/volatility/seasonality detection |
+| `GET /api/analytics/finbert/sentiment` | On-demand FinBERT sentiment |
+| `GET /api/anomaly/detect` | Z-score + Isolation Forest anomaly flags |
+| `GET /api/anomaly/forecast` | Supply forecast (StatsForecast/AutoARIMA) |
 | `POST /api/admin/backfill` | Optional synthetic history (env-gated) |
 | `GET /api/alerts/config` | Alert rule definitions |
 | `GET /api/osint/feed` | Recent news articles with sentiment |
@@ -145,18 +162,24 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/osint/attestation` | Issuer report age + DefiLlama supply feed freshness (per asset) |
 | `GET /api/osint/correlate` | Sentiment-depeg correlation |
 | `GET /api/governance` | Governance monitoring |
-| `GET /api/anomaly/detect` | Z-score + Isolation Forest anomaly flags |
-| `GET /api/anomaly/forecast` | Supply forecast (Prophet) |
-| `GET /metrics` | Internal metrics endpoint (not publicly exposed via frontend route) |
+| `GET /api/sources/status` | Source health dashboard with circuit breaker states |
+| `GET /api/ai/explain` | LLM-generated risk explanation (env-gated) |
+| `GET /metrics` | Internal Prometheus metrics (blocked at nginx in production) |
 
 ## Project Structure
 
-- `backend/` — FastAPI app, multi-source ingestion, DuckDB analytics, alerts, OSINT, governance, ML anomaly detection, Alembic migrations
-- `frontend/` — Alpine.js dashboard (`index.html` + `app.js`), Chart.js, nginx API proxy in Docker
+- `backend/` — FastAPI app, multi-source ingestion, analytics engine, alerts, OSINT, ML models
+- `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter)
+- `backend/ml_models/` — model plugins (TimesFM, anomaly, FinBERT) with discoverable registry
+- `backend/middleware/` — security validation + observability middleware
+- `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, etc.)
+- `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener) with circuit breakers
+- `backend/signal_engine/` — V3 risk scoring (scoring, metrics, history, risk inputs)
+- `frontend/` — Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
 - `config/` — chain, asset, and alert configuration
-- `docs/` — architecture and data methodology only (public)
-- `scripts/` — deployment smoke checks
-- `traefik/` — reverse proxy static config + `dynamic/middlewares.yml` for basic auth
+- `data/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
+- `docs/` — architecture, data methodology, adding-asset, adding-chain, plugins, API ref, grant strategy
+- `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration
 
 Phase logs and server runbooks live under `.progress/` (gitignored). Planning briefs and `research/` are local only too.
 
@@ -166,10 +189,16 @@ Phase logs and server runbooks live under `.progress/` (gitignored). Planning br
 
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - Data methodology: [`docs/data-methodology.md`](docs/data-methodology.md)
+- Adding a stablecoin: [`docs/adding-asset.md`](docs/adding-asset.md)
+- Adding a chain: [`docs/adding-chain.md`](docs/adding-chain.md)
+- Plugin development: [`docs/plugins.md`](docs/plugins.md)
+- API reference: [`docs/api.md`](docs/api.md)
+- Grant strategy: [`docs/grant-strategy.md`](docs/grant-strategy.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - Release notes: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)
+- Backup script: [`scripts/backup.sh`](scripts/backup.sh)
 
 ## Not Investment Advice
 

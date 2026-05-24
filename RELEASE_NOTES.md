@@ -1,5 +1,23 @@
 # Release Notes
 
+## v3.3.0 — Stack Simplification & Audit Fixes
+
+Major infrastructure cleanup: Traefik, Prometheus, and Grafana removed from the stack. Comprehensive P0–P3 audit fixes applied across the entire codebase. Frontend forecast charts finally wired to real API data. Auto-backfill on first run gives immediate historical data for new deployments.
+
+**106 tests pass.** Zero paid API dependencies.
+
+### Highlights
+
+- **Traefik/Prometheus/Grafana removed** — no more TLS secrets, `cloudflare_token`, `acme.json`, `web_gateway` network, or monitoring containers. Frontend serves directly on port 80.
+- **P0 blockers fixed** — `depends_on` removed from default-profile backend (compose validates without `--profile data`); dead `_get_http_session` calls replaced with `httpx.Client()` context managers
+- **P1 behavior fixes** — `LOG_LEVEL` filtering wired, Celery health timeout added, forecast charts use real API data, sources routes rate-limited, `previous_status` tracking for recovery alerts, 90d window support, numpy/sklearn pinned
+- **P2 hardening** — compose health conditions (`frontend`→`backend` with `service_healthy`, redis healthcheck), AI_MODE aligned, Postgres `pool_pre_ping`/`pool_recycle`, flaky test fixed, structured logging on plugin/RSS failures
+- **P3 cleanup** — `prophet_forecast` → `statsforecast_supply`, dead imports removed, stale Grafana/Traefik references purged from docs and gitignore
+- **Auto-backfill** — fresh databases get 7 days of historical data seeded automatically on first boot
+- **Alembic migration** — `da39a3ee5e6b` adds `previous_status` column for Postgres users
+
+See `CHANGELOG.md` for the full list of changes.
+
 ## Unreleased — Next-level platform
 
 Reliability, VPS-ready data plane, predictive intelligence, and optional AI — core risk engine runs with `AI_MODE=ai_off`.

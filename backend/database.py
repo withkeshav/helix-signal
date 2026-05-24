@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, UniqueConstraint, create_engine, text
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -18,6 +18,9 @@ connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite")
 _pool_kw: dict = {}
 if DATABASE_URL in ("sqlite:///:memory:", "sqlite://"):
     _pool_kw["poolclass"] = StaticPool
+elif DATABASE_URL.startswith("postgresql"):
+    _pool_kw["pool_pre_ping"] = True
+    _pool_kw["pool_recycle"] = 3600
 engine = create_engine(DATABASE_URL, connect_args=connect_args, **_pool_kw)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -65,6 +68,7 @@ class SourceStatus(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     source_name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(32), default="unknown")
+    previous_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     last_attempted_fetch: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_successful_fetch: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -163,6 +167,48 @@ class SignalEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class ForecastRun(Base):
+    __tablename__ = "forecast_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    model_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_metric: Mapped[str] = mapped_column(String(32), nullable=False)
+    asset_symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    chain_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    input_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    input_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    horizon: Mapped[int] = mapped_column(Integer, nullable=False)
+    frequency: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="completed")
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    input_points: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class ForecastPoint(Base):
+    __tablename__ = "forecast_points"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    run_id: Mapped[int] = mapped_column(Integer, ForeignKey("forecast_runs.id"), nullable=False, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    chain_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    target_metric: Mapped[str] = mapped_column(String(32), nullable=False)
+    horizon_step: Mapped[int] = mapped_column(Integer, nullable=False)
+    forecast_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    point_forecast: Mapped[float | None] = mapped_column(Float, nullable=True)
+    q10: Mapped[float | None] = mapped_column(Float, nullable=True)
+    q50: Mapped[float | None] = mapped_column(Float, nullable=True)
+    q90: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
 

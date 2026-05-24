@@ -61,6 +61,7 @@ class DashboardChainRow(BaseModel):
 class SourceStatusOut(BaseModel):
     source_name: str
     status: str
+    previous_status: str | None = None
     last_attempted_fetch: datetime | None = None
     last_successful_fetch: datetime | None = None
     last_error: str | None = None
@@ -104,6 +105,11 @@ class AssetSignalOut(BaseModel):
     components: dict
 
 
+class DataQualityOut(BaseModel):
+    degraded_sources: list[str] = []
+    using_cached_data: bool = False
+
+
 class DashboardResponse(BaseModel):
     asset: AssetMetadataOut
     generated_at: datetime
@@ -116,6 +122,7 @@ class DashboardResponse(BaseModel):
     total_supply_change_24h_pct: float | None = None
     chains: list[DashboardChainRow]
     sources: list[SourceStatusOut]
+    data_quality: DataQualityOut = DataQualityOut()
 
 
 class AssetConfigOut(BaseModel):

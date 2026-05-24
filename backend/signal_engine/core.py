@@ -20,7 +20,7 @@ log = get_logger(__name__)
 CHAINS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "chains.json"
 ASSETS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "assets.json"
 
-ENABLE_CHAINLINK = False
+ENABLE_CHAINLINK = os.getenv("ENABLE_CHAINLINK", "").strip().lower() in ("1", "true", "yes")
 
 
 class SourceRegistry:
@@ -123,6 +123,7 @@ def _upsert_source_status(
     if row is None:
         row = SourceStatus(source_name=source_name)
         db.add(row)
+    row.previous_status = row.status
     row.status = status
     row.last_attempted_fetch = attempted_at
     if successful_at is not None:

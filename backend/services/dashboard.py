@@ -17,6 +17,7 @@ from schemas import (
     DashboardChainRow,
     DashboardResponse,
     DataConfidenceOut,
+    DataQualityOut,
     DepegIndexOut,
     FreshnessOut,
     SourceStatusOut,
@@ -200,6 +201,9 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
 
     generated_at = datetime.now(timezone.utc)
 
+    degraded_sources = [s.source_name for s in sources_orm if s.status != "ok"]
+    using_cached = len(degraded_sources) > 0
+
     return DashboardResponse(
         asset=AssetMetadataOut(
             symbol=selected_symbol,
@@ -216,4 +220,8 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         total_supply_change_24h_pct=total_change_24h_pct,
         chains=dashboard_chains,
         sources=sources,
+        data_quality=DataQualityOut(
+            degraded_sources=degraded_sources,
+            using_cached_data=using_cached,
+        ),
     )

@@ -1,0 +1,20 @@
+# Local development override for docker-compose.yml
+#
+# Usage:  cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# IMPORTANT: docker-compose.override.yml is gitignored.
+# It overrides the Dockerfile CMD if you include a `command:` block,
+# which can break deployments. This example keeps it clean.
+
+services:
+  backend:
+    # Uncomment to access the API from the host:
+    # ports:
+    #   - "8000:8000"
+    environment:
+      ALLOW_BACKFILL: "true"
+
+  frontend:
+    # Uncomment if port 80 is already in use on the host:
+    # ports:
+    #   - "4567:80"

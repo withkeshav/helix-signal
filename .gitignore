@@ -40,6 +40,7 @@ out/
 # --- Docker ---
 .docker/
 secrets/
+docker-compose.override.yml
 
 # --- Test Artifacts ---
 tests/cassettes/

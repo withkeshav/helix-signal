@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.3 (2026-05-24)
+
+### Fixed
+
+- **Backend Docker startup on VPS** — root cause was a stale `docker-compose.override.yml` overriding the Dockerfile CMD with `--reload` and dropping `--app-dir`. Override file is now `.gitignore`d to prevent future conflicts. Added `docker-compose.override.yml.example` as a safe reference.
+- **`docker-compose.override.yml` gitignored** — prevents local overrides from causing git conflicts or overriding the production CMD
+
 ## 3.3.2 (2026-05-24)
 
 ### Fixed

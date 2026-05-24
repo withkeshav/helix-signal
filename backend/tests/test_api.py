@@ -8,7 +8,7 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "3.3.2"
+    assert body["version"] == "3.3.3"
     assert "db" in body
     assert "scheduler_running" in body
 

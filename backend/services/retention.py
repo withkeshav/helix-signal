@@ -21,7 +21,7 @@ from backend.core.database_manager import dbm
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "3.3.0"
+HELIX_VERSION = "3.3.2"
 
 RETENTION_DEFAULTS: dict[str, int] = {
     "asset_trend_snapshots": 90,

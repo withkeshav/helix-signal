@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.2 (2026-05-24)
+
+### Fixed
+
+- **Backend container startup on VPS** — `CMD` in Dockerfile now uses `--app-dir /app/backend` to explicitly tell uvicorn where to find `main:app`, working around Docker/Python sys.path differences across environments. Backend was crashing with `Could not import module "main"` on VPS despite working locally.
+
 ## 3.3.0 (2026-05-24)
 
 ### Removed

@@ -45,6 +45,11 @@
 - **Forecast API key rename** — `"price"` → `"peg"` for historical data (mapped to depeg_index, not USD price)
 - **`sys.path` fix** — repo root added to path so local `uvicorn backend.main:app` works from both repo root and `backend/` directory
 
+### Fixed
+
+- **Docker package structure fixed** — `backend/Dockerfile` now `COPY . /app/backend` + `WORKDIR /app/backend`, creating the `backend` package that `from backend.core.*` imports require; compose volume mounts updated from `/config` to `/app/config` to match new depth
+- **Fresh clone runs out of the box** — `docker compose up` no longer crashes with `ModuleNotFoundError: No module named 'backend'`
+
 ### Developer Experience
 
 - **Auto-backfill on first run** — when DB has fewer than 24 trend rows, automatically seeds 7 days of synthetic history per enabled asset; gated by `HELIX_SKIP_STARTUP_REFRESH` (same env var used in tests)

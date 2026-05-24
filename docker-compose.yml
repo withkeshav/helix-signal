@@ -110,7 +110,7 @@ services:
     networks:
       - internal
     volumes:
-      - ./config:/config:ro
+      - ./config:/app/config:ro
       - helix_data:/data
     expose:
       - "8000"
@@ -170,7 +170,7 @@ services:
     networks:
       - internal
     volumes:
-      - ./config:/config:ro
+      - ./config:/app/config:ro
       - helix_data:/data
     depends_on:
       - redis

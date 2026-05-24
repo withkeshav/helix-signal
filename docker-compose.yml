@@ -44,7 +44,7 @@ services:
         hard: 262144
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./data/clickhouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./docker/clickhouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     networks:
       - internal
     ports:

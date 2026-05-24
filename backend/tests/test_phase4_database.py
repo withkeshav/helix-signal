@@ -267,14 +267,14 @@ class TestDockerComposeConfig:
     def test_clickhouse_schema_exists(self):
         import os
         schema_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "data", "clickhouse", "schema.sql"
+            os.path.dirname(__file__), "..", "..", "docker", "clickhouse", "schema.sql"
         )
         assert os.path.exists(schema_path)
 
     def test_clickhouse_schema_has_tables(self):
         import os
         schema_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "data", "clickhouse", "schema.sql"
+            os.path.dirname(__file__), "..", "..", "docker", "clickhouse", "schema.sql"
         )
         with open(schema_path) as f:
             content = f.read()
@@ -292,7 +292,7 @@ class TestDockerComposeConfig:
         with open(compose_path) as f:
             content = f.read()
         assert "clickhouse" in content
-        assert "data/clickhouse/schema.sql" in content
+        assert "docker/clickhouse/schema.sql" in content
         assert "clickhouse_data" in content
 
     def test_env_example_has_clickhouse_vars(self):

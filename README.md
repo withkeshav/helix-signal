@@ -177,7 +177,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/signal_engine/` — V3 risk scoring (scoring, metrics, history, risk inputs)
 - `frontend/` — Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
 - `config/` — chain, asset, and alert configuration
-- `data/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
+- `docker/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
 - `docs/` — architecture, data methodology, adding-asset, adding-chain, plugins, API ref, grant strategy
 - `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration
 
@@ -197,7 +197,6 @@ Phase logs and server runbooks live under `.progress/` (gitignored). Planning br
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
-- Release notes: [`RELEASE_NOTES.md`](RELEASE_NOTES.md)
 - Backup script: [`scripts/backup.sh`](scripts/backup.sh)
 
 ## Not Investment Advice

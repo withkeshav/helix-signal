@@ -52,7 +52,7 @@ function helixApp() {
     evidenceOpen:false,evidenceTitle:'',evidenceFormula:'',evidenceComponents:{},evidenceSources:{},
     forecastSignals:[],correlations:[],dataQualityHistory:[],
     anomalyEvents:{},forecastAccuracy:[],
-    nlpAvailable:false,loadingEvents:false,loadingForecast:false,
+    nlpAvailable:false,loadingEvents:false,loadingForecast:false,_sentimentSeries:[],
     settingsList:[],
     errorEvents:'',errorForecast:'',
     get gaugeArc() {
@@ -222,6 +222,7 @@ function helixApp() {
         await this.loadInsights();
         if(this.tab==='intel')this.loadIntel();
         if(this.tab==='events')this.loadEvents();
+        else if(this._sentimentSeries.length){this.renderSentimentChart(this._sentimentSeries);}
         if(this.tab==='forecast'){this.loadForecastData();this.loadForecastAccuracy();}
       }catch(e){this.staleWarning=`Dashboard error: ${e.message}`;}
     },
@@ -277,7 +278,7 @@ function helixApp() {
         const s=await fetch(`/api/osint/sentiment?asset=${this.asset}&window_days=7`,{cache:'no-store'});
         if(s.ok){
           const series=await s.json();
-          if(Array.isArray(series)&&series.length>0){this.renderSentimentChart(series);}
+          if(Array.isArray(series)){this._sentimentSeries=series;if(series.length>0){this.renderSentimentChart(series);}}
         }
       }catch(e){}finally{this.loadingEvents=false;}
     },

@@ -198,7 +198,7 @@ def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) ->
             "title": a.title,
             "url": a.url,
             "source": a.source,
-            "summary": a.summary,
+            "summary": _strip_html(a.summary) if a.summary else None,
             "published_at": a.published_at.isoformat().replace("+00:00", "Z") if a.published_at else None,
             "sentiment_score": a.sentiment_score,
             "sentiment_label": a.sentiment_label,

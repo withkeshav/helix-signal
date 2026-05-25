@@ -172,7 +172,7 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Recent Events: {recent_events}\n"
             "Explain the current market narrative and what to watch."
         ),
-        "max_tokens_lite": 150,
+        "max_tokens_lite": 350,
         "max_tokens_full": 300,
     },
     "insight_summary": {
@@ -187,7 +187,7 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Anomalies (7d): {anomaly_count}\n"
             "What are the most important trends and risks?"
         ),
-        "max_tokens_lite": 150,
+        "max_tokens_lite": 350,
         "max_tokens_full": 300,
     },
 }

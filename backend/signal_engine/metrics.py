@@ -26,6 +26,9 @@ class ChainMetricRow:
     chain_signal_band: str
     data_confidence_score: int
     data_confidence_label: str
+    supply_prev_day: float | None = None
+    supply_prev_week: float | None = None
+    supply_prev_month: float | None = None
 
 
 @dataclass
@@ -45,6 +48,7 @@ class AssetMetricBundle:
     source_error: str | None
     freshness_age_seconds: float | None
     chains: list[ChainMetricRow]
+    risk_kwargs: dict | None = None
 
 
 def compute_asset_metric_bundle(
@@ -145,6 +149,9 @@ def compute_asset_metric_bundle(
                 chain_name=name,
                 chain_key=chain_key_from_name(name),
                 supply_current=c.supply_current,
+                supply_prev_day=c.supply_prev_day,
+                supply_prev_week=c.supply_prev_week,
+                supply_prev_month=c.supply_prev_month,
                 supply_share_pct=round(share_pct, 4) if share_pct is not None else None,
                 chain_tvl=c.tvl,
                 chain_signal_score=int(cs_raw["score"]),
@@ -170,5 +177,6 @@ def compute_asset_metric_bundle(
         source_error=source_error,
         freshness_age_seconds=age_seconds,
         chains=chain_rows,
+        risk_kwargs=risk_kwargs,
     )
 

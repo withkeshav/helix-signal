@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from database import AssetTrendSnapshot, ChainTrendSnapshot, SignalEvent, SourceStatus
 from services.alerts import evaluate_alerts
 from signal_engine.metrics import compute_asset_metric_bundle
-from signal_engine.risk_inputs import build_risk_score_kwargs
 from utils import utc_now
 
 BUCKET_SECONDS = 300
@@ -453,14 +452,9 @@ def persist_trends_and_events(
             "top3_pool_share_pct": bundle.top_chain_share_pct,
         }
         # Enrich with risk_kwargs fields needed by alert evaluators
-        risk_kwargs = build_risk_score_kwargs(
-            bundle.chains,
-            source_ok=bundle.source_ok,
-            source_error=bundle.source_error,
-            age_seconds=bundle.freshness_age_seconds,
-        )
-        bundle_dict["slippage_100k"] = risk_kwargs.get("slippage_100k")
-        bundle_dict["slippage_7d_median"] = risk_kwargs.get("slippage_7d_median")
-        bundle_dict["supply_age_hours"] = risk_kwargs.get("supply_age_hours")
+        rk = bundle.risk_kwargs or {}
+        bundle_dict["slippage_100k"] = rk.get("slippage_100k_bps")
+        bundle_dict["slippage_7d_median"] = rk.get("slippage_7d_median")
+        bundle_dict["supply_age_hours"] = rk.get("supply_age_hours")
         evaluate_alerts(db, bundle=bundle_dict, asset_symbol=u, now=ts)
 

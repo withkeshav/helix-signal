@@ -13,6 +13,7 @@ def register_routes(app):
     from routes.chain_detail import router as chain_detail_router
     from routes.sources import router as sources_router
     from routes.forecasts import router as forecasts_router
+    from routes.settings import router as settings_router
 
     app.include_router(dashboard_router, prefix="/api")
     app.include_router(trends_router, prefix="/api")
@@ -25,3 +26,4 @@ def register_routes(app):
     app.include_router(chain_detail_router, prefix="/api")
     app.include_router(sources_router, prefix="/api")
     app.include_router(forecasts_router, prefix="/api")
+    app.include_router(settings_router, prefix="/api")

@@ -51,6 +51,7 @@ function helixApp() {
     evidenceOpen:false,evidenceTitle:'',evidenceFormula:'',evidenceComponents:{},evidenceSources:{},
     forecastSignals:[],correlations:[],dataQualityHistory:[],
     nlpAvailable:false,loadingEvents:false,loadingForecast:false,
+    settingsList:[],
     errorEvents:'',errorForecast:'',
     get gaugeArc() {
       const s=Number(this.signal.score);if(Number.isNaN(s))return 0;
@@ -201,6 +202,22 @@ function helixApp() {
       if(this.tab==='intel')this.loadIntel();
       if(this.tab==='events')this.loadEvents();
       if(this.tab==='supply')this.loadSupplyTrend();
+      if(this.tab==='settings')this.loadSettings();
+    },
+    async loadSettings() {
+      try{
+        const r=await fetch('/api/settings',{cache:'no-store'});
+        if(r.ok)this.settingsList=await r.json();
+      }catch(e){this.settingsList=[];}
+    },
+    async toggleSetting(key,value) {
+      try{
+        const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})});
+        if(r.ok){
+          const item=this.settingsList.find(s=>s.key===key);
+          if(item)item.value=value;
+        }
+      }catch(e){}
     },
     async loadEvents() {
       this.loadingEvents=true;this.errorEvents='';

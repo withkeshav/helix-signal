@@ -109,6 +109,12 @@
       .evidence-drawer{width:100vw;max-width:100vw}
       .chart-wrap,.chart-wrap.tall,.chart-wrap.xl{height:160px}
     }
+    .toggle{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
+    .toggle input{opacity:0;width:0;height:0}
+    .toggle-slider{position:absolute;inset:0;background:var(--line);border-radius:20px;transition:.2s}
+    .toggle-slider::before{content:'';position:absolute;left:3px;bottom:3px;width:14px;height:14px;background:var(--panel);border-radius:50%;transition:.2s}
+    .toggle input:checked+.toggle-slider{background:var(--up)}
+    .toggle input:checked+.toggle-slider::before{transform:translateX(16px)}
     @media(max-width:480px){
       .intel-header{grid-template-columns:repeat(3,1fr);gap:3px}
       .intel-item{padding:6px 8px}.intel-value{font-size:.9rem}
@@ -220,6 +226,7 @@
       <button class="tab" :class="tab === 'events' && 'active'" @click="tab='events';loadTab()">Events</button>
       <button class="tab" :class="tab === 'intel' && 'active'" @click="tab='intel';loadTab()">Intel</button>
       <button class="tab" :class="tab === 'health' && 'active'" @click="tab='health';loadTab()">Health</button>
+      <button class="tab" :class="tab === 'settings' && 'active'" @click="tab='settings';loadTab()">&#9881; Settings</button>
     </nav>
 
     <!-- Event Ticker -->
@@ -494,6 +501,62 @@
             <div class="signal-item" x-text="`${dq.label}: ${dq.value}`"></div>
           </template>
           <div x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div class="tab-content" :class="tab === 'settings' && 'active'">
+      <div class="insight-grid">
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>Data Providers</h2>
+          <template x-for="s in settingsList" :key="s.key">
+            <div x-show="s.key.startsWith('provider_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <div>
+                <span style="font-weight:600;font-size:13px" x-text="s.label"></span>
+                <span x-show="s.always_active" class="pill source-ok" style="margin-left:6px">always active</span>
+                <span x-show="s.key_env && !s.always_active" style="font-size:11px;color:var(--muted);margin-left:6px" x-text="`(${s.key_env})`"></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <label class="toggle" x-show="!s.always_active">
+                  <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="!settingsList.filter(s => s.key.startsWith('provider_')).length" class="kpi-sub" style="padding:8px 0">Loading providers...</div>
+        </div>
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>Features</h2>
+          <template x-for="s in settingsList" :key="s.key">
+            <div x-show="s.key.startsWith('feature_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span style="font-size:13px" x-text="s.label"></span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <label class="toggle">
+                  <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+              </div>
+            </div>
+          </template>
+          <div x-show="!settingsList.filter(s => s.key.startsWith('feature_')).length" class="kpi-sub" style="padding:8px 0">Loading features...</div>
+        </div>
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>Refresh Intervals</h2>
+          <template x-for="s in settingsList" :key="s.key">
+            <div x-show="s.key.startsWith('refresh_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span style="font-size:13px" x-text="s.label"></span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="number" :value="s.value" :min="s.min" :max="s.max" style="width:80px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
+                       @change="toggleSetting(s.key, parseInt($event.target.value))">
+                <span style="font-size:11px;color:var(--muted)" x-text="s.key.includes('_seconds') ? 'sec' : 'min'"></span>
+                <button class="btn btn-muted" style="padding:3px 8px;font-size:11px" @click="toggleSetting(s.key, s.default)">Reset</button>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>

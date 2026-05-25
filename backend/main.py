@@ -65,8 +65,11 @@ def _retention_job() -> None:
 
 
 def _osint_job() -> None:
+    from providers.settings import get_setting
     db = SessionLocal()
     try:
+        if not get_setting("feature_osint_feed", db):
+            return
         count = ingest_osint_feed(db)
         refresh_attestation_reports(force=True)
         if count:
@@ -93,20 +96,23 @@ async def lifespan(app: FastAPI):
 
     discover_plugins()
 
+    from providers.settings import get_setting
+
     scheduler = BackgroundScheduler()
-    skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
-    if not skip_refresh:
-        try:
-            interval_seconds = max(60, int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")))
-        except (ValueError, TypeError):
-            interval_seconds = 300
-        scheduler.add_job(
-            _refresh_job,
-            "interval",
-            seconds=interval_seconds,
-            id="defillama-refresh",
-            replace_existing=True,
-        )
+    with SessionLocal() as setup_db:
+        skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
+        if not skip_refresh:
+            interval_seconds = max(60, get_setting("refresh_core_seconds", setup_db) or int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")))
+            scheduler.add_job(
+                _refresh_job,
+                "interval",
+                seconds=interval_seconds,
+                id="defillama-refresh",
+                replace_existing=True,
+            )
+        osint_minutes = max(15, get_setting("refresh_osint_minutes", setup_db) or 60)
+        forecast_minutes = max(15, get_setting("refresh_forecast_minutes", setup_db) or 30)
+
     scheduler.add_job(
         _retention_job,
         "cron",
@@ -118,14 +124,14 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         _osint_job,
         "interval",
-        hours=1,
+        minutes=osint_minutes,
         id="osint-ingest",
         replace_existing=True,
     )
     scheduler.add_job(
         _forecast_job,
         "interval",
-        minutes=30,
+        minutes=forecast_minutes,
         id="forecast-generation",
         replace_existing=True,
     )

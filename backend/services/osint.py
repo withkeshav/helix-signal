@@ -120,8 +120,9 @@ def _ensure_nlp():
     return _NLP_PIPELINE
 
 
-def _compute_sentiment(text: str) -> dict[str, Any]:
-    if not ENABLE_NLP or not text:
+def _compute_sentiment(text: str, nlp_enabled: bool | None = None) -> dict[str, Any]:
+    active = ENABLE_NLP if nlp_enabled is None else nlp_enabled
+    if not active or not text:
         return {"score": 0.0, "label": "neutral"}
     pipe = _ensure_nlp()
     if pipe is None:
@@ -136,6 +137,9 @@ def _compute_sentiment(text: str) -> dict[str, Any]:
 
 
 def ingest_osint_feed(db: Session) -> int:
+    from providers.settings import get_setting
+    nlp_from_settings = get_setting("feature_nlp_sentiment", db)
+    nlp_active = nlp_from_settings if isinstance(nlp_from_settings, bool) else ENABLE_NLP
     count = 0
     for source, url in RSS_FEEDS.items():
         articles = _fetch_rss(url, source)
@@ -143,7 +147,7 @@ def ingest_osint_feed(db: Session) -> int:
             if _article_exists(db, art["title"], art["source"]):
                 continue
             assets = _classify_asset(art["title"] + " " + (art["summary"] or ""))
-            sentiment = _compute_sentiment(art["title"])
+            sentiment = _compute_sentiment(art["title"], nlp_enabled=nlp_active)
             db.add(OsintArticle(
                 asset_symbols=",".join(assets) if assets else None,
                 source=art["source"],
@@ -161,7 +165,7 @@ def ingest_osint_feed(db: Session) -> int:
         if _article_exists(db, art["title"], art["source"]):
             continue
         assets = _classify_asset(art["title"])
-        sentiment = _compute_sentiment(art["title"])
+        sentiment = _compute_sentiment(art["title"], nlp_enabled=nlp_active)
         db.add(OsintArticle(
             asset_symbols=",".join(assets) if assets else None,
             source=art["source"],

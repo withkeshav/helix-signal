@@ -204,7 +204,10 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
     degraded_sources = [s.source_name for s in sources_orm if s.status != "ok"]
     using_cached = len(degraded_sources) > 0
 
-    nlp_enabled = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
+    from providers.settings import get_setting
+    nlp_from_settings = get_setting("feature_nlp_sentiment", db)
+    nlp_from_env = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
+    nlp_enabled = nlp_from_settings if isinstance(nlp_from_settings, bool) else nlp_from_env
 
     return DashboardResponse(
         asset=AssetMetadataOut(

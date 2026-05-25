@@ -41,6 +41,19 @@ def get_alert_config(request: Request) -> list[dict[str, Any]]:
     return load_alert_rules()
 
 
+@router.get("/reports/summary")
+@limiter.limit("30/minute")
+def api_report_summary(
+    request: Request,
+    asset: str = Query(...),
+    days: int = Query(7, ge=1, le=90),
+    db: Session = Depends(get_db),
+    _auth=Depends(_admin_token_valid),
+) -> dict[str, Any]:
+    from services.reports import generate_summary_report
+    return generate_summary_report(db, asset_symbol=asset, days=days)
+
+
 @router.get("/governance")
 @limiter.limit("60/minute")
 def api_governance(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:

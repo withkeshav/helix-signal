@@ -8,6 +8,9 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
+import smtplib
+from email.mime.text import MIMEText
+
 import httpx
 from sqlalchemy.orm import Session
 
@@ -264,4 +267,31 @@ def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict) -> None:
 
 
 def _dispatch_email(asset_symbol: str, rule: dict, meta: dict) -> None:
-    log.warning("email_skipped", reason="not_implemented")
+    smtp_host = os.getenv("ALERT_SMTP_HOST", "")
+    smtp_port = int(os.getenv("ALERT_SMTP_PORT", "587"))
+    smtp_user = os.getenv("ALERT_SMTP_USER", "")
+    smtp_pass = os.getenv("ALERT_SMTP_PASS", "")
+    mail_to = os.getenv("ALERT_EMAIL_TO", "")
+    mail_from = os.getenv("ALERT_EMAIL_FROM", smtp_user)
+    if not smtp_host or not smtp_user or not smtp_pass or not mail_to:
+        log.warning("email_skipped", reason="missing_smtp_config")
+        return
+    try:
+        msg = MIMEText(
+            f"Helix Signal Alert\n\n"
+            f"Asset: {asset_symbol}\n"
+            f"Type: {rule['type']}\n"
+            f"Severity: {rule['severity']}\n"
+            f"Condition: {rule['condition']}\n"
+            f"Meta: {json.dumps(meta, indent=2)}\n",
+        )
+        msg["Subject"] = f"[Helix Signal] {rule['severity'].upper()} - {asset_symbol} {rule['type']}"
+        msg["From"] = mail_from
+        msg["To"] = mail_to
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
+            s.starttls()
+            s.login(smtp_user, smtp_pass)
+            s.send_message(msg)
+        log.info("email_sent", asset=asset_symbol, to=mail_to)
+    except Exception as exc:
+        log.warning("email_failed", error=str(exc))

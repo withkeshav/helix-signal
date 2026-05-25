@@ -658,7 +658,22 @@
           </div>
         </div>
       </div>
-      <div class="chart-card" x-show="forecastSignals.length">
+        <div class="insight-card">
+          <h2>Alert History <span class="kpi-sub" x-text="`events`"></span></h2>
+          <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.5">
+            <template x-for="ev in (events || []).slice(0, 20)" :key="ev.id">
+              <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px">
+                <div>
+                  <span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span>
+                  <span x-text="ev.title"></span>
+                </div>
+                <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
+              </div>
+            </template>
+            <div x-show="!events.length" class="kpi-sub" style="padding:8px 0">No recent events</div>
+          </div>
+        </div>
+        <div class="chart-card" x-show="forecastSignals.length">
         <h2>Data Quality</h2>
         <div style="font-size:13px">
           <template x-for="(dq, i) in dataQualityHistory" :key="i">

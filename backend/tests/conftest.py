@@ -21,6 +21,7 @@ _TABLES = [
     "signal_events",
     "forecast_runs",
     "forecast_points",
+    "ai_snapshots",
 ]
 
 

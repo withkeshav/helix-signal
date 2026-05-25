@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import (
+    AiSnapshot,
     AssetTrendSnapshot,
     ChainTrendSnapshot,
     ForecastPoint,
@@ -29,6 +30,7 @@ RETENTION_DEFAULTS: dict[str, int] = {
     "forecast_points": 30,
     "signal_events": 180,
     "osint_articles": 30,
+    "ai_snapshots": 90,
 }
 
 
@@ -39,6 +41,7 @@ def _retention_days(table: str) -> int:
         "forecast_points": "FORECAST_RETENTION_DAYS",
         "signal_events": "EVENT_RETENTION_DAYS",
         "osint_articles": "OSINT_RETENTION_DAYS",
+        "ai_snapshots": "AI_SNAPSHOT_RETENTION_DAYS",
     }
     env_key = env_map.get(table, f"RETENTION_{table.upper()}")
     default = RETENTION_DEFAULTS.get(table, 90)
@@ -55,6 +58,7 @@ def prune_old_history(db: Session) -> dict[str, Any]:
     event_cutoff = now - timedelta(days=_retention_days("signal_events"))
     osint_cutoff = now - timedelta(days=_retention_days("osint_articles"))
     forecast_cutoff = now - timedelta(days=_retention_days("forecast_points"))
+    ai_cutoff = now - timedelta(days=_retention_days("ai_snapshots"))
 
     asset_deleted = (
         db.query(AssetTrendSnapshot)
@@ -81,6 +85,11 @@ def prune_old_history(db: Session) -> dict[str, Any]:
         .filter(ForecastPoint.created_at < forecast_cutoff)
         .delete(synchronize_session=False)
     )
+    ai_deleted = (
+        db.query(AiSnapshot)
+        .filter(AiSnapshot.created_at < ai_cutoff)
+        .delete(synchronize_session=False)
+    )
     db.flush()
     forecast_runs_orphaned = (
         db.query(ForecastRun)
@@ -100,6 +109,7 @@ def prune_old_history(db: Session) -> dict[str, Any]:
         "signal_event_rows": events_deleted,
         "osint_article_rows": osint_deleted,
         "forecast_point_rows": forecast_points_deleted,
+        "ai_snapshot_rows": ai_deleted,
         "forecast_run_orphans": forecast_runs_orphaned,
         "generated_at": now.isoformat().replace("+00:00", "Z"),
     }

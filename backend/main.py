@@ -2,11 +2,13 @@ import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from typing import Any
 
+import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +19,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
-from database import AssetTrendSnapshot, Base, SessionLocal, SourceStatus, engine, get_db, init_db
+from database import AiSnapshot, AssetTrendSnapshot, Base, SessionLocal, SourceStatus, engine, get_db, init_db
 from logging_config import configure_logging
 from middleware.security import SecurityValidationMiddleware
 from middleware.observability import ObservabilityMiddleware, METRIC_REQUEST_COUNT, METRIC_REQUEST_LATENCY, METRIC_SOURCE_HEALTH
@@ -98,6 +100,52 @@ def _forecast_job() -> None:
         log.info("forecast_job.complete", tasks=result.get("tasks"))
     except Exception:
         log.exception("forecast_job.failed")
+
+
+def _save_ai_snapshot(db: Session, asset: str, feature: str, result: dict[str, Any], context: dict[str, Any]) -> None:
+    if result.get("available") and not result.get("cached"):
+        try:
+            snap = AiSnapshot(
+                asset_symbol=asset.upper(),
+                feature=feature,
+                summary=result.get("summary", ""),
+                provider=result.get("provider", ""),
+                model=result.get("model", ""),
+                tokens_used=result.get("tokens", 0),
+                context_snapshot=context,
+            )
+            db.add(snap)
+            db.commit()
+        except Exception:
+            db.rollback()
+
+
+def _web_search_context(asset: str) -> str | None:
+    enabled = os.getenv("AI_WEB_SEARCH", "false").lower() in ("1", "true")
+    if not enabled:
+        return None
+    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    if not api_key:
+        return None
+    current = datetime.now(timezone.utc)
+    try:
+        resp = httpx.post(
+            "https://ollama.com/api/web_search",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "query": f"{asset} stablecoin {current.strftime('%B %Y')}",
+                "max_results": int(os.getenv("AI_WEB_SEARCH_MAX_RESULTS", "3")),
+            },
+            timeout=8.0,
+        )
+        if resp.status_code == 200:
+            results = resp.json().get("results", [])
+            if results:
+                lines = [f"- {r['title']}: {r.get('content', '')[:300]}" for r in results[:3]]
+                return "\n".join(lines)
+    except Exception:
+        pass
+    return "unavailable"
 
 
 @asynccontextmanager
@@ -253,8 +301,11 @@ def api_ai_explain(
         "signal_score": pred.get("signal_score"),
         "signal_band": "Risk" if (pred.get("signal_score") or 0) >= 70 else "Watch" if (pred.get("signal_score") or 0) >= 40 else "Normal",
         "regime": pred.get("regime"),
+        "web_search_results": _web_search_context(asset) or "unavailable",
     }
-    return enrich_with_ai(feature="risk_explain", context=context)
+    result = enrich_with_ai(feature="risk_explain", context=context)
+    _save_ai_snapshot(db, asset, "risk_explain", result, context)
+    return result
 
 
 @app.get("/api/ai/narrative")
@@ -303,8 +354,11 @@ def api_ai_narrative(
         "sentiment_label": sentiment_label,
         "sentiment_score": sentiment_score,
         "recent_events": recent_events,
+        "web_search_results": _web_search_context(asset) or "unavailable",
     }
-    return enrich_with_ai(feature="market_narrative", context=context)
+    result = enrich_with_ai(feature="market_narrative", context=context)
+    _save_ai_snapshot(db, asset, "market_narrative", result, context)
+    return result
 
 
 @app.get("/api/ai/insights")
@@ -355,8 +409,47 @@ def api_ai_insights(
         "chain_count": chain_count,
         "top_chain_share": top_chain_share,
         "anomaly_count": anomaly_count,
+        "web_search_results": _web_search_context(asset) or "unavailable",
     }
-    return enrich_with_ai(feature="insight_summary", context=context)
+    result = enrich_with_ai(feature="insight_summary", context=context)
+    _save_ai_snapshot(db, asset, "insight_summary", result, context)
+    return result
+
+
+@app.get("/api/ai/history")
+@limiter.limit("30/minute")
+def api_ai_history(
+    request: Request,
+    asset: str = Query("USDT"),
+    feature: str | None = Query(None),
+    days: int = Query(90),
+    limit: int = Query(50),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    q = db.query(AiSnapshot).filter(AiSnapshot.asset_symbol == asset.upper())
+    if feature:
+        q = q.filter(AiSnapshot.feature == feature)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    q = q.filter(AiSnapshot.created_at >= cutoff)
+    q = q.order_by(AiSnapshot.created_at.desc()).limit(limit)
+    rows = q.all()
+    return {
+        "available": True,
+        "asset": asset.upper(),
+        "count": len(rows),
+        "snapshots": [
+            {
+                "id": r.id,
+                "feature": r.feature,
+                "summary": r.summary,
+                "provider": r.provider,
+                "model": r.model,
+                "tokens_used": r.tokens_used,
+                "created_at": r.created_at.isoformat().replace("+00:00", "Z"),
+            }
+            for r in rows
+        ],
+    }
 
 
 if __name__ == "__main__":

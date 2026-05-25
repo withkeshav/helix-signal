@@ -320,7 +320,7 @@
           <div>
             <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
             <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
-            <p class="kpi-sub" style="margin-top:8px" x-show="aiSummary" x-text="aiSummary"></p>
+            <p class="kpi-sub" style="margin-top:8px;white-space:pre-wrap" x-show="aiSummary" x-text="aiSummary"></p>
             <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} · v${predictive.model_version ?? predictive.version ?? '1.0'}`"></span>
           </div>
         </div>
@@ -328,12 +328,12 @@
       <!-- AI Market Narrative -->
       <div class="insight-card glass" x-show="aiNarrative" style="margin-bottom:10px">
         <h2>Market Narrative <span class="model-badge">AI</span></h2>
-        <p style="margin:0;font-size:13px;line-height:1.5" x-text="aiNarrative"></p>
+        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
       </div>
       <!-- AI Insights -->
       <div class="insight-card glass" x-show="aiInsights" style="margin-bottom:10px">
         <h2>Analytics Insight <span class="model-badge">AI</span></h2>
-        <p style="margin:0;font-size:13px;line-height:1.5" x-text="aiInsights"></p>
+        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
       </div>
       <!-- Time Range Selector -->
       <div class="time-range">

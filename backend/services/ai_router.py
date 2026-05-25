@@ -7,12 +7,13 @@ import json
 import os
 import time
 from datetime import datetime, timezone
+from functools import partial
 from typing import Any
 
 import httpx
 
 _AI_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_CACHE_TTL_SECONDS = 3600
+_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "1800"))
 _LOCAL_DAILY_TOKENS = 0
 
 
@@ -40,10 +41,10 @@ def _prompt_hash(feature: str, context: dict[str, Any]) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
-def _openrouter_lite(prompt: str, max_tokens: int) -> dict[str, Any]:
+def _openrouter_lite(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
     api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY not set")
+        return None
     model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(
@@ -62,11 +63,11 @@ def _openrouter_lite(prompt: str, max_tokens: int) -> dict[str, Any]:
     return {"provider": "openrouter", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
-def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None) -> dict[str, Any]:
+def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None) -> dict[str, Any] | None:
     api_key = os.getenv("OLLAMA_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("OLLAMA_API_KEY not set")
-    model = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
+        return None
+    model = model or os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -84,10 +85,10 @@ def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None) -> di
     return {"provider": "ollama_cloud", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
-def _groq(prompt: str, max_tokens: int) -> dict[str, Any]:
+def _groq(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("GROQ_API_KEY not set")
+        return None
     model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(
@@ -109,11 +110,26 @@ def _groq(prompt: str, max_tokens: int) -> dict[str, Any]:
 def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
     if mode == "ai_off":
         return []
+    primary = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
+    fallback = os.getenv("OLLAMA_CLOUD_FALLBACK_MODEL", "qwen-2.5-7b-cloud")
     if mode == "ai_lite":
-        return [_ollama_cloud]
+        return [
+            partial(_ollama_cloud, model=primary),
+            partial(_ollama_cloud, model=fallback),
+        ]
     if priority:
-        return [_groq, _ollama_cloud, _openrouter_lite]
-    return [_ollama_cloud, _openrouter_lite, _groq]
+        return [
+            partial(_ollama_cloud, model=fallback),
+            partial(_ollama_cloud, model=primary),
+            _groq,
+            _openrouter_lite,
+        ]
+    return [
+        partial(_ollama_cloud, model=primary),
+        partial(_ollama_cloud, model=fallback),
+        _openrouter_lite,
+        _groq,
+    ]
 
 
 def _within_budget(additional_tokens: int) -> bool:
@@ -148,19 +164,31 @@ def _within_budget(additional_tokens: int) -> bool:
 
 _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
     "risk_explain": {
-        "system": "You are a stablecoin risk analyst. Reply in <=3 concise sentences. Risk ops tone.",
+        "system": (
+            "You are a stablecoin risk analyst. Plain text only — no markdown, no bold, no italics. "
+            "Output 2-3 bullet points starting with '-'. Be concise and data-driven. "
+            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
+            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+        ),
         "user": (
             "Asset: {asset_symbol}\n"
             "Risk Score: {signal_score}/100\n"
             "Band: {signal_band}\n"
             "Regime: {regime}\n"
+            "Web Search Results:\n{web_search_results}\n"
             "Explain the key risk driver."
         ),
-        "max_tokens_lite": 120,
-        "max_tokens_full": 256,
+        "max_tokens_lite": 200,
+        "max_tokens_full": 350,
     },
     "market_narrative": {
-        "system": "You are a crypto market analyst. Explain what's driving this asset in 2-4 sentences. Be specific and data-driven.",
+        "system": (
+            "You are a crypto market analyst. Plain text only — no markdown, no bold, no italics. "
+            "Output 3-5 bullet points starting with '-'. Cover: key driver, market context, what to watch. "
+            "Be specific and data-driven. "
+            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
+            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+        ),
         "user": (
             "Asset: {asset_symbol}\n"
             "Risk Score: {signal_score}/100\n"
@@ -170,13 +198,20 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Depeg Probability (24h): {depeg_24h}%\n"
             "Sentiment: {sentiment_label} ({sentiment_score})\n"
             "Recent Events: {recent_events}\n"
+            "Web Search Results:\n{web_search_results}\n"
             "Explain the current market narrative and what to watch."
         ),
         "max_tokens_lite": 350,
-        "max_tokens_full": 300,
+        "max_tokens_full": 500,
     },
     "insight_summary": {
-        "system": "You are a stablecoin intelligence analyst. Summarize key trends and anomalies for this asset in 2-4 sentences.",
+        "system": (
+            "You are a stablecoin intelligence analyst. Plain text only — no markdown, no bold, no italics. "
+            "Output 3-4 bullet points starting with '-'. Cover: stability status, key trends, risk watch. "
+            "Be specific and data-driven. "
+            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
+            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+        ),
         "user": (
             "Asset: {asset_symbol}\n"
             "Risk Score: {signal_score}/100 (Band: {signal_band})\n"
@@ -185,10 +220,11 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Chain Count: {chain_count}\n"
             "Top Chain Share: {top_chain_share}%\n"
             "Anomalies (7d): {anomaly_count}\n"
+            "Web Search Results:\n{web_search_results}\n"
             "What are the most important trends and risks?"
         ),
         "max_tokens_lite": 350,
-        "max_tokens_full": 300,
+        "max_tokens_full": 500,
     },
 }
 
@@ -197,19 +233,24 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
     config = _FEATURE_PROMPTS.get(feature)
     if not config:
         config = {
-            "system": None,
+            "system": "Plain text only — no markdown. Output 2-3 bullet points. Use ONLY the data provided.",
             "user": (
                 "Feature:{feature}\n"
                 "Asset:{asset_symbol}\n"
                 "Score:{signal_score}\n"
                 "Band:{signal_band}\n"
                 "Regime:{regime}\n"
-                "Reply in <=3 sentences."
+                "Web Search Results:\n{web_search_results}\n"
+                "Reply in <=3 bullet points."
             ),
             "max_tokens_lite": 120,
             "max_tokens_full": 256,
         }
-    prompt = config["user"].format(**{k: context.get(k, "?") for k in ["asset_symbol", "signal_score", "signal_band", "regime", "depeg_1h", "depeg_24h", "sentiment_label", "sentiment_score", "recent_events", "supply_change_pct", "chain_count", "top_chain_share", "anomaly_count"]})
+    template = config["user"]
+    available = {k: v for k, v in context.items() if f"{{{k}}}" in template}
+    for k in ("asset_symbol", "signal_score", "signal_band", "regime", "web_search_results"):
+        available.setdefault(k, "?")
+    prompt = template.format(**available)
     mode = ai_mode()
     max_tokens = config["max_tokens_lite"] if mode == "ai_lite" else config["max_tokens_full"]
     return prompt, config["system"], max_tokens
@@ -231,6 +272,8 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
     for provider_fn in _providers_for_mode(mode, priority=priority):
         try:
             result = provider_fn(prompt, max_tokens, system=system)
+            if result is None:
+                continue
             tokens_returned = int(result.get("tokens") or 0)
             if not _within_budget(tokens_returned):
                 return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
@@ -240,7 +283,7 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
                 "feature": feature,
                 "provider": result["provider"],
                 "model": result["model"],
-                "summary": result["text"].strip(),
+                "summary": result["text"].strip().replace("**", ""),
                 "tokens": tokens_returned,
                 "cached": False,
             }

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import html as html_mod
 import json
 import os
 import re
 import xml.etree.ElementTree as ET
 import calendar
 from datetime import datetime, timedelta, timezone
+from html.parser import HTMLParser
 from typing import Any
 
 import httpx
@@ -31,17 +33,24 @@ CRYPTOCURRENCY_CV_URL = "https://api.cryptocurrency.cv/v1/news/latest"
 ENABLE_NLP = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
 
 
-def _get_transformers_pipeline():
-    if ENABLE_NLP:
-        try:
-            from transformers import pipeline
-            return pipeline("text-classification", model="ProsusAI/finbert")
-        except Exception:
-            return None
-    return None
+class _HTMLStripper(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._text: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self._text.append(data)
+
+    def get_text(self) -> str:
+        return "".join(self._text)
 
 
-_NLP_PIPELINE = None
+def _strip_html(raw: str) -> str:
+    if not raw:
+        return ""
+    stripper = _HTMLStripper()
+    stripper.feed(raw)
+    return html_mod.unescape(stripper.get_text()).strip()
 
 
 def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
@@ -53,7 +62,7 @@ def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
         for item in root.iter("item"):
             title = item.findtext("title", "")
             link = item.findtext("link", "")
-            desc = item.findtext("description", "")
+            desc = _strip_html(item.findtext("description", ""))
             pub_date = item.findtext("pubDate", "")
             dt = _parse_rss_date(pub_date)
             articles.append({"title": title, "url": link, "summary": desc, "published_at": dt, "source": source})
@@ -113,61 +122,52 @@ def _classify_asset(text: str) -> list[str]:
     return found
 
 
-def _ensure_nlp():
-    global _NLP_PIPELINE
-    if _NLP_PIPELINE is None and ENABLE_NLP:
-        _NLP_PIPELINE = _get_transformers_pipeline()
-    return _NLP_PIPELINE
-
-
 def _compute_sentiment(text: str, nlp_enabled: bool | None = None) -> dict[str, Any]:
     active = ENABLE_NLP if nlp_enabled is None else nlp_enabled
     if not active or not text:
         return {"score": 0.0, "label": "neutral"}
-    pipe = _ensure_nlp()
-    if pipe is None:
-        return {"score": 0.0, "label": "neutral"}
-    try:
-        result = pipe(text[:512])[0]
-        label = result["label"].lower()
-        score_map = {"positive": 1.0, "negative": -1.0, "neutral": 0.0}
-        return {"score": score_map.get(label, 0.0) * result["score"], "label": label}
-    except Exception:
-        return {"score": 0.0, "label": "neutral"}
+    from services.sentiment import analyze_batch
+    results = analyze_batch([text])
+    return results[0] if results else {"score": 0.0, "label": "neutral"}
+
+
+def _batch_sentiment(titles: list[str], nlp_active: bool) -> list[dict[str, Any]]:
+    if not nlp_active or not titles:
+        return [{"score": 0.0, "label": "neutral"} for _ in titles]
+    from services.sentiment import analyze_batch
+    return analyze_batch(titles)
 
 
 def ingest_osint_feed(db: Session) -> int:
     from providers.settings import get_setting
+    from services.sentiment import clear_cache as _clear_sentiment_cache
     nlp_from_settings = get_setting("feature_nlp_sentiment", db)
     nlp_active = nlp_from_settings if isinstance(nlp_from_settings, bool) else ENABLE_NLP
-    count = 0
+    _clear_sentiment_cache()
+
+    all_articles: list[dict[str, Any]] = []
     for source, url in RSS_FEEDS.items():
-        articles = _fetch_rss(url, source)
-        for art in articles:
+        for art in _fetch_rss(url, source):
             if _article_exists(db, art["title"], art["source"]):
                 continue
             assets = _classify_asset(art["title"] + " " + (art["summary"] or ""))
-            sentiment = _compute_sentiment(art["title"], nlp_enabled=nlp_active)
-            db.add(OsintArticle(
-                asset_symbols=",".join(assets) if assets else None,
-                source=art["source"],
-                title=art["title"],
-                url=art["url"],
-                summary=art["summary"],
-                published_at=art["published_at"],
-                sentiment_score=sentiment["score"],
-                sentiment_label=sentiment["label"],
-                entities=json.dumps(assets) if assets else None,
-            ))
-            count += 1
-    cv_articles = _fetch_cryptocurrency_cv()
-    for art in cv_articles:
+            all_articles.append({**art, "assets": assets})
+
+    for art in _fetch_cryptocurrency_cv():
         if _article_exists(db, art["title"], art["source"]):
             continue
         assets = _classify_asset(art["title"])
-        sentiment = _compute_sentiment(art["title"], nlp_enabled=nlp_active)
+        all_articles.append({**art, "assets": assets})
+
+    if not all_articles:
+        return 0
+
+    titles = [a["title"] for a in all_articles]
+    sentiments = _batch_sentiment(titles, nlp_active)
+
+    for art, sentiment in zip(all_articles, sentiments):
         db.add(OsintArticle(
-            asset_symbols=",".join(assets) if assets else None,
+            asset_symbols=",".join(art["assets"]) if art["assets"] else None,
             source=art["source"],
             title=art["title"],
             url=art["url"],
@@ -175,12 +175,11 @@ def ingest_osint_feed(db: Session) -> int:
             published_at=art["published_at"],
             sentiment_score=sentiment["score"],
             sentiment_label=sentiment["label"],
-            entities=json.dumps(assets) if assets else None,
+            entities=json.dumps(art["assets"]) if art["assets"] else None,
         ))
-        count += 1
-    if count > 0:
-        db.commit()
-    return count
+
+    db.commit()
+    return len(all_articles)
 
 
 def _article_exists(db: Session, title: str, source: str) -> bool:

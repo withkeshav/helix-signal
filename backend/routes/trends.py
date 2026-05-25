@@ -15,7 +15,7 @@ from backend.core.limiter import limiter
 
 router = APIRouter()
 
-_ALLOWED_TREND_WINDOWS = frozenset({"24h", "7d", "30d"})
+_ALLOWED_TREND_WINDOWS = frozenset({"6h", "24h", "7d", "30d", "90d"})
 
 
 def _chain_trend_summary_dict(
@@ -89,7 +89,7 @@ def _chain_trend_summary_dict(
 def trends(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> TrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
-        raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
+        raise HTTPException(status_code=400, detail="Invalid window. Use 6h, 24h, 7d, 30d, or 90d.")
     sym = asset.strip().upper()
     selected = get_asset_by_symbol(sym)
     if selected is None or not bool(selected.get("enabled")):
@@ -146,7 +146,7 @@ def trends_export_route(
 def trends_chains(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> ChainTrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
-        raise HTTPException(status_code=400, detail="Invalid window. Use 24h, 7d, or 30d.")
+        raise HTTPException(status_code=400, detail="Invalid window. Use 6h, 24h, 7d, 30d, or 90d.")
     sym = asset.strip().upper()
     selected = get_asset_by_symbol(sym)
     if selected is None or not bool(selected.get("enabled")):

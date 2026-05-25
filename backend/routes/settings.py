@@ -22,7 +22,6 @@ class SettingUpdate(BaseModel):
 def api_get_settings(
     request: Request,
     db: Session = Depends(get_db),
-    _auth=Depends(require_admin_token),
 ) -> list[dict]:
     return get_all_settings(db)
 

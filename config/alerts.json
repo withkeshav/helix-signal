@@ -78,6 +78,6 @@
     "severity": "info",
     "channels": ["dashboard"],
     "cooldown_minutes": 0,
-    "enabled": true
+    "enabled": false
   }
 ]

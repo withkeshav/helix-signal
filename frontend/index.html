@@ -556,14 +556,14 @@
         <div class="insight-card">
           <h2>Signal Events</h2>
           <div style="max-height:400px;overflow-y:auto">
-            <template x-for="ev in events" :key="ev.id">
+            <template x-for="ev in events.filter(e=>e.severity!=='debug')" :key="ev.id">
               <div class="event-card" style="margin-bottom:6px">
                 <div class="event-title"><span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span> <span x-text="ev.title"></span></div>
                 <div class="event-meta" x-text="formatWhen(ev.timestamp)"></div>
                 <div class="event-summary" x-text="ev.summary"></div>
               </div>
             </template>
-            <div x-show="!events.length" class="kpi-sub" style="padding:12px">No events in window</div>
+            <div x-show="!events.filter(e=>e.severity!=='debug').length" class="kpi-sub" style="padding:12px">No events in window</div>
           </div>
         </div>
         <div class="insight-card">
@@ -571,14 +571,14 @@
           <div style="max-height:400px;overflow-y:auto">
             <div x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">&#9888; Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
             <template x-for="art in osintArticles" :key="art.id">
-              <div style="padding:8px 0;border-bottom:1px solid var(--line)">
-                <div><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px">
+              <div class="event-card" style="margin-bottom:8px">
+                <div class="event-title"><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" x-text="art.title"></a></div>
+                <div class="event-meta">
                   <span x-text="art.source"></span>
-                  <span x-show="art.published_at"> &middot; <span x-text="formatWhen(art.published_at)"></span></span>
-                  <span> &middot; sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
+                  <span x-show="art.published_at"> · <span x-text="formatWhen(art.published_at)"></span></span>
+                  <span> · sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
                 </div>
-                <div x-show="art.summary" style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4" x-text="art.summary"></div>
+                <div class="event-summary" x-show="art.summary" x-text="art.summary"></div>
               </div>
             </template>
             <div x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
@@ -673,7 +673,7 @@
         <div class="insight-card">
           <h2>Alert History <span class="kpi-sub" x-text="`events`"></span></h2>
           <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.5">
-            <template x-for="(ev, i) in (events || []).slice(0, 20)" :key="ev.id">
+            <template x-for="(ev, i) in (events || []).filter(e=>e.severity!=='debug').slice(0, 20)" :key="ev.id">
               <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px">
                 <div>
                   <span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span>
@@ -682,23 +682,7 @@
                 <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
               </div>
             </template>
-            <div x-show="!events.length" class="kpi-sub" style="padding:8px 0">No recent events</div>
-          </div>
-        </div>
-        <div class="insight-card" x-show="dataQualityHistory.length">
-          <h2>Data Quality</h2>
-          <div style="font-size:13px">
-            <template x-for="(dq, i) in dataQualityHistory" :key="i">
-              <div class="signal-item" x-text="`${dq.label}: ${dq.value}`"></div>
-            </template>
-            <div x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
-          </div>
-        </div>
-      </div>
-                <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
-              </div>
-            </template>
-            <div x-show="!events.length" class="kpi-sub" style="padding:8px 0">No recent events</div>
+            <div x-show="!(events || []).filter(e=>e.severity!=='debug').length" class="kpi-sub" style="padding:8px 0">No recent events</div>
           </div>
         </div>
         <div class="chart-card" x-show="dataQualityHistory.length">

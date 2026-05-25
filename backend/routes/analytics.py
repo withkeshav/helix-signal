@@ -51,9 +51,11 @@ def api_finbert_sentiment(
     from providers.settings import get_setting
     if not get_setting("feature_nlp_sentiment", db):
         return {"available": False, "reason": "NLP sentiment is disabled"}
-    from backend.ml_models.finbert import FinBERTModel
-    model = FinBERTModel()
-    return model.predict({"text": text})
+    from services.sentiment import analyze_batch
+    results = analyze_batch([text])
+    result = results[0] if results else {"score": 0.0, "label": "neutral", "fallback": True}
+    result["available"] = True
+    return result
 
 
 @router.get("/analytics/forecast-accuracy")

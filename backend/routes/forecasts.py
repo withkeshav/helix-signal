@@ -1,13 +1,13 @@
-"""Forecast endpoints — queries forecast tables."""
+"""Forecast endpoints — queries and triggers."""
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from database import ForecastPoint, ForecastRun, AssetTrendSnapshot, get_db
-
+from backend.core.admin_auth import require_admin_token
 from backend.core.limiter import limiter
+from database import ForecastPoint, ForecastRun, AssetTrendSnapshot, get_db
 
 router = APIRouter()
 
@@ -85,4 +85,20 @@ def list_forecasts(
         "forecast_points": forecast_points,
         "historical": historical_by_metric,
         "asset": asset_key,
+    }
+
+
+@router.post("/forecasts/trigger")
+@limiter.limit("5/minute")
+def trigger_forecasts(
+    request: Request,
+    _auth=Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Manually trigger forecast generation for all enabled assets."""
+    from services.forecast import run_all_forecasts
+
+    result = run_all_forecasts()
+    return {
+        "status": result.get("status"),
+        "tasks": result.get("tasks"),
     }

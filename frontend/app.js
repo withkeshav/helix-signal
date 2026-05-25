@@ -168,7 +168,7 @@ function helixApp() {
         const r=await fetch(`/api/events?asset=${this.asset}&limit=12`,{cache:'no-store'});
         if(!r.ok)return;
         const j=await r.json();
-        const evs=j.events||[];
+        const evs=(j.events||[]).filter(e=>e.severity!=='debug');
         const items=evs.map(e=>`${e.severity?.toUpperCase()||'INFO'} · ${e.title||'event'} · ${formatWhen(e.timestamp)}`);
         this.tickerItems=items.length?items.concat(items):[];
       }catch(e){this.tickerItems=[];}
@@ -191,6 +191,8 @@ function helixApp() {
         this.supplyFeed=d.supply_feed||{};
         this.attSignal=d.attestation||{};
         {const s=Number(this.signal.score);if(!Number.isNaN(s)){const a=this._trendCache.signal||[];a.push(s);if(a.length>120)a.splice(0,a.length-120);this._trendCache.signal=a;}}
+        {const p=d.depeg_index?.current_price;if(p!=null){const a=this._trendCache.peg||[];a.push(Number(p));if(a.length>120)a.splice(0,a.length-120);this._trendCache.peg=a;}}
+        {const sp=d.total_supply_current;if(sp!=null){const a=this._trendCache.supply||[];a.push(Number(sp));if(a.length>120)a.splice(0,a.length-120);this._trendCache.supply=a;}}
         this.depeg=d.depeg_index||{};
         this.concentration=d.chain_concentration||{};
         this.freshness=d.freshness||{};

@@ -302,7 +302,7 @@ def _emit_source_recovered(db: Session, *, prior: str | None, ts: datetime) -> N
         asset_symbol="ALL",
         chain_key=None,
         event_type="source_recovered",
-        severity="info",
+        severity="debug",
         title="DefiLlama source recovered",
         summary="DefiLlama ingest completed successfully after a prior error state.",
         old_value="error",

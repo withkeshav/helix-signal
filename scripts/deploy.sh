@@ -32,7 +32,7 @@ ssh "${REMOTE}" bash -s << ENDSSH
 
   cd /opt/helix-signal || {
     echo "First time — cloning repo..."
-    git clone https://github.com/anomalyco/Helix-Signal.git /opt/helix-signal
+    git clone https://github.com/withkeshav/helix-signal.git /opt/helix-signal
     cd /opt/helix-signal
   }
 

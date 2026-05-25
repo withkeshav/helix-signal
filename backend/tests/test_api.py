@@ -21,8 +21,12 @@ def test_dashboard_empty_db(client):
     assert "freshness" in data
 
 
-def test_trends_invalid_window(client):
+def test_trends_valid_window_90d(client):
     response = client.get("/api/trends?asset=USDT&window=90d")
+    assert response.status_code == 200
+
+def test_trends_invalid_window(client):
+    response = client.get("/api/trends?asset=USDT&window=999d")
     assert response.status_code == 400
 
 

@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
-RUN pip install --no-cache-dir uvicorn fastapi timesfm
+RUN pip install --no-cache-dir uvicorn fastapi "timesfm @ https://github.com/google-research/timesfm/archive/master.tar.gz"
 
 COPY service.py .
 

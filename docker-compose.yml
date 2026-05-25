@@ -106,6 +106,7 @@ services:
       ALLOW_BACKFILL: ${ALLOW_BACKFILL:-false}
       DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
       AI_MODE: ${AI_MODE:-ai_off}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
     networks:
       - internal
     volumes:

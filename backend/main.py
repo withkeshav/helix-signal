@@ -257,6 +257,108 @@ def api_ai_explain(
     return enrich_with_ai(feature="risk_explain", context=context)
 
 
+@app.get("/api/ai/narrative")
+@limiter.limit("20/minute")
+def api_ai_narrative(
+    request: Request,
+    asset: str = Query("USDT"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.ai_router import enrich_with_ai
+    from services.predictive import run_predictive_bundle
+
+    pred = run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
+    signal_score = pred.get("signal_score") or 0
+    signal_band = "Risk" if signal_score >= 70 else "Watch" if signal_score >= 40 else "Normal"
+    regime = pred.get("regime") or "stable"
+    depeg_1h = round((pred.get("depeg_probability", {}).get("horizon_1h", 0) or 0) * 100, 1)
+    depeg_24h = round((pred.get("depeg_probability", {}).get("horizon_24h", 0) or 0) * 100, 1)
+
+    sentiment_label = "neutral"
+    sentiment_score = 0.0
+    recent_events = "none"
+    try:
+        from services.osint import get_sentiment_time_series
+        series = get_sentiment_time_series(db, asset_symbol=asset.upper(), window_days=3)
+        if series:
+            avg_s = sum(s.get("avg_sentiment", 0) for s in series) / len(series)
+            sentiment_score = round(avg_s, 3)
+            sentiment_label = "positive" if avg_s > 0.1 else "negative" if avg_s < -0.1 else "neutral"
+        from database import EventLog
+        recent = db.query(EventLog).filter(
+            EventLog.asset_symbol == asset.upper()
+        ).order_by(EventLog.timestamp.desc()).limit(3).all()
+        if recent:
+            recent_events = "; ".join([f"{e.title}" for e in recent if e.title])
+    except Exception:
+        pass
+
+    context = {
+        "asset_symbol": asset.upper(),
+        "signal_score": signal_score,
+        "signal_band": signal_band,
+        "regime": regime,
+        "depeg_1h": depeg_1h,
+        "depeg_24h": depeg_24h,
+        "sentiment_label": sentiment_label,
+        "sentiment_score": sentiment_score,
+        "recent_events": recent_events,
+    }
+    return enrich_with_ai(feature="market_narrative", context=context)
+
+
+@app.get("/api/ai/insights")
+@limiter.limit("20/minute")
+def api_ai_insights(
+    request: Request,
+    asset: str = Query("USDT"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.ai_router import enrich_with_ai
+    from services.predictive import run_predictive_bundle
+
+    pred = run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
+    signal_score = pred.get("signal_score") or 0
+    signal_band = "Risk" if signal_score >= 70 else "Watch" if signal_score >= 40 else "Normal"
+    regime = pred.get("regime") or "stable"
+
+    supply_change_pct = 0.0
+    chain_count = 0
+    top_chain_share = 0.0
+    anomaly_count = 0
+    try:
+        from database import AssetTrendSnapshot
+        latest = db.query(AssetTrendSnapshot).filter(
+            AssetTrendSnapshot.asset_symbol == asset.upper()
+        ).order_by(AssetTrendSnapshot.timestamp.desc()).first()
+        if latest:
+            supply_change_pct = round((latest.supply_change_24h_pct or 0), 2)
+        from signal_engine.core import get_asset_by_symbol
+        asset_data = get_asset_by_symbol(db, asset.upper())
+        if asset_data:
+            chains = asset_data.get("chains") or []
+            chain_count = len(chains)
+            if chains:
+                top_chain_share = round(max((c.get("chain_share_pct") or 0) for c in chains), 1)
+        from services.anomaly import detect_anomalies
+        anomalies = detect_anomalies(db, asset_symbol=asset.upper(), window_days=7)
+        anomaly_count = len(anomalies.get("anomalies", []))
+    except Exception:
+        pass
+
+    context = {
+        "asset_symbol": asset.upper(),
+        "signal_score": signal_score,
+        "signal_band": signal_band,
+        "regime": regime,
+        "supply_change_pct": supply_change_pct,
+        "chain_count": chain_count,
+        "top_chain_share": top_chain_share,
+        "anomaly_count": anomaly_count,
+    }
+    return enrich_with_ai(feature="insight_summary", context=context)
+
+
 if __name__ == "__main__":
     import uvicorn
 

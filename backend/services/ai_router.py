@@ -62,19 +62,26 @@ def _openrouter_lite(prompt: str, max_tokens: int) -> dict[str, Any]:
     return {"provider": "openrouter", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
-def _ollama_cloud(prompt: str, max_tokens: int) -> dict[str, Any]:
-    base = os.getenv("OLLAMA_CLOUD_BASE_URL", "").strip().rstrip("/")
-    if not base:
-        raise RuntimeError("OLLAMA_CLOUD_BASE_URL not set")
-    model = os.getenv("OLLAMA_CLOUD_MODEL", "llama3.2:3b")
+def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None) -> dict[str, Any]:
+    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OLLAMA_API_KEY not set")
+    model = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
     with httpx.Client(timeout=60.0) as client:
         resp = client.post(
-            f"{base}/api/generate",
-            json={"model": model, "prompt": prompt, "stream": False, "options": {"num_predict": max_tokens}},
+            "https://ollama.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": model, "messages": messages, "max_tokens": max_tokens},
         )
         resp.raise_for_status()
         data = resp.json()
-    return {"provider": "ollama_cloud", "model": model, "text": data.get("response", ""), "tokens": 0}
+    text = data["choices"][0]["message"]["content"]
+    usage = data.get("usage") or {}
+    return {"provider": "ollama_cloud", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
 def _groq(prompt: str, max_tokens: int) -> dict[str, Any]:
@@ -103,10 +110,10 @@ def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
     if mode == "ai_off":
         return []
     if mode == "ai_lite":
-        return [_openrouter_lite, _ollama_cloud]
+        return [_ollama_cloud]
     if priority:
         return [_groq, _ollama_cloud, _openrouter_lite]
-    return [_openrouter_lite, _ollama_cloud, _groq]
+    return [_ollama_cloud, _openrouter_lite, _groq]
 
 
 def _within_budget(additional_tokens: int) -> bool:
@@ -139,6 +146,75 @@ def _within_budget(additional_tokens: int) -> bool:
     return True
 
 
+_FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
+    "risk_explain": {
+        "system": "You are a stablecoin risk analyst. Reply in <=3 concise sentences. Risk ops tone.",
+        "user": (
+            "Asset: {asset_symbol}\n"
+            "Risk Score: {signal_score}/100\n"
+            "Band: {signal_band}\n"
+            "Regime: {regime}\n"
+            "Explain the key risk driver."
+        ),
+        "max_tokens_lite": 120,
+        "max_tokens_full": 256,
+    },
+    "market_narrative": {
+        "system": "You are a crypto market analyst. Explain what's driving this asset in 2-4 sentences. Be specific and data-driven.",
+        "user": (
+            "Asset: {asset_symbol}\n"
+            "Risk Score: {signal_score}/100\n"
+            "Band: {signal_band}\n"
+            "Regime: {regime}\n"
+            "Depeg Probability (1h): {depeg_1h}%\n"
+            "Depeg Probability (24h): {depeg_24h}%\n"
+            "Sentiment: {sentiment_label} ({sentiment_score})\n"
+            "Recent Events: {recent_events}\n"
+            "Explain the current market narrative and what to watch."
+        ),
+        "max_tokens_lite": 150,
+        "max_tokens_full": 300,
+    },
+    "insight_summary": {
+        "system": "You are a stablecoin intelligence analyst. Summarize key trends and anomalies for this asset in 2-4 sentences.",
+        "user": (
+            "Asset: {asset_symbol}\n"
+            "Risk Score: {signal_score}/100 (Band: {signal_band})\n"
+            "Regime: {regime}\n"
+            "Supply Change 24h: {supply_change_pct}%\n"
+            "Chain Count: {chain_count}\n"
+            "Top Chain Share: {top_chain_share}%\n"
+            "Anomalies (7d): {anomaly_count}\n"
+            "What are the most important trends and risks?"
+        ),
+        "max_tokens_lite": 150,
+        "max_tokens_full": 300,
+    },
+}
+
+
+def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | None, int]:
+    config = _FEATURE_PROMPTS.get(feature)
+    if not config:
+        config = {
+            "system": None,
+            "user": (
+                "Feature:{feature}\n"
+                "Asset:{asset_symbol}\n"
+                "Score:{signal_score}\n"
+                "Band:{signal_band}\n"
+                "Regime:{regime}\n"
+                "Reply in <=3 sentences."
+            ),
+            "max_tokens_lite": 120,
+            "max_tokens_full": 256,
+        }
+    prompt = config["user"].format(**{k: context.get(k, "?") for k in ["asset_symbol", "signal_score", "signal_band", "regime", "depeg_1h", "depeg_24h", "sentiment_label", "sentiment_score", "recent_events", "supply_change_pct", "chain_count", "top_chain_share", "anomaly_count"]})
+    mode = ai_mode()
+    max_tokens = config["max_tokens_lite"] if mode == "ai_lite" else config["max_tokens_full"]
+    return prompt, config["system"], max_tokens
+
+
 def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = False) -> dict[str, Any]:
     mode = ai_mode()
     if mode == "ai_off":
@@ -149,20 +225,12 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
     if cached:
         return {**cached, "cached": True}
 
-    prompt = (
-        f"Feature:{feature}\n"
-        f"Asset:{context.get('asset_symbol', '?')}\n"
-        f"Score:{context.get('signal_score')}\n"
-        f"Band:{context.get('signal_band')}\n"
-        f"Regime:{context.get('regime')}\n"
-        "Reply in <=3 sentences. Risk ops tone."
-    )
-    max_tokens = 120 if mode == "ai_lite" else 256
+    prompt, system, max_tokens = _build_prompt(feature, context)
     errors: list[str] = []
 
     for provider_fn in _providers_for_mode(mode, priority=priority):
         try:
-            result = provider_fn(prompt, max_tokens)
+            result = provider_fn(prompt, max_tokens, system=system)
             tokens_returned = int(result.get("tokens") or 0)
             if not _within_budget(tokens_returned):
                 return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}

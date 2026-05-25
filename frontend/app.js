@@ -48,7 +48,7 @@ function helixApp() {
     _charts:new Map(),_timer:null,_refreshingStale:false,_trendCache:{},
     adminToken:sessionStorage.getItem('helix_admin_token')||'',
     refreshing:false,refreshingForecast:false,refreshingCorrelations:false,
-    predictive:{},aiSummary:'',tickerItems:[],
+    predictive:{},aiSummary:'',aiNarrative:'',aiInsights:'',tickerItems:[],
     evidenceOpen:false,evidenceTitle:'',evidenceFormula:'',evidenceComponents:{},evidenceSources:{},
     forecastSignals:[],correlations:[],dataQualityHistory:[],
     anomalyEvents:{},forecastAccuracy:[],
@@ -151,6 +151,18 @@ function helixApp() {
         if(r.ok){const j=await r.json();this.aiSummary=j.available?j.summary:(j.reason||'');}
       }catch(e){this.aiSummary='';}
     },
+    async loadNarrative() {
+      try{
+        const r=await fetch(`/api/ai/narrative?asset=${this.asset}`,{cache:'no-store'});
+        if(r.ok){const j=await r.json();this.aiNarrative=j.available?j.summary:(j.reason||'');}
+      }catch(e){this.aiNarrative='';}
+    },
+    async loadInsights() {
+      try{
+        const r=await fetch(`/api/ai/insights?asset=${this.asset}`,{cache:'no-store'});
+        if(r.ok){const j=await r.json();this.aiInsights=j.available?j.summary:(j.reason||'');}
+      }catch(e){this.aiInsights='';}
+    },
     async loadTicker() {
       try{
         const r=await fetch(`/api/events?asset=${this.asset}&limit=12`,{cache:'no-store'});
@@ -204,6 +216,8 @@ function helixApp() {
         await this.loadPredictive();
         await this.loadTicker();
         await this.loadAiExplain();
+        await this.loadNarrative();
+        await this.loadInsights();
         if(this.tab==='intel')this.loadIntel();
         if(this.tab==='events')this.loadEvents();
         if(this.tab==='forecast'){this.loadForecastData();this.loadForecastAccuracy();}

@@ -106,7 +106,6 @@ services:
       ALLOW_BACKFILL: ${ALLOW_BACKFILL:-false}
       DEFILLAMA_API_KEY: ${DEFILLAMA_API_KEY:-}
       AI_MODE: ${AI_MODE:-ai_off}
-      HELIX_USE_CELERY_REFRESH: ${HELIX_USE_CELERY_REFRESH:-false}
     networks:
       - internal
     volumes:
@@ -120,61 +119,6 @@ services:
       timeout: 10s
       start_period: 30s
       retries: 3
-
-  celery-beat:
-    build:
-      context: ./backend
-    profiles: ["data"]
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp:size=16M
-    command: celery -A celery_app beat --loglevel=info
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://helix:helix@postgres:5432/helix}
-      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-true}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}
-    networks:
-      - internal
-    depends_on:
-      - redis
-
-  celery-worker:
-    build:
-      context: ./backend
-    profiles: ["data"]
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp:size=32M
-    command: celery -A celery_app worker --loglevel=info --concurrency=1
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://helix:helix@postgres:5432/helix}
-      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-true}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:-http://mlflow:5000}
-      AI_MODE: ${AI_MODE:-ai_off}
-    networks:
-      - internal
-    volumes:
-      - ./config:/app/config:ro
-      - helix_data:/data
-    depends_on:
-      - redis
-      - postgres
 
   timesfm:
     build:
@@ -190,7 +134,6 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=256M
-    profiles: ["data"]
     environment:
       MODEL_NAME: google/timesfm-2.5-200m-pytorch
       MAX_CONTEXT: ${TIMESFM_MAX_CONTEXT:-1024}

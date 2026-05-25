@@ -1,46 +1,27 @@
-"""Celery tasks: refresh, predictive inference, optional AI enrichment."""
+"""Plain-function forecasts extracted from Celery worker_tasks.py.
 
+Replaces Celery-based forecast_asset_metric with APScheduler-compatible functions.
+"""
 from __future__ import annotations
 
-from celery_app import celery_app
-from database import SessionLocal
-from signal_engine.core import refresh_chain_data
+import json
+from datetime import datetime, timedelta, timezone
+
+from database import AssetTrendSnapshot, ForecastPoint, ForecastRun, SessionLocal
+from services.forecast_signals import evaluate_forecast_risk
+from structlog import get_logger
+
+log = get_logger(__name__)
+
+_ALLOWED_METRICS = frozenset({"total_supply", "price", "signal_score", "depeg_index", "concentration_score"})
 
 
-@celery_app.task(name="helix.refresh_chain_data")
-def task_refresh_chain_data() -> str:
-    db = SessionLocal()
-    try:
-        refresh_chain_data(db)
-        return "ok"
-    finally:
-        db.close()
+def forecast_asset_metric(asset_symbol: str, metric: str, horizon: int = 24) -> dict:
+    """Forecast a single asset metric using TimesFM.
 
-
-@celery_app.task(name="helix.predictive_inference")
-def task_predictive_inference(asset_symbol: str = "USDT") -> dict:
-    from services.predictive import run_predictive_bundle
-
-    db = SessionLocal()
-    try:
-        return run_predictive_bundle(db, asset_symbol=asset_symbol, log_to_mlflow=True)
-    finally:
-        db.close()
-
-
-@celery_app.task(name="helix.ai_enrich")
-def task_ai_enrich(feature: str, context: dict) -> dict:
-    from services.ai_router import enrich_with_ai
-
-    return enrich_with_ai(feature=feature, context=context)
-
-
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=60, name="helix.forecast_asset_metric")
-def forecast_asset_metric(self, asset_symbol: str, metric: str, horizon: int = 24):
-    """Forecast a single asset metric using TimesFM."""
-    from datetime import datetime, timedelta, timezone
-
-    from database import AssetTrendSnapshot, ForecastPoint, ForecastRun
+    Plain function (no Celery) — callable from APScheduler or API endpoints.
+    """
+    from ml_models.registry import get_model_service
 
     db = SessionLocal()
     try:
@@ -58,16 +39,14 @@ def forecast_asset_metric(self, asset_symbol: str, metric: str, horizon: int = 2
         if len(rows) < 10:
             return {"status": "skipped", "reason": "insufficient_data", "points": len(rows)}
 
-        _ALLOWED_METRICS = frozenset({"total_supply", "price", "signal_score", "depeg_index", "concentration_score"})
         if metric not in _ALLOWED_METRICS:
             return {"status": "skipped", "reason": "invalid_metric", "metric": metric}
+
         values = [getattr(r, metric) for r in rows if getattr(r, metric) is not None]
         timestamps = [r.timestamp.isoformat() for r in rows if getattr(r, metric) is not None]
 
         if len(values) < 10:
             return {"status": "skipped", "reason": "insufficient_values", "points": len(values)}
-
-        from backend.ml_models.registry import get_model_service
 
         timesfm = get_model_service("timesfm")
         if timesfm is None:
@@ -79,8 +58,6 @@ def forecast_asset_metric(self, asset_symbol: str, metric: str, horizon: int = 2
             timestamps=timestamps,
             horizon=horizon,
         )
-
-        import json
 
         run = ForecastRun(
             model_name="timesfm",
@@ -114,7 +91,6 @@ def forecast_asset_metric(self, asset_symbol: str, metric: str, horizon: int = 2
 
         db.commit()
 
-        from services.forecast_signals import evaluate_forecast_risk
         points_q = db.query(ForecastPoint).filter(ForecastPoint.run_id == run.id).all()
         signals = evaluate_forecast_risk(asset_symbol, metric, points_q)
         for sig in signals:
@@ -134,16 +110,17 @@ def forecast_asset_metric(self, asset_symbol: str, metric: str, horizon: int = 2
             db.add(ev)
         db.commit()
 
+        log.info("forecast.completed", asset=asset_symbol, metric=metric, run_id=run.id, signals=len(signals))
         return {"status": "completed", "run_id": run.id, "horizon": horizon, "signals": len(signals)}
 
     except Exception as exc:
         db.rollback()
-        self.retry(exc=exc)
+        log.error("forecast.failed", asset=asset_symbol, metric=metric, error=str(exc))
+        return {"status": "failed", "error": str(exc)}
     finally:
         db.close()
 
 
-@celery_app.task(name="helix.run_all_forecasts")
 def run_all_forecasts():
     """Run forecasts for all enabled assets and metrics."""
     from backend.core.config_loader import ConfigLoader
@@ -154,7 +131,8 @@ def run_all_forecasts():
     results = []
     for asset in assets:
         for metric in metrics:
-            task = forecast_asset_metric.delay(asset["symbol"], metric)
-            results.append({"asset": asset["symbol"], "metric": metric, "task_id": task.id})
+            result = forecast_asset_metric(asset["symbol"], metric)
+            results.append({"asset": asset["symbol"], "metric": metric, "status": result.get("status")})
+            log.info("forecast.dispatched", asset=asset["symbol"], metric=metric, status=result.get("status"))
 
-    return {"status": "dispatched", "tasks": len(results)}
+    return {"status": "completed", "tasks": len(results)}

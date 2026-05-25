@@ -25,6 +25,10 @@ SUPPLY_INFO_PCT = 1.0
 CONC_SHARE_DELTA_WARN = 5.0
 CONC_SCORE_DELTA_WARN = 10
 
+# Cooldown for source_recovered events — max 1 per 6 hours
+SOURCE_RECOVERED_COOLDOWN_HOURS = 6
+_last_source_recovery_emitted: datetime | None = None
+
 
 def _depeg_zone(score: int) -> str:
     if score >= DEPEG_CRIT:
@@ -283,8 +287,14 @@ def _emit_confidence_drop(
 
 
 def _emit_source_recovered(db: Session, *, prior: str | None, ts: datetime) -> None:
+    global _last_source_recovery_emitted
     if prior != "error":
         return
+    if _last_source_recovery_emitted is not None:
+        elapsed = (ts - _last_source_recovery_emitted).total_seconds()
+        if elapsed < SOURCE_RECOVERED_COOLDOWN_HOURS * 3600:
+            return
+    _last_source_recovery_emitted = ts
     _emit(
         db,
         asset_symbol="ALL",

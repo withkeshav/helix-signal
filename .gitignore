@@ -94,8 +94,6 @@ frontend/main.js
 .code-review-graph/
 
 # --- Internal / local docs and tracking (never commit) ---
-internal reserach/
-internal reserach/**
 internal research/
 internal research/**
 .progress/
@@ -114,3 +112,6 @@ helix_signal_strategic_report.md
 .cursor/
 .code-review-graph/
 **/NEXT_SESSION.md
+
+# Internal planning docs — not for public consumption
+docs/grant-strategy.md

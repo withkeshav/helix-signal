@@ -13,6 +13,7 @@ from sources.defillama import DefiLlamaError, _DefiLlamaSource, fetch_chain_tvl_
 from sources.coingecko import CoinGeckoSource
 from sources.dexscreener import DexScreenerSource
 from sources.base import AbstractSource
+from backend.core.registry import get_source
 from structlog import get_logger
 
 log = get_logger(__name__)
@@ -42,7 +43,11 @@ class SourceRegistry:
 
 def build_default_registry() -> SourceRegistry:
     r = SourceRegistry()
-    r.register(_DefiLlamaSource())
+    plugin_src = get_source("defillama")
+    if plugin_src is not None:
+        r.register(plugin_src)
+    else:
+        r.register(_DefiLlamaSource())
     r.register(CoinGeckoSource())
     r.register(DexScreenerSource())
     if ENABLE_CHAINLINK:

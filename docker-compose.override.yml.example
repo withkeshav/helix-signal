@@ -13,6 +13,8 @@ services:
     #   - "8000:8000"
     environment:
       ALLOW_BACKFILL: "true"
+      # Enable NLP sentiment analysis (FinBERT, ~500MB model download on first use):
+      ENABLE_NLP: "true"
 
   frontend:
     # Uncomment if port 80 is already in use on the host:

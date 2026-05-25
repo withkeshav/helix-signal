@@ -59,13 +59,13 @@ def list_forecasts(
     snapshots = (
         db.query(AssetTrendSnapshot)
         .filter(AssetTrendSnapshot.asset_symbol == asset_key)
-        .order_by(AssetTrendSnapshot.bucket_timestamp.desc())
+        .order_by(AssetTrendSnapshot.timestamp.desc())
         .limit(288)
         .all()
     )
     historical_by_metric: dict[str, list[dict]] = {}
     for snap in reversed(snapshots):
-        ts = snap.bucket_timestamp.timestamp() * 1000 if snap.bucket_timestamp else None
+        ts = snap.timestamp.timestamp() * 1000 if snap.timestamp else None
         for metric, val in [
             ("peg", snap.depeg_index),
             ("supply", snap.total_supply),

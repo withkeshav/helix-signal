@@ -77,6 +77,16 @@ def _osint_job() -> None:
         db.close()
 
 
+def _forecast_job() -> None:
+    from services.forecast import run_all_forecasts
+    log.info("forecast_job.start")
+    try:
+        result = run_all_forecasts()
+        log.info("forecast_job.complete", tasks=result.get("tasks"))
+    except Exception:
+        log.exception("forecast_job.failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -85,8 +95,7 @@ async def lifespan(app: FastAPI):
 
     scheduler = BackgroundScheduler()
     skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
-    use_celery_refresh = os.getenv("HELIX_USE_CELERY_REFRESH", "").strip().lower() in ("1", "true", "yes")
-    if not skip_refresh and not use_celery_refresh:
+    if not skip_refresh:
         try:
             interval_seconds = max(60, int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")))
         except (ValueError, TypeError):
@@ -113,13 +122,22 @@ async def lifespan(app: FastAPI):
         id="osint-ingest",
         replace_existing=True,
     )
+    scheduler.add_job(
+        _forecast_job,
+        "interval",
+        minutes=30,
+        id="forecast-generation",
+        replace_existing=True,
+    )
     scheduler.start()
     app.state.scheduler = scheduler
 
-    if not skip_refresh and not use_celery_refresh:
+    _osint_job()  # immediate first run, no waiting 1 hour
+
+    if not skip_refresh:
         _refresh_job()
 
-    if not skip_refresh and not use_celery_refresh:
+    if not skip_refresh:
         db = SessionLocal()
         try:
             row_count = db.query(AssetTrendSnapshot).count()

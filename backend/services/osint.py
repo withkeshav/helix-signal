@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 import calendar
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from urllib.parse import urlencode
 
 import httpx
 from sqlalchemy.orm import Session
@@ -22,9 +21,13 @@ RSS_FEEDS = {
     "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "cointelegraph": "https://cointelegraph.com/rss",
     "theblock": "https://www.theblock.co/rss.xml",
+    "cryptoslate": "https://cryptoslate.com/feed/",
+    "decrypt": "https://decrypt.co/feed",
+    "bitcoincom": "https://news.bitcoin.com/feed/",
+    "thedefiant": "https://thedefiant.io/api/feed",
 }
 
-CRYPTOPANIC_API = "https://cryptopanic.com/api/v1/posts/"
+CRYPTOCURRENCY_CV_URL = "https://api.cryptocurrency.cv/v1/news/latest"
 ENABLE_NLP = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
 
 
@@ -68,20 +71,18 @@ def _parse_rss_date(date_str: str) -> datetime | None:
         return None
 
 
-def _fetch_cryptopanic() -> list[dict[str, Any]]:
-    api_key = os.getenv("CRYPTOPANIC_API_KEY", "")
-    if not api_key:
-        return []
+def _fetch_cryptocurrency_cv() -> list[dict[str, Any]]:
     try:
-        params = {"auth_token": api_key, "public": "true", "kind": "news"}
-        resp = httpx.get(f"{CRYPTOPANIC_API}?{urlencode(params)}", timeout=15)
+        resp = httpx.get(CRYPTOCURRENCY_CV_URL, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         articles: list[dict[str, Any]] = []
-        for post in data.get("results", []):
+        for post in data.get("results") or data.get("data") or data.get("articles") or []:
+            if not isinstance(post, dict):
+                continue
             title = post.get("title", "")
-            url = post.get("url", "")
-            published = post.get("published_at", "")
+            url = post.get("url", "") or post.get("link", "")
+            published = post.get("published_at") or post.get("publishedAt") or post.get("date") or post.get("createdAt")
             dt = None
             if published:
                 try:
@@ -91,9 +92,9 @@ def _fetch_cryptopanic() -> list[dict[str, Any]]:
             articles.append({
                 "title": title,
                 "url": url,
-                "summary": post.get("domain", ""),
+                "summary": post.get("description", "") or post.get("summary", ""),
                 "published_at": dt,
-                "source": "cryptopanic",
+                "source": post.get("source", "") or "cryptocurrency_cv",
             })
         return articles
     except Exception:
@@ -155,8 +156,8 @@ def ingest_osint_feed(db: Session) -> int:
                 entities=json.dumps(assets) if assets else None,
             ))
             count += 1
-    cp_articles = _fetch_cryptopanic()
-    for art in cp_articles:
+    cv_articles = _fetch_cryptocurrency_cv()
+    for art in cv_articles:
         if _article_exists(db, art["title"], art["source"]):
             continue
         assets = _classify_asset(art["title"])

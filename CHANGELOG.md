@@ -1,5 +1,41 @@
 # Changelog
 
+## 3.5.1 (2026-05-25)
+
+### Security (Audit v1–v3 Remediation)
+
+- **Fail-closed admin auth** — `backend/core/admin_auth.py` with `require_admin_token()` fails closed (503 if unset, 403 if invalid). Applied to all admin routes, settings, refresh, metrics, and governance endpoints.
+- **Configurable CORS** — `CORS_ORIGINS` env var (comma-separated, default `*`) with whitespace trimming. Replaces hardcoded `allow_origins=["*"]`.
+- **Content-Security-Policy header** — Set on all backend responses and nginx static assets (`frontend/nginx.conf`). Configurable via `CONTENT_SECURITY_POLICY` env var. Mitigates XSS token theft from sessionStorage.
+- **Auth-protected GET /api/settings** — Read-only settings no longer public; frontend `loadSettings()` sends `X-Admin-Token`.
+- **Auth-protected GET /api/governance** — Was accidentally public despite being in `admin.py`.
+- **Auth-protected GET /metrics** — Prometheus metrics require admin token; nginx returns 404 at edge.
+- **Input validation** — FinBERT route enforces `max_length=512`; compare `assets` validated at middleware layer; CSP on static frontend assets.
+- **Alert dispatcher HTTP checking** — `_dispatch_webhook`, `_dispatch_discord`, `_dispatch_telegram` now call `raise_for_status()`; non-2xx responses logged.
+- **Deploy script hardened** — No hardcoded IP (requires `HELIX_DEPLOY_REMOTE`); smoke URL configurable via `HELIX_SMOKE_URL`; admin-route auth verified in smoke checks.
+
+### Bugfixes
+
+- **Chart lifecycle** (`c.destroy is not a function`) — Unified `_disposeChart()` helper branching on `dispose` (ECharts) vs `destroy` (Chart.js).
+- **Stale auto-refresh** — No longer fires `POST /api/refresh` without an admin token configured.
+- **Resize handler** — Moved from `_renderForecastCanvas` to `init()` via `_setupResizeHandler()`, preventing duplicate listener registration.
+- **Health tab layout** — Alert History and Data Quality wrapped in `insight-grid` for consistent spacing.
+- **Intel tab nav link added** — Intel tab content existed but had no navigation button.
+
+### API Contracts
+
+- **Forecast point aliases** — `peg` ← `depeg_index`/`price`, `supply` ← `total_supply` mapped in `forecasts.py` so charts display correctly.
+- **Anomaly events normalized** — `detect_anomalies()` emits `anomalies[]` list matching frontend expectation.
+- **Forecast risk signals** — Loaded from `/api/events` filtered by `forecast_` event type prefix.
+- **Data quality card** — Mapped to `{label, value}` rows (NLP, cached data, degraded sources).
+
+### Infrastructure
+
+- **Alembic settings migration** — `Setting` model now inherits `Base.metadata`; ad-hoc `create_all` removed; idempotent migration `f5f21ba3d585`.
+- **Redis rate limiter** — Already wired via `RATE_LIMITER_STORAGE_URI` env var; documented in `.env.example`.
+- **Smoke-check.sh** — Verifies `/api/settings` and `/api/governance` require auth without token.
+- **.env.example** — Added `CORS_ORIGINS`, `CONTENT_SECURITY_POLICY`, `HELIX_DEPLOY_REMOTE`, `HELIX_SMOKE_URL`.
+
 ## 3.3.4 (2026-05-24)
 
 ### Fixed

@@ -56,6 +56,13 @@ def list_forecasts(
         if run.target_metric not in forecast_points:
             forecast_points[run.target_metric] = serialized
 
+    for pref in ("depeg_index", "price"):
+        if pref in forecast_points:
+            forecast_points["peg"] = forecast_points[pref]
+            break
+    if "total_supply" in forecast_points:
+        forecast_points["supply"] = forecast_points["total_supply"]
+
     snapshots = (
         db.query(AssetTrendSnapshot)
         .filter(AssetTrendSnapshot.asset_symbol == asset_key)

@@ -1,8 +1,6 @@
-from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request, Response
-from prometheus_client import generate_latest
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, SourceStatus, get_db

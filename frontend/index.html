@@ -178,6 +178,7 @@
         <button class="nav-link" :class="tab==='supply'&&'active'" @click="tab='supply';loadTab()">Supply</button>
         <button class="nav-link" :class="tab==='events'&&'active'" @click="tab='events';loadTab()">OSINT</button>
         <button class="nav-link" :class="tab==='forecast'&&'active'" @click="tab='forecast';loadTab()">Forecast</button>
+        <button class="nav-link" :class="tab==='intel'&&'active'" @click="tab='intel';loadTab()">Intel</button>
         <button class="nav-link" :class="tab==='health'&&'active'" @click="tab='health';loadTab()">Health</button>
         <button class="nav-link" :class="tab==='settings'&&'active'" @click="tab='settings';loadTab()">&#9881;</button>
       </div>
@@ -320,7 +321,7 @@
             <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
             <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
             <p class="kpi-sub" style="margin-top:8px" x-show="aiSummary" x-text="aiSummary"></p>
-            <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} · v${predictive.version ?? '1.0'}`"></span>
+            <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} · v${predictive.model_version ?? predictive.version ?? '1.0'}`"></span>
           </div>
         </div>
       </div>
@@ -479,10 +480,10 @@
         <div class="insight-card">
           <h2>Forecast Risk Signals</h2>
           <div id="forecast-signals">
-            <template x-for="sig in forecastSignals" :key="sig.id">
-              <div class="signal-item" :class="`sev-${sig.severity}`">
-                <span><strong x-text="sig.severity.toUpperCase()"></strong> <span x-text="sig.title"></span></span>
-                <span class="signal-meta" x-text="`q10: ${sig.forecast_value?.toFixed(4) ?? '--'}`"></span>
+            <template x-for="sig in forecastSignals" :key="sig.id ?? sig.run_id ?? sig.title">
+              <div class="signal-item" :class="`sev-${sig.severity || 'info'}`">
+                <span><strong x-text="(sig.severity || 'info').toUpperCase()"></strong> <span x-text="sig.title"></span></span>
+                <span class="signal-meta" x-text="sig.new_value ? `value: ${sig.new_value}` : ''"></span>
               </div>
             </template>
             <div x-show="!forecastSignals.length" class="kpi-sub" style="padding:8px 0">No forecast risk signals</div>
@@ -658,10 +659,11 @@
           </div>
         </div>
       </div>
+      <div class="insight-grid">
         <div class="insight-card">
           <h2>Alert History <span class="kpi-sub" x-text="`events`"></span></h2>
           <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.5">
-            <template x-for="ev in (events || []).slice(0, 20)" :key="ev.id">
+            <template x-for="(ev, i) in (events || []).slice(0, 20)" :key="ev.id">
               <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px">
                 <div>
                   <span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span>
@@ -673,7 +675,23 @@
             <div x-show="!events.length" class="kpi-sub" style="padding:8px 0">No recent events</div>
           </div>
         </div>
-        <div class="chart-card" x-show="forecastSignals.length">
+        <div class="insight-card" x-show="dataQualityHistory.length">
+          <h2>Data Quality</h2>
+          <div style="font-size:13px">
+            <template x-for="(dq, i) in dataQualityHistory" :key="i">
+              <div class="signal-item" x-text="`${dq.label}: ${dq.value}`"></div>
+            </template>
+            <div x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
+          </div>
+        </div>
+      </div>
+                <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
+              </div>
+            </template>
+            <div x-show="!events.length" class="kpi-sub" style="padding:8px 0">No recent events</div>
+          </div>
+        </div>
+        <div class="chart-card" x-show="dataQualityHistory.length">
         <h2>Data Quality</h2>
         <div style="font-size:13px">
           <template x-for="(dq, i) in dataQualityHistory" :key="i">
@@ -737,6 +755,14 @@
             </div>
           </template>
         </div>
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>Admin Token</h2>
+          <p class="kpi-sub" style="margin-bottom:8px">Required for refresh and settings changes when HELIX_ADMIN_TOKEN is set on the server.</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="password" x-model="adminToken" placeholder="X-Admin-Token" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
+            <button class="btn btn-muted" @click="saveAdminToken()">Save</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -746,7 +772,7 @@
       <template x-for="s in sources" :key="s.source_name">
         <span class="pill" :class="`source-${s.status}`" x-text="`${s.source_name}: ${s.status}`"></span>
       </template>
-      <span class="pill">v3.4.0</span>
+      <span class="pill">v3.5.1</span>
     </footer>
   </main>
 </body>

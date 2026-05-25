@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from sqlalchemy import String, Text, create_engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
+from sqlalchemy import String, Text
+from sqlalchemy.orm import Mapped, mapped_column, Session
 
-from database import engine, SessionLocal
+from database import Base, engine, SessionLocal
 
 _DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "provider_defillama": {"label": "DefiLlama", "type": "bool", "default": True, "always_active": True},
@@ -26,11 +26,7 @@ _DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
 }
 
 
-class SettingModel(DeclarativeBase):
-    pass
-
-
-class Setting(SettingModel):
+class Setting(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
@@ -61,9 +57,21 @@ def get_setting(key: str, db: Session | None = None) -> Any:
 def set_setting(key: str, value: Any, db: Session) -> None:
     meta = _DEFAULT_SETTINGS.get(key)
     if not meta:
-        return
+        raise ValueError(f"Unknown setting: {key}")
     if meta.get("always_active"):
-        return
+        raise ValueError(f"Setting '{key}' cannot be changed")
+    if meta.get("type") == "int":
+        try:
+            int_val = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Setting '{key}' requires an integer value") from exc
+        min_val = meta.get("min")
+        max_val = meta.get("max")
+        if min_val is not None and int_val < min_val:
+            raise ValueError(f"Setting '{key}' must be >= {min_val}")
+        if max_val is not None and int_val > max_val:
+            raise ValueError(f"Setting '{key}' must be <= {max_val}")
+        value = int_val
     row = db.query(Setting).filter(Setting.key == key).first()
     if row:
         row.value = str(value)
@@ -110,4 +118,4 @@ def _coerce(val: str, typ: str) -> Any:
     return val
 
 
-SettingModel.metadata.create_all(bind=engine)
+

@@ -101,7 +101,7 @@ cd backend
 .venv/bin/pytest -q
 ```
 
-Post-deploy smoke test (checks frontend shell, API health, `/metrics` not public):
+Post-deploy smoke test (checks frontend shell, API health, `/metrics` not public, admin routes require auth):
 
 ```bash
 ./scripts/smoke-check.sh https://your-host.example
@@ -125,6 +125,8 @@ Auto-generate a new migration after model changes:
 Copy `.env.example` to `.env` and adjust:
 
 - `HELIX_DOMAIN` — public hostname (default `helix.local`)
+- `CORS_ORIGINS` — comma-separated allowed origins (default `*`); set in production
+- `CONTENT_SECURITY_POLICY` — Content-Security-Policy header (set on backend + nginx)
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
 - `ENABLE_ANOMALY_DETECTION` (default `false`) — enables ML anomaly detection (requires scikit-learn, numpy, pandas, statsforecast)
 - `ENABLE_NLP` (default `false`) — enables FinBERT sentiment scoring (requires transformers + PyTorch)
@@ -134,6 +136,8 @@ Copy `.env.example` to `.env` and adjust:
 - `CRYPTOPANIC_API_KEY` — for news feed
 - `LOG_LEVEL` (default `INFO`) — set to `DEBUG` for verbose logging
 - `LOG_FORMAT` (default `dev`) — set to `json` for structured JSON logs in production
+- `HELIX_ADMIN_TOKEN` — required for admin routes (settings, refresh, backfill, metrics, governance)
+- `RATE_LIMITER_STORAGE_URI` — Redis URL for multi-worker rate limiting (optional)
 
 Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `config/alerts.json`.
 
@@ -155,8 +159,12 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/analytics/finbert/sentiment` | On-demand FinBERT sentiment |
 | `GET /api/anomaly/detect` | Z-score + Isolation Forest anomaly flags |
 | `GET /api/anomaly/forecast` | Supply forecast (StatsForecast/AutoARIMA) |
-| `POST /api/admin/backfill` | Optional synthetic history (env-gated) |
-| `GET /api/alerts/config` | Alert rule definitions |
+| `POST /api/admin/backfill` | Optional synthetic history (env-gated; admin token required) |
+| `GET /api/alerts/config` | Alert rule definitions (admin token required) |
+| `GET /api/settings` | Feature flags and refresh intervals (admin token required) |
+| `PUT /api/settings` | Update settings (admin token required) |
+| `GET /api/governance` | Governance monitoring (admin token required) |
+| `GET /metrics` | Internal Prometheus metrics (admin token required; blocked at nginx) |
 | `GET /api/osint/feed` | Recent news articles with sentiment |
 | `GET /api/osint/sentiment` | Sentiment time-series |
 | `GET /api/osint/attestation` | Issuer report age + DefiLlama supply feed freshness (per asset) |

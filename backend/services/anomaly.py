@@ -120,6 +120,22 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
         features.append(row)
     if_anomalies = isolation_forest_detect(features)
     results["isolation_forest"] = {"anomaly_indices": if_anomalies, "point_count": len(features)}
+
+    normalized: list[dict[str, Any]] = []
+    for metric, items in (("supply", supply_anomalies), ("price", price_anomalies)):
+        for item in items:
+            idx = item.get("index")
+            if idx is None or idx >= len(history["timestamps"]):
+                continue
+            ts = history["timestamps"][idx]
+            z = float(item.get("z_score", 0))
+            normalized.append({
+                "metric": metric,
+                "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else ts,
+                "direction": "above" if z >= 0 else "below",
+                "z_score": z,
+            })
+    results["anomalies"] = normalized
     return results
 
 

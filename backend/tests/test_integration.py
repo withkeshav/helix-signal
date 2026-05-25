@@ -49,8 +49,8 @@ def client():
         yield test_client
 
 
-def test_metrics_endpoint(client):
-    response = client.get("/metrics")
+def test_metrics_endpoint(client, admin_headers):
+    response = client.get("/metrics", headers=admin_headers)
     assert response.status_code == 200
     body = response.text
     assert "helix_http_requests_total" in body
@@ -58,8 +58,8 @@ def test_metrics_endpoint(client):
     assert "helix_trend_snapshot_rows" in body
 
 
-def test_metrics_gauge_values(client):
-    response = client.get("/metrics")
+def test_metrics_gauge_values(client, admin_headers):
+    response = client.get("/metrics", headers=admin_headers)
     assert response.status_code == 200
     lines = response.text.splitlines()
     gauges = [l for l in lines if l.startswith("helix_scheduler_running")]
@@ -106,16 +106,16 @@ def test_anomaly_forecast_disabled(client):
     assert isinstance(data, dict)
 
 
-def test_alerts_config_returns_rules(client):
-    response = client.get("/api/alerts/config")
+def test_alerts_config_returns_rules(client, admin_headers):
+    response = client.get("/api/alerts/config", headers=admin_headers)
     assert response.status_code == 200
     rules = response.json()
     assert isinstance(rules, list)
     assert len(rules) > 0
 
 
-def test_governance_monitoring(client):
-    response = client.get("/api/governance?asset=USDT")
+def test_governance_monitoring(client, admin_headers):
+    response = client.get("/api/governance?asset=USDT", headers=admin_headers)
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)

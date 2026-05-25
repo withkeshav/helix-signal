@@ -93,7 +93,7 @@ class TestObservabilityMiddleware:
     def test_metrics_endpoint_still_works(self):
         import main
         with TestClient(main.app) as client:
-            resp = client.get("/metrics")
+            resp = client.get("/metrics", headers={"X-Admin-Token": "test-admin-token"})
             assert resp.status_code == 200
             assert "helix_http_requests_total" in resp.text
 

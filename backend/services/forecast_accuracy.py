@@ -51,6 +51,7 @@ def compute_forecast_accuracy(
         errors: list[float] = []
         abs_errors: list[float] = []
         matched = 0
+        actual_magnitudes: list[float] = []
         for p in points:
             if not p.forecast_timestamp or p.q50 is None:
                 continue
@@ -62,9 +63,11 @@ def compute_forecast_accuracy(
             if diff_sec > 7200:
                 continue
             actual_val: float | None = None
-            if run.target_metric == "peg":
+            if run.target_metric in {"peg", "depeg_index"}:
                 actual_val = float(closest.depeg_index) if closest.depeg_index is not None else None
-            elif run.target_metric == "supply":
+            elif run.target_metric == "price":
+                actual_val = float(closest.price) if closest.price is not None else None
+            elif run.target_metric in {"supply", "total_supply"}:
                 actual_val = float(closest.total_supply) if closest.total_supply is not None else None
             elif run.target_metric == "signal_score":
                 actual_val = float(closest.signal_score) if closest.signal_score is not None else None
@@ -73,11 +76,12 @@ def compute_forecast_accuracy(
             err = actual_val - float(p.q50)
             errors.append(err)
             abs_errors.append(abs(err))
+            actual_magnitudes.append(abs(actual_val))
             matched += 1
         if matched < 2:
             continue
         mae = sum(abs_errors) / matched
-        mean_actual = sum(abs(e) for e in errors) / matched
+        mean_actual = sum(actual_magnitudes) / matched
         mape = (mae / mean_actual * 100) if mean_actual > 0 else None
         results.append({
             "run_id": run.id,

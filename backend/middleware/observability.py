@@ -8,6 +8,8 @@ from fastapi import Request
 from prometheus_client import Counter, Histogram, Gauge
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
+from middleware.security import sanitize_query_params
+
 from structlog import get_logger
 
 log = get_logger(__name__)
@@ -60,5 +62,6 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             path=endpoint,
             status=response.status_code,
             duration_ms=round(duration * 1000, 2),
+            query=sanitize_query_params(dict(request.query_params)),
         )
         return response

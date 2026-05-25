@@ -5,13 +5,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from datetime import datetime, timezone
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client import Gauge, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -20,13 +19,14 @@ from structlog import get_logger
 
 from database import AssetTrendSnapshot, Base, SessionLocal, SourceStatus, engine, get_db, init_db
 from logging_config import configure_logging
-from middleware.security import SecurityValidationMiddleware, validate_asset_symbol
+from middleware.security import SecurityValidationMiddleware
 from middleware.observability import ObservabilityMiddleware, METRIC_REQUEST_COUNT, METRIC_REQUEST_LATENCY, METRIC_SOURCE_HEALTH
 from services.backfill import run_backfill
 from services.osint import ingest_osint_feed, refresh_attestation_reports
 from services.retention import prune_old_history
 from signal_engine.core import get_asset_by_symbol, load_enabled_assets, refresh_chain_data
 
+from backend.core.admin_auth import require_admin_token
 from backend.core.limiter import limiter
 from backend.core.registry import discover_plugins
 from routes import register_routes
@@ -81,7 +81,17 @@ def _osint_job() -> None:
 
 
 def _forecast_job() -> None:
+    from providers.settings import get_setting
     from services.forecast import run_all_forecasts
+
+    db = SessionLocal()
+    try:
+        if not get_setting("feature_forecasting", db):
+            log.info("forecast_job.skipped", reason="feature_forecasting_disabled")
+            return
+    finally:
+        db.close()
+
     log.info("forecast_job.start")
     try:
         result = run_all_forecasts()
@@ -174,9 +184,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityValidationMiddleware)
 app.add_middleware(ObservabilityMiddleware)
+_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -187,7 +198,7 @@ register_routes(app)
 
 
 @app.get("/metrics")
-def prometheus_metrics() -> Response:
+def prometheus_metrics(request: Request, _auth=Depends(require_admin_token)) -> Response:
     db = SessionLocal()
     try:
         scheduler = getattr(app.state, "scheduler", None)
@@ -217,7 +228,11 @@ def root(request: Request) -> str:
 
 @app.post("/api/refresh")
 @limiter.limit("10/minute")
-def api_refresh(request: Request, db: Session = Depends(get_db)) -> dict[str, bool]:
+def api_refresh(
+    request: Request,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+) -> dict[str, bool]:
     refresh_chain_data(db)
     return {"ok": True}
 

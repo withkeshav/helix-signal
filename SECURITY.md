@@ -29,6 +29,12 @@ Security priorities still include:
 - `.env` and `secrets/` (API keys)
 - Internal execution briefs and local research (see `.gitignore`)
 
-### Production edge auth
+### Authentication
 
-Helix-Signal does not include built-in authentication. If deploying publicly, place a reverse proxy with basic-auth or OAuth in front of the frontend and backend.
+Helix-Signal uses `X-Admin-Token` header-based auth for admin routes (settings, refresh, backfill, alerts config, governance, metrics). Set `HELIX_ADMIN_TOKEN` in `.env` to enable. Unset tokens fail closed (503). Mismatched tokens return 403.
+
+Public endpoints (dashboard, health, trends, events, OSINT, forecasts, sources, AI explain) remain accessible. For additional edge protection, place a reverse proxy with basic-auth or OAuth in front.
+
+### Content Security Policy
+
+A `Content-Security-Policy` header is applied to all backend responses and nginx static assets. Configure via `CONTENT_SECURITY_POLICY` env var. The default policy restricts scripts to `'self'` + CDN, blocks `frame-ancestors`, and restricts `form-action` and `base-uri`.

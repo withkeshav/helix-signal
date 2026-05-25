@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from database import Base
 from database import DATABASE_URL
+import providers.settings  # noqa: E402,F401 — registers Setting model with Base.metadata
 
 config = context.config
 

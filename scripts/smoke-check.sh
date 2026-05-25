@@ -31,11 +31,19 @@ if [[ "${dashboard_status}" != "200" ]]; then
 fi
 echo "OK: /api/dashboard reachable"
 
-if [[ "${BASE_URL}" == https://* ]]; then
-  echo "SKIP: admin-route auth checks only apply to full TLS deploys"
-else
-  echo "SKIP: admin-route auth checks (pass https:// URL for full deploy validation)"
+settings_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/settings")"
+if [[ "${settings_code}" != "403" && "${settings_code}" != "503" ]]; then
+  echo "FAILED: /api/settings should require admin token (got ${settings_code})"
+  exit 1
 fi
+echo "OK: /api/settings requires auth (${settings_code})"
+
+governance_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/governance?asset=USDT")"
+if [[ "${governance_code}" != "403" && "${governance_code}" != "503" ]]; then
+  echo "FAILED: /api/governance should require admin token (got ${governance_code})"
+  exit 1
+fi
+echo "OK: /api/governance requires auth (${governance_code})"
 
 metrics_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/metrics")"
 if [[ "${metrics_code}" == "200" ]]; then

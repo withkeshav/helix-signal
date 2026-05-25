@@ -1,7 +1,8 @@
-"""Security middleware — input validation, sanitization, rate limiting."""
+"""Security middleware — input validation, sanitization, CSP, rate limiting."""
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -11,6 +12,19 @@ from starlette.responses import JSONResponse, Response
 
 VALID_SYMBOL = re.compile(r"^[A-Z0-9]{2,16}$")
 VALID_WINDOWS = frozenset({"24h", "7d", "30d", "90d"})
+
+_CSP = os.getenv(
+    "CONTENT_SECURITY_POLICY",
+    "default-src 'self'; "
+    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'",
+)
 
 
 def validate_asset_symbol(symbol: str) -> str:
@@ -54,6 +68,17 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
                             status_code=400,
                             content={"detail": e.detail},
                         )
+                if key == "assets":
+                    for sym in val.split(","):
+                        sym = sym.strip()
+                        if sym:
+                            try:
+                                validate_asset_symbol(sym)
+                            except HTTPException as e:
+                                return JSONResponse(
+                                    status_code=400,
+                                    content={"detail": e.detail},
+                                )
                 if key == "window":
                     try:
                         validate_window(val)
@@ -63,4 +88,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
                             content={"detail": e.detail},
                         )
 
-        return await call_next(request)
+        response = await call_next(request)
+        if _CSP:
+            response.headers["Content-Security-Policy"] = _CSP
+        return response

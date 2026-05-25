@@ -44,13 +44,14 @@ function helixApp() {
     enabledAssets:['USDT','USDC','DAI','PYUSD'],
     chains:[],signal:{},depeg:{},concentration:{},freshness:{},sources:[],crossSource:{},supplyFeed:{},attSignal:{},
     attestation:{},osintArticles:[],events:[],totalSupply:null,supplyChange:null,
-    crossSource:{},staleWarning:'',generatedAt:'',
-    _charts:new Map(),_echarts:null,_timer:null,_refreshingStale:false,_trendCache:{},
+    staleWarning:'',generatedAt:'',
+    _charts:new Map(),_timer:null,_refreshingStale:false,_trendCache:{},
+    adminToken:sessionStorage.getItem('helix_admin_token')||'',
     refreshing:false,refreshingForecast:false,refreshingCorrelations:false,
     predictive:{},aiSummary:'',tickerItems:[],
     evidenceOpen:false,evidenceTitle:'',evidenceFormula:'',evidenceComponents:{},evidenceSources:{},
     forecastSignals:[],correlations:[],dataQualityHistory:[],
-    anomalyEvents:[],forecastAccuracy:[],
+    anomalyEvents:{},forecastAccuracy:[],
     nlpAvailable:false,loadingEvents:false,loadingForecast:false,
     settingsList:[],
     errorEvents:'',errorForecast:'',
@@ -69,6 +70,20 @@ function helixApp() {
       await this.loadDashboard();
       await this.loadAttestation();
       this._timer=setInterval(()=>{this.loadDashboard();},60000);
+      this._setupResizeHandler();
+    },
+    _setupResizeHandler() {
+      if(window._helixResizeHandler)return;
+      window._helixResizeHandler=()=>{
+        for(const[_,c]of this._charts){
+          if(typeof c.isDisposed==='function'){
+            if(!c.isDisposed())c.resize();
+          }else if(typeof c.resize==='function'){
+            c.resize();
+          }
+        }
+      };
+      window.addEventListener('resize',window._helixResizeHandler);
     },
     async search() {
       const q=this.searchQuery.trim();
@@ -174,9 +189,13 @@ function helixApp() {
         this.nlpAvailable=!!(d.data_quality&&d.data_quality.nlp_available);
         this.staleWarning=this.freshness.status==='Stale'?'Data is stale. Metrics may not reflect current conditions.':'';
         if(d.data_quality) {
-          this.dataQualityHistory=[d.data_quality];
+          this.dataQualityHistory=[
+            {label:'NLP sentiment',value:d.data_quality.nlp_available?'ON':'OFF'},
+            {label:'Cached data',value:d.data_quality.using_cached_data?'YES':'NO'},
+            {label:'Degraded sources',value:(d.data_quality.degraded_sources||[]).join(', ')||'none'},
+          ];
         }
-        if(this.freshness.status==='Stale'&&!this._refreshingStale){
+        if(this.freshness.status==='Stale'&&this.adminToken&&!this._refreshingStale){
           this._refreshingStale=true;
           this.refresh().finally(()=>{this._refreshingStale=false;});
         }
@@ -191,7 +210,10 @@ function helixApp() {
       }catch(e){this.staleWarning=`Dashboard error: ${e.message}`;}
     },
     async loadAnomalies() {
-      try{const r=await fetch(`/api/anomaly/detect?asset=${this.asset}`,{cache:'no-store'});if(r.ok)this.anomalyEvents=await r.json();}catch(e){}
+      try{
+        const r=await fetch(`/api/anomaly/detect?asset=${this.asset}`,{cache:'no-store'});
+        if(r.ok)this.anomalyEvents=await r.json();
+      }catch(e){this.anomalyEvents={};}
     },
     async loadForecastAccuracy() {
       try{const r=await fetch(`/api/analytics/forecast-accuracy?asset=${this.asset}&max_runs=5`,{cache:'no-store'});if(r.ok)this.forecastAccuracy=await r.json();}catch(e){}
@@ -201,17 +223,24 @@ function helixApp() {
       if(this.tab==='intel')this.loadIntel();
       if(this.tab==='events')this.loadEvents();
       if(this.tab==='supply')this.loadSupplyTrend();
+      if(this.tab==='health')this.loadEvents();
       if(this.tab==='settings')this.loadSettings();
+    },
+    saveAdminToken() {
+      sessionStorage.setItem('helix_admin_token', this.adminToken || '');
+    },
+    _adminHeaders() {
+      return this.adminToken ? {'X-Admin-Token': this.adminToken} : {};
     },
     async loadSettings() {
       try{
-        const r=await fetch('/api/settings',{cache:'no-store'});
+        const r=await fetch('/api/settings',{cache:'no-store',headers:this._adminHeaders()});
         if(r.ok)this.settingsList=await r.json();
       }catch(e){this.settingsList=[];}
     },
     async toggleSetting(key,value) {
       try{
-        const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})});
+        const r=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json',...this._adminHeaders()},body:JSON.stringify({key,value})});
         if(r.ok){
           const item=this.settingsList.find(s=>s.key===key);
           if(item)item.value=value;
@@ -247,9 +276,13 @@ function helixApp() {
         const f=await fetch(`/api/forecasts?asset=${this.asset}`,{cache:'no-store'});
         if(f.ok){
           const body=await f.json();
-          this.forecastSignals=body.forecasts||[];
           this._forecastData=body;
         }else{this.errorForecast=`Forecast API: HTTP ${f.status}`;}
+        const ev=await fetch(`/api/events?asset=${this.asset}&limit=20`,{cache:'no-store'});
+        if(ev.ok){
+          const eventsBody=await ev.json();
+          this.forecastSignals=(eventsBody.events||[]).filter(e=>String(e.event_type||'').startsWith('forecast_'));
+        }
         this.renderForecastCharts();
       }catch(e){this.errorForecast='Failed to load forecast data';}finally{this.refreshingForecast=false;this.loadingForecast=false;}
     },
@@ -269,7 +302,7 @@ function helixApp() {
           if(j.points&&j.points.length&&typeof Chart!=='undefined'){
             const el=document.getElementById('chart-supply-trend');
             if(!el)return;
-            if(this._charts.has('chart-supply-trend'))this._charts.get('chart-supply-trend').destroy();
+            if(this._charts.has('chart-supply-trend'))this._disposeChart(this._charts.get('chart-supply-trend'));
             const pts=j.points.filter(p=>p.total_supply!=null).map(p=>({x:new Date(p.timestamp).getTime(),y:Number(p.total_supply)}));
             const primary=getComputedStyle(document.documentElement).getPropertyValue('--spark').trim()||'#60a5fa';
             this._charts.set('chart-supply-trend',new Chart(el.getContext('2d'),{
@@ -284,7 +317,10 @@ function helixApp() {
     },
     async refresh() {
       this.refreshing=true;
-      try{const r=await fetch('/api/refresh',{method:'POST',cache:'no-store'});if(!r.ok)throw Error(`HTTP ${r.status}`);}catch(e){}
+      try{
+        const r=await fetch('/api/refresh',{method:'POST',cache:'no-store',headers:this._adminHeaders()});
+        if(!r.ok)throw Error(`HTTP ${r.status}`);
+      }catch(e){this.staleWarning='Refresh failed. Set admin token in Settings if HELIX_ADMIN_TOKEN is configured.';}
       await this.loadDashboard();
       this.refreshing=false;
     },
@@ -297,8 +333,16 @@ function helixApp() {
         this.renderCharts({chains: this.chains});
       }
     },
+    _disposeChart(c) {
+      if(!c)return;
+      if(typeof c.dispose==='function'){
+        if(typeof c.isDisposed!=='function'||!c.isDisposed())c.dispose();
+      }else if(typeof c.destroy==='function'){
+        c.destroy();
+      }
+    },
     destroyCharts(){
-      for(const[_,c]of this._charts)c.destroy();
+      for(const[_,c]of this._charts)this._disposeChart(c);
       this._charts.clear();
     },
     renderCharts(data){
@@ -330,7 +374,7 @@ function helixApp() {
             if(!t||!t.points||!t.points.length||typeof Chart==='undefined') return;
             const el=document.getElementById('chart-trend-signal');
             if(!el) return;
-            if(this._charts.has('chart-trend-signal')) this._charts.get('chart-trend-signal').destroy();
+            if(this._charts.has('chart-trend-signal')) this._disposeChart(this._charts.get('chart-trend-signal'));
             const pts=t.points.map(p=>({x:new Date(p.timestamp).getTime(),y:p.signal_score!=null?Number(p.signal_score):null}));
             this._charts.set('chart-trend-signal',new Chart(el.getContext('2d'),{
               type:'line',
@@ -343,7 +387,7 @@ function helixApp() {
       }catch(e){}
     },
     _makeBar(canvasId,labels,values,color) {
-      if(this._charts.has(canvasId))this._charts.get(canvasId).destroy();
+      if(this._charts.has(canvasId))this._disposeChart(this._charts.get(canvasId));
       const el=document.getElementById(canvasId);
       if(!el||typeof Chart==='undefined')return;
       const muted=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#9aa8c4';
@@ -355,7 +399,7 @@ function helixApp() {
     },
     renderSentimentChart(series){
       if(!series||!series.length||typeof Chart==='undefined')return;
-      if(this._charts.has('chart-sentiment'))this._charts.get('chart-sentiment').destroy();
+      if(this._charts.has('chart-sentiment'))this._disposeChart(this._charts.get('chart-sentiment'));
       const el=document.getElementById('chart-sentiment');
       if(!el)return;
       const primary=getComputedStyle(document.documentElement).getPropertyValue('--spark').trim()||'#60a5fa';
@@ -363,7 +407,6 @@ function helixApp() {
     },
     renderForecastCharts() {
       if(typeof echarts==='undefined')return;
-      if(this._echarts){echarts.dispose(this._echarts);this._echarts=null;}
       const elPeg=document.getElementById('chart-peg-forecast');
       const elSupply=document.getElementById('chart-supply-forecast');
       if(!elPeg||!elSupply)return;
@@ -385,7 +428,7 @@ function helixApp() {
       this._renderForecastCanvas(elSupply,'Supply Forecast',supplyHistorical,supplyForecast,baseConfig,textColor,lineColor);
     },
     _renderForecastCanvas(el,title,historical,forecast,baseConfig,textColor,lineColor) {
-      if(this._charts.has(el.id)){this._charts.get(el.id).dispose();this._charts.delete(el.id);}
+      if(this._charts.has(el.id)){this._disposeChart(this._charts.get(el.id));this._charts.delete(el.id);}
       const chart=echarts.init(el);
       this._charts.set(el.id,chart);
       const option={...baseConfig,
@@ -401,10 +444,6 @@ function helixApp() {
         ],
       };
       chart.setOption(option);
-      if(!window._helixResizeHandler){
-        window._helixResizeHandler=()=>{for(const[_,c]of this._charts){if(!c.isDisposed())c.resize();}};
-        window.addEventListener('resize',window._helixResizeHandler);
-      }
     },
     switchTo(symbol) {
       this.asset=symbol;
@@ -424,7 +463,6 @@ function helixApp() {
     },
     async switchAsset() {
       this.destroyCharts();
-      if(this._echarts){echarts.dispose(this._echarts);this._echarts=null;}
       await this.loadDashboard();
     }
   };

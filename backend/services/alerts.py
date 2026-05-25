@@ -239,7 +239,8 @@ def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict) -> None:
     if not url:
         return
     try:
-        httpx.post(url, json={"asset": asset_symbol, "type": rule["type"], "severity": rule["severity"], "meta": meta}, timeout=10)
+        resp = httpx.post(url, json={"asset": asset_symbol, "type": rule["type"], "severity": rule["severity"], "meta": meta}, timeout=10)
+        resp.raise_for_status()
     except Exception as exc:
         log.warning("webhook_failed", error=str(exc))
 
@@ -249,7 +250,8 @@ def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict) -> None:
     if not url:
         return
     try:
-        httpx.post(url, json={"content": f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']} - {rule['condition']}"}, timeout=10)
+        resp = httpx.post(url, json={"content": f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']} - {rule['condition']}"}, timeout=10)
+        resp.raise_for_status()
     except Exception as exc:
         log.warning("discord_failed", error=str(exc))
 
@@ -261,7 +263,8 @@ def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict) -> None:
         return
     try:
         text = f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']}\n{rule['condition']}"
-        httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
+        resp = httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
+        resp.raise_for_status()
     except Exception as exc:
         log.warning("telegram_failed", error=str(exc))
 

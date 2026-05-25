@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.core.admin_auth import require_admin_token
+from backend.core.limiter import limiter
 from database import get_db
 from providers.settings import get_all_settings, set_setting
 
@@ -16,12 +18,23 @@ class SettingUpdate(BaseModel):
 
 
 @router.get("/settings")
-def api_get_settings(db: Session = Depends(get_db)) -> list[dict]:
+@limiter.limit("60/minute")
+def api_get_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+) -> list[dict]:
     return get_all_settings(db)
 
 
 @router.put("/settings")
-def api_update_setting(body: SettingUpdate, db: Session = Depends(get_db)) -> dict:
+@limiter.limit("30/minute")
+def api_update_setting(
+    request: Request,
+    body: SettingUpdate,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+) -> dict:
     try:
         set_setting(body.key, body.value, db)
         return {"ok": True, "key": body.key, "value": body.value}

@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/compare")
 @limiter.limit("60/minute")
-def compare(request: Request, assets: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> dict[str, Any]:
+def compare(request: Request, assets: str = Query(..., min_length=1), window: str = Query("7d"), db: Session = Depends(get_db)) -> dict[str, Any]:
     return build_compare_payload(db, assets_csv=assets, window=window)
 
 
@@ -45,8 +45,12 @@ def api_patterns(
 @limiter.limit("60/minute")
 def api_finbert_sentiment(
     request: Request,
-    text: str = Query(...),
+    text: str = Query(..., min_length=1, max_length=512),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    from providers.settings import get_setting
+    if not get_setting("feature_nlp_sentiment", db):
+        return {"available": False, "reason": "NLP sentiment is disabled"}
     from backend.ml_models.finbert import FinBERTModel
     model = FinBERTModel()
     return model.predict({"text": text})

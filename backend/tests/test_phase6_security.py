@@ -124,7 +124,7 @@ class TestContainerSecurity:
         )
         with open(compose_path) as f:
             content = f.read()
-        for service in ("backend:", "celery-beat:", "celery-worker:", "timesfm:"):
+        for service in ("backend:", "timesfm:", "frontend:"):
             idx = content.index(service)
             block = content[idx: idx + 200]
             assert "no-new-privileges" in block, f"{service} missing no-new-privileges"

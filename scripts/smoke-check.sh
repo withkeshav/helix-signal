@@ -6,7 +6,7 @@ BASE_URL="${1:-http://localhost:3000}"
 echo "Running smoke checks against ${BASE_URL}"
 
 html="$(curl -fsSL "${BASE_URL}/")"
-for marker in 'x-data="helixApp()"' 'tab === '\''market'\''' 'id="chart-trend-signal"' 'id="chart-sentiment"'; do
+for marker in 'x-data="helixApp()"' 'class="top-nav"' 'class="kpi-row"' 'class="time-range"' 'id="chart-trend-signal"'; do
   if ! printf '%s' "${html}" | rg -Fq "${marker}"; then
     echo "FAILED: frontend marker missing -> ${marker}"
     exit 1

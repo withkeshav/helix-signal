@@ -50,6 +50,8 @@ function helixApp() {
     predictive:{},aiSummary:'',tickerItems:[],
     evidenceOpen:false,evidenceTitle:'',evidenceFormula:'',evidenceComponents:{},evidenceSources:{},
     forecastSignals:[],correlations:[],dataQualityHistory:[],
+    nlpAvailable:false,loadingEvents:false,loadingForecast:false,
+    errorEvents:'',errorForecast:'',
     get gaugeArc() {
       const s=Number(this.signal.score);if(Number.isNaN(s))return 0;
       return Math.max(0,Math.min(251,(s/100)*251));
@@ -163,6 +165,7 @@ function helixApp() {
         this.totalSupply=d.total_supply_current;
         this.supplyChange=d.total_supply_change_24h_pct;
         this.generatedAt=new Date().toLocaleTimeString();
+        this.nlpAvailable=!!(d.data_quality&&d.data_quality.nlp_available);
         this.staleWarning=this.freshness.status==='Stale'?'Data is stale. Metrics may not reflect current conditions.':'';
         if(d.data_quality) {
           this.dataQualityHistory=[d.data_quality];
@@ -200,28 +203,29 @@ function helixApp() {
       if(this.tab==='supply')this.loadSupplyTrend();
     },
     async loadEvents() {
+      this.loadingEvents=true;this.errorEvents='';
       try{
         const ev=await fetch(`/api/events?asset=${this.asset}&limit=30`,{cache:'no-store'});
         if(ev.ok){const j=await ev.json();this.events=j.events||[];}
-      }catch(e){}
+      }catch(e){this.errorEvents='Failed to load events';}
       try{
         const r=await fetch(`/api/osint/feed?asset=${this.asset}&limit=15`,{cache:'no-store'});
         if(r.ok){this.osintArticles=await r.json();}
-      }catch(e){}
+      }catch(e){if(!this.errorEvents)this.errorEvents='Failed to load OSINT feed';}
       try{
         const s=await fetch(`/api/osint/sentiment?asset=${this.asset}&window_days=7`,{cache:'no-store'});
         if(s.ok){
           const series=await s.json();
           if(Array.isArray(series)&&series.length>0){this.renderSentimentChart(series);}
         }
-      }catch(e){}
+      }catch(e){}finally{this.loadingEvents=false;}
     },
     async loadIntel() {
       await this.loadAttestation();
     },
     async loadForecastData() {
       if(this.refreshingForecast)return;
-      this.refreshingForecast=true;
+      this.refreshingForecast=true;this.loadingForecast=true;this.errorForecast='';
       try{
         await this.loadCorrelations();
         const f=await fetch(`/api/forecasts?asset=${this.asset}`,{cache:'no-store'});
@@ -229,9 +233,9 @@ function helixApp() {
           const body=await f.json();
           this.forecastSignals=body.forecasts||[];
           this._forecastData=body;
-        }
+        }else{this.errorForecast=`Forecast API: HTTP ${f.status}`;}
         this.renderForecastCharts();
-      }catch(e){}finally{this.refreshingForecast=false;}
+      }catch(e){this.errorForecast='Failed to load forecast data';}finally{this.refreshingForecast=false;this.loadingForecast=false;}
     },
     async loadCorrelations() {
       if(this.refreshingCorrelations)return;

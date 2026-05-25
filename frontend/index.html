@@ -32,7 +32,7 @@
     .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .asset-select{border:1px solid var(--line);border-radius:9px;padding:8px 12px;background:var(--panel);color:var(--text);font-weight:600;font-size:13px;font-family:Inter,sans-serif}
     /* Intel Header */
-    .intel-header{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+    .intel-header{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
     .intel-item{background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:10px;padding:10px 14px;backdrop-filter:blur(8px);cursor:pointer;text-align:center}
     .intel-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:2px}
     .intel-value{font-size:1.2rem;font-weight:700;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;display:block}
@@ -97,6 +97,25 @@
     th{font-size:10px;text-transform:uppercase;color:var(--muted)}
     .num{text-align:right;font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
     .footer{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;padding:12px 0;align-items:center}
+    @media(max-width:768px){
+      .intel-header{grid-template-columns:repeat(3,1fr);gap:4px}
+      .intel-value{font-size:1rem}.container{width:100vw;margin:8px auto}
+      .command-bar{flex-direction:column;align-items:stretch}.search-wrapper{max-width:none}
+      .tabs{overflow-x:auto;gap:2px}.tab{padding:8px 10px;font-size:12px}
+      .kpi-grid{grid-template-columns:repeat(2,1fr)}
+      .insight-grid{grid-template-columns:1fr}
+      .risk-gauge-wrap{flex-direction:column;align-items:center;text-align:center}
+      .table-wrap{overflow-x:auto}table{min-width:600px}
+      .evidence-drawer{width:100vw;max-width:100vw}
+      .chart-wrap,.chart-wrap.tall,.chart-wrap.xl{height:160px}
+    }
+    @media(max-width:480px){
+      .intel-header{grid-template-columns:repeat(3,1fr);gap:3px}
+      .intel-item{padding:6px 8px}.intel-value{font-size:.9rem}
+      .kpi-grid{grid-template-columns:1fr 1fr;gap:4px}
+      .tab{padding:6px 6px;font-size:11px}
+      .chart-wrap,.chart-wrap.tall,.chart-wrap.xl{height:140px}
+    }
   </style>
 </head>
 <body>
@@ -151,6 +170,10 @@
       <div class="intel-item">
         <span class="intel-label">Model</span>
         <span class="intel-value" :class="predictive.available ? 'text-green' : 'text-muted'" x-text="predictive.available ? 'ON' : 'OFF'"></span>
+      </div>
+      <div class="intel-item">
+        <span class="intel-label">NLP</span>
+        <span class="intel-value" :class="nlpAvailable ? 'text-green' : 'band-watch'" x-text="nlpAvailable ? 'ON' : 'OFF'"></span>
       </div>
     </div>
 
@@ -273,7 +296,7 @@
         </tr></thead><tbody>
           <template x-for="c in chains" :key="c.chain_name">
             <tr>
-              <td x-text="c.chain_name"></td>
+              <td><a :href="`/api/chains/${c.chain_name.toLowerCase()}?asset=${asset}`" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline dotted var(--muted)" x-text="c.chain_name"></a></td>
               <td class="num" x-text="formatUsd(c.supply_current)"></td>
               <td class="num" x-text="c.chain_share_pct != null ? `${c.chain_share_pct.toFixed(2)}%` : 'N/A'"></td>
               <td class="num" x-text="formatUsd(c.chain_tvl)"></td>
@@ -289,6 +312,7 @@
     <!-- Tab: Forecast -->
     <div class="tab-content" :class="tab === 'forecast' && 'active'"
          x-init="$watch('tab', val => { if(val === 'forecast') $nextTick(() => renderForecastCharts()); })">
+      <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
       <div class="chart-card">
         <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
         <div class="chart-wrap xl" id="chart-peg-forecast"></div>
@@ -345,6 +369,7 @@
 
     <!-- Tab: Events -->
     <div class="tab-content" :class="tab === 'events' && 'active'">
+      <div x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
       <div class="insight-grid">
         <div class="insight-card">
           <h2>Signal Events</h2>
@@ -362,13 +387,20 @@
         <div class="insight-card">
           <h2>OSINT Feed</h2>
           <div style="max-height:400px;overflow-y:auto">
+            <div x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">&#9888; Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
             <template x-for="art in osintArticles" :key="art.id">
-              <div style="padding:6px 0;border-bottom:1px solid var(--line)">
-                <div><strong x-text="art.title"></strong></div>
-                <div class="kpi-sub" x-text="`${art.source} · sentiment: ${art.sentiment_label ?? 'neutral'} (${art.sentiment_score?.toFixed(2) ?? '0.0'})`"></div>
+              <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+                <div><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">
+                  <span x-text="art.source"></span>
+                  <span x-show="art.published_at"> &middot; <span x-text="formatWhen(art.published_at)"></span></span>
+                  <span> &middot; sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
+                </div>
+                <div x-show="art.summary" style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4" x-text="art.summary"></div>
               </div>
             </template>
-            <div x-show="osintArticles.length === 0" class="kpi-sub" style="padding:12px">No articles yet</div>
+            <div x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
+            <div x-show="loadingEvents" class="kpi-sub" style="padding:12px">Loading...</div>
           </div>
         </div>
       </div>
@@ -422,9 +454,21 @@
         <div class="insight-card">
           <h2>Source Health</h2>
           <template x-for="s in sources" :key="s.source_name">
-            <div class="signal-item">
-              <span x-text="s.source_name"></span>
-              <span :class="s.status === 'ok' ? 'text-green' : 'text-red'" x-text="s.status"></span>
+            <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:600;font-size:13px" x-text="s.source_name"></span>
+                <span :class="s.status === 'ok' ? 'text-green' : 'text-red'" x-text="s.status"></span>
+              </div>
+              <div x-show="s.last_error" style="font-size:11px;color:var(--down);margin-top:2px" x-text="s.last_error"></div>
+              <div x-show="s.last_successful_fetch" style="font-size:11px;color:var(--muted);margin-top:2px">
+                Last OK: <span x-text="formatWhen(s.last_successful_fetch)"></span>
+              </div>
+              <div x-show="s.last_attempted_fetch" style="font-size:11px;color:var(--muted)">
+                Last attempt: <span x-text="formatWhen(s.last_attempted_fetch)"></span>
+              </div>
+              <div x-show="s.previous_status && s.status !== s.previous_status" style="font-size:11px;color:var(--neutral);margin-top:2px">
+                Previous: <span x-text="s.previous_status"></span>
+              </div>
             </div>
           </template>
           <div x-show="!sources.length" class="kpi-sub" style="padding:8px 0">No source data</div>

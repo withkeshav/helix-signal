@@ -108,6 +108,7 @@ class AssetSignalOut(BaseModel):
 class DataQualityOut(BaseModel):
     degraded_sources: list[str] = []
     using_cached_data: bool = False
+    nlp_available: bool = False
 
 
 class DashboardResponse(BaseModel):

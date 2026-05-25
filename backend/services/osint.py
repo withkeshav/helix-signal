@@ -171,6 +171,7 @@ def ingest_osint_feed(db: Session) -> int:
             published_at=art["published_at"],
             sentiment_score=sentiment["score"],
             sentiment_label=sentiment["label"],
+            entities=json.dumps(assets) if assets else None,
         ))
         count += 1
     if count > 0:

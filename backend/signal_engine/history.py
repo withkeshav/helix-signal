@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -28,6 +29,7 @@ CONC_SCORE_DELTA_WARN = 10
 # Cooldown for source_recovered events — max 1 per 6 hours
 SOURCE_RECOVERED_COOLDOWN_HOURS = 6
 _last_source_recovery_emitted: datetime | None = None
+_source_recovery_lock = threading.Lock()
 
 
 def _depeg_zone(score: int) -> str:
@@ -290,11 +292,12 @@ def _emit_source_recovered(db: Session, *, prior: str | None, ts: datetime) -> N
     global _last_source_recovery_emitted
     if prior != "error":
         return
-    if _last_source_recovery_emitted is not None:
-        elapsed = (ts - _last_source_recovery_emitted).total_seconds()
-        if elapsed < SOURCE_RECOVERED_COOLDOWN_HOURS * 3600:
-            return
-    _last_source_recovery_emitted = ts
+    with _source_recovery_lock:
+        if _last_source_recovery_emitted is not None:
+            elapsed = (ts - _last_source_recovery_emitted).total_seconds()
+            if elapsed < SOURCE_RECOVERED_COOLDOWN_HOURS * 3600:
+                return
+        _last_source_recovery_emitted = ts
     _emit(
         db,
         asset_symbol="ALL",

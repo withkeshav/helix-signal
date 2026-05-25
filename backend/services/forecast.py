@@ -1,7 +1,4 @@
-"""Plain-function forecasts extracted from Celery worker_tasks.py.
-
-Replaces Celery-based forecast_asset_metric with APScheduler-compatible functions.
-"""
+"""Plain-function forecasts — runs via APScheduler every 30 min."""
 from __future__ import annotations
 
 import json

@@ -204,6 +204,8 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
     degraded_sources = [s.source_name for s in sources_orm if s.status != "ok"]
     using_cached = len(degraded_sources) > 0
 
+    nlp_enabled = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
+
     return DashboardResponse(
         asset=AssetMetadataOut(
             symbol=selected_symbol,
@@ -223,5 +225,6 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         data_quality=DataQualityOut(
             degraded_sources=degraded_sources,
             using_cached_data=using_cached,
+            nlp_available=nlp_enabled,
         ),
     )

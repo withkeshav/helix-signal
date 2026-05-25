@@ -111,8 +111,7 @@ class _DefiLlamaSource(AbstractSource):
         if not asset_config:
             return {}
         symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
-        session = self.get_http_session()
-        stablecoins_payload = session.get(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
+        stablecoins_payload = http_get_with_retry(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
         if not isinstance(stablecoins_payload, dict):
             raise DefiLlamaError("Unexpected payload")
         selected_asset = None

@@ -105,6 +105,28 @@ class AssetSignalOut(BaseModel):
     components: dict
 
 
+class CrossSourceSignalOut(BaseModel):
+    sources_agreeing: int = 0
+    max_discrepancy_pct: float = 0.0
+    discrepancy_flag: bool = False
+    avg_price: float | None = None
+
+
+class SupplyFeedOut(BaseModel):
+    status: str = "unknown"
+    age_minutes: float | None = None
+    label: str = "unknown"
+    note: str = ""
+
+
+class AttestationOut(BaseModel):
+    status: str = "unknown"
+    age_days: float | None = None
+    last_report_date: str | None = None
+    label: str = "unknown"
+    note: str = ""
+
+
 class DataQualityOut(BaseModel):
     degraded_sources: list[str] = []
     using_cached_data: bool = False
@@ -119,6 +141,9 @@ class DashboardResponse(BaseModel):
     asset_signal: AssetSignalOut
     depeg_index: DepegIndexOut
     chain_concentration: ChainConcentrationOut
+    cross_source_signal: CrossSourceSignalOut = CrossSourceSignalOut()
+    supply_feed: SupplyFeedOut = SupplyFeedOut()
+    attestation: AttestationOut = AttestationOut()
     total_supply_current: float | None = None
     total_supply_change_24h_pct: float | None = None
     chains: list[DashboardChainRow]

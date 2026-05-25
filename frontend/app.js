@@ -40,16 +40,17 @@ function pegLabel(p) {
 }
 function helixApp() {
   return {
-    tab:'market',theme:'light',asset:'USDT',searchQuery:'',searchResults:[],
+    tab:'overview',theme:'light',asset:'USDT',searchQuery:'',searchResults:[],timeRange:'7d',
     enabledAssets:['USDT','USDC','DAI','PYUSD'],
-    chains:[],signal:{},depeg:{},concentration:{},freshness:{},sources:[],
+    chains:[],signal:{},depeg:{},concentration:{},freshness:{},sources:[],crossSource:{},supplyFeed:{},attSignal:{},
     attestation:{},osintArticles:[],events:[],totalSupply:null,supplyChange:null,
     crossSource:{},staleWarning:'',generatedAt:'',
-    _charts:new Map(),_echarts:null,_timer:null,_refreshingStale:false,
+    _charts:new Map(),_echarts:null,_timer:null,_refreshingStale:false,_trendCache:{},
     refreshing:false,refreshingForecast:false,refreshingCorrelations:false,
     predictive:{},aiSummary:'',tickerItems:[],
     evidenceOpen:false,evidenceTitle:'',evidenceFormula:'',evidenceComponents:{},evidenceSources:{},
     forecastSignals:[],correlations:[],dataQualityHistory:[],
+    anomalyEvents:[],forecastAccuracy:[],
     nlpAvailable:false,loadingEvents:false,loadingForecast:false,
     settingsList:[],
     errorEvents:'',errorForecast:'',
@@ -159,6 +160,10 @@ function helixApp() {
         this.assetName=d.asset?.name||this.asset;
         this.chains=d.chains||[];
         this.signal=d.asset_signal||{};
+        this.crossSource=d.cross_source_signal||{};
+        this.supplyFeed=d.supply_feed||{};
+        this.attSignal=d.attestation||{};
+        {const s=Number(this.signal.score);if(!Number.isNaN(s)){const a=this._trendCache.signal||[];a.push(s);if(a.length>120)a.splice(0,a.length-120);this._trendCache.signal=a;}}
         this.depeg=d.depeg_index||{};
         this.concentration=d.chain_concentration||{};
         this.freshness=d.freshness||{};
@@ -176,26 +181,20 @@ function helixApp() {
           this.refresh().finally(()=>{this._refreshingStale=false;});
         }
         this.renderCharts(d);
-        this._updateCrossSource();
+        await this.loadAnomalies();
         await this.loadPredictive();
         await this.loadTicker();
         await this.loadAiExplain();
         if(this.tab==='intel')this.loadIntel();
         if(this.tab==='events')this.loadEvents();
-        if(this.tab==='forecast'){this.loadForecastData();}
+        if(this.tab==='forecast'){this.loadForecastData();this.loadForecastAccuracy();}
       }catch(e){this.staleWarning=`Dashboard error: ${e.message}`;}
     },
-    _updateCrossSource() {
-      const prices=[];
-      for(const c of this.chains){
-        if(c.price>0)prices.push(c.price);
-        if(c.price_coingecko>0)prices.push(c.price_coingecko);
-        if(c.price_dexscreener>0)prices.push(c.price_dexscreener);
-      }
-      if(prices.length<2){this.crossSource={sources_agreeing:prices.length,discrepancy_flag:false,max_discrepancy_pct:0};return;}
-      const mean=prices.reduce((a,b)=>a+b,0)/prices.length;
-      const maxDisc=Math.max(...prices.map(v=>Math.abs(v-mean)/mean*100));
-      this.crossSource={sources_agreeing:prices.length,max_discrepancy_pct:maxDisc,discrepancy_flag:maxDisc>0.5};
+    async loadAnomalies() {
+      try{const r=await fetch(`/api/anomaly/detect?asset=${this.asset}`,{cache:'no-store'});if(r.ok)this.anomalyEvents=await r.json();}catch(e){}
+    },
+    async loadForecastAccuracy() {
+      try{const r=await fetch(`/api/analytics/forecast-accuracy?asset=${this.asset}&max_runs=5`,{cache:'no-store'});if(r.ok)this.forecastAccuracy=await r.json();}catch(e){}
     },
     async loadTab() {
       if(this.tab==='forecast')this.loadForecastData();
@@ -323,7 +322,8 @@ function helixApp() {
       try{
         const muted=getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()||'#9aa8c4';
         const primary=getComputedStyle(document.documentElement).getPropertyValue('--spark').trim()||'#60a5fa';
-        fetch(`/api/trends?asset=${this.asset}&window=7d`,{cache:'no-store'})
+        const tr=this.timeRange||'7d';
+        fetch(`/api/trends?asset=${this.asset}&window=${tr}`,{cache:'no-store'})
           .then(r=>r.ok?r.json():null)
           .then(t=>{
             if(this.asset!==_asset) return;
@@ -405,6 +405,22 @@ function helixApp() {
         window._helixResizeHandler=()=>{for(const[_,c]of this._charts){if(!c.isDisposed())c.resize();}};
         window.addEventListener('resize',window._helixResizeHandler);
       }
+    },
+    switchTo(symbol) {
+      this.asset=symbol;
+      this.switchAsset();
+    },
+    loadChartRange() {
+      this.loadTrendChart();
+      this.renderCharts({chains:this.chains});
+    },
+    sparkline(key) {
+      const pts=this._trendCache[key||'signal'];
+      if(!pts||pts.length<2)return '0,10 60,10';
+      const max=Math.max(...pts),min=Math.min(...pts),range=max-min||1;
+      const w=60,h=20;
+      const step=w/(pts.length-1);
+      return pts.map((v,i)=>`${(i*step).toFixed(1)},${(h-((v-min)/range)*(h-4)-2).toFixed(1)}`).join(' ');
     },
     async switchAsset() {
       this.destroyCharts();

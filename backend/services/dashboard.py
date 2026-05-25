@@ -12,8 +12,10 @@ from database import AssetChainSnapshot, SourceStatus
 from schemas import (
     AssetMetadataOut,
     AssetSignalOut,
+    AttestationOut,
     ChainConcentrationOut,
     ChainSignalOut,
+    CrossSourceSignalOut,
     DashboardChainRow,
     DashboardResponse,
     DataConfidenceOut,
@@ -21,6 +23,7 @@ from schemas import (
     DepegIndexOut,
     FreshnessOut,
     SourceStatusOut,
+    SupplyFeedOut,
     SupplyMomentumOut,
 )
 from signal_engine import scoring
@@ -204,6 +207,51 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
     degraded_sources = [s.source_name for s in sources_orm if s.status != "ok"]
     using_cached = len(degraded_sources) > 0
 
+    prices_all = [c.price for c in chains_orm if c.price is not None]
+    prices_cg = [c.price_coingecko for c in chains_orm if c.price_coingecko is not None]
+    prices_ds = [c.price_dexscreener for c in chains_orm if c.price_dexscreener is not None]
+    all_prices = prices_all + prices_cg + prices_ds
+    cross_source = CrossSourceSignalOut()
+    if len(all_prices) >= 2:
+        avg_p = sum(all_prices) / len(all_prices)
+        max_disc = max(abs(p - avg_p) / avg_p * 100 if avg_p else 0 for p in all_prices)
+        cross_source = CrossSourceSignalOut(
+            sources_agreeing=len(all_prices),
+            max_discrepancy_pct=round(max_disc, 4),
+            discrepancy_flag=max_disc > 0.5,
+            avg_price=round(avg_p, 6),
+        )
+
+    supply_feed = SupplyFeedOut()
+    defillama_source = next((s for s in sources_orm if s.source_name == "defillama"), None)
+    if defillama_source and defillama_source.last_successful_fetch:
+        feed_age = (now - utc_normalize(defillama_source.last_successful_fetch)).total_seconds() / 60
+        supply_feed = SupplyFeedOut(
+            age_minutes=round(feed_age, 1),
+            status="fresh" if feed_age < 15 else ("aging" if feed_age < 60 else "stale"),
+            label="Fresh" if feed_age < 15 else ("Aging" if feed_age < 60 else "Stale"),
+            note=f"DefiLlama supply feed last updated {feed_age:.0f} min ago",
+        )
+
+    attestation_signal = AttestationOut()
+    try:
+        from services.osint import get_attestation_status
+        att = get_attestation_status(db)
+        if selected_symbol in att:
+            a = att[selected_symbol]
+            att_age = a.get("attestation_age_days")
+            if att_age is not None:
+                att_status = "fresh" if att_age < 90 else ("aging" if att_age < 180 else "stale")
+                attestation_signal = AttestationOut(
+                    status=att_status,
+                    age_days=att_age,
+                    last_report_date=a.get("latest_attestation_report_date"),
+                    label="Fresh" if att_age < 90 else ("Aging" if att_age < 180 else "Stale"),
+                    note=f"{att_age:.0f}d since last attestation report",
+                )
+    except Exception:
+        pass
+
     from providers.settings import get_setting
     nlp_from_settings = get_setting("feature_nlp_sentiment", db)
     nlp_from_env = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
@@ -221,6 +269,9 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         asset_signal=asset_signal,
         depeg_index=depeg_index,
         chain_concentration=chain_concentration,
+        cross_source_signal=cross_source,
+        supply_feed=supply_feed,
+        attestation=attestation_signal,
         total_supply_current=total_supply,
         total_supply_change_24h_pct=total_change_24h_pct,
         chains=dashboard_chains,

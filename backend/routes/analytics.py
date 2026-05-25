@@ -52,6 +52,18 @@ def api_finbert_sentiment(
     return model.predict({"text": text})
 
 
+@router.get("/analytics/forecast-accuracy")
+@limiter.limit("30/minute")
+def api_forecast_accuracy(
+    request: Request,
+    asset: str = Query(...),
+    max_runs: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.forecast_accuracy import compute_forecast_accuracy
+    return compute_forecast_accuracy(db, asset_symbol=asset, max_runs=max_runs)
+
+
 @router.get("/anomaly/detect")
 @limiter.limit("30/minute")
 def api_anomaly_detect(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:

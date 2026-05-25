@@ -134,6 +134,8 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=256M
+    volumes:
+      - helix_timesfm_cache:/root/.cache/huggingface
     environment:
       MODEL_NAME: google/timesfm-2.5-200m-pytorch
       MAX_CONTEXT: ${TIMESFM_MAX_CONTEXT:-1024}
@@ -191,4 +193,5 @@ volumes:
   clickhouse_data:
   redis_data:
   mlflow_data:
+  helix_timesfm_cache:
 

@@ -92,6 +92,8 @@ frontend/main.js
 # --- AI/Dev tool artifacts ---
 .antigravitycli/
 .code-review-graph/
+.opencode/
+opencode.json
 
 # --- Internal / local docs and tracking (never commit) ---
 internal research/

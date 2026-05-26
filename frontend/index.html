@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  <!-- Defer Alpine auto-init until modules register components -->
-  <script>window.deferLoadingAlpine=function(cb){window._helixStartAlpine=cb};</script>
+  <!-- Block Alpine auto-scan until modules register components (prefix-override) -->
+  <script>document.addEventListener('alpine:init',()=>Alpine.prefix('x-alpine-'),{once:true});</script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>

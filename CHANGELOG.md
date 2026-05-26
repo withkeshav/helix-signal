@@ -4,7 +4,7 @@
 
 ### Bugfixes
 
-- **Blank page on deploy** — Removed `defer` from Alpine/Chart.js/ECharts CDN `<script>` tags in `frontend/index.html`. `defer` caused a race where Alpine tried to scan the DOM before `type="module" init.js` registered `Alpine.data('helixApp')`, producing `ReferenceError`s for `helixApp`, `init`, `tab`, `asset`, etc. CDN scripts now load synchronously in `<head>`; `deferLoadingAlpine` interceptor still defers the initial DOM scan.
+- **Blank page on deploy** — Alpine 3.14.9 CDN auto-starts via `queueMicrotask` before deferred `<script type="module">` scripts execute, causing `ReferenceError` for `helixApp`, `init`, `tab`, `asset`, etc. Fixed with Alpine prefix-override: `alpine:init` handler sets `Alpine.prefix('x-alpine-')` before the initial DOM scan (making it a no-op), then `init.js` restores `Alpine.prefix('x-')` and calls `Alpine.initTree(document.documentElement)` after registering all components.
 - **Chart flicker** — ECharts instances stored in separate `_echarts` Map distinct from Chart.js `_charts` Map. `destroyCharts()` no longer wipes forecast charts during the 60s auto-refresh timer. `destroyForecastCharts()` added and called on `switchAsset`/`cycleTheme`/`loadChartRange`. `_setupResizeHandler()` resizes both chart types.
 - **Overlapping 60s refresh** — `_loadingDashboard` guard prevents concurrent `loadDashboard()` calls. `loadTab()` uses `await` on all tab loaders.
 - **cycleTheme() re-render** — `destroyForecastCharts()` followed by `renderForecastCharts()` when on the Forecast tab, preventing blank charts after theme toggle.

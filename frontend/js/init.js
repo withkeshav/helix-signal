@@ -386,4 +386,5 @@ Alpine.data('helixApp', () => {
   };
 });
 
-if (window._helixStartAlpine) window._helixStartAlpine();
+Alpine.prefix('x-');
+Alpine.initTree(document.documentElement);

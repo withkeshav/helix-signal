@@ -3,6 +3,7 @@ import { helixMarket } from './market.js';
 import { helixOSINT } from './osint.js';
 import { helixGovernance } from './governance.js';
 import { helixForecast } from './forecast.js';
+import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js';
 
 Alpine.data('helixApp', () => {
   const m = helixMarket();
@@ -386,5 +387,4 @@ Alpine.data('helixApp', () => {
   };
 });
 
-Alpine.prefix('x-');
-Alpine.initTree(document.documentElement);
+Alpine.start();

@@ -4,7 +4,7 @@
 
 ### Bugfixes
 
-- **Blank page on deploy** — Alpine 3.14.9 CDN auto-starts via `queueMicrotask` before deferred `<script type="module">` scripts execute, causing `ReferenceError` for `helixApp`, `init`, `tab`, `asset`, etc. Fixed with Alpine prefix-override: `alpine:init` handler sets `Alpine.prefix('x-alpine-')` before the initial DOM scan (making it a no-op), then `init.js` restores `Alpine.prefix('x-')` and calls `Alpine.initTree(document.documentElement)` after registering all components.
+- **Blank page on deploy** — Alpine 3.14.9 CDN auto-starts via `queueMicrotask(() => Vt.start())` before deferred `<script type="module">` scripts execute, causing `ReferenceError: helixApp is not defined`. Switched from CDN `<script src="...cdn.min.js">` to ESM module import (`import Alpine from '.../module.esm.js'`) — the ESM build has no auto-start, Alpine is imported as a hoisted dependency, and `Alpine.start()` is called manually after all component registration.
 - **Chart flicker** — ECharts instances stored in separate `_echarts` Map distinct from Chart.js `_charts` Map. `destroyCharts()` no longer wipes forecast charts during the 60s auto-refresh timer. `destroyForecastCharts()` added and called on `switchAsset`/`cycleTheme`/`loadChartRange`. `_setupResizeHandler()` resizes both chart types.
 - **Overlapping 60s refresh** — `_loadingDashboard` guard prevents concurrent `loadDashboard()` calls. `loadTab()` uses `await` on all tab loaders.
 - **cycleTheme() re-render** — `destroyForecastCharts()` followed by `renderForecastCharts()` when on the Forecast tab, preventing blank charts after theme toggle.

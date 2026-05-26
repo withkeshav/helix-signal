@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 _AI_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "1800"))
+_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "3600"))
 _LOCAL_DAILY_TOKENS = 0
 
 
@@ -166,7 +166,7 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
     "risk_explain": {
         "system": (
             "You are a stablecoin risk analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 2-3 bullet points starting with '-'. Be concise and data-driven. "
+            "Output 2-3 bullet points starting with '-'. Limit: ~80 words. Be concise and data-driven. "
             "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
             "knowledge or fabricate numbers. If data doesn't support a claim, say so."
         ),
@@ -178,13 +178,13 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Web Search Results:\n{web_search_results}\n"
             "Explain the key risk driver."
         ),
-        "max_tokens_lite": 200,
-        "max_tokens_full": 350,
+        "max_tokens_lite": 350,
+        "max_tokens_full": 500,
     },
     "market_narrative": {
         "system": (
             "You are a crypto market analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 3-5 bullet points starting with '-'. Cover: key driver, market context, what to watch. "
+            "Output 3-4 bullet points starting with '-'. Limit: ~120 words. Cover: key driver, market context, what to watch. "
             "Be specific and data-driven. "
             "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
             "knowledge or fabricate numbers. If data doesn't support a claim, say so."
@@ -201,8 +201,8 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Web Search Results:\n{web_search_results}\n"
             "Explain the current market narrative and what to watch."
         ),
-        "max_tokens_lite": 350,
-        "max_tokens_full": 500,
+        "max_tokens_lite": 500,
+        "max_tokens_full": 700,
     },
     "anomaly_investigation": {
         "system": (
@@ -224,7 +224,7 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
     "market_overview": {
         "system": (
             "You are a crypto market intelligence analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 3-5 bullet points starting with '-'. Cover: overall market health, notable trends, "
+            "Output 4-5 bullet points starting with '-'. Limit: ~180 words. Cover: overall market health, notable trends, "
             "risk concentrations, and assets to watch. Be specific and data-driven. "
             "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
             "knowledge or fabricate numbers. If data doesn't support a claim, say so."
@@ -238,13 +238,13 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Provide a market-wide intelligence overview covering overall stability, "
             "notable divergences, and assets requiring attention."
         ),
-        "max_tokens_lite": 400,
-        "max_tokens_full": 600,
+        "max_tokens_lite": 800,
+        "max_tokens_full": 1200,
     },
     "insight_summary": {
         "system": (
             "You are a stablecoin intelligence analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 3-4 bullet points starting with '-'. Cover: stability status, key trends, risk watch. "
+            "Output 3-4 bullet points starting with '-'. Limit: ~120 words. Cover: stability status, key trends, risk watch. "
             "Be specific and data-driven. "
             "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
             "knowledge or fabricate numbers. If data doesn't support a claim, say so."
@@ -260,8 +260,8 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
             "Web Search Results:\n{web_search_results}\n"
             "What are the most important trends and risks?"
         ),
-        "max_tokens_lite": 350,
-        "max_tokens_full": 500,
+        "max_tokens_lite": 500,
+        "max_tokens_full": 700,
     },
 }
 
@@ -316,6 +316,7 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
             if result is None:
                 continue
             tokens_returned = int(result.get("tokens") or 0)
+            now_dt = datetime.now(timezone.utc)
             payload = {
                 "available": True,
                 "mode": mode,
@@ -325,6 +326,8 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
                 "summary": result["text"].strip().replace("**", ""),
                 "tokens": tokens_returned,
                 "cached": False,
+                "generated_at": now_dt.isoformat(),
+                "expires_at": datetime.fromtimestamp(now_dt.timestamp() + _CACHE_TTL_SECONDS, tz=timezone.utc).isoformat(),
             }
             _cache_set(cache_key, payload)
             return payload

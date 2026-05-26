@@ -1,4 +1,4 @@
-import { formatUsd, formatWhen, formatFeedAge, statusBand, pegLabel } from './utils.js';
+import { formatUsd, formatWhen, formatFeedAge, statusBand, pegLabel, formatAiAge } from './utils.js';
 import { helixMarket } from './market.js';
 import { helixOSINT } from './osint.js';
 import { helixGovernance } from './governance.js';
@@ -22,6 +22,7 @@ Alpine.data('helixApp', () => {
     formatFeedAge,
     statusBand,
     pegLabel,
+    formatAiAge,
 
     tab: 'overview',
     theme: 'light',
@@ -43,6 +44,14 @@ Alpine.data('helixApp', () => {
     aiInsights: '',
     marketOverview: '',
     _marketOverviewLoaded: false,
+    aiGeneratedAt: '',
+    aiExpiresAt: '',
+    aiNarrativeGeneratedAt: '',
+    aiNarrativeExpiresAt: '',
+    aiInsightsGeneratedAt: '',
+    aiInsightsExpiresAt: '',
+    marketOverviewGeneratedAt: '',
+    marketOverviewExpiresAt: '',
     tickerItems: [],
     evidenceOpen: false,
     evidenceTitle: '',
@@ -198,12 +207,15 @@ Alpine.data('helixApp', () => {
         this.predictive = pred || {};
         this.tickerItems = await this.loadTicker();
 
-        this.aiSummary = await this.loadAiExplain(this.asset);
-        this.aiNarrative = await this.loadNarrative(this.asset);
-        this.aiInsights = await this.loadInsights(this.asset);
+        { const r = await this.loadAiExplain(this.asset); this.aiSummary = r.summary; this.aiGeneratedAt = r.generatedAt; this.aiExpiresAt = r.expiresAt; }
+        { const r = await this.loadNarrative(this.asset); this.aiNarrative = r.summary; this.aiNarrativeGeneratedAt = r.generatedAt; this.aiNarrativeExpiresAt = r.expiresAt; }
+        { const r = await this.loadInsights(this.asset); this.aiInsights = r.summary; this.aiInsightsGeneratedAt = r.generatedAt; this.aiInsightsExpiresAt = r.expiresAt; }
 
         if (!this._marketOverviewLoaded) {
-          this.marketOverview = await this.loadMarketOverview();
+          const r = await this.loadMarketOverview();
+          this.marketOverview = r.summary;
+          this.marketOverviewGeneratedAt = r.generatedAt;
+          this.marketOverviewExpiresAt = r.expiresAt;
           this._marketOverviewLoaded = true;
         }
 

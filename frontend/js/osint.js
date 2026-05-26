@@ -40,33 +40,33 @@ export function helixOSINT() {
     async loadAiExplain(asset) {
       try {
         const r = await fetch(`/api/ai/explain?asset=${asset}`, { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return j.available ? j.summary : (j.reason || ''); }
+        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
       } catch (e) {}
-      return '';
+      return { summary: '', generatedAt: '', expiresAt: '' };
     },
 
     async loadNarrative(asset) {
       try {
         const r = await fetch(`/api/ai/narrative?asset=${asset}`, { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return j.available ? j.summary : (j.reason || ''); }
+        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
       } catch (e) {}
-      return '';
+      return { summary: '', generatedAt: '', expiresAt: '' };
     },
 
     async loadInsights(asset) {
       try {
         const r = await fetch(`/api/ai/insights?asset=${asset}`, { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return j.available ? j.summary : (j.reason || ''); }
+        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
       } catch (e) {}
-      return '';
+      return { summary: '', generatedAt: '', expiresAt: '' };
     },
 
     async loadMarketOverview() {
       try {
         const r = await fetch('/api/ai/market-overview', { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return j.available ? j.summary : (j.reason || ''); }
+        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
       } catch (e) {}
-      return '';
+      return { summary: '', generatedAt: '', expiresAt: '' };
     },
   };
 }

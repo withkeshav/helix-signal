@@ -308,7 +308,10 @@
     <div class="tab-content" :class="tab === 'overview' && 'active'">
       <!-- Market Overview -->
       <div class="insight-card glass" x-show="marketOverview" style="margin-bottom:12px">
-        <h2 style="margin:0 0 8px;font-size:13px;text-transform:uppercase;color:var(--muted)">Market Overview <span class="model-badge">AI</span></h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:13px;text-transform:uppercase;color:var(--muted)">Market Overview <span class="model-badge">AI</span></h2>
+          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(marketOverviewGeneratedAt, marketOverviewExpiresAt)"></span>
+        </div>
         <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
       </div>
       <!-- Risk Terminal -->
@@ -322,7 +325,10 @@
             <text x="50" y="64" text-anchor="middle" font-size="9" fill="var(--muted)" x-text="signal.band || ''"></text>
           </svg>
           <div>
-            <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
+              <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiGeneratedAt, aiExpiresAt)"></span>
+            </div>
             <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
             <p class="kpi-sub" style="margin-top:8px;white-space:pre-wrap" x-show="aiSummary" x-text="aiSummary"></p>
             <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} · v${predictive.model_version ?? predictive.version ?? '1.0'}`"></span>
@@ -331,12 +337,18 @@
       </div>
       <!-- AI Market Narrative -->
       <div class="insight-card glass" x-show="aiNarrative" style="margin-bottom:10px">
-        <h2>Market Narrative <span class="model-badge">AI</span></h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Market Narrative <span class="model-badge">AI</span></h2>
+          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiNarrativeGeneratedAt, aiNarrativeExpiresAt)"></span>
+        </div>
         <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
       </div>
       <!-- AI Insights -->
       <div class="insight-card glass" x-show="aiInsights" style="margin-bottom:10px">
-        <h2>Analytics Insight <span class="model-badge">AI</span></h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Analytics Insight <span class="model-badge">AI</span></h2>
+          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiInsightsGeneratedAt, aiInsightsExpiresAt)"></span>
+        </div>
         <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
       </div>
       <!-- Time Range Selector -->

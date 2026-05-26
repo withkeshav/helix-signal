@@ -12,13 +12,11 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 
 ## v3.6.0 Highlights
 
-- **MCP server** (`backend/mcp_server.py`) — standalone FastMCP server on port 8100 with tools (dashboard, explain, trend, forecast); Stdio and SSE transport
-- **Circuit-breaker anomaly agent** (`backend/agents/anomaly_agent.py`) — event-driven anomaly detection, forecast, and alert dispatch with configurable circuit breaker
-- **Event-driven refresh pipeline** — `_refresh_job()` refactored to sources → signal → anomalies → alerts with clear separation
-- **Modular frontend** — monolithic `frontend/app.js` replaced by 9 ES6 modules under `frontend/js/`: market, osint, governance, forecast + 3 Web Components (trend-chart, gauge-chart, pool-chart) + init.js orchestrator
-- **OLAP support** — `backend/core/olap.py` + `backend/services/olap_service.py` for ClickHouse analytical queries
-- **`_ollama_cloud()` provider** — OpenAI-compatible endpoint at `https://ollama.com/v1/chat/completions` for AI features without local GPU
-- **`deferLoadingAlpine` interceptor** — ensures Alpine.data() registrations complete before DOM scan
+- **Chart flicker eliminated** — ECharts stored in separate `_echarts` Map; `destroyCharts()` no longer wipes forecast charts on 60s auto-refresh
+- **Forecast API restored** — `GET /api/forecasts?asset=X` + `GET /api/analytics/forecast-accuracy` with ORM models, rate limits, and 5 integration tests
+- **AI cost containment** — All AI features share a single budget pool via Redis `INCRBY`; `AI_MODE=off` is the total kill switch; pre-pay budget estimation before provider calls
+- **Blank page fix** — Removed `defer` from CDN script tags (Alpine/Chart.js/ECharts) to eliminate race condition with ES6 module init
+- **99 regression tests pass** — Zero regressions across all endpoints
 
 ## v3.3 Highlights
 

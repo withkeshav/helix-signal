@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.6.0 (2026-05-26)
+
+### Bugfixes
+
+- **Blank page on deploy** — Removed `defer` from Alpine/Chart.js/ECharts CDN `<script>` tags in `frontend/index.html`. `defer` caused a race where Alpine tried to scan the DOM before `type="module" init.js` registered `Alpine.data('helixApp')`, producing `ReferenceError`s for `helixApp`, `init`, `tab`, `asset`, etc. CDN scripts now load synchronously in `<head>`; `deferLoadingAlpine` interceptor still defers the initial DOM scan.
+- **Chart flicker** — ECharts instances stored in separate `_echarts` Map distinct from Chart.js `_charts` Map. `destroyCharts()` no longer wipes forecast charts during the 60s auto-refresh timer. `destroyForecastCharts()` added and called on `switchAsset`/`cycleTheme`/`loadChartRange`. `_setupResizeHandler()` resizes both chart types.
+- **Overlapping 60s refresh** — `_loadingDashboard` guard prevents concurrent `loadDashboard()` calls. `loadTab()` uses `await` on all tab loaders.
+- **cycleTheme() re-render** — `destroyForecastCharts()` followed by `renderForecastCharts()` when on the Forecast tab, preventing blank charts after theme toggle.
+- **Duplicate route registration** — Removed second `app.include_router(settings_router, prefix="/api")` in `backend/routes/__init__.py`.
+
+### API & Backend
+
+- **Forecast API restored** — `ForecastRun` + `ForecastPoint` ORM models in `backend/database.py`. `GET /api/forecasts?asset=X` returns forecasts, points (with `peg`/`supply` aliases), and historical data. `GET /api/analytics/forecast-accuracy` computes accuracy against actuals. Both routers registered and rate-limited.
+- **5 forecast endpoint tests** — `backend/tests/test_forecasts.py` covers empty DB, populated DB, and invalid asset scenarios (99 total tests).
+
+### AI Cost Leaks
+
+- **`_extract_report_date_via_llm`** — Gated on `ai_mode() != "ai_off"` and calls shared `_within_budget()` in `backend/services/osint.py`.
+- **Sentiment budget** — `_within_sentiment_budget()` now delegates to `ai_router._within_budget()` — single Redis pool, shared key `helix:ai:daily_tokens:*`. Local budget tracking removed.
+- **Pre-pay budget** — `enrich_with_ai()` estimates tokens (`max_tokens + len(prompt.split())`) and reserves via `INCRBY` before the provider call. All AI features gated by `AI_MODE` env var.
+
 ## 3.5.1 (2026-05-25)
 
 ### Security (Audit v1–v3 Remediation)

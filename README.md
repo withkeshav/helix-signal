@@ -8,7 +8,17 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**106 regression tests pass.** Zero paid API dependencies for core operation.
+**99 regression tests pass.** Zero paid API dependencies for core operation.
+
+## v3.6.0 Highlights
+
+- **MCP server** (`backend/mcp_server.py`) — standalone FastMCP server on port 8100 with tools (dashboard, explain, trend, forecast); Stdio and SSE transport
+- **Circuit-breaker anomaly agent** (`backend/agents/anomaly_agent.py`) — event-driven anomaly detection, forecast, and alert dispatch with configurable circuit breaker
+- **Event-driven refresh pipeline** — `_refresh_job()` refactored to sources → signal → anomalies → alerts with clear separation
+- **Modular frontend** — monolithic `frontend/app.js` replaced by 9 ES6 modules under `frontend/js/`: market, osint, governance, forecast + 3 Web Components (trend-chart, gauge-chart, pool-chart) + init.js orchestrator
+- **OLAP support** — `backend/core/olap.py` + `backend/services/olap_service.py` for ClickHouse analytical queries
+- **`_ollama_cloud()` provider** — OpenAI-compatible endpoint at `https://ollama.com/v1/chat/completions` for AI features without local GPU
+- **`deferLoadingAlpine` interceptor** — ensures Alpine.data() registrations complete before DOM scan
 
 ## v3.3 Highlights
 
@@ -177,21 +187,22 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 ## Project Structure
 
 - `backend/` — FastAPI app, multi-source ingestion, analytics engine, alerts, OSINT, ML models
-- `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter)
-- `backend/ml_models/` — model plugins (TimesFM, anomaly, FinBERT) with discoverable registry
+- `backend/agents/` — event-driven agents (anomaly detection, forecast, alert dispatch)
+- `backend/chain/` — blockchain data retrieval layer
+- `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter, OLAP)
+- `backend/mcp_server.py` — standalone FastMCP server (port 8100, Stdio/SSE transport)
 - `backend/middleware/` — security validation + observability middleware
 - `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, etc.)
 - `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener) with circuit breakers
 - `backend/signal_engine/` — V3 risk scoring (scoring, metrics, history, risk inputs)
-- `frontend/` — Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
+- `frontend/` — pure static HTML, Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
+- `frontend/js/` — ES6 modules (market, osint, governance, forecast) + 3 Web Components + init.js
 - `config/` — chain, asset, and alert configuration
 - `docker/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
 - `docs/` — architecture, data methodology, adding-asset, adding-chain, plugins, API ref, grant strategy
 - `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration
 
-Phase logs and server runbooks live under `.progress/` (gitignored). Planning briefs and `research/` are local only too.
-
-**SQLite → Postgres on a server:** run [`scripts/migrate_sqlite_to_postgres.py`](scripts/migrate_sqlite_to_postgres.py) with backups and `--verify-only` before cutover. Full no-data-loss steps are in `.progress/SERVER_MIGRATION.md` (local).
+**SQLite → Postgres on a server:** run [`scripts/migrate_sqlite_to_postgres.py`](scripts/migrate_sqlite_to_postgres.py) with backups and `--verify-only` before cutover.
 
 ## Documentation (in repo)
 

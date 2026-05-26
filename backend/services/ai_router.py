@@ -204,6 +204,23 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
         "max_tokens_lite": 350,
         "max_tokens_full": 500,
     },
+    "anomaly_investigation": {
+        "system": (
+            "You are a stablecoin forensics analyst. Plain text only — no markdown, no bold, no italics. "
+            "Output 2-3 bullet points starting with '-'. Cover: likely cause, market impact, recommended action. "
+            "Be specific and data-driven. CRITICAL: Use ONLY the data provided below. Do NOT use your "
+            "internal training knowledge or fabricate numbers. If data doesn't support a claim, say so."
+        ),
+        "user": (
+            "Asset: {asset_symbol}\n"
+            "Highest Z-Score: {z_score_max}\n"
+            "Anomaly Metrics: {anomalies}\n"
+            "Bridge Flow: {bridge_flow}\n"
+            "Investigate the root cause and recommend action."
+        ),
+        "max_tokens_lite": 200,
+        "max_tokens_full": 400,
+    },
     "insight_summary": {
         "system": (
             "You are a stablecoin intelligence analyst. Plain text only — no markdown, no bold, no italics. "
@@ -269,14 +286,16 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
     prompt, system, max_tokens = _build_prompt(feature, context)
     errors: list[str] = []
 
+    estimated_tokens = max_tokens + len(prompt.split())
+    if not _within_budget(estimated_tokens):
+        return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
+
     for provider_fn in _providers_for_mode(mode, priority=priority):
         try:
             result = provider_fn(prompt, max_tokens, system=system)
             if result is None:
                 continue
             tokens_returned = int(result.get("tokens") or 0)
-            if not _within_budget(tokens_returned):
-                return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
             payload = {
                 "available": True,
                 "mode": mode,

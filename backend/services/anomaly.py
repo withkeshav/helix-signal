@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
-from database import AssetTrendSnapshot, SignalEvent
+from database import AssetChainSnapshot, AssetTrendSnapshot, SignalEvent
 
 log = get_logger(__name__)
 
@@ -97,6 +97,41 @@ def _load_model(name: str) -> Any | None:
         return None
 
 
+def _check_bridge_flow(db: Session, *, asset_symbol: str, threshold_pct: float = 5.0) -> dict[str, Any]:
+    rows = (
+        db.query(AssetChainSnapshot)
+        .filter(AssetChainSnapshot.asset_symbol == asset_symbol)
+        .all()
+    )
+    if len(rows) < 2:
+        return {"active": False, "chains": 0}
+    chains_with_flow = 0
+    total_supply = 0.0
+    chain_supplies: dict[str, float] = {}
+    for row in rows:
+        sup = row.supply_current
+        if sup is not None:
+            s = float(sup)
+            chain_supplies[row.chain_name] = s
+            total_supply += s
+    if total_supply == 0:
+        return {"active": False, "chains": len(chain_supplies)}
+    for chain, sup in chain_supplies.items():
+        pct = (sup / total_supply) * 100
+        if pct >= threshold_pct:
+            chains_with_flow += 1
+    threshold_reached = chains_with_flow >= 2
+    if threshold_reached:
+        log.info("bridge_flow_detected", asset=asset_symbol, chain_count=chains_with_flow, chains=list(chain_supplies.keys()))
+    return {
+        "active": threshold_reached,
+        "chains": len(chain_supplies),
+        "chains_with_flow": chains_with_flow,
+        "chain_supplies": chain_supplies,
+        "total_supply": total_supply,
+    }
+
+
 def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     if not ENABLED:
         return {"enabled": False, "note": "Anomaly detection is disabled. Set ENABLE_ANOMALY_DETECTION=true to enable."}
@@ -104,6 +139,9 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     if not history["prices"]:
         return {"asset": asset_symbol, "anomalies": [], "note": "Insufficient history (need >=10 points)."}
     results: dict[str, Any] = {"asset": asset_symbol, "z_score": [], "isolation_forest": []}
+
+    bridge = _check_bridge_flow(db, asset_symbol=asset_symbol)
+    results["bridge_flow"] = bridge
 
     supply_anomalies = zscore_detect(history["supplies"])
     price_anomalies = zscore_detect(history["prices"])
@@ -165,40 +203,6 @@ def train_models(db: Session, *, asset_symbol: str) -> dict[str, Any]:
         return {"asset": asset_symbol, "trained": False, "error": str(exc)}
 
 
-def statsforecast_supply(db: Session, *, asset_symbol: str, hours: int = 24) -> dict[str, Any]:
-    if not ENABLED:
-        return {"enabled": False}
-    history = _fetch_trend_history(db, asset_symbol=asset_symbol, window_days=30)
-    if len(history["timestamps"]) < 20:
-        return {"asset": asset_symbol, "note": "Need >=20 historical points for forecast.", "forecast": []}
-    try:
-        import pandas as pd
-        from statsforecast import StatsForecast
-        from statsforecast.models import AutoARIMA
-        series: list[dict[str, Any]] = []
-        for i, ts in enumerate(history["timestamps"]):
-            supply = history["supplies"][i] if i < len(history["supplies"]) else None
-            if supply is not None:
-                series.append({"ds": ts, "y": supply, "unique_id": asset_symbol})
-        if len(series) < 20:
-            return {"asset": asset_symbol, "note": "Insufficient supply data.", "forecast": []}
-        df = pd.DataFrame(series)
-        # 5-minute buckets: 288 steps per day for daily seasonality
-        sf = StatsForecast(models=[AutoARIMA(season_length=288)], freq="5min", n_jobs=1)
-        sf.fit(df)
-        fcast = sf.forecast(h=min(hours * 12, 288))
-        forecast_points: list[dict[str, Any]] = []
-        for idx, row in fcast.iterrows():
-            forecast_points.append({
-                "timestamp": idx[1].isoformat().replace("+00:00", "Z"),
-                "predicted_supply": float(row.get("AutoARIMA", 0)),
-            })
-        return {"asset": asset_symbol, "forecast_hours": hours, "forecast": forecast_points}
-    except Exception as exc:
-        log.warning("statsforecast_failed", error=str(exc))
-        return {"asset": asset_symbol, "note": f"Forecast failed: {exc}", "forecast": []}
-
-
 def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, Any]) -> int:
     count = 0
     for z_type, z_data in anomalies.get("z_score", {}).items():
@@ -221,7 +225,3 @@ def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, 
                 db.add(row)
                 count += 1
     return count
-
-
-def forecast_supply(db: Session, *, asset_symbol: str, hours: int = 24) -> dict[str, Any]:
-    return statsforecast_supply(db, asset_symbol=asset_symbol, hours=hours)

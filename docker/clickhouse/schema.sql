@@ -36,20 +36,4 @@ CREATE TABLE IF NOT EXISTS chain_trend_snapshots (
 PARTITION BY toYYYYMM(timestamp)
 ORDER BY (asset_symbol, chain_key, timestamp);
 
-CREATE TABLE IF NOT EXISTS forecast_points (
-    run_id String,
-    model_name LowCardinality(String),
-    model_version LowCardinality(String),
-    asset_symbol String,
-    chain_key Nullable(String),
-    target_metric String,
-    forecast_timestamp DateTime64(3, 'UTC'),
-    horizon_step UInt16,
-    point_forecast Nullable(Float64),
-    q10 Nullable(Float64),
-    q50 Nullable(Float64),
-    q90 Nullable(Float64),
-    created_at DateTime DEFAULT now()
-) ENGINE = ReplacingMergeTree(created_at)
-PARTITION BY toYYYYMM(forecast_timestamp)
-ORDER BY (asset_symbol, target_metric, run_id, forecast_timestamp);
+

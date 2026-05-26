@@ -9,7 +9,6 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, AssetTrendSnapshot
-from services.ml_registry import log_predictive_run
 from services.onnx_inference import build_feature_vector, predict_depeg_probability
 from signal_engine.metrics import compute_asset_metric_bundle
 from signal_engine.risk_inputs import build_risk_score_kwargs, compute_unified_risk_score
@@ -78,7 +77,6 @@ def run_predictive_bundle(
     db: Session,
     *,
     asset_symbol: str,
-    log_to_mlflow: bool = True,
 ) -> dict[str, Any]:
     sym = asset_symbol.upper()
     bundle = compute_asset_metric_bundle(db, asset_symbol=sym)
@@ -119,38 +117,7 @@ def run_predictive_bundle(
 
     enabled = os.getenv("ENABLE_PREDICTIVE", "true").strip().lower() not in ("0", "false", "no")
 
-    timesfm_forecast = None
-    tf_endpoint = os.getenv("TIMESFM_ENDPOINT", "")
-    if tf_endpoint:
-        try:
-            from datetime import datetime, timedelta, timezone
-
-            cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-            rows = (
-                db.query(AssetTrendSnapshot)
-                .filter(
-                    AssetTrendSnapshot.asset_symbol == sym,
-                    AssetTrendSnapshot.timestamp >= cutoff,
-                )
-                .order_by(AssetTrendSnapshot.timestamp.asc())
-                .all()
-            )
-            if len(rows) >= 10:
-                values = [r.price for r in rows if r.price is not None]
-                tss = [r.timestamp.isoformat() for r in rows if r.price is not None]
-                if len(values) >= 10:
-                    import requests
-                    resp = requests.post(
-                        f"{tf_endpoint}/forecast",
-                        json={"series_id": f"{sym}_price", "values": values, "timestamps": tss, "horizon": 24},
-                        timeout=30,
-                    )
-                    if resp.status_code == 200:
-                        timesfm_forecast = resp.json()
-        except Exception:
-            pass
-
-    result = {
+    return {
         "asset_symbol": bundle.asset_symbol,
         "available": enabled,
         "signal_score": bundle.signal_score,
@@ -160,17 +127,8 @@ def run_predictive_bundle(
         "liquidity_expected_shortfall_pct": es,
         "model": depeg.get("model", "heuristic_v1"),
         "model_version": depeg.get("version", "1.0.0"),
-        "timesfm_forecast": timesfm_forecast,
-        "forecast_source": "timesfm" if timesfm_forecast else "none",
         "explainability": {
             "top_driver": "peg_stability" if bundle.depeg_index > 50 else "concentration",
             "data_confidence": bundle.data_confidence_label,
         },
     }
-    if log_to_mlflow:
-        log_predictive_run(
-            asset_symbol=bundle.asset_symbol,
-            metrics={"signal_score": bundle.signal_score, "depeg_index": bundle.depeg_index, "regime": regime},
-            params={"model": depeg.get("model")},
-        )
-    return result

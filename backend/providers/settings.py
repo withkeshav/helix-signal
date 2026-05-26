@@ -19,10 +19,8 @@ _DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "feature_osint_feed": {"label": "OSINT Feed (RSS)", "type": "bool", "default": True},
     "feature_nlp_sentiment": {"label": "Sentiment NLP (FinBERT)", "type": "bool", "default": False, "key_env": "ENABLE_NLP"},
     "feature_ai_summary": {"label": "AI Summary", "type": "bool", "default": True},
-    "feature_forecasting": {"label": "TimesFM Forecasting", "type": "bool", "default": True},
     "refresh_core_seconds": {"label": "Core data refresh interval", "type": "int", "default": 300, "min": 60, "max": 3600},
     "refresh_osint_minutes": {"label": "OSINT feed refresh interval", "type": "int", "default": 60, "min": 15, "max": 1440},
-    "refresh_forecast_minutes": {"label": "Forecast generation interval", "type": "int", "default": 30, "min": 15, "max": 1440},
 }
 
 

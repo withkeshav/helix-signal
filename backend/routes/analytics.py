@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.anomaly import detect_anomalies, forecast_supply
+from services.anomaly import detect_anomalies
 from services.analytics import compute_correlations, detect_patterns
 from services.compare import build_compare_payload
 
@@ -63,11 +63,10 @@ def api_finbert_sentiment(
 def api_forecast_accuracy(
     request: Request,
     asset: str = Query(...),
-    max_runs: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     from services.forecast_accuracy import compute_forecast_accuracy
-    return compute_forecast_accuracy(db, asset_symbol=asset, max_runs=max_runs)
+    return compute_forecast_accuracy(db, asset_symbol=asset)
 
 
 @router.get("/anomaly/detect")
@@ -76,12 +75,4 @@ def api_anomaly_detect(request: Request, asset: str = Query(...), db: Session = 
     return detect_anomalies(db, asset_symbol=asset)
 
 
-@router.get("/anomaly/forecast")
-@limiter.limit("30/minute")
-def api_anomaly_forecast(
-    request: Request,
-    asset: str = Query(...),
-    hours: int = Query(24, ge=1, le=168),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    return forecast_supply(db, asset_symbol=asset, hours=hours)
+

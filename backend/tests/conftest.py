@@ -19,9 +19,8 @@ _TABLES = [
     "chain_trend_snapshots",
     "osint_articles",
     "signal_events",
-    "forecast_runs",
     "forecast_points",
-    "ai_snapshots",
+    "forecast_runs",
 ]
 
 

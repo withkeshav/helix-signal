@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" x-data="helixApp()" x-init="init()">
+<html lang="en" x-data="helixApp" x-init="init()">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,10 +7,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  <script data-cfasync="false" src="app.js?v=13"></script>
+  <!-- Defer Alpine auto-init until modules register components -->
+  <script>window.deferLoadingAlpine=function(cb){window._helixStartAlpine=cb};</script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script type="module" src="/js/init.js"></script>
   <style>
     :root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06)}
     :root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35)}

@@ -21,8 +21,6 @@ _TABLES = [
     "chain_trend_snapshots",
     "osint_articles",
     "signal_events",
-    "forecast_runs",
-    "forecast_points",
 ]
 
 
@@ -47,23 +45,6 @@ def client():
     init_db()
     with TestClient(main.app) as test_client:
         yield test_client
-
-
-def test_metrics_endpoint(client, admin_headers):
-    response = client.get("/metrics", headers=admin_headers)
-    assert response.status_code == 200
-    body = response.text
-    assert "helix_http_requests_total" in body
-    assert "helix_scheduler_running" in body
-    assert "helix_trend_snapshot_rows" in body
-
-
-def test_metrics_gauge_values(client, admin_headers):
-    response = client.get("/metrics", headers=admin_headers)
-    assert response.status_code == 200
-    lines = response.text.splitlines()
-    gauges = [l for l in lines if l.startswith("helix_scheduler_running")]
-    assert any("1.0" in g for g in gauges)
 
 
 def test_osint_feed_empty(client):
@@ -94,13 +75,6 @@ def test_osint_attestation(client):
 
 def test_anomaly_detect_disabled(client):
     response = client.get("/api/anomaly/detect?asset=USDT")
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, dict)
-
-
-def test_anomaly_forecast_disabled(client):
-    response = client.get("/api/anomaly/forecast?asset=USDT")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, dict)

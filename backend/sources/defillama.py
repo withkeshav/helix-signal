@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
-from sources.base import AbstractSource, SourceError, http_get_with_retry
+from sources.base import AbstractSource, SourceError, async_http_get_with_retry, http_get_with_retry
 
 USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
 STABLECOIN_CHAINS_URL = "https://stablecoins.llama.fi/stablecoinchains"
@@ -26,9 +26,39 @@ def _discover_chain_ids() -> list[str]:
         return []
 
 
+async def _async_discover_chain_ids() -> list[str]:
+    try:
+        resp = await async_http_get_with_retry(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
+        payload = resp.json()
+        rows = payload if isinstance(payload, list) else payload.get("peggedAssets") or payload.get("chains") or []
+        return sorted({str(r["name"]) for r in rows if isinstance(r, dict) and r.get("name")})
+    except Exception:
+        return []
+
+
 def fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
     try:
         resp = http_get_with_retry(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
+        chains_payload = resp.json()
+    except Exception:
+        return {}
+    rows = chains_payload if isinstance(chains_payload, list) else chains_payload.get("peggedAssets") or chains_payload.get("chains") or []
+    out: dict[str, float] = {}
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or item.get("chain") or item.get("id") or "").strip()
+        if not name:
+            continue
+        tvl_value = item.get("tvl")
+        if isinstance(tvl_value, (int, float)):
+            out[name] = float(tvl_value)
+    return out
+
+
+async def async_fetch_chain_tvl_by_defillama_name() -> dict[str, float]:
+    try:
+        resp = await async_http_get_with_retry(STABLECOIN_CHAINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
         chains_payload = resp.json()
     except Exception:
         return {}
@@ -105,17 +135,45 @@ class _DefiLlamaSource(AbstractSource):
     name = "defillama"
 
     def fetch(self, **kwargs: Any) -> dict[str, Any]:
+        return self._do_fetch(httpx_client=self.get_http_session(), **kwargs)
+
+    async def async_fetch(self, **kwargs: Any) -> dict[str, Any]:
+        client = await self.get_async_http_session()
+        return await self._do_async_fetch(client=client, **kwargs)
+
+    def _do_fetch(self, *, httpx_client: httpx.Client, **kwargs: Any) -> dict[str, Any]:
         asset_config = kwargs.get("asset_config")
         chain_ids = kwargs.get("chain_ids", [])
         chain_tvl_by_name = kwargs.get("chain_tvl_by_name")
         if not asset_config:
             return {}
         symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
-        stablecoins_payload = http_get_with_retry(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
+        stablecoins_payload = httpx_client.get(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS).json()
         if not isinstance(stablecoins_payload, dict):
             raise DefiLlamaError("Unexpected payload")
-        selected_asset = None
-        for asset in stablecoins_payload.get("peggedAssets", []):
+        selected_asset = self._find_asset(stablecoins_payload, symbol)
+        if selected_asset is None:
+            raise DefiLlamaError(f"{symbol} asset not found")
+        return self._build_snapshot(selected_asset, chain_ids, chain_tvl_by_name, symbol, asset_config)
+
+    async def _do_async_fetch(self, *, client: httpx.AsyncClient, **kwargs: Any) -> dict[str, Any]:
+        asset_config = kwargs.get("asset_config")
+        chain_ids = kwargs.get("chain_ids", [])
+        chain_tvl_by_name = kwargs.get("chain_tvl_by_name")
+        if not asset_config:
+            return {}
+        symbol = str(asset_config.get("defillama_symbol") or asset_config.get("symbol") or "").upper()
+        resp = await client.get(USDT_STABLECOINS_URL, timeout=DEFAULT_TIMEOUT_SECONDS)
+        stablecoins_payload = resp.json()
+        if not isinstance(stablecoins_payload, dict):
+            raise DefiLlamaError("Unexpected payload")
+        selected_asset = self._find_asset(stablecoins_payload, symbol)
+        if selected_asset is None:
+            raise DefiLlamaError(f"{symbol} asset not found")
+        return self._build_snapshot(selected_asset, chain_ids, chain_tvl_by_name, symbol, asset_config)
+
+    def _find_asset(self, payload: dict, symbol: str) -> dict | None:
+        for asset in payload.get("peggedAssets", []):
             if not isinstance(asset, dict):
                 continue
             asset_symbol = str(asset.get("symbol", "")).upper()
@@ -123,10 +181,10 @@ class _DefiLlamaSource(AbstractSource):
             gecko_id = str(asset.get("gecko_id", "")).lower()
             desired = symbol.upper()
             if asset_symbol == desired or gecko_id == desired.lower() or desired.lower() in name:
-                selected_asset = asset
-                break
-        if selected_asset is None:
-            raise DefiLlamaError(f"{symbol} asset not found")
+                return asset
+        return None
+
+    def _build_snapshot(self, selected_asset: dict, chain_ids: list, chain_tvl_by_name: dict | None, symbol: str, asset_config: dict) -> dict[str, Any]:
         raw_circulating = selected_asset.get("chainCirculating", {})
         chain_circulating: dict = raw_circulating if isinstance(raw_circulating, dict) else {}
         current_map: dict[str, object] = {}

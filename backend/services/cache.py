@@ -14,7 +14,6 @@ CACHE_TTL = {
     "price": 30,
     "supply": 300,
     "trends": 600,
-    "forecasts": 900,
     "events": 300,
     "sources": 60,
 }

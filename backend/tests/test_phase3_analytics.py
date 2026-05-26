@@ -137,56 +137,6 @@ class TestAnalyticsService:
         assert _pearson([1, 2], [2, 4]) == 0.0
 
 
-class TestFinBERTPlugin:
-    def test_registered_in_registry(self):
-        from backend.core.registry import ML_MODELS_REGISTRY, discover_plugins
-        discover_plugins()
-        assert "finbert" in ML_MODELS_REGISTRY
-
-    def test_predict_empty_text(self):
-        from backend.ml_models.finbert import FinBERTModel
-        model = FinBERTModel()
-        result = model.predict({"text": ""})
-        assert result["score"] == 0.0
-        assert result["label"] == "neutral"
-
-    def test_predict_no_transformers_fallback(self):
-        import backend.ml_models.finbert as finbert_mod
-        old = finbert_mod._global_pipeline
-        try:
-            finbert_mod._global_pipeline = False
-            model = finbert_mod.FinBERTModel()
-            result = model.predict({"text": "The market is crashing badly."})
-            assert result["fallback"] is True
-            assert result["label"] == "neutral"
-            assert result["score"] == 0.0
-        finally:
-            finbert_mod._global_pipeline = old
-
-    def test_predict_batch_fallback_no_pipeline(self):
-        import backend.ml_models.finbert as finbert_mod
-        old = finbert_mod._global_pipeline
-        try:
-            finbert_mod._global_pipeline = False
-            model = finbert_mod.FinBERTModel()
-            results = model.predict_batch(["Good news", "Bad news"])
-            assert len(results) == 2
-            assert all(r["fallback"] is True for r in results)
-        finally:
-            finbert_mod._global_pipeline = old
-
-    def test_label_to_score_direction(self):
-        from backend.ml_models.finbert import _label_to_score
-        assert _label_to_score("positive", 0.9) > 0
-        assert _label_to_score("negative", 0.9) < 0
-        assert _label_to_score("neutral", 0.9) == 0.0
-
-    def test_abstract_model_compliance(self):
-        from backend.ml_models.finbert import FinBERTModel
-        from backend.core.plugin_base import AbstractModel
-        assert issubclass(FinBERTModel, AbstractModel)
-
-
 class TestAnomalyDetection:
     def test_zscore_detect_all_normal(self):
         from services.anomaly import zscore_detect

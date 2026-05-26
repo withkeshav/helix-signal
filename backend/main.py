@@ -1,32 +1,28 @@
 import os
 import sys
-import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from typing import Any
 
-import httpx
-from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, Query, Request, Response
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Gauge, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
-from database import AiSnapshot, AssetTrendSnapshot, Base, SessionLocal, SourceStatus, engine, get_db, init_db
+from database import AssetTrendSnapshot, Base, SessionLocal, get_db, init_db
 from logging_config import configure_logging
 from middleware.security import SecurityValidationMiddleware
-from middleware.observability import ObservabilityMiddleware, METRIC_REQUEST_COUNT, METRIC_REQUEST_LATENCY, METRIC_SOURCE_HEALTH
+from middleware.observability import ObservabilityMiddleware
 from services.backfill import run_backfill
 from services.osint import ingest_osint_feed, refresh_attestation_reports
 from services.retention import prune_old_history
-from signal_engine.core import get_asset_by_symbol, load_enabled_assets, refresh_chain_data
+from signal_engine.core import load_enabled_assets, refresh_chain_data
 
 from backend.core.admin_auth import require_admin_token
 from backend.core.limiter import limiter
@@ -36,26 +32,29 @@ from routes import register_routes
 configure_logging()
 log = get_logger(__name__)
 
-METRIC_SCHEDULER_RUNNING = Gauge("helix_scheduler_running", "Scheduler is running (1/0)")
-METRIC_LAST_REFRESH_AGE = Gauge("helix_last_refresh_age_seconds", "Seconds since last successful refresh")
-METRIC_TREND_ROWS = Gauge("helix_trend_snapshot_rows", "Number of trend snapshot rows")
 
-_last_successful_refresh: float | None = None
-
-
-def _refresh_job() -> None:
-    global _last_successful_refresh
+async def _refresh_job() -> None:
     log.info("refresh_job.start")
     db = SessionLocal()
     try:
-        refresh_chain_data(db)
-        _last_successful_refresh = time.time()
+        await refresh_chain_data(db)
+        log.info("refresh_job.data_refresh_complete")
+        _run_anomaly_circuit_breaker(db)
         log.info("refresh_job.complete")
     except Exception:
         log.exception("refresh_job.failed")
         raise
     finally:
         db.close()
+
+
+def _run_anomaly_circuit_breaker(db: Session) -> None:
+    from agents.anomaly_agent import run_circuit_breaker_cycle
+    results = run_circuit_breaker_cycle(db)
+    if results:
+        triggered = [r["asset_symbol"] for r in results if r.get("investigated")]
+        if triggered:
+            log.info("circuit_breaker.triggered", assets=triggered)
 
 
 def _retention_job() -> None:
@@ -82,72 +81,6 @@ def _osint_job() -> None:
         db.close()
 
 
-def _forecast_job() -> None:
-    from providers.settings import get_setting
-    from services.forecast import run_all_forecasts
-
-    db = SessionLocal()
-    try:
-        if not get_setting("feature_forecasting", db):
-            log.info("forecast_job.skipped", reason="feature_forecasting_disabled")
-            return
-    finally:
-        db.close()
-
-    log.info("forecast_job.start")
-    try:
-        result = run_all_forecasts()
-        log.info("forecast_job.complete", tasks=result.get("tasks"))
-    except Exception:
-        log.exception("forecast_job.failed")
-
-
-def _save_ai_snapshot(db: Session, asset: str, feature: str, result: dict[str, Any], context: dict[str, Any]) -> None:
-    if result.get("available") and not result.get("cached"):
-        try:
-            snap = AiSnapshot(
-                asset_symbol=asset.upper(),
-                feature=feature,
-                summary=result.get("summary", ""),
-                provider=result.get("provider", ""),
-                model=result.get("model", ""),
-                tokens_used=result.get("tokens", 0),
-                context_snapshot=context,
-            )
-            db.add(snap)
-            db.commit()
-        except Exception:
-            db.rollback()
-
-
-def _web_search_context(asset: str) -> str | None:
-    enabled = os.getenv("AI_WEB_SEARCH", "false").lower() in ("1", "true")
-    if not enabled:
-        return None
-    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
-    if not api_key:
-        return None
-    current = datetime.now(timezone.utc)
-    try:
-        resp = httpx.post(
-            "https://ollama.com/api/web_search",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "query": f"{asset} stablecoin {current.strftime('%B %Y')}",
-                "max_results": int(os.getenv("AI_WEB_SEARCH_MAX_RESULTS", "3")),
-            },
-            timeout=8.0,
-        )
-        if resp.status_code == 200:
-            results = resp.json().get("results", [])
-            if results:
-                lines = [f"- {r['title']}: {r.get('content', '')[:300]}" for r in results[:3]]
-                return "\n".join(lines)
-    except Exception:
-        pass
-    return "unavailable"
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -156,7 +89,7 @@ async def lifespan(app: FastAPI):
 
     from providers.settings import get_setting
 
-    scheduler = BackgroundScheduler()
+    scheduler = AsyncIOScheduler()
     with SessionLocal() as setup_db:
         skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
         if not skip_refresh:
@@ -169,7 +102,6 @@ async def lifespan(app: FastAPI):
                 replace_existing=True,
             )
         osint_minutes = max(15, get_setting("refresh_osint_minutes", setup_db) or 60)
-        forecast_minutes = max(15, get_setting("refresh_forecast_minutes", setup_db) or 30)
 
     scheduler.add_job(
         _retention_job,
@@ -186,20 +118,13 @@ async def lifespan(app: FastAPI):
         id="osint-ingest",
         replace_existing=True,
     )
-    scheduler.add_job(
-        _forecast_job,
-        "interval",
-        minutes=forecast_minutes,
-        id="forecast-generation",
-        replace_existing=True,
-    )
     scheduler.start()
     app.state.scheduler = scheduler
 
-    _osint_job()  # immediate first run, no waiting 1 hour
+    _osint_job()
 
     if not skip_refresh:
-        _refresh_job()
+        await _refresh_job()
 
     if not skip_refresh:
         db = SessionLocal()
@@ -219,6 +144,19 @@ async def lifespan(app: FastAPI):
                 db.commit()
         finally:
             db.close()
+
+    try:
+        from chain.web3_listener import start_block_listener
+        await start_block_listener()
+    except Exception as exc:
+        log.warning("block_listener.start_failed", error=str(exc))
+
+    try:
+        from chain.fred_api import start_fred_poller
+        loop = asyncio.get_running_loop()
+        loop.create_task(start_fred_poller())
+    except Exception as exc:
+        log.warning("fred_poller.start_failed", error=str(exc))
 
     try:
         yield
@@ -245,29 +183,6 @@ app.add_middleware(
 register_routes(app)
 
 
-@app.get("/metrics")
-def prometheus_metrics(request: Request, _auth=Depends(require_admin_token)) -> Response:
-    db = SessionLocal()
-    try:
-        scheduler = getattr(app.state, "scheduler", None)
-        METRIC_SCHEDULER_RUNNING.set(1 if scheduler and scheduler.running else 0)
-
-        if _last_successful_refresh is not None:
-            METRIC_LAST_REFRESH_AGE.set(time.time() - _last_successful_refresh)
-
-        source_count = db.query(AssetTrendSnapshot).count()
-        METRIC_TREND_ROWS.set(source_count)
-
-        for src in ("defillama", "coingecko", "dexscreener"):
-            row = db.query(SourceStatus).filter(SourceStatus.source_name == src).first()
-            healthy = 1 if row and row.status == "ok" else 0
-            METRIC_SOURCE_HEALTH.labels(source=src).set(healthy)
-
-        return Response(content=generate_latest(), media_type="text/plain; charset=utf-8")
-    finally:
-        db.close()
-
-
 @app.get("/")
 @limiter.limit("60/minute")
 def root(request: Request) -> str:
@@ -276,180 +191,13 @@ def root(request: Request) -> str:
 
 @app.post("/api/refresh")
 @limiter.limit("10/minute")
-def api_refresh(
+async def api_refresh(
     request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ) -> dict[str, bool]:
-    refresh_chain_data(db)
+    await refresh_chain_data(db)
     return {"ok": True}
-
-
-@app.get("/api/ai/explain")
-@limiter.limit("30/minute")
-def api_ai_explain(
-    request: Request,
-    asset: str = Query("USDT"),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    from services.ai_router import enrich_with_ai
-    from services.predictive import run_predictive_bundle
-
-    pred = run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
-    context = {
-        "asset_symbol": asset.upper(),
-        "signal_score": pred.get("signal_score"),
-        "signal_band": "Risk" if (pred.get("signal_score") or 0) >= 70 else "Watch" if (pred.get("signal_score") or 0) >= 40 else "Normal",
-        "regime": pred.get("regime"),
-        "web_search_results": _web_search_context(asset) or "unavailable",
-    }
-    result = enrich_with_ai(feature="risk_explain", context=context)
-    _save_ai_snapshot(db, asset, "risk_explain", result, context)
-    return result
-
-
-@app.get("/api/ai/narrative")
-@limiter.limit("20/minute")
-def api_ai_narrative(
-    request: Request,
-    asset: str = Query("USDT"),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    from services.ai_router import enrich_with_ai
-    from services.predictive import run_predictive_bundle
-
-    pred = run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
-    signal_score = pred.get("signal_score") or 0
-    signal_band = "Risk" if signal_score >= 70 else "Watch" if signal_score >= 40 else "Normal"
-    regime = pred.get("regime") or "stable"
-    depeg_1h = round((pred.get("depeg_probability", {}).get("horizon_1h", 0) or 0) * 100, 1)
-    depeg_24h = round((pred.get("depeg_probability", {}).get("horizon_24h", 0) or 0) * 100, 1)
-
-    sentiment_label = "neutral"
-    sentiment_score = 0.0
-    recent_events = "none"
-    try:
-        from services.osint import get_sentiment_time_series
-        series = get_sentiment_time_series(db, asset_symbol=asset.upper(), window_days=3)
-        if series:
-            avg_s = sum(s.get("avg_sentiment", 0) for s in series) / len(series)
-            sentiment_score = round(avg_s, 3)
-            sentiment_label = "positive" if avg_s > 0.1 else "negative" if avg_s < -0.1 else "neutral"
-        from database import EventLog
-        recent = db.query(EventLog).filter(
-            EventLog.asset_symbol == asset.upper()
-        ).order_by(EventLog.timestamp.desc()).limit(3).all()
-        if recent:
-            recent_events = "; ".join([f"{e.title}" for e in recent if e.title])
-    except Exception:
-        pass
-
-    context = {
-        "asset_symbol": asset.upper(),
-        "signal_score": signal_score,
-        "signal_band": signal_band,
-        "regime": regime,
-        "depeg_1h": depeg_1h,
-        "depeg_24h": depeg_24h,
-        "sentiment_label": sentiment_label,
-        "sentiment_score": sentiment_score,
-        "recent_events": recent_events,
-        "web_search_results": _web_search_context(asset) or "unavailable",
-    }
-    result = enrich_with_ai(feature="market_narrative", context=context)
-    _save_ai_snapshot(db, asset, "market_narrative", result, context)
-    return result
-
-
-@app.get("/api/ai/insights")
-@limiter.limit("20/minute")
-def api_ai_insights(
-    request: Request,
-    asset: str = Query("USDT"),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    from services.ai_router import enrich_with_ai
-    from services.predictive import run_predictive_bundle
-
-    pred = run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
-    signal_score = pred.get("signal_score") or 0
-    signal_band = "Risk" if signal_score >= 70 else "Watch" if signal_score >= 40 else "Normal"
-    regime = pred.get("regime") or "stable"
-
-    supply_change_pct = 0.0
-    chain_count = 0
-    top_chain_share = 0.0
-    anomaly_count = 0
-    try:
-        from database import AssetTrendSnapshot
-        latest = db.query(AssetTrendSnapshot).filter(
-            AssetTrendSnapshot.asset_symbol == asset.upper()
-        ).order_by(AssetTrendSnapshot.timestamp.desc()).first()
-        if latest:
-            supply_change_pct = round((latest.supply_change_24h_pct or 0), 2)
-        from signal_engine.core import get_asset_by_symbol
-        asset_data = get_asset_by_symbol(db, asset.upper())
-        if asset_data:
-            chains = asset_data.get("chains") or []
-            chain_count = len(chains)
-            if chains:
-                top_chain_share = round(max((c.get("chain_share_pct") or 0) for c in chains), 1)
-        from services.anomaly import detect_anomalies
-        anomalies = detect_anomalies(db, asset_symbol=asset.upper(), window_days=7)
-        anomaly_count = len(anomalies.get("anomalies", []))
-    except Exception:
-        pass
-
-    context = {
-        "asset_symbol": asset.upper(),
-        "signal_score": signal_score,
-        "signal_band": signal_band,
-        "regime": regime,
-        "supply_change_pct": supply_change_pct,
-        "chain_count": chain_count,
-        "top_chain_share": top_chain_share,
-        "anomaly_count": anomaly_count,
-        "web_search_results": _web_search_context(asset) or "unavailable",
-    }
-    result = enrich_with_ai(feature="insight_summary", context=context)
-    _save_ai_snapshot(db, asset, "insight_summary", result, context)
-    return result
-
-
-@app.get("/api/ai/history")
-@limiter.limit("30/minute")
-def api_ai_history(
-    request: Request,
-    asset: str = Query("USDT"),
-    feature: str | None = Query(None),
-    days: int = Query(90),
-    limit: int = Query(50),
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    q = db.query(AiSnapshot).filter(AiSnapshot.asset_symbol == asset.upper())
-    if feature:
-        q = q.filter(AiSnapshot.feature == feature)
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    q = q.filter(AiSnapshot.created_at >= cutoff)
-    q = q.order_by(AiSnapshot.created_at.desc()).limit(limit)
-    rows = q.all()
-    return {
-        "available": True,
-        "asset": asset.upper(),
-        "count": len(rows),
-        "snapshots": [
-            {
-                "id": r.id,
-                "feature": r.feature,
-                "summary": r.summary,
-                "provider": r.provider,
-                "model": r.model,
-                "tokens_used": r.tokens_used,
-                "created_at": r.created_at.isoformat().replace("+00:00", "Z"),
-            }
-            for r in rows
-        ],
-    }
 
 
 if __name__ == "__main__":

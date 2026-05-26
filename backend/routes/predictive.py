@@ -19,4 +19,4 @@ def api_predictive(
 ) -> dict[str, Any]:
     from services.predictive import run_predictive_bundle
 
-    return run_predictive_bundle(db, asset_symbol=asset.upper(), log_to_mlflow=False)
+    return run_predictive_bundle(db, asset_symbol=asset.upper())

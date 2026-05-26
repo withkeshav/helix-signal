@@ -10,11 +10,8 @@ from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import (
-    AiSnapshot,
     AssetTrendSnapshot,
     ChainTrendSnapshot,
-    ForecastPoint,
-    ForecastRun,
     OsintArticle,
     SignalEvent,
 )
@@ -22,15 +19,13 @@ from backend.core.database_manager import dbm
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "3.5.1"
+HELIX_VERSION = "3.6.0"
 
 RETENTION_DEFAULTS: dict[str, int] = {
     "asset_trend_snapshots": 90,
     "chain_trend_snapshots": 90,
-    "forecast_points": 30,
     "signal_events": 180,
     "osint_articles": 30,
-    "ai_snapshots": 90,
 }
 
 
@@ -38,10 +33,8 @@ def _retention_days(table: str) -> int:
     env_map = {
         "asset_trend_snapshots": "TREND_RETENTION_DAYS",
         "chain_trend_snapshots": "CHAIN_TREND_RETENTION_DAYS",
-        "forecast_points": "FORECAST_RETENTION_DAYS",
         "signal_events": "EVENT_RETENTION_DAYS",
         "osint_articles": "OSINT_RETENTION_DAYS",
-        "ai_snapshots": "AI_SNAPSHOT_RETENTION_DAYS",
     }
     env_key = env_map.get(table, f"RETENTION_{table.upper()}")
     default = RETENTION_DEFAULTS.get(table, 90)
@@ -57,8 +50,6 @@ def prune_old_history(db: Session) -> dict[str, Any]:
     trend_cutoff = now - timedelta(days=_retention_days("asset_trend_snapshots"))
     event_cutoff = now - timedelta(days=_retention_days("signal_events"))
     osint_cutoff = now - timedelta(days=_retention_days("osint_articles"))
-    forecast_cutoff = now - timedelta(days=_retention_days("forecast_points"))
-    ai_cutoff = now - timedelta(days=_retention_days("ai_snapshots"))
 
     asset_deleted = (
         db.query(AssetTrendSnapshot)
@@ -80,26 +71,6 @@ def prune_old_history(db: Session) -> dict[str, Any]:
         .filter(OsintArticle.fetched_at < osint_cutoff)
         .delete(synchronize_session=False)
     )
-    forecast_points_deleted = (
-        db.query(ForecastPoint)
-        .filter(ForecastPoint.created_at < forecast_cutoff)
-        .delete(synchronize_session=False)
-    )
-    ai_deleted = (
-        db.query(AiSnapshot)
-        .filter(AiSnapshot.created_at < ai_cutoff)
-        .delete(synchronize_session=False)
-    )
-    db.flush()
-    forecast_runs_orphaned = (
-        db.query(ForecastRun)
-        .filter(
-            ForecastRun.id.not_in(
-                db.query(ForecastPoint.run_id)
-            )
-        )
-        .delete(synchronize_session=False)
-    )
 
     db.commit()
 
@@ -108,9 +79,6 @@ def prune_old_history(db: Session) -> dict[str, Any]:
         "chain_trend_rows": chain_deleted,
         "signal_event_rows": events_deleted,
         "osint_article_rows": osint_deleted,
-        "forecast_point_rows": forecast_points_deleted,
-        "ai_snapshot_rows": ai_deleted,
-        "forecast_run_orphans": forecast_runs_orphaned,
         "generated_at": now.isoformat().replace("+00:00", "Z"),
     }
 
@@ -123,7 +91,7 @@ def prune_old_history(db: Session) -> dict[str, Any]:
 
 def _prune_olap(now: datetime) -> dict[str, Any]:
     try:
-        for table in ("asset_trend_snapshots", "chain_trend_snapshots", "forecast_points"):
+        for table in ("asset_trend_snapshots", "chain_trend_snapshots"):
             retention = _retention_days(table)
             cutoff = (now - timedelta(days=retention)).strftime("%Y-%m-%d %H:%M:%S")
             dbm.olap_query(

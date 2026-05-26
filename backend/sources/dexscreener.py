@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
+
 from sources.base import AbstractSource, SourceError
 
 DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
@@ -11,7 +13,7 @@ DEXSCREENER_TOKEN_URL = "https://api.dexscreener.com/token-pairs/v1/{chain}/{add
 DEFAULT_TIMEOUT = 15
 MAX_RETRIES = 2
 
-STABLECOIN_ADDRESSES: dict[str, list[tuple[str, str, str]]] = {
+STABLECOIN_ADDRESSES: dict[str, list[tuple[str, str]]] = {
     "ethereum": [
         ("USDT", "0xdAC17F958D2ee523a2206206994597C13D831ec7"),
         ("USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
@@ -45,21 +47,26 @@ class DexScreenerSource(AbstractSource):
     def fetch(self, **kwargs: Any) -> list[dict[str, Any]]:
         symbols = kwargs.get("symbols", ["USDT"])
         session = self.get_http_session()
+        return self._do_fetch(session, symbols)
+
+    async def async_fetch(self, **kwargs: Any) -> list[dict[str, Any]]:
+        symbols = kwargs.get("symbols", ["USDT"])
+        client = await self.get_async_http_session()
+        return await self._do_async_fetch(client, symbols)
+
+    def _do_fetch(self, session: httpx.Client, symbols: list[str]) -> list[dict[str, Any]]:
         all_pairs: list[dict[str, Any]] = []
         seen: set[str] = set()
-
         for chain, tokens in STABLECOIN_ADDRESSES.items():
             for sym, addr in tokens:
                 if sym not in symbols:
                     continue
-
                 urls = [
                     f"{DEXSCREENER_TOKEN_URL.format(chain=chain, address=addr)}",
                     f"{DEXSCREENER_PAIRS_URL}/{chain}/{addr}",
                     f"{DEXSCREENER_SEARCH_URL}?q={addr}",
                 ]
-
-                for attempt, url in enumerate(urls):
+                for url in urls:
                     try:
                         resp = session.get(url, timeout=DEFAULT_TIMEOUT)
                         if resp.status_code != 200:
@@ -75,7 +82,36 @@ class DexScreenerSource(AbstractSource):
                             break
                     except Exception:
                         continue
+        return all_pairs
 
+    async def _do_async_fetch(self, client: httpx.AsyncClient, symbols: list[str]) -> list[dict[str, Any]]:
+        all_pairs: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for chain, tokens in STABLECOIN_ADDRESSES.items():
+            for sym, addr in tokens:
+                if sym not in symbols:
+                    continue
+                urls = [
+                    f"{DEXSCREENER_TOKEN_URL.format(chain=chain, address=addr)}",
+                    f"{DEXSCREENER_PAIRS_URL}/{chain}/{addr}",
+                    f"{DEXSCREENER_SEARCH_URL}?q={addr}",
+                ]
+                for url in urls:
+                    try:
+                        resp = await client.get(url, timeout=DEFAULT_TIMEOUT)
+                        if resp.status_code != 200:
+                            continue
+                        data = resp.json()
+                        pairs = data.get("pairs") or []
+                        if pairs and isinstance(pairs, list):
+                            for pair in pairs:
+                                pid = pair.get("pairAddress", "")
+                                if pid and pid not in seen:
+                                    seen.add(pid)
+                                    all_pairs.append(pair)
+                            break
+                    except Exception:
+                        continue
         return all_pairs
 
     def transform(self, raw: list[dict[str, Any]]) -> dict[str, Any]:

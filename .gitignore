@@ -88,6 +88,8 @@ oc-implementation-plan.md
 
 # --- Dead frontend code ---
 frontend/main.js
+frontend/app.js
+frontend/app.js
 
 # --- AI/Dev tool artifacts ---
 .antigravitycli/
@@ -99,21 +101,15 @@ opencode.json
 internal research/
 internal research/**
 .progress/
-.progress/**
-.progress/AUDIT_FINDINGS.md
 research/
 docs/phase-tracking.md
 docs/vps-tuning.md
-**/PHASE_LOG.md
-**/SERVER_MIGRATION.md
-.progress/SERVER_MIGRATION.md
 *strategic_report*
 *STRATEGIC_REPORT*
 helix_signal_strategic_report.md
 *.plan.md
 .cursor/
 .code-review-graph/
-**/NEXT_SESSION.md
 
 # Internal planning docs — not for public consumption
 docs/grant-strategy.md

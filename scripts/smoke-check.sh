@@ -6,7 +6,7 @@ BASE_URL="${1:-http://localhost:3000}"
 echo "Running smoke checks against ${BASE_URL}"
 
 html="$(curl -fsSL "${BASE_URL}/")"
-for marker in 'x-data="helixApp()"' 'class="top-nav"' 'class="kpi-row"' 'class="time-range"' 'id="chart-trend-signal"'; do
+for marker in 'x-data="helixApp"' 'class="top-nav"' 'class="kpi-row"' 'class="time-range"' 'id="chart-trend-signal"'; do
   if ! printf '%s' "${html}" | rg -Fq "${marker}"; then
     echo "FAILED: frontend marker missing -> ${marker}"
     exit 1
@@ -14,12 +14,12 @@ for marker in 'x-data="helixApp()"' 'class="top-nav"' 'class="kpi-row"' 'class="
 done
 echo "OK: frontend shell markers present"
 
-app_status="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/app.js")"
+app_status="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/js/init.js")"
 if [[ "${app_status}" != "200" ]]; then
-  echo "FAILED: /app.js returned ${app_status}"
+  echo "FAILED: /js/init.js returned ${app_status}"
   exit 1
 fi
-echo "OK: /app.js reachable"
+echo "OK: /js/init.js reachable"
 
 health_json="$(curl -fsSL "${BASE_URL}/api/health")"
 python3 -c 'import json,sys; d=json.load(sys.stdin); assert "status" in d and "version" in d; print("OK: /api/health -> status={}, version={}".format(d.get("status"), d.get("version")))' <<< "${health_json}"

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import statistics
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -9,7 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, SourceStatus
-from sources.defillama import DefiLlamaError, _DefiLlamaSource, fetch_chain_tvl_by_defillama_name, _discover_chain_ids
+from sources.defillama import DefiLlamaError, _DefiLlamaSource, async_fetch_chain_tvl_by_defillama_name, _discover_chain_ids
 from sources.coingecko import CoinGeckoSource
 from sources.dexscreener import DexScreenerSource
 from sources.base import AbstractSource
@@ -59,15 +61,17 @@ def build_default_registry() -> SourceRegistry:
 def cross_source_price_check(prices: dict[str, float | None]) -> dict[str, Any]:
     valid = {k: v for k, v in prices.items() if v is not None and v > 0}
     if len(valid) < 2:
-        return {"max_discrepancy_pct": 0.0, "discrepancy_flag": False, "sources_agreeing": len(valid), "price_mean": next(iter(valid.values())) if valid else None}
+        single = next(iter(valid.values())) if valid else None
+        return {"max_discrepancy_pct": 0.0, "discrepancy_flag": False, "sources_agreeing": len(valid), "price_median": single, "price_mean": single}
     vals = list(valid.values())
-    mean = sum(vals) / len(vals)
-    max_disc = max(abs(v - mean) / mean * 100 for v in vals) if mean > 0 else 0.0
+    med = statistics.median(vals)
+    max_disc = max(abs(v - med) / med * 100 for v in vals) if med > 0 else 0.0
     return {
         "max_discrepancy_pct": round(max_disc, 4),
         "discrepancy_flag": max_disc > 0.5,
         "sources_agreeing": len(valid),
-        "price_mean": round(mean, 6),
+        "price_median": round(med, 6),
+        "price_mean": round(sum(vals) / len(vals), 6),
     }
 
 
@@ -137,7 +141,7 @@ def _upsert_source_status(
     row.updated_at = datetime.now(timezone.utc)
 
 
-def refresh_chain_data(db: Session) -> None:
+async def refresh_chain_data(db: Session) -> None:
     attempted_at = datetime.now(timezone.utc)
     prior_row = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
     prior_source_status = prior_row.status if prior_row else None
@@ -164,71 +168,104 @@ def refresh_chain_data(db: Session) -> None:
         dx_ok = False
         cg_error: str | None = None
         dx_error: str | None = None
-        chain_tvl_map = fetch_chain_tvl_by_defillama_name()
 
-        for asset in enabled_assets:
+        all_symbols = [str(a.get("symbol", "")).upper() for a in enabled_assets]
+
+        chain_tvl_task = asyncio.create_task(async_fetch_chain_tvl_by_defillama_name())
+
+        async def _fetch_asset(idx: int, asset: dict, tvl_map: dict[str, float]) -> tuple[int, dict | None, Exception | None]:
             try:
-                llm_snapshot = defillama_src.fetch(asset_config=asset, chain_ids=chain_ids, chain_tvl_by_name=chain_tvl_map) if defillama_src else {}
-                fetched_at = llm_snapshot.get("fetched_at", datetime.now(timezone.utc))
-                per_chain = llm_snapshot.get("chain_data", {})
-                asset_symbol = str(llm_snapshot.get("asset_symbol", asset.get("symbol", ""))).upper()
-                asset_name = str(llm_snapshot.get("asset_name") or asset.get("name") or asset_symbol)
-                peg_type = str(llm_snapshot.get("peg_type") or asset.get("peg_type") or "peggedUSD")
-                success_count += 1
-                successful_asset_symbols.append(asset_symbol)
+                if defillama_src:
+                    result = await defillama_src.async_fetch(
+                        asset_config=asset, chain_ids=chain_ids, chain_tvl_by_name=tvl_map
+                    )
+                    return idx, result, None
+                return idx, None, None
+            except (DefiLlamaError, Exception) as exc:
+                return idx, None, exc
 
-                try:
-                    cg_data = coingecko_src.fetch(symbols=[asset_symbol]) if coingecko_src else {}
-                    cg_transformed = coingecko_src.transform(cg_data) if coingecko_src else {}
-                    cg_asset = cg_transformed.get(asset_symbol, {})
-                    if cg_asset:
-                        cg_ok = True
-                except Exception as cg_exc:
-                    cg_error = str(cg_exc)
-                    cg_asset = {}
+        async def _fetch_coingecko() -> tuple[dict | None, str | None]:
+            try:
+                data = await coingecko_src.async_fetch(symbols=all_symbols) if coingecko_src else {}
+                transformed = coingecko_src.transform(data) if coingecko_src else {}
+                return transformed, None
+            except Exception as exc:
+                return None, str(exc)
 
-                try:
-                    dx_data = dexscreener_src.fetch(symbols=[asset_symbol]) if dexscreener_src else []
-                    dx_transformed = dexscreener_src.transform(dx_data) if dexscreener_src else {}
-                    dx_asset = dx_transformed.get(asset_symbol, {})
-                    if dx_asset:
-                        dx_ok = True
-                except Exception as dx_exc:
-                    dx_error = str(dx_exc)
-                    dx_asset = {}
+        async def _fetch_dexscreener() -> tuple[dict | None, str | None]:
+            try:
+                data = await dexscreener_src.async_fetch(symbols=all_symbols) if dexscreener_src else []
+                transformed = dexscreener_src.transform(data) if dexscreener_src else {}
+                return transformed, None
+            except Exception as exc:
+                return None, str(exc)
 
-                for chain in configured:
-                    chain_name = str(chain["name"])
-                    key = str(chain["defillama_id"])
-                    values = per_chain.get(key, {})
-                    row = db.query(AssetChainSnapshot).filter(AssetChainSnapshot.asset_symbol == asset_symbol, AssetChainSnapshot.chain_name == chain_name).first()
-                    if row is None:
-                        row = AssetChainSnapshot(asset_symbol=asset_symbol, chain_name=chain_name)
-                        db.add(row)
-                    row.asset_name = asset_name
-                    row.supply_current = values.get("supply_current")
-                    row.supply_prev_day = values.get("supply_prev_day")
-                    row.supply_prev_week = values.get("supply_prev_week")
-                    row.supply_prev_month = values.get("supply_prev_month")
-                    row.tvl = values.get("tvl")
-                    row.price = values.get("price")
-                    row.price_coingecko = cg_asset.get("price")
-                    row.market_cap = cg_asset.get("market_cap")
-                    row.volume_24h = cg_asset.get("volume_24h")
-                    dex_price = dx_asset.get("price")
-                    if dex_price is not None:
-                        row.price_dexscreener = dex_price
-                    row.total_liquidity_usd = dx_asset.get("total_liquidity_usd")
-                    row.top3_pool_share_pct = dx_asset.get("top3_pool_share_pct")
-                    row.pool_count = dx_asset.get("pool_count")
-                    row.peg_type = peg_type
-                    row.source_name = "multi"
-                    row.fetched_at = fetched_at
-                    row.updated_at = datetime.now(timezone.utc)
+        tvl_map, cg_result, dx_result = await asyncio.gather(
+            chain_tvl_task,
+            _fetch_coingecko(),
+            _fetch_dexscreener(),
+        )
+        cg_transformed, cg_error = cg_result
+        cg_ok = cg_transformed is not None
+        dx_transformed, dx_error = dx_result
+        dx_ok = dx_transformed is not None
 
-            except (DefiLlamaError, Exception) as asset_exc:
-                symbol = str(asset.get("symbol", "UNKNOWN")).upper()
+        dl_results = await asyncio.gather(
+            *[_fetch_asset(i, asset, tvl_map) for i, asset in enumerate(enabled_assets)]
+        )
+        cg_transformed, cg_error = cg_result
+        cg_ok = cg_transformed is not None
+        dx_transformed, dx_error = dx_result
+        dx_ok = dx_transformed is not None
+
+        for idx, llm_snapshot, asset_exc in dl_results:
+            if asset_exc is not None or llm_snapshot is None:
+                symbol = str(enabled_assets[idx].get("symbol", "UNKNOWN")).upper() if idx < len(enabled_assets) else "UNKNOWN"
                 errors.append(f"{symbol}: {asset_exc}")
+                continue
+
+            fetched_at = llm_snapshot.get("fetched_at", datetime.now(timezone.utc))
+            per_chain = llm_snapshot.get("chain_data", {})
+            asset_symbol = str(llm_snapshot.get("asset_symbol", enabled_assets[idx].get("symbol", ""))).upper()
+            asset_name = str(llm_snapshot.get("asset_name") or enabled_assets[idx].get("name") or asset_symbol)
+            peg_type = str(llm_snapshot.get("peg_type") or enabled_assets[idx].get("peg_type") or "peggedUSD")
+            success_count += 1
+            successful_asset_symbols.append(asset_symbol)
+
+            cg_asset = (cg_transformed or {}).get(asset_symbol, {})
+            dx_asset = (dx_transformed or {}).get(asset_symbol, {})
+
+            for chain in configured:
+                chain_name = str(chain["name"])
+                key = str(chain["defillama_id"])
+                values = per_chain.get(key, {})
+                row = db.query(AssetChainSnapshot).filter(
+                    AssetChainSnapshot.asset_symbol == asset_symbol,
+                    AssetChainSnapshot.chain_name == chain_name
+                ).first()
+                if row is None:
+                    row = AssetChainSnapshot(asset_symbol=asset_symbol, chain_name=chain_name)
+                    db.add(row)
+                row.asset_name = asset_name
+                row.supply_current = values.get("supply_current")
+                row.supply_prev_day = values.get("supply_prev_day")
+                row.supply_prev_week = values.get("supply_prev_week")
+                row.supply_prev_month = values.get("supply_prev_month")
+                row.tvl = values.get("tvl")
+                row.price = values.get("price")
+                row.price_coingecko = cg_asset.get("price")
+                row.market_cap = cg_asset.get("market_cap")
+                row.volume_24h = cg_asset.get("volume_24h")
+                dex_price = dx_asset.get("price")
+                if dex_price is not None:
+                    row.price_dexscreener = dex_price
+                row.total_liquidity_usd = dx_asset.get("total_liquidity_usd")
+                row.top3_pool_share_pct = dx_asset.get("top3_pool_share_pct")
+                row.pool_count = dx_asset.get("pool_count")
+                row.peg_type = peg_type
+                row.source_name = "multi"
+                row.fetched_at = fetched_at
+                row.updated_at = datetime.now(timezone.utc)
 
         if success_count > 0:
             completed_at = datetime.now(timezone.utc)

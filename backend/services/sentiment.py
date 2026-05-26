@@ -11,8 +11,14 @@ import httpx
 OLLAMA_API_BASE = os.getenv("OLLAMA_CLOUD_BASE", "https://ollama.com/v1")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 OLLAMA_MODEL = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
-
 _SENTIMENT_CACHE: dict[str, dict[str, Any]] = {}
+
+_SENTIMENT_MAX_INPUT_ARTICLES = int(os.getenv("SENTIMENT_MAX_ARTICLES_PER_BATCH", "15"))
+
+
+def _within_sentiment_budget(estimated_tokens: int) -> bool:
+    from services.ai_router import _within_budget
+    return _within_budget(estimated_tokens)
 
 
 def _parse_sentiment(item: dict) -> dict[str, Any]:
@@ -26,13 +32,24 @@ def _make_request(titles: list[str]) -> list[dict[str, Any]]:
     if not OLLAMA_API_KEY:
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
-    headlines = "\n".join(f"{i+1}. {t[:200]}" for i, t in enumerate(titles))
+    titles = titles[:_SENTIMENT_MAX_INPUT_ARTICLES]
+    if not titles:
+        return []
+
+    headlines = "\n".join(f"{i+1}. {t[:120]}" for i, t in enumerate(titles))
     prompt = (
         "Classify the sentiment of each crypto news headline as positive, negative, or neutral.\n"
         "Respond ONLY with a valid JSON array, no other text:\n"
         '[{"label": "positive|negative|neutral", "confidence": 0.0-1.0}, ...]\n\n'
         f"Headlines:\n{headlines}"
     )
+
+    estimated_input = len(prompt.split()) + 50
+    estimated_output = len(titles) * 15
+    estimated_total = estimated_input + estimated_output
+
+    if not _within_sentiment_budget(estimated_total):
+        return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
     try:
         resp = httpx.post(
@@ -45,7 +62,7 @@ def _make_request(titles: list[str]) -> list[dict[str, Any]]:
                 "model": OLLAMA_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.0,
-                "max_tokens": 4096,
+                "max_tokens": 500,
             },
             timeout=30,
         )

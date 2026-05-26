@@ -146,30 +146,6 @@ class OsintArticle(Base):
     topics: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-class SignalEvent(Base):
-    """Local, explainable monitoring events (not external alerts)."""
-
-    __tablename__ = "signal_events"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
-    chain_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
-    event_type: Mapped[str] = mapped_column(String(48), index=True)
-    severity: Mapped[str] = mapped_column(String(16), index=True)
-    title: Mapped[str] = mapped_column(String(200))
-    summary: Mapped[str] = mapped_column(String(500))
-    old_value: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    new_value: Mapped[str | None] = mapped_column(String(256), nullable=True)
-    delta: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    threshold: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-    )
-
-
 class ForecastRun(Base):
     __tablename__ = "forecast_runs"
 
@@ -196,7 +172,7 @@ class ForecastRun(Base):
 class ForecastPoint(Base):
     __tablename__ = "forecast_points"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(Integer, ForeignKey("forecast_runs.id"), nullable=False, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     chain_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -212,22 +188,31 @@ class ForecastPoint(Base):
     )
 
 
-class AiSnapshot(Base):
-    """Record of every AI narrative/insight/explain generated, for historical analysis."""
+class SignalEvent(Base):
+    """Local, explainable monitoring events (not external alerts)."""
 
-    __tablename__ = "ai_snapshots"
+    __tablename__ = "signal_events"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
-    feature: Mapped[str] = mapped_column(String(64), index=True)
-    summary: Mapped[str] = mapped_column(Text)
-    provider: Mapped[str] = mapped_column(String(64))
-    model: Mapped[str] = mapped_column(String(64))
-    tokens_used: Mapped[int] = mapped_column(Integer, default=0)
-    context_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    chain_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(48), index=True)
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    summary: Mapped[str] = mapped_column(String(500))
+    old_value: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    new_value: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    delta: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    threshold: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
     )
+
+
+
 
 
 def get_db():

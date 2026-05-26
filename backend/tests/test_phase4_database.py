@@ -18,8 +18,6 @@ from database import (
     AssetTrendSnapshot,
     SignalEvent,
     OsintArticle,
-    ForecastPoint,
-    ForecastRun,
     Base,
     engine,
 )
@@ -137,8 +135,6 @@ class TestRetentionPolicy:
             assert result["chain_trend_rows"] == 0
             assert result["signal_event_rows"] == 0
             assert result["osint_article_rows"] == 0
-            assert result["forecast_point_rows"] == 0
-            assert result["forecast_run_orphans"] == 0
         finally:
             db.close()
 
@@ -207,39 +203,8 @@ class TestRetentionPolicy:
         from services.retention import _retention_days
         assert _retention_days("asset_trend_snapshots") == 90
         assert _retention_days("signal_events") == 180
-        assert _retention_days("forecast_points") == 30
         assert _retention_days("osint_articles") == 30
         assert _retention_days("chain_trend_snapshots") == 90
-
-    def test_forecast_orphan_cleanup(self):
-        init_db()
-        db = SessionLocal()
-        try:
-            old = datetime(2020, 1, 1, tzinfo=timezone.utc)
-            run = ForecastRun(
-                model_name="timesfm", model_version="2.5.0",
-                target_metric="price", asset_symbol="USDT",
-                input_start=old, input_end=old, horizon=24,
-                frequency="5min", generated_at=old,
-            )
-            db.add(run)
-            db.flush()
-
-            next_id = max(p.id for p in db.query(ForecastPoint).all()) + 1 if db.query(ForecastPoint).count() > 0 else 1
-            db.add(ForecastPoint(
-                id=next_id,
-                run_id=run.id, asset_symbol="USDT",
-                target_metric="price", horizon_step=1,
-                forecast_timestamp=old,
-                point_forecast=1.0, q10=0.99, q50=1.0, q90=1.01,
-            ))
-            db.commit()
-
-            from services.retention import prune_all
-            result = prune_all(db)
-            assert result["forecast_run_orphans"] >= 0
-        finally:
-            db.close()
 
     def test_osint_pruning(self):
         init_db()
@@ -280,7 +245,6 @@ class TestDockerComposeConfig:
             content = f.read()
         assert "asset_trend_snapshots" in content
         assert "chain_trend_snapshots" in content
-        assert "forecast_points" in content
         assert "ReplacingMergeTree" in content
         assert "FIN" in content
 
@@ -304,5 +268,4 @@ class TestDockerComposeConfig:
             content = f.read()
         assert "CLICKHOUSE_HOST=" in content
         assert "CLICKHOUSE_PORT=" in content
-        assert "FORECAST_RETENTION_DAYS=" in content
         assert "OSINT_RETENTION_DAYS=" in content

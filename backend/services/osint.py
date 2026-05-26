@@ -6,6 +6,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 import calendar
+import time
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
@@ -235,6 +236,8 @@ ATTESTATION_CHECKLIST: dict[str, dict[str, Any]] = {
 
 _ATTESTATION_CACHE: dict[str, Any] = {"fetched_at": None, "reports": {}}
 _ATTESTATION_CACHE_TTL = int(os.getenv("ATTESTATION_CACHE_TTL_SECONDS", "21600"))
+_LLM_EXTRACT_CACHE: dict[str, tuple[float, datetime | None]] = {}
+_LLM_EXTRACT_CACHE_TTL = int(os.getenv("LLM_EXTRACT_CACHE_TTL", "86400"))
 _ATTESTATION_HINT_WORDS = ("attestation", "reserve", "transparency", "report", "proof")
 _MONTH_NAMES = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December"
 _DATE_PATTERNS = (
@@ -326,14 +329,21 @@ def _fetch_last_report_date(url: str) -> datetime | None:
     try:
         resp = httpx.get(url, timeout=20, follow_redirects=True)
         resp.raise_for_status()
+        raw_html = resp.text
+
         if "paxos.com/pyusd-transparency" in url:
-            from_index = _fetch_pyusd_attestation_date_from_framer_index(resp.text)
+            from_index = _fetch_pyusd_attestation_date_from_framer_index(raw_html)
             if from_index is not None:
                 return from_index
-        exact = _extract_report_date_from_text(resp.text)
+
+        llm_result = _extract_report_date_via_llm(raw_html)
+        if llm_result is not None:
+            return llm_result
+
+        exact = _extract_report_date_from_text(raw_html)
         if exact is not None:
             return exact
-        return _extract_latest_monthly_attestation_date(resp.text)
+        return _extract_latest_monthly_attestation_date(raw_html)
     except Exception:
         return None
 
@@ -372,6 +382,80 @@ def _fetch_pyusd_attestation_date_from_framer_index(page_html: str) -> datetime 
         return None
     joined = " ".join(chunks)
     return _extract_latest_monthly_attestation_date(joined)
+
+
+def _dense_text_from_html(raw: str, max_chars: int = 8000) -> str:
+    text = _strip_html(raw)
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    dense = " ".join(lines)
+    return dense[:max_chars]
+
+
+def _extract_report_date_via_llm(raw_html: str) -> datetime | None:
+    from services.ai_router import ai_mode, _within_budget
+
+    if ai_mode() == "ai_off":
+        return None
+
+    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    url_hash = str(hash(raw_html[:200]))
+    cached = _LLM_EXTRACT_CACHE.get(url_hash)
+    if cached is not None:
+        ts, result = cached
+        if time.time() - ts < _LLM_EXTRACT_CACHE_TTL:
+            return result
+    model = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
+    dense = _dense_text_from_html(raw_html)
+
+    estimated_tokens = len(dense.split()) // 2 + 100
+    if not _within_budget(estimated_tokens):
+        return None
+
+    system_prompt = (
+        "You are a financial document parser. Extract the issuer attestation report date "
+        "from the text below. Look for dates associated with Tether, Circle, or Paxos "
+        "attestation or transparency reports. "
+        "Respond ONLY with a valid JSON object in exactly this format, nothing else:\n"
+        '{"report_date": "YYYY-MM-DD"}\n'
+        "If no clear attestation report date is found, respond with:\n"
+        '{"report_date": null}'
+    )
+
+    try:
+        resp = httpx.post(
+            "https://ollama.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Web page content:\n\n{dense}"},
+                ],
+                "temperature": 0.0,
+                "max_tokens": 100,
+            },
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        body = resp.json()
+        text = body["choices"][0]["message"]["content"].strip()
+        parsed = json.loads(text)
+        date_str = parsed.get("report_date")
+        if date_str:
+            result = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
+            _LLM_EXTRACT_CACHE[url_hash] = (time.time(), result)
+            return result
+        _LLM_EXTRACT_CACHE[url_hash] = (time.time(), None)
+        return None
+    except Exception:
+        _LLM_EXTRACT_CACHE[url_hash] = (time.time(), None)
+        return None
 
 
 def refresh_attestation_reports(*, force: bool = False) -> dict[str, datetime | None]:

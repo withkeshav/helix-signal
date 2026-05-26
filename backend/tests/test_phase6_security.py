@@ -62,40 +62,12 @@ class TestObservabilityMiddleware:
             resp = client.get("/api/health")
             assert resp.status_code == 200
 
-    def test_request_count_increments(self):
-        import main
-        from middleware.observability import METRIC_REQUEST_COUNT
-        with TestClient(main.app) as client:
-            resp = client.get("/api/health")
-            assert resp.status_code == 200
-
-    def test_observability_metrics_registered(self):
-        from middleware.observability import (
-            METRIC_REQUEST_COUNT,
-            METRIC_REQUEST_LATENCY,
-            METRIC_SOURCE_HEALTH,
-            METRIC_MODEL_LATENCY,
-            METRIC_CACHE_HIT_RATIO,
-        )
-        assert "helix_http_requests" in str(METRIC_REQUEST_COUNT._name)
-        assert METRIC_REQUEST_LATENCY._name == "helix_http_request_duration_seconds"
-        assert METRIC_SOURCE_HEALTH._name == "helix_source_health"
-        assert METRIC_MODEL_LATENCY._name == "helix_model_inference_seconds"
-        assert METRIC_CACHE_HIT_RATIO._name == "helix_cache_hit_ratio"
-
     def test_root_still_works_with_middleware(self):
         import main
         with TestClient(main.app) as client:
             resp = client.get("/")
             assert resp.status_code == 200
             assert "Hello" in resp.text
-
-    def test_metrics_endpoint_still_works(self):
-        import main
-        with TestClient(main.app) as client:
-            resp = client.get("/metrics", headers={"X-Admin-Token": "test-admin-token"})
-            assert resp.status_code == 200
-            assert "helix_http_requests_total" in resp.text
 
     def test_invalid_asset_rejected(self):
         import main
@@ -124,7 +96,7 @@ class TestContainerSecurity:
         )
         with open(compose_path) as f:
             content = f.read()
-        for service in ("backend:", "timesfm:", "frontend:"):
+        for service in ("backend:", "frontend:"):
             idx = content.index(service)
             block = content[idx: idx + 200]
             assert "no-new-privileges" in block, f"{service} missing no-new-privileges"

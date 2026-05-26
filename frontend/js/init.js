@@ -41,6 +41,8 @@ Alpine.data('helixApp', () => {
     aiSummary: '',
     aiNarrative: '',
     aiInsights: '',
+    marketOverview: '',
+    _marketOverviewLoaded: false,
     tickerItems: [],
     evidenceOpen: false,
     evidenceTitle: '',
@@ -199,6 +201,11 @@ Alpine.data('helixApp', () => {
         this.aiSummary = await this.loadAiExplain(this.asset);
         this.aiNarrative = await this.loadNarrative(this.asset);
         this.aiInsights = await this.loadInsights(this.asset);
+
+        if (!this._marketOverviewLoaded) {
+          this.marketOverview = await this.loadMarketOverview();
+          this._marketOverviewLoaded = true;
+        }
 
         if (this.tab === 'intel') await this.loadIntel();
         if (this.tab === 'events') await this.loadEvents(this.asset);

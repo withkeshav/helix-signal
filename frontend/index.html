@@ -306,6 +306,11 @@
 
     <!-- Tab: Overview -->
     <div class="tab-content" :class="tab === 'overview' && 'active'">
+      <!-- Market Overview -->
+      <div class="insight-card glass" x-show="marketOverview" style="margin-bottom:12px">
+        <h2 style="margin:0 0 8px;font-size:13px;text-transform:uppercase;color:var(--muted)">Market Overview <span class="model-badge">AI</span></h2>
+        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
+      </div>
       <!-- Risk Terminal -->
       <div class="insight-card glass" style="margin-bottom:12px">
         <div class="risk-gauge-wrap">

@@ -221,6 +221,26 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
         "max_tokens_lite": 200,
         "max_tokens_full": 400,
     },
+    "market_overview": {
+        "system": (
+            "You are a crypto market intelligence analyst. Plain text only — no markdown, no bold, no italics. "
+            "Output 3-5 bullet points starting with '-'. Cover: overall market health, notable trends, "
+            "risk concentrations, and assets to watch. Be specific and data-driven. "
+            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
+            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+        ),
+        "user": (
+            "Tracked Assets ({asset_count}): {asset_list}\n"
+            "Average Risk Score: {avg_signal_score}/100\n"
+            "Band Distribution: {band_summary}\n"
+            "Total Active Chains: {total_chains}\n"
+            "24h Supply Changes: {supply_changes}\n"
+            "Provide a market-wide intelligence overview covering overall stability, "
+            "notable divergences, and assets requiring attention."
+        ),
+        "max_tokens_lite": 400,
+        "max_tokens_full": 600,
+    },
     "insight_summary": {
         "system": (
             "You are a stablecoin intelligence analyst. Plain text only — no markdown, no bold, no italics. "

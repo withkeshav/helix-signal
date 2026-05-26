@@ -60,5 +60,13 @@ export function helixOSINT() {
       } catch (e) {}
       return '';
     },
+
+    async loadMarketOverview() {
+      try {
+        const r = await fetch('/api/ai/market-overview', { cache: 'no-store' });
+        if (r.ok) { const j = await r.json(); return j.available ? j.summary : (j.reason || ''); }
+      } catch (e) {}
+      return '';
+    },
   };
 }

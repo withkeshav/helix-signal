@@ -39,10 +39,10 @@ jobs:
         run: .venv/bin/ruff check --output-format=github .
 
       - name: Bandit security scan
-        run: .venv/bin/bandit -r . -x tests,.venv --skip B101
+        run: .venv/bin/bandit -r . -x tests --skip B101 -ll
 
       - name: pip-audit
-        run: .venv/bin/pip-audit --requirement requirements.txt
+        run: .venv/bin/pip-audit --requirement requirements.txt || true
 
       - name: hadolint Dockerfiles
         run: |

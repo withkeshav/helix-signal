@@ -10,13 +10,15 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 
 **99 regression tests pass.** Zero paid API dependencies for core operation.
 
-## v3.6.0 Highlights
+## v3.7.0 Highlights
 
-- **Chart flicker eliminated** — ECharts stored in separate `_echarts` Map; `destroyCharts()` no longer wipes forecast charts on 60s auto-refresh
-- **Forecast API restored** — `GET /api/forecasts?asset=X` + `GET /api/analytics/forecast-accuracy` with ORM models, rate limits, and 5 integration tests
-- **AI cost containment** — All AI features share a single budget pool via Redis `INCRBY`; `AI_MODE=off` is the total kill switch; pre-pay budget estimation before provider calls
-- **Blank page fix** — Removed `defer` from CDN script tags (Alpine/Chart.js/ECharts) to eliminate race condition with ES6 module init
-- **99 regression tests pass** — Zero regressions across all endpoints
+- **AI Settings UI** — New AI & Anomaly Detection card in Settings tab: mode select (Off/Lite/Full), token budget bar, toggle switches, number inputs
+- **Token budget endpoint** — `GET /api/ai/budget` exposes daily usage with real-time progress bar in frontend
+- **OpenRouter free tier** — `openrouter/free` added as primary provider in `ai_lite`/`ai_full` chains
+- **6 new DB-backed settings** — AI mode, token budget, cache TTL, web search, anomaly detection all editable via Settings UI
+- **Anomaly detection enhanced** — `latest_zscore()`, `min_bps` filter, `STD_FLOOR` env var
+- **sync-env.sh** — Utility to merge `.env.example` keys into `.env` preserving existing values
+- **124 regression tests pass**
 
 ## v3.3 Highlights
 

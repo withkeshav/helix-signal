@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.7.0 (2026-05-27)
+
+### Added
+
+- **AI Settings UI** — New "AI & Anomaly Detection" card in Settings tab with mode select (Off/Lite/Full), toggle switches, and number inputs for token budget, cache TTL, web search config
+- **Token budget dashboard** — `GET /api/ai/budget` endpoint exposes `daily_budget`, `tokens_used_today`, `tokens_remaining`, `pct_used` with progress bar in frontend
+- **DB-backed AI settings** — `ai_mode`, `ai_daily_token_budget`, `ai_cache_ttl_seconds`, `ai_web_search`, `ai_web_search_max_results`, `enable_anomaly_detection` registered in `_DEFAULT_SETTINGS` and editable via Settings UI
+- **OpenRouter free tier** — `openrouter/free` model added as primary provider in `ai_lite` and `ai_full` chains; configurable via `OPENROUTER_FREE_MODEL` env var
+- **Redis cache for AI responses** — `_try_redis_cache()` / `_cache_set` with `helix:ai:cache:` prefix; falls back to in-memory dict
+- **`latest_zscore()`** — Returns latest point's z-score, bps, and anomaly flag for real-time monitoring
+- **`min_bps` filter on `zscore_detect()`** — Suppresses tiny statistical fluctuations
+- **`STD_FLOOR` env var** — Prevents division-by-near-zero in z-score computation (`ANOMALY_STD_FLOOR`, default 0.001)
+- **`sync-env.sh`** — Merges new keys from `.env.example` into `.env` preserving existing values
+
+### Changed
+
+- **Budget tracking refactored** — `_deduct_tokens()` replaces `_within_budget()`: deducts actual tokens returned (not estimated pre-pay), supports Redis and local modes uniformly
+- **Provider chain reordered** — OpenRouter free → Ollama Cloud → Groq in `ai_lite`; free → fallback → primary → Groq in `ai_full` priority mode
+- **`.env.example`** — AI section reorganized with OpenRouter first, `AI_CACHE_TTL_SECONDS` default bumped from 1800→3600
+
+### Fixed
+
+- **Frontend version sync** — Footer pill `v3.5.1` → `v3.7.0` matching backend `HELIX_VERSION`
+
 ## 3.6.0 (2026-05-26)
 
 ### Bugfixes

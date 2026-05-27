@@ -61,13 +61,21 @@ Alpine.data('helixApp', () => {
     evidenceSources: {},
     dataQualityHistory: [],
 
+    aiStillFresh(expiresAt) {
+      if (!expiresAt) return false;
+      return Date.now() < new Date(expiresAt).getTime();
+    },
+
     async init() {
       const root = document.documentElement;
       this.theme = root.getAttribute('data-theme') || 'light';
       await this.loadAssets();
       await this.loadDashboard();
       await this.loadAttestation();
-      this._timer = setInterval(() => { this.loadDashboard(); }, 60000);
+      this._timer = setInterval(() => {
+        if (document.hidden) return;
+        this.loadDashboard();
+      }, 60000);
       this._setupResizeHandler();
     },
 
@@ -208,11 +216,17 @@ Alpine.data('helixApp', () => {
         this.predictive = pred || {};
         this.tickerItems = await this.loadTicker();
 
-        { const r = await this.loadAiExplain(this.asset); this.aiSummary = r.summary; this.aiGeneratedAt = r.generatedAt; this.aiExpiresAt = r.expiresAt; }
-        { const r = await this.loadNarrative(this.asset); this.aiNarrative = r.summary; this.aiNarrativeGeneratedAt = r.generatedAt; this.aiNarrativeExpiresAt = r.expiresAt; }
-        { const r = await this.loadInsights(this.asset); this.aiInsights = r.summary; this.aiInsightsGeneratedAt = r.generatedAt; this.aiInsightsExpiresAt = r.expiresAt; }
+        if (!this.aiStillFresh(this.aiExpiresAt)) {
+          const r = await this.loadAiExplain(this.asset); this.aiSummary = r.summary; this.aiGeneratedAt = r.generatedAt; this.aiExpiresAt = r.expiresAt;
+        }
+        if (!this.aiStillFresh(this.aiNarrativeExpiresAt)) {
+          const r = await this.loadNarrative(this.asset); this.aiNarrative = r.summary; this.aiNarrativeGeneratedAt = r.generatedAt; this.aiNarrativeExpiresAt = r.expiresAt;
+        }
+        if (!this.aiStillFresh(this.aiInsightsExpiresAt)) {
+          const r = await this.loadInsights(this.asset); this.aiInsights = r.summary; this.aiInsightsGeneratedAt = r.generatedAt; this.aiInsightsExpiresAt = r.expiresAt;
+        }
 
-        if (!this._marketOverviewLoaded) {
+        if (!this._marketOverviewLoaded && !this.aiStillFresh(this.marketOverviewExpiresAt)) {
           const r = await this.loadMarketOverview();
           this.marketOverview = r.summary;
           this.marketOverviewGeneratedAt = r.generatedAt;

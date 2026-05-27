@@ -18,7 +18,7 @@ class SettingUpdate(BaseModel):
 
 
 @router.get("/settings")
-@limiter.limit("60/minute")
+@limiter.limit("10/minute")
 def api_get_settings(
     request: Request,
     db: Session = Depends(get_db),
@@ -31,7 +31,7 @@ def api_get_settings(
 
 
 @router.put("/settings")
-@limiter.limit("30/minute")
+@limiter.limit("5/minute")
 def api_update_setting(
     request: Request,
     body: SettingUpdate,

@@ -34,3 +34,43 @@ def test_predictive_api(client, monkeypatch: pytest.MonkeyPatch) -> None:
     assert r.status_code == 200
     body = r.json()
     assert "available" in body
+
+
+def test_ai_narrative_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_off")
+    r = client.get("/api/ai/narrative?asset=USDT")
+    assert r.status_code == 200
+    body = r.json()
+    assert body.get("available") is False
+
+
+def test_ai_insights_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_off")
+    r = client.get("/api/ai/insights?asset=USDT")
+    assert r.status_code == 200
+    body = r.json()
+    assert body.get("available") is False
+
+
+def test_ai_explain_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_off")
+    r = client.get("/api/ai/explain?asset=USDT")
+    assert r.status_code == 200
+    body = r.json()
+    assert body.get("available") is False
+
+
+def test_ai_narrative_returns_200_when_asset_not_found(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_lite")
+    r = client.get("/api/ai/narrative?asset=NONEXISTENT")
+    assert r.status_code == 200
+    body = r.json()
+    assert body.get("available") is False
+
+
+def test_ai_insights_returns_200_when_asset_not_found(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_lite")
+    r = client.get("/api/ai/insights?asset=NONEXISTENT")
+    assert r.status_code == 200
+    body = r.json()
+    assert body.get("available") is False

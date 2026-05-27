@@ -1,14 +1,12 @@
-"""ONNX Runtime depeg classifier with pickle fallback."""
+"""ONNX Runtime depeg classifier."""
 
 from __future__ import annotations
 
 import os
-import pickle
 from pathlib import Path
 from typing import Any
 
 _SESSION = None
-_PICKLE_MODEL = None
 
 
 def _get_session():
@@ -24,18 +22,6 @@ def _get_session():
         import onnxruntime as ort
         _SESSION = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
         return _SESSION
-    except Exception:
-        return _load_pickle_fallback(path)
-
-
-def _load_pickle_fallback(path: str):
-    global _PICKLE_MODEL
-    if _PICKLE_MODEL is not None:
-        return _PICKLE_MODEL
-    try:
-        with open(path, "rb") as f:
-            _PICKLE_MODEL = pickle.load(f)
-        return _PICKLE_MODEL
     except Exception:
         return None
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -22,6 +22,21 @@ from signal_engine.core import load_enabled_assets
 log = get_logger(__name__)
 
 MAX_ASSETS_PER_CYCLE = int(os.getenv("ANOMALY_AGENT_MAX_ASSETS", "5"))
+INVESTIGATION_COOLDOWN_MINUTES = int(os.getenv("ANOMALY_INVESTIGATION_COOLDOWN_MINUTES", "30"))
+
+
+def _recent_ai_investigation(db: Session, *, asset_symbol: str) -> bool:
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=INVESTIGATION_COOLDOWN_MINUTES)
+    count = (
+        db.query(SignalEvent)
+        .filter(
+            SignalEvent.asset_symbol == asset_symbol,
+            SignalEvent.event_type == "ai_investigation",
+            SignalEvent.timestamp >= cutoff,
+        )
+        .count()
+    )
+    return count > 0
 
 
 def _circuit_breaker_triggered(anomalies: dict[str, Any]) -> bool:
@@ -48,6 +63,10 @@ def investigate_anomaly(
     mode = ai_mode()
     if mode == "ai_off":
         return {"asset_symbol": asset_symbol, "investigated": False, "reason": "ai_off"}
+
+    if _recent_ai_investigation(db, asset_symbol=asset_symbol):
+        log.info("anomaly_agent.cooldown", asset=asset_symbol)
+        return {"asset_symbol": asset_symbol, "investigated": False, "reason": "cooldown"}
 
     z_items = anomaly_results.get("z_score", {})
     anomalies = anomaly_results.get("anomalies", [])

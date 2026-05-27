@@ -36,6 +36,9 @@ def ai_explain(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    mode = ai_mode()
+    if mode == "ai_off":
+        return {"available": False, "reason": "AI disabled"}
     ctx = _build_context(asset, db)
     if ctx is None:
         return {"available": False, "reason": "asset_not_found"}
@@ -49,6 +52,9 @@ def ai_narrative(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    mode = ai_mode()
+    if mode == "ai_off":
+        return {"available": False, "reason": "AI disabled"}
     ctx = _build_context(asset, db)
     if ctx is None:
         return {"available": False, "reason": "asset_not_found"}
@@ -75,9 +81,9 @@ def ai_narrative(
     except Exception:
         ctx["recent_events"] = "?"
 
-    from services.predictive import build_predictive_bundle
     try:
-        bundle = build_predictive_bundle(db, asset_symbol=asset)
+        from services.predictive import run_predictive_bundle
+        bundle = run_predictive_bundle(db, asset_symbol=asset)
         ctx["regime"] = bundle.get("regime", "?")
         depeg = bundle.get("depeg_probability", {})
         ctx["depeg_1h"] = f"{depeg.get('horizon_1h', 0) * 100:.1f}"
@@ -97,13 +103,16 @@ def ai_insights(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    mode = ai_mode()
+    if mode == "ai_off":
+        return {"available": False, "reason": "AI disabled"}
     ctx = _build_context(asset, db)
     if ctx is None:
         return {"available": False, "reason": "asset_not_found"}
 
-    from services.predictive import build_predictive_bundle
     try:
-        bundle = build_predictive_bundle(db, asset_symbol=asset)
+        from services.predictive import run_predictive_bundle
+        bundle = run_predictive_bundle(db, asset_symbol=asset)
         ctx["regime"] = bundle.get("regime", "?")
     except Exception:
         ctx["regime"] = "?"

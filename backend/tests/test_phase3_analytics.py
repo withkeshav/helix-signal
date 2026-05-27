@@ -195,3 +195,42 @@ class TestAnomalyDetection:
         result = detector.predict({"values": []})
         assert result["anomalies"] == []
         assert result["anomaly_count"] == 0
+
+    def test_zscore_direction_below(self):
+        from services.anomaly import zscore_detect
+        values = [10.0] * 15 + [1.0]
+        result = zscore_detect(values, threshold=2.0)
+        assert len(result) >= 1
+        assert result[0]["z_score"] < 0
+
+    def test_zscore_direction_above(self):
+        from services.anomaly import zscore_detect
+        values = [1.0] * 15 + [10.0]
+        result = zscore_detect(values, threshold=2.0)
+        assert len(result) >= 1
+        assert result[0]["z_score"] > 0
+
+    def test_get_recent_anomaly_count_empty(self, db_session):
+        from services.anomaly import get_recent_anomaly_count
+        count = get_recent_anomaly_count(db_session, asset_symbol="USDT", days=7)
+        assert count == 0
+
+    def test_get_recent_anomaly_count_with_events(self, db_session):
+        from datetime import datetime, timezone
+        from database import SignalEvent
+        from services.anomaly import get_recent_anomaly_count
+
+        event = SignalEvent(
+            asset_symbol="USDT",
+            chain_key=None,
+            event_type="anomaly_detected",
+            severity="warning",
+            title="test anomaly",
+            summary="test",
+            timestamp=datetime.now(timezone.utc),
+        )
+        db_session.add(event)
+        db_session.commit()
+
+        count = get_recent_anomaly_count(db_session, asset_symbol="USDT", days=7)
+        assert count == 1

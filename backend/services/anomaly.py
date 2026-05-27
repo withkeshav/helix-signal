@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import pickle
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -15,21 +13,6 @@ from database import AssetChainSnapshot, AssetTrendSnapshot, SignalEvent
 log = get_logger(__name__)
 
 ENABLED = os.getenv("ENABLE_ANOMALY_DETECTION", "").strip().lower() in ("1", "true", "yes")
-MODEL_DIR = None
-
-
-def _ensure_model_dir() -> Path:
-    global MODEL_DIR
-    if MODEL_DIR is None:
-        p = Path(os.getenv("MODEL_DIR", "/data/models"))
-        try:
-            p.mkdir(parents=True, exist_ok=True)
-            MODEL_DIR = p
-        except PermissionError:
-            p = Path("/tmp/helix-models")
-            p.mkdir(parents=True, exist_ok=True)
-            MODEL_DIR = p
-    return MODEL_DIR
 
 
 def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 30) -> dict[str, Any]:
@@ -61,8 +44,8 @@ def zscore_detect(values: list[float], threshold: float = 3.0) -> list[dict[str,
     std = np.std(arr)
     if std == 0:
         return []
-    z_scores = np.abs((arr - mean) / std)
-    anomalies = np.where(z_scores > threshold)[0]
+    z_scores = (arr - mean) / std
+    anomalies = np.where(np.abs(z_scores) > threshold)[0]
     return [{"index": int(i), "value": float(arr[i]), "z_score": float(z_scores[i]), "mean": float(mean), "std": float(std)} for i in anomalies]
 
 
@@ -77,24 +60,6 @@ def isolation_forest_detect(points: list[list[float]], contamination: float = 0.
         return [int(i) for i, p in enumerate(preds) if p == -1]
     except Exception:
         return []
-
-
-def _save_model(name: str, model: Any) -> None:
-    path = _ensure_model_dir() / f"{name}.pkl"
-    with open(path, "wb") as f:
-        pickle.dump(model, f)
-    log.info("model_saved", name=name, path=str(path))
-
-
-def _load_model(name: str) -> Any | None:
-    path = _ensure_model_dir() / f"{name}.pkl"
-    if not path.exists():
-        return None
-    try:
-        with open(path, "rb") as f:
-            return pickle.load(f)
-    except Exception:
-        return None
 
 
 def _check_bridge_flow(db: Session, *, asset_symbol: str, threshold_pct: float = 5.0) -> dict[str, Any]:
@@ -177,32 +142,6 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     return results
 
 
-def train_models(db: Session, *, asset_symbol: str) -> dict[str, Any]:
-    if not ENABLED:
-        return {"enabled": False}
-    history = _fetch_trend_history(db, asset_symbol=asset_symbol)
-    if len(history["timestamps"]) < 20:
-        return {"asset": asset_symbol, "note": "Need >=20 points for training."}
-    features: list[list[float]] = []
-    for i in range(len(history["timestamps"])):
-        row: list[float] = [
-            history["prices"][i] if i < len(history["prices"]) else 1.0,
-            history["supplies"][i] if i < len(history["supplies"]) else 0.0,
-            float(history["depeg_indices"][i]),
-            float(history["concentration_scores"][i]),
-        ]
-        features.append(row)
-    try:
-        import numpy as np
-        from sklearn.ensemble import IsolationForest
-        model = IsolationForest(contamination=0.05, random_state=42)
-        model.fit(np.array(features))
-        _save_model(f"if_{asset_symbol}", model)
-        return {"asset": asset_symbol, "trained": True, "model": "isolation_forest", "samples": len(features)}
-    except Exception as exc:
-        return {"asset": asset_symbol, "trained": False, "error": str(exc)}
-
-
 def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, Any]) -> int:
     count = 0
     for z_type, z_data in anomalies.get("z_score", {}).items():
@@ -225,3 +164,16 @@ def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, 
                 db.add(row)
                 count += 1
     return count
+
+
+def get_recent_anomaly_count(db: Session, *, asset_symbol: str, days: int = 7) -> int:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    return (
+        db.query(SignalEvent)
+        .filter(
+            SignalEvent.asset_symbol == asset_symbol,
+            SignalEvent.event_type.in_(["anomaly_detected", "ai_investigation"]),
+            SignalEvent.timestamp >= cutoff,
+        )
+        .count()
+    )

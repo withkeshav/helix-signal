@@ -27,7 +27,7 @@ def admin_backfill(
 
 
 @router.get("/alerts/config")
-@limiter.limit("60/minute")
+@limiter.limit("10/minute")
 def get_alert_config(
     request: Request,
     _auth=Depends(require_admin_token),
@@ -36,7 +36,7 @@ def get_alert_config(
 
 
 @router.get("/reports/summary")
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 def api_report_summary(
     request: Request,
     asset: str = Query(...),
@@ -49,7 +49,7 @@ def api_report_summary(
 
 
 @router.get("/governance")
-@limiter.limit("60/minute")
+@limiter.limit("10/minute")
 def api_governance(
     request: Request,
     asset: str = Query(...),

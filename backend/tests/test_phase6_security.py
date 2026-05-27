@@ -125,3 +125,105 @@ class TestSettingsAuth:
     def test_put_settings_403_without_token(self, client):
         resp = client.put("/api/settings", json={"key": "test", "value": True})
         assert resp.status_code == 403
+
+
+class TestBruteforceLockout:
+    """PR3: In-process failed-auth backoff."""
+
+    def _reset_lockout(self):
+        from backend.core.admin_auth import _FAILED_ATTEMPTS
+        _FAILED_ATTEMPTS.clear()
+
+    def test_bruteforce_lockout_after_20_failures(self, client):
+        self._reset_lockout()
+        wrong_headers = {"X-Admin-Token": "wrong-token"}
+        for _ in range(20):
+            resp = client.get("/api/settings", headers=wrong_headers)
+            assert resp.status_code in (403, 429)
+        resp = client.get("/api/settings", headers=wrong_headers)
+        assert resp.status_code == 429
+        assert "Too many failed auth attempts" in resp.text
+
+    def test_different_ip_not_blocked_by_lockout(self, client, admin_headers):
+        self._reset_lockout()
+        attacker_headers = {"X-Admin-Token": "wrong-token", "X-Forwarded-For": "10.0.0.99"}
+        for _ in range(20):
+            client.get("/api/settings", headers=attacker_headers)
+        legit_headers = {**admin_headers, "X-Forwarded-For": "10.0.0.1"}
+        resp = client.get("/api/settings", headers=legit_headers)
+        assert resp.status_code == 200
+
+    def test_lockout_window_expiry(self, client, monkeypatch):
+        self._reset_lockout()
+        import time
+        import backend.core.admin_auth as aa
+
+        monkeypatch.setattr(aa, "_LOCKOUT_WINDOW_SECONDS", 0)
+        wrong_headers = {"X-Admin-Token": "wrong-token"}
+        for _ in range(21):
+            client.get("/api/settings", headers=wrong_headers)
+        resp = client.get("/api/settings", headers=wrong_headers)
+        assert resp.status_code in (403, 429)
+        time.sleep(0.01)
+        resp = client.get("/api/settings", headers=wrong_headers)
+        assert resp.status_code == 403
+
+    def test_different_ip_not_locked_out(self, client):
+        self._reset_lockout()
+        wrong_headers = {"X-Admin-Token": "wrong-token", "X-Forwarded-For": "10.0.0.1"}
+        for _ in range(20):
+            client.get("/api/settings", headers=wrong_headers)
+        resp = client.get("/api/settings", headers=wrong_headers)
+        assert resp.status_code == 429
+
+        other_headers = {"X-Admin-Token": "wrong-token", "X-Forwarded-For": "10.0.0.2"}
+        resp = client.get("/api/settings", headers=other_headers)
+        assert resp.status_code == 403
+
+
+class TestRateLimiting:
+    """PR3: Stricter rate limits on admin routes."""
+
+    def test_settings_get_rate_limited(self, client, admin_headers):
+        for i in range(11):
+            resp = client.get("/api/settings", headers=admin_headers)
+            if resp.status_code == 429:
+                return
+        assert False, "Expected 429 before 11th request"
+
+    def test_settings_put_rate_limited(self, client, admin_headers):
+        for i in range(6):
+            resp = client.put("/api/settings", json={"key": "test", "value": True}, headers=admin_headers)
+            if resp.status_code == 429:
+                return
+        assert False, "Expected 429 before 6th request"
+
+
+class TestXForwardedFor:
+    """PR3: Rate limiter reads X-Forwarded-For."""
+
+    def test_get_remote_address_uses_forwarded(self):
+        from backend.core.limiter import _get_remote_address
+        from fastapi import Request
+        from starlette.datastructures import Headers
+
+        scope = {
+            "type": "http",
+            "headers": [
+                (b"x-forwarded-for", b"203.0.113.42, 10.0.0.1"),
+            ],
+        }
+        req = Request(scope)
+        assert _get_remote_address(req) == "203.0.113.42"
+
+    def test_get_remote_address_fallback_to_client(self):
+        from backend.core.limiter import _get_remote_address
+        from fastapi import Request
+
+        scope = {
+            "type": "http",
+            "client": ("192.168.1.1", 54321),
+            "headers": [],
+        }
+        req = Request(scope)
+        assert _get_remote_address(req) == "192.168.1.1"

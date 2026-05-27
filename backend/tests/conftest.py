@@ -8,6 +8,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
 os.environ["HELIX_SKIP_STARTUP_REFRESH"] = "1"
 os.environ["HELIX_ADMIN_TOKEN"] = "test-admin-token"
+os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 
 from database import Base, engine, init_db  # noqa: E402
 import main  # noqa: E402

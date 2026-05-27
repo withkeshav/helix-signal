@@ -119,7 +119,8 @@ async def poll_stablecoin_logs() -> None:
         await asyncio.sleep(POLL_INTERVAL)
 
 
-async def start_block_listener() -> None:
+async def start_block_listener() -> asyncio.Task | None:
     loop = asyncio.get_running_loop()
-    loop.create_task(poll_stablecoin_logs())
+    task = loop.create_task(poll_stablecoin_logs())
     log.info("rpc_listener.dispatched")
+    return task

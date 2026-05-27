@@ -146,23 +146,34 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
-    try:
-        from chain.web3_listener import start_block_listener
-        await start_block_listener()
-    except Exception as exc:
-        log.warning("block_listener.start_failed", error=str(exc))
+    disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
+    listener_task = None
+    fred_task = None
 
-    try:
-        from chain.fred_api import start_fred_poller
-        loop = asyncio.get_running_loop()
-        loop.create_task(start_fred_poller())
-    except Exception as exc:
-        log.warning("fred_poller.start_failed", error=str(exc))
+    if not disable_bg:
+        try:
+            from chain.web3_listener import start_block_listener
+            listener_task = await start_block_listener()
+        except Exception as exc:
+            log.warning("block_listener.start_failed", error=str(exc))
+
+        try:
+            from chain.fred_api import start_fred_poller
+            loop = asyncio.get_running_loop()
+            fred_task = loop.create_task(start_fred_poller())
+        except Exception as exc:
+            log.warning("fred_poller.start_failed", error=str(exc))
 
     try:
         yield
     finally:
         scheduler.shutdown(wait=False)
+        for task in (listener_task, fred_task):
+            if task and not task.done():
+                task.cancel()
+        tasks_to_await = [t for t in (listener_task, fred_task) if t]
+        if tasks_to_await:
+            await asyncio.gather(*tasks_to_await, return_exceptions=True)
 
 
 app = FastAPI(title="Helix-Signal API", lifespan=lifespan)

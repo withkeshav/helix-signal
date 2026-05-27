@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.8.1.1 (2026-05-28)
+
+### Fixed
+
+- **CI teardown timeout** — RPC Web3 listener and FRED poller tasks were fire-and-forget infinite loops never cancelled during lifespan shutdown, causing `TestClient` teardown to hang until pytest-timeout killed the process at 120s. Fixed by returning/capturing task handles and cancelling them in the `finally` block with `asyncio.gather(..., return_exceptions=True)`. Added `HELIX_DISABLE_BACKGROUND_TASKS` env var to skip both during tests (follows existing `HELIX_SKIP_STARTUP_REFRESH` pattern).
+
 ## 3.8.1 (2026-05-27)
 
 ### Added

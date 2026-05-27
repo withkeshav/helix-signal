@@ -359,6 +359,14 @@ def persist_trends_and_events(
         if bundle is None:
             continue
 
+        rk = bundle.risk_kwargs or {}
+        cross_source = None
+        if rk.get("cross_source_agreement") is not None:
+            cross_source = {
+                "agreement": rk["cross_source_agreement"],
+                "discrepancy_pct": rk.get("cross_source_discrepancy_pct", 0.0),
+            }
+
         db.add(
             AssetTrendSnapshot(
                 asset_symbol=u,
@@ -372,6 +380,7 @@ def persist_trends_and_events(
                 concentration_score=bundle.concentration_score,
                 data_confidence_label=bundle.data_confidence_label,
                 source_status=bundle.source_status,
+                cross_source_discrepancy=cross_source,
             )
         )
         for ch in bundle.chains:

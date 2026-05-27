@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from core.cache_manager import cache
-from database import SourceStatus
+from database import AssetFreshness, SourceStatus
 from services.retention import HELIX_VERSION
 
 
@@ -48,6 +48,18 @@ def build_health_payload(
     if defillama and defillama.status == "error":
         status = "degraded"
 
+    asset_freshness_rows = db.query(AssetFreshness).order_by(AssetFreshness.asset_symbol).all()
+    asset_freshness = {}
+    oldest = None
+    for af in asset_freshness_rows:
+        if af.last_successful_fetch is None:
+            continue
+        age = (datetime.now(timezone.utc) - af.last_successful_fetch).total_seconds() / 3600
+        asset_freshness[af.asset_symbol] = {"age_hours": round(age, 2), "last_fetch": af.last_successful_fetch.isoformat()}
+        if oldest is None or age > oldest:
+            oldest = age
+    worst_asset_age = round(oldest, 1) if oldest is not None else None
+
     return {
         "status": status,
         "db": db_connected,
@@ -55,5 +67,7 @@ def build_health_payload(
         "redis_connected": redis_connected,
         "last_successful_fetch": last_fetch,
         "scheduler_running": scheduler_running,
+        "asset_freshness": asset_freshness,
+        "worst_asset_age_hours": worst_asset_age,
         "version": HELIX_VERSION,
     }

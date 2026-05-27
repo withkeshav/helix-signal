@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from database import AssetChainSnapshot, SourceStatus
+from database import AssetChainSnapshot, AssetFreshness, SourceStatus
 from sources.defillama import DefiLlamaError, _DefiLlamaSource, async_fetch_chain_tvl_by_defillama_name, _discover_chain_ids
 from sources.coingecko import CoinGeckoSource
 from sources.dexscreener import DexScreenerSource
@@ -286,6 +286,16 @@ async def refresh_chain_data(db: Session) -> None:
                 successful_at=completed_at if dx_ok else None,
                 last_error=dx_error,
             )
+
+            for sym in successful_asset_symbols:
+                freshen = db.query(AssetFreshness).filter(AssetFreshness.asset_symbol == sym).first()
+                if freshen is None:
+                    freshen = AssetFreshness(asset_symbol=sym, last_successful_fetch=completed_at)
+                    db.add(freshen)
+                else:
+                    freshen.last_successful_fetch = completed_at
+                    freshen.updated_at = completed_at
+
             from signal_engine.history import persist_trends_and_events
             from services.cache import invalidate_dashboard
 

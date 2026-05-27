@@ -81,6 +81,7 @@ Alpine.data('helixApp', () => {
     evidenceComponents: {},
     evidenceSources: {},
     dataQualityHistory: [],
+    rotation: {},
 
     aiStillFresh(expiresAt) {
       if (!expiresAt) return false;
@@ -205,6 +206,7 @@ Alpine.data('helixApp', () => {
         this.predictive = pred || {};
         this.tickerItems = await this.loadTicker();
         await this.loadStressLeaderboard();
+        await this.loadRotation();
 
         if (!this.aiStillFresh(this.aiExpiresAt)) {
           const r = await this.loadAiExplain(this.asset); this.aiSummary = r.summary; this.aiGeneratedAt = r.generatedAt; this.aiExpiresAt = r.expiresAt;
@@ -285,6 +287,19 @@ Alpine.data('helixApp', () => {
         this.stressLeaderboard = d.leaderboard || [];
       } catch (e) {
         this.stressLeaderboard = [];
+      }
+    },
+
+    async loadRotation() {
+      try {
+        const assets = (this.enabledAssets || []).join(",");
+        if (!assets) { this.rotation = { available: false, pairs: [] }; return; }
+        const r = await fetch(`/api/analytics/cross-asset-rotation?assets=${encodeURIComponent(assets)}`, { cache: 'no-store' });
+        if (!r.ok) { this.rotation = { available: false, pairs: [] }; return; }
+        const d = await r.json();
+        this.rotation = d;
+      } catch (e) {
+        this.rotation = { available: false, pairs: [] };
       }
     },
 

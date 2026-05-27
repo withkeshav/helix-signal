@@ -196,33 +196,7 @@
           </div>
         </div>
       </div>
-      <!-- AI Market Narrative -->
-      <div class="insight-card glass" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Market Narrative <span class="model-badge">AI</span></h2>
-          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiNarrativeGeneratedAt, aiNarrativeExpiresAt)"></span>
-        </div>
-        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="aiNarrative" x-text="aiNarrative"></p>
-        <div x-show="!aiNarrative" class="empty-state">
-          <span class="empty-state-icon">&#128240;</span>
-          <span class="kpi-label">No narrative yet</span>
-          <span class="kpi-sub">Market narrative is generated from recent on-chain activity</span>
-        </div>
-      </div>
-      <!-- AI Insights -->
-      <div class="insight-card glass" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Analytics Insight <span class="model-badge">AI</span></h2>
-          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiInsightsGeneratedAt, aiInsightsExpiresAt)"></span>
-        </div>
-        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="aiInsights" x-text="aiInsights"></p>
-        <div x-show="!aiInsights" class="empty-state">
-          <span class="empty-state-icon">&#128269;</span>
-          <span class="kpi-label">No insights yet</span>
-          <span class="kpi-sub">Analytics insights will appear once supply chain anomalies are detected</span>
-        </div>
-      </div>
-      <!-- Stress Leaderboard -->
+      <!-- Stress Leaderboard — moved up for 5-second glance -->
       <div class="insight-card glass" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
           <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Stress Leaderboard <span class="model-badge">&#916;</span></h2>
@@ -244,7 +218,56 @@
         <div x-show="!stressLeaderboard?.length" class="empty-state">
           <span class="empty-state-icon">&#128202;</span>
           <span class="kpi-label">No chain velocity data yet</span>
-          <span class="kpi-sub">Stress leaderboard will show chain-level supply movements</span>
+          <span class="kpi-sub">Needs multiple 5-min snapshots to compute chain-level velocity</span>
+        </div>
+      </div>
+      <!-- AI Market Narrative -->
+      <div class="insight-card glass" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Market Narrative <span class="model-badge">AI</span></h2>
+          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiNarrativeGeneratedAt, aiNarrativeExpiresAt)"></span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="aiNarrative" x-text="aiNarrative"></p>
+        <div x-show="!aiNarrative" class="empty-state">
+          <span class="empty-state-icon">&#128240;</span>
+          <span class="kpi-label">No narrative yet</span>
+          <span class="kpi-sub">Requires AI_MODE enabled in server settings. Data refreshes every 5 min.</span>
+        </div>
+      </div>
+      <!-- AI Insights -->
+      <div class="insight-card glass" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Analytics Insight <span class="model-badge">AI</span></h2>
+          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiInsightsGeneratedAt, aiInsightsExpiresAt)"></span>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="aiInsights" x-text="aiInsights"></p>
+        <div x-show="!aiInsights" class="empty-state">
+          <span class="empty-state-icon">&#128269;</span>
+          <span class="kpi-label">No insights yet</span>
+          <span class="kpi-sub">Requires AI_MODE enabled + at least 24h of snapshot history</span>
+        </div>
+      </div>
+      <!-- Cross-Asset Rotation -->
+      <div class="insight-card glass" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Rotation <span class="model-badge">&#8644;</span></h2>
+          <span class="kpi-sub" style="font-size:10px">Cross-asset supply rotation</span>
+        </div>
+        <div x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
+          <template x-for="(p, i) in rotation.pairs" :key="i">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+              <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
+              <span>
+                <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
+                <span x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="p.dominance_shift"></span>
+              </span>
+            </div>
+          </template>
+        </div>
+        <div x-show="!rotation?.available || !rotation?.pairs?.length" class="empty-state">
+          <span class="empty-state-icon">&#128260;</span>
+          <span class="kpi-label">No rotation data</span>
+          <span class="kpi-sub">Needs 7 days of history on multiple assets. Enable more assets in Settings.</span>
         </div>
       </div>
       <!-- Time Range Selector -->

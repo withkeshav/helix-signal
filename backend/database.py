@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Integer, String, Text, JSON, UniqueConstraint, create_engine, text
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -78,11 +78,28 @@ class SourceStatus(Base):
     )
 
 
+class AssetFreshness(Base):
+    """Per-asset (and optionally per-chain) last-successful-fetch tracking."""
+
+    __tablename__ = "asset_freshness"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), unique=True, index=True)
+    last_successful_fetch: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 class AssetTrendSnapshot(Base):
     """One asset-level aggregate row per successful refresh bucket (5-minute UTC bucket)."""
 
     __tablename__ = "asset_trend_snapshots"
-    __table_args__ = (UniqueConstraint("asset_symbol", "bucket_id", name="uq_asset_trend_bucket"),)
+    __table_args__ = (
+        UniqueConstraint("asset_symbol", "bucket_id", name="uq_asset_trend_bucket"),
+        Index("ix_asset_trend_asset_ts", "asset_symbol", "timestamp"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
@@ -96,6 +113,7 @@ class AssetTrendSnapshot(Base):
     concentration_score: Mapped[int] = mapped_column(Integer, default=0)
     data_confidence_label: Mapped[str] = mapped_column(String(16), default="Unknown")
     source_status: Mapped[str] = mapped_column(String(32), default="unknown")
+    cross_source_discrepancy: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -106,7 +124,10 @@ class ChainTrendSnapshot(Base):
     """One chain-level row per asset per refresh bucket."""
 
     __tablename__ = "chain_trend_snapshots"
-    __table_args__ = (UniqueConstraint("asset_symbol", "chain_key", "bucket_id", name="uq_chain_trend_bucket"),)
+    __table_args__ = (
+        UniqueConstraint("asset_symbol", "chain_key", "bucket_id", name="uq_chain_trend_bucket"),
+        Index("ix_chain_trend_asset_chain_ts", "asset_symbol", "chain_key", "timestamp"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), index=True)

@@ -7,6 +7,8 @@ import pytest
 from services.ai_router import ai_mode, enrich_with_ai
 from services.predictive import run_predictive_bundle
 
+network = pytest.mark.network
+
 
 def test_ai_off_returns_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_off")
@@ -60,6 +62,7 @@ def test_ai_explain_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPa
     assert body.get("available") is False
 
 
+@network
 def test_ai_narrative_returns_200_when_asset_not_found(client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_lite")
     r = client.get("/api/ai/narrative?asset=NONEXISTENT")
@@ -68,6 +71,7 @@ def test_ai_narrative_returns_200_when_asset_not_found(client, monkeypatch: pyte
     assert body.get("available") is False
 
 
+@network
 def test_ai_insights_returns_200_when_asset_not_found(client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_lite")
     r = client.get("/api/ai/insights?asset=NONEXISTENT")
@@ -102,6 +106,7 @@ def test_ai_explain_requires_token_when_enabled(client, monkeypatch: pytest.Monk
     assert r.status_code == 403
 
 
+@network
 def test_ai_explain_passes_with_correct_token(client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_lite")
     monkeypatch.setenv("AI_REQUIRE_TOKEN", "true")

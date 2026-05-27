@@ -8,6 +8,8 @@ os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
 
 import pytest
 import vcr as vcr_lib
+
+network = pytest.mark.network
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -95,6 +97,7 @@ def test_governance_monitoring(client, admin_headers):
     assert isinstance(data, dict)
 
 
+@network
 @vcr.use_cassette()
 def test_defillama_source_fetch():
     """Recorded DefiLlama API call — no network on subsequent runs."""
@@ -106,6 +109,7 @@ def test_defillama_source_fetch():
     assert "peggedAssets" in data
 
 
+@network
 @vcr.use_cassette()
 def test_coingecko_price_fetch():
     """Recorded CoinGecko API call."""
@@ -119,6 +123,7 @@ def test_coingecko_price_fetch():
     assert "tether" in data
 
 
+@network
 @vcr.use_cassette()
 def test_dexscreener_pool_fetch():
     """Recorded DEX Screener API call."""

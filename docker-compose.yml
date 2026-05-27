@@ -1,12 +1,12 @@
 services:
   postgres:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.26.4-pg16
     container_name: helix-postgres
     restart: unless-stopped
     profiles: ["data"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-helix}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-helix}
     command:
       - postgres
@@ -30,7 +30,7 @@ services:
       retries: 5
 
   clickhouse:
-    image: clickhouse/clickhouse-server:24-alpine
+    image: clickhouse/clickhouse-server:26.3.10.60-alpine
     container_name: helix-clickhouse
     restart: unless-stopped
     profiles: ["data"]
@@ -50,9 +50,15 @@ services:
     expose:
       - "8123"
     mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.9-alpine
     container_name: helix-redis
     restart: unless-stopped
     profiles: ["data"]
@@ -71,6 +77,13 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -101,11 +114,15 @@ services:
     expose:
       - "8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       start_period: 30s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 768M
 
   frontend:
     build:
@@ -128,6 +145,10 @@ services:
       timeout: 10s
       start_period: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     networks:
       - internal
     depends_on:

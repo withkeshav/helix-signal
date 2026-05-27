@@ -37,36 +37,17 @@ export function helixOSINT() {
       }
     },
 
-    async loadAiExplain(asset) {
+    async _fetchAi(path, asset = null) {
       try {
-        const r = await fetch(`/api/ai/explain?asset=${asset}`, { cache: 'no-store' });
+        const url = asset ? `/api/ai/${path}?asset=${asset}` : `/api/ai/${path}`;
+        const r = await fetch(url, { cache: 'no-store' });
         if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
       } catch (e) {}
       return { summary: '', generatedAt: '', expiresAt: '' };
     },
-
-    async loadNarrative(asset) {
-      try {
-        const r = await fetch(`/api/ai/narrative?asset=${asset}`, { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
-      } catch (e) {}
-      return { summary: '', generatedAt: '', expiresAt: '' };
-    },
-
-    async loadInsights(asset) {
-      try {
-        const r = await fetch(`/api/ai/insights?asset=${asset}`, { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
-      } catch (e) {}
-      return { summary: '', generatedAt: '', expiresAt: '' };
-    },
-
-    async loadMarketOverview() {
-      try {
-        const r = await fetch('/api/ai/market-overview', { cache: 'no-store' });
-        if (r.ok) { const j = await r.json(); return { summary: j.available ? j.summary : (j.reason || ''), generatedAt: j.generated_at || '', expiresAt: j.expires_at || '' }; }
-      } catch (e) {}
-      return { summary: '', generatedAt: '', expiresAt: '' };
-    },
+    loadAiExplain(a) { return this._fetchAi('explain', a); },
+    loadNarrative(a) { return this._fetchAi('narrative', a); },
+    loadInsights(a) { return this._fetchAi('insights', a); },
+    loadMarketOverview() { return this._fetchAi('market-overview'); },
   };
 }

@@ -3,6 +3,11 @@ import { helixMarket } from './market.js';
 import { helixOSINT } from './osint.js';
 import { helixGovernance } from './governance.js';
 import { helixForecast } from './forecast.js';
+import {
+  _disposeChart, destroyCharts, destroyForecastCharts, _disposeAllCharts,
+  _setupResizeHandler, renderCharts, loadTrendChart, _makeBar,
+  renderSentimentChart, renderForecastCharts, _renderForecastCanvas, renderSupplyChart,
+} from './charts.js';
 import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js';
 
 Alpine.data('helixApp', () => {
@@ -23,6 +28,19 @@ Alpine.data('helixApp', () => {
     statusBand,
     pegLabel,
     formatAiAge,
+
+    _disposeChart,
+    destroyCharts,
+    destroyForecastCharts,
+    _disposeAllCharts,
+    _setupResizeHandler,
+    renderCharts,
+    loadTrendChart,
+    _makeBar,
+    renderSentimentChart,
+    renderForecastCharts,
+    _renderForecastCanvas,
+    renderSupplyChart,
 
     tab: 'overview',
     theme: 'light',
@@ -77,38 +95,6 @@ Alpine.data('helixApp', () => {
         this.loadDashboard();
       }, 60000);
       this._setupResizeHandler();
-    },
-
-    _setupResizeHandler() {
-      if (window._helixResizeHandler) return;
-      window._helixResizeHandler = () => {
-        for (const [, c] of this._charts) {
-          if (typeof c.resize === 'function') c.resize();
-        }
-        for (const [, c] of this._echarts) {
-          if (typeof c.isDisposed === 'function' && !c.isDisposed()) c.resize();
-        }
-      };
-      window.addEventListener('resize', window._helixResizeHandler);
-    },
-
-    _disposeChart(c) {
-      if (!c) return;
-      if (typeof c.dispose === 'function') {
-        if (typeof c.isDisposed !== 'function' || !c.isDisposed()) c.dispose();
-      } else if (typeof c.destroy === 'function') {
-        c.destroy();
-      }
-    },
-
-    destroyCharts() {
-      for (const [, c] of this._charts) this._disposeChart(c);
-      this._charts.clear();
-    },
-
-    destroyForecastCharts() {
-      for (const [, c] of this._echarts) this._disposeChart(c);
-      this._echarts.clear();
     },
 
     search() {
@@ -283,8 +269,7 @@ Alpine.data('helixApp', () => {
     },
 
     async switchAsset() {
-      this.destroyCharts();
-      this.destroyForecastCharts();
+      this._disposeAllCharts();
       await this.loadDashboard();
     },
 
@@ -292,131 +277,6 @@ Alpine.data('helixApp', () => {
       this.loadTrendChart();
       this.renderCharts({ chains: this.chains });
       this.destroyForecastCharts();
-    },
-
-    renderCharts(data) {
-      this.destroyCharts();
-      if (typeof Chart === 'undefined') return;
-      const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
-      const chains = data.chains || [];
-      if (chains.length) {
-        const sorted = [...chains].sort((a, b) => Number(b.chain_share_pct || 0) - Number(a.chain_share_pct || 0)).slice(0, 12);
-        const labels = sorted.map(c => c.chain_name);
-        const vals = sorted.map(c => c.chain_share_pct || 0);
-        const supplyVals = sorted.map(c => c.supply_current || 0);
-        this._makeBar('chart-distribution', labels, vals, primary);
-        this._makeBar('chart-supply-bar', labels, supplyVals, primary);
-      }
-      this.loadTrendChart();
-    },
-
-    loadTrendChart() {
-      const _asset = this.asset;
-      try {
-        const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#9aa8c4';
-        const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
-        const tr = this.timeRange || '7d';
-        fetch(`/api/trends?asset=${this.asset}&window=${tr}`, { cache: 'no-store' })
-          .then(r => r.ok ? r.json() : null)
-          .then(t => {
-            if (this.asset !== _asset) return;
-            if (!t || !t.points || !t.points.length || typeof Chart === 'undefined') return;
-            const el = document.getElementById('chart-trend-signal');
-            if (!el) return;
-            if (this._charts.has('chart-trend-signal')) this._disposeChart(this._charts.get('chart-trend-signal'));
-            const pts = t.points.map(p => ({ x: new Date(p.timestamp).getTime(), y: p.signal_score != null ? Number(p.signal_score) : null }));
-            this._charts.set('chart-trend-signal', new Chart(el.getContext('2d'), {
-              type: 'line',
-              data: { datasets: [{ data: pts, borderColor: primary, backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 }] },
-              options: {
-                responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } },
-                scales: { x: { type: 'linear', ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { min: 0, max: 100, ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } } },
-              },
-            }));
-          })
-          .catch(() => {});
-      } catch (e) {}
-    },
-
-    _makeBar(canvasId, labels, values, color) {
-      if (this._charts.has(canvasId)) this._disposeChart(this._charts.get(canvasId));
-      const el = document.getElementById(canvasId);
-      if (!el || typeof Chart === 'undefined') return;
-      const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#9aa8c4';
-      this._charts.set(canvasId, new Chart(el.getContext('2d'), {
-        type: 'bar', data: { labels, datasets: [{ label: '', data: values, backgroundColor: color, borderRadius: 4 }] },
-        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } } } },
-      }));
-    },
-
-    renderSentimentChart(series) {
-      if (!series || !series.length || typeof Chart === 'undefined') return;
-      if (this._charts.has('chart-sentiment')) this._disposeChart(this._charts.get('chart-sentiment'));
-      const el = document.getElementById('chart-sentiment');
-      if (!el) return;
-      const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
-      this._charts.set('chart-sentiment', new Chart(el.getContext('2d'), {
-        type: 'line',
-        data: { labels: series.map(s => s.date), datasets: [{ label: 'Avg Sentiment', data: series.map(s => s.avg_sentiment), borderColor: primary, fill: false, tension: 0.25 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: -1, max: 1 } } },
-      }));
-    },
-
-    renderForecastCharts() {
-      if (typeof echarts === 'undefined') return;
-      const elPeg = document.getElementById('chart-peg-forecast');
-      const elSupply = document.getElementById('chart-supply-forecast');
-      if (!elPeg || !elSupply) return;
-      const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e8edf7';
-      const lineColor = getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#273247';
-      const baseConfig = {
-        tooltip: { trigger: 'axis' }, grid: { left: 50, right: 16, top: 20, bottom: 36 },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: lineColor } }, axisLabel: { color: textColor } },
-        yAxis: { type: 'value', splitLine: { lineStyle: { color: lineColor, opacity: 0.2 } }, axisLabel: { color: textColor } },
-        legend: { bottom: 0, textStyle: { color: textColor, fontSize: 11 } },
-        animation: false,
-      };
-      const data = this._forecastData || {};
-      const pegForecast = (data.forecast_points?.peg) || [];
-      const pegHistorical = (data.historical?.peg) || [];
-      const supplyForecast = (data.forecast_points?.supply) || [];
-      const supplyHistorical = (data.historical?.supply) || [];
-      this._renderForecastCanvas(elPeg, 'Peg Forecast', pegHistorical, pegForecast, baseConfig, textColor, lineColor);
-      this._renderForecastCanvas(elSupply, 'Supply Forecast', supplyHistorical, supplyForecast, baseConfig, textColor, lineColor);
-    },
-
-    _renderForecastCanvas(el, title, historical, forecast, baseConfig, textColor, lineColor) {
-      if (this._echarts.has(el.id)) { this._disposeChart(this._echarts.get(el.id)); this._echarts.delete(el.id); }
-      const chart = echarts.init(el);
-      this._echarts.set(el.id, chart);
-      const series = forecast && forecast.length
-        ? [
-            { name: 'q10 base', type: 'line', data: forecast.map(p => [p.timestamp, p.q10 ?? p.q50 * 0.997]), lineStyle: { opacity: 0 }, itemStyle: { opacity: 0 }, stack: 'confidence', areaStyle: { color: 'rgba(59,130,246,0.06)' }, symbol: 'none' },
-            { name: '90% Band', type: 'line', data: forecast.map(p => [p.timestamp, Math.max(0, (p.q90 ?? p.q50) - p.q10)]), lineStyle: { opacity: 0 }, itemStyle: { opacity: 0 }, stack: 'confidence', areaStyle: { color: 'rgba(59,130,246,0.08)' }, symbol: 'none' },
-            { name: 'Median', type: 'line', data: forecast.map(p => [p.timestamp, p.q50]), lineStyle: { width: 2, color: '#3b82f6' }, symbol: 'none', z: 10 },
-            { name: 'Historical', type: 'line', data: historical.map(p => [p.timestamp, p.value]), lineStyle: { width: 1.5, color: textColor }, symbolSize: 2, z: 10 },
-          ]
-        : [{ name: 'No forecast data', type: 'line', data: historical.map(p => [p.timestamp, p.value]), lineStyle: { width: 1.5, color: textColor }, symbolSize: 2, z: 10 }];
-      chart.setOption({ ...baseConfig,
-        title: { text: title, left: 'center', top: 0, textStyle: { color: textColor, fontSize: 13, fontWeight: 500 } },
-        grid: { left: 50, right: 16, top: 36, bottom: 40 },
-        series,
-      });
-    },
-
-    async renderSupplyChart() {
-      const d = await this.loadSupplyTrend();
-      if (!d || !d.points || !d.points.length || typeof Chart === 'undefined') return;
-      const el = document.getElementById('chart-supply-trend');
-      if (!el) return;
-      if (this._charts.has('chart-supply-trend')) this._disposeChart(this._charts.get('chart-supply-trend'));
-      const pts = d.points.filter(p => p.total_supply != null).map(p => ({ x: new Date(p.timestamp).getTime(), y: Number(p.total_supply) }));
-      const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
-      this._charts.set('chart-supply-trend', new Chart(el.getContext('2d'), {
-        type: 'line',
-        data: { datasets: [{ data: pts, borderColor: primary, backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { type: 'linear', ticks: { display: false }, grid: { display: false } }, y: { ticks: { callback: v => formatUsd(v) } } } },
-      }));
     },
   };
 });

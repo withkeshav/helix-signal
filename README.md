@@ -18,6 +18,10 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **6 new DB-backed settings** — AI mode, token budget, cache TTL, web search, anomaly detection all editable via Settings UI
 - **Anomaly detection enhanced** — `latest_zscore()`, `min_bps` filter, `STD_FLOOR` env var
 - **sync-env.sh** — Utility to merge `.env.example` keys into `.env` preserving existing values
+- **Docker hardened** — All images pinned to immutable versions, `POSTGRES_PASSWORD` required (no default fallback), resource limits, health conditions, ClickHouse healthcheck, non-root nginx, `.dockerignore`
+- **CI pipeline** — Hadolint Dockerfile lint, Trivy vulnerability scan (HIGH/CRITICAL), SSH auto-deploy on `v*` tags, polling loop for service readiness
+- **Frontend refactored** — Chart module extracted to `frontend/js/charts.js` (12 exported functions), CSS externalized to `styles.css`, ARIA tab roles, deferred CDN scripts, empty-state placeholders, AI loader helper
+- **Health endpoint** — `redis_connected` and `db_connected` fields in `/api/health`
 - **129 regression tests pass**
 
 ## v3.3 Highlights
@@ -58,6 +62,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 git clone https://github.com/withkeshav/helix-signal.git
 cd helix-signal
 cp .env.example .env
+# Set POSTGRES_PASSWORD in .env (required — docker will error if empty)
 docker compose up --build -d
 ./scripts/smoke-check.sh http://localhost:80
 ```
@@ -197,7 +202,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener) with circuit breakers
 - `backend/signal_engine/` — V3 risk scoring (scoring, metrics, history, risk inputs)
 - `frontend/` — pure static HTML, Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
-- `frontend/js/` — ES6 modules (market, osint, governance, forecast) + 3 Web Components + init.js
+- `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast) + 3 Web Components
 - `config/` — chain, asset, and alert configuration
 - `docker/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
 - `docs/` — architecture, data methodology, adding-asset, adding-chain, plugins, API ref, grant strategy

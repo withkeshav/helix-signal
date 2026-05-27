@@ -13,12 +13,28 @@
 - **`min_bps` filter on `zscore_detect()`** — Suppresses tiny statistical fluctuations
 - **`STD_FLOOR` env var** — Prevents division-by-near-zero in z-score computation (`ANOMALY_STD_FLOOR`, default 0.001)
 - **`sync-env.sh`** — Merges new keys from `.env.example` into `.env` preserving existing values
+- **Health endpoint** — `redis_connected` and `db_connected` fields in `/api/health` response
+- **`_fetchAi` helper** — Consolidated 4 redundant AI loader methods in `osint.js` into a single `_fetchAi()` helper
+- **Chart module extraction** — All chart methods extracted from `init.js` into `frontend/js/charts.js` (12 exported functions, ECharts lazy-load via dynamic `import()`)
+- **`frontend/styles.css`** — External stylesheet extracted from inline `<style>` in `index.html`; `.kpi-placeholder` pulse animation, `.empty-state` styles with icon support
+- **Empty-state placeholders** — Missing empty states added for Market Overview, AI Narrative, AI Insights, Anomaly Events, and Supply tab
+- **CI hadolint + Trivy** — Hadolint Dockerfile linting and Trivy vulnerability scan (HIGH/CRITICAL, exit-code 1) added to CI pipeline
+- **CI SSH deploy job** — Automated deploy on `v*` tag push via SSH + docker-compose
+- **`.dockerignore`** — `backend/.dockerignore` excludes venv, pyc, coverage, egg-info, pytest cache, git
 
 ### Changed
 
 - **Budget tracking refactored** — `_deduct_tokens()` replaces `_within_budget()`: deducts actual tokens returned (not estimated pre-pay), supports Redis and local modes uniformly
 - **Provider chain reordered** — OpenRouter free → Ollama Cloud → Groq in `ai_lite`; free → fallback → primary → Groq in `ai_full` priority mode
 - **`.env.example`** — AI section reorganized with OpenRouter first, `AI_CACHE_TTL_SECONDS` default bumped from 1800→3600
+- **Docker images pinned** — `timescaledb:2.26.4-pg16`, `clickhouse-server:26.3.10.60-alpine`, `redis:7.4.9-alpine`, `python:3.12.13-slim`, `nginx:1.30.1-alpine` — all immutable minor versions
+- **`POSTGRES_PASSWORD` required** — Docker errors on empty password (`${POSTGRES_PASSWORD:?}`) instead of defaulting to `helix`
+- **Docker healthchecks** — Switched from `python -c` to `curl -f`; added `depends_on` with health conditions for all data services
+- **Resource limits** — Backend capped at 768M memory, frontend at 128M via `deploy.resources`
+- **Frontend tab ARIA** — Navigation buttons use `role="tablist"`, `role="tab"`, `:aria-selected` attributes
+- **CDN scripts deferred** — Chart.js and ECharts CDN scripts now load with `defer` to avoid render blocking
+- **`rg → grep` in smoke-check.sh** — Replaced `ripgrep` with standard `grep` for portability
+- **CI sleep → polling** — `sleep 15` replaced with 60-iteration polling loop (2s interval) for service readiness
 
 ### Fixed
 
@@ -27,6 +43,8 @@
 - **Pre-flight budget deduct** — Token reservation moved before provider call; accepts 1-2% overage for simplicity
 - **Rate limiter on `/api/ai/budget`** — 30/minute limit applied
 - **CI coverage floor** bumped from 60% → 65%
+- **Non-root nginx** — `frontend/Dockerfile` adds `USER nginx` with `chown` on static assets
+- **ClickHouse healthcheck** — Added `clickhouse-client --query="SELECT 1"` healthcheck to prevent rollover queries on unhealthy instance
 
 ## 3.6.0 (2026-05-26)
 

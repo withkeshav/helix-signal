@@ -52,16 +52,6 @@ export function gaugeColor(band) {
   return 'var(--up)';
 }
 
-export function timeAgo(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const s = (Date.now() - d.getTime()) / 1e3;
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
-}
-
 export function formatAiAge(generatedAt, expiresAt) {
   if (!generatedAt) return '';
   const gen = new Date(generatedAt);

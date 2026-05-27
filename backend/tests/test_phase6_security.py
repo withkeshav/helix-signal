@@ -98,9 +98,9 @@ class TestContainerSecurity:
             content = f.read()
         for service in ("backend:", "frontend:"):
             idx = content.index(service)
-            block = content[idx: idx + 200]
-            assert "no-new-privileges" in block, f"{service} missing no-new-privileges"
-            assert "cap_drop" in block, f"{service} missing cap_drop"
+            block = content[idx: idx + 350]
+            assert "no-new-privileges" in block, f"{service} missing no-new-privileges\nblock={block}"
+            assert "cap_drop" in block, f"{service} missing cap_drop\nblock={block}"
 
 
 class TestSettingsAuth:

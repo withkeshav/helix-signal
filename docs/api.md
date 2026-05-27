@@ -100,6 +100,28 @@ All endpoints return JSON. Error responses follow:
 {"detail": "Error description"}
 ```
 
+## Health Response
+
+`GET /api/health` returns:
+
+```json
+{
+  "status": "ok",
+  "db": true,
+  "db_connected": true,
+  "redis_connected": false,
+  "last_successful_fetch": "2026-05-27T12:00:00Z",
+  "scheduler_running": true,
+  "version": "3.7.0"
+}
+```
+
+- `db` / `db_connected` — Database connectivity (`SELECT 1` ping)
+- `redis_connected` — Redis reachability (`PING` via `cache._redis.ping()`), false when Redis not configured
+- `last_successful_fetch` — DeFiLlama source last OK fetch timestamp
+- `scheduler_running` — APScheduler background scheduler state
+- `version` — `HELIX_VERSION` from `backend/services/retention.py`
+
 ## Schema
 
 Typed Pydantic response models in `backend/schemas.py`:

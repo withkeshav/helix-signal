@@ -10,6 +10,8 @@ def test_health(client):
     body = response.json()
     assert body["version"] == "3.7.0"
     assert "db" in body
+    assert body["db_connected"] is True
+    assert body["redis_connected"] is False
     assert "scheduler_running" in body
 
 

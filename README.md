@@ -8,7 +8,7 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**99 regression tests pass.** Zero paid API dependencies for core operation.
+**129 regression tests pass.** Zero paid API dependencies for core operation.
 
 ## v3.7.0 Highlights
 
@@ -18,7 +18,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **6 new DB-backed settings** — AI mode, token budget, cache TTL, web search, anomaly detection all editable via Settings UI
 - **Anomaly detection enhanced** — `latest_zscore()`, `min_bps` filter, `STD_FLOOR` env var
 - **sync-env.sh** — Utility to merge `.env.example` keys into `.env` preserving existing values
-- **124 regression tests pass**
+- **129 regression tests pass**
 
 ## v3.3 Highlights
 
@@ -147,6 +147,7 @@ Copy `.env.example` to `.env` and adjust:
 - `LOG_LEVEL` (default `INFO`) — set to `DEBUG` for verbose logging
 - `LOG_FORMAT` (default `dev`) — set to `json` for structured JSON logs in production
 - `HELIX_ADMIN_TOKEN` — required for admin routes (settings, refresh, backfill, metrics, governance)
+- `AI_REQUIRE_TOKEN` — set to `true` to require `X-Admin-Token` on AI endpoints (default: off, for backward compatibility)
 - `RATE_LIMITER_STORAGE_URI` — Redis URL for multi-worker rate limiting (optional)
 
 Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `config/alerts.json`.

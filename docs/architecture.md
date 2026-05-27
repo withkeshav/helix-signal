@@ -70,7 +70,7 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - APScheduler: interval ingest + hourly OSINT + retention
 - Signal engine: ingest, V3 scoring via `risk_inputs.py`, 5-minute buckets, deduplicated events
 - **Predictive** (`services/predictive.py`): statistical/ML outputs — always available without LLM
-- **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged
+- **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `AI_REQUIRE_TOKEN` gate with per-IP lockout after 20 failed attempts; pre-flight budget deduct in `enrich_with_ai()`
 - **Celery** (`celery_app.py`, `worker_tasks.py`): background refresh and inference when Redis profile is enabled
 
 ### Data Store

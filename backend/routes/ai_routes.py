@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -8,9 +8,25 @@ from services.ai_router import ai_mode, enrich_with_ai, get_budget_status
 from services.dashboard import build_dashboard_response
 from signal_engine.core import load_enabled_assets
 
+from backend.core.admin_auth import _check_lockout, _record_failure, _ip_key
 from backend.core.limiter import limiter
 
 router = APIRouter()
+
+
+def _require_ai_auth(request: Request) -> None:
+    import os
+    if os.getenv("AI_REQUIRE_TOKEN", "").strip().lower() not in ("1", "true", "yes"):
+        return
+    _check_lockout(request)
+    token = request.headers.get("X-Admin-Token", "")
+    expected = os.getenv("HELIX_ADMIN_TOKEN", "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="Admin token not configured in the environment.")
+    import hmac
+    if not token or not hmac.compare_digest(token, expected):
+        _record_failure(request)
+        raise HTTPException(status_code=403, detail="Forbidden")
 
 
 def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
@@ -30,7 +46,8 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
 
 
 @router.get("/ai/budget")
-def ai_budget_endpoint() -> dict[str, Any]:
+@limiter.limit("30/minute")
+def ai_budget_endpoint(request: Request) -> dict[str, Any]:
     return get_budget_status()
 
 
@@ -41,6 +58,7 @@ def ai_explain(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    _require_ai_auth(request)
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
@@ -57,6 +75,7 @@ def ai_narrative(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    _require_ai_auth(request)
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
@@ -108,6 +127,7 @@ def ai_insights(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    _require_ai_auth(request)
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
@@ -163,6 +183,7 @@ def ai_market_overview(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    _require_ai_auth(request)
     context = _build_market_context(db)
     if context is None:
         return {"available": False, "reason": "no_assets"}

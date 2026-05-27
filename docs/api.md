@@ -76,7 +76,11 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | GET | `/api/ai/narrative?asset=USDT` | Market narrative with sentiment + events | 30/min | `AI_MODE != ai_off` |
 | GET | `/api/ai/insights?asset=USDT` | Supply, chain, and anomaly insights | 30/min | `AI_MODE != ai_off` |
 | GET | `/api/ai/market-overview` | Cross-asset market summary | 20/min | `AI_MODE != ai_off` (returns engine data when off) |
-| GET | `/api/ai/budget` | Daily token budget, used, remaining, pct | 60/min | Always available |
+| GET | `/api/ai/budget` | Daily token budget, used, remaining, pct | 30/min | Always available |
+
+AI endpoints can optionally require `X-Admin-Token` by setting `AI_REQUIRE_TOKEN=true` in `.env`.
+When enabled, failed auth triggers a per-IP lockout after 20 failed attempts (15-minute window).
+Lockout uses Redis when available, falling back to in-memory tracking.
 
 ## Common Parameters
 

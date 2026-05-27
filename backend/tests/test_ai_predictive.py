@@ -74,3 +74,45 @@ def test_ai_insights_returns_200_when_asset_not_found(client, monkeypatch: pytes
     assert r.status_code == 200
     body = r.json()
     assert body.get("available") is False
+
+
+def test_ai_budget_endpoint(client) -> None:
+    r = client.get("/api/ai/budget")
+    assert r.status_code == 200
+    body = r.json()
+    assert "daily_budget" in body
+    assert "tokens_used_today" in body
+    assert "tokens_remaining" in body
+    assert "pct_used" in body
+
+
+def test_ai_budget_shape(client) -> None:
+    r = client.get("/api/ai/budget")
+    body = r.json()
+    assert body["daily_budget"] > 0
+    assert body["tokens_remaining"] >= 0
+    assert 0 <= body["pct_used"] <= 100
+
+
+def test_ai_explain_requires_token_when_enabled(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_lite")
+    monkeypatch.setenv("AI_REQUIRE_TOKEN", "true")
+    monkeypatch.setenv("HELIX_ADMIN_TOKEN", "test-admin-token")
+    r = client.get("/api/ai/explain?asset=USDT", headers={"X-Admin-Token": "wrong"})
+    assert r.status_code == 403
+
+
+def test_ai_explain_passes_with_correct_token(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_lite")
+    monkeypatch.setenv("AI_REQUIRE_TOKEN", "true")
+    monkeypatch.setenv("HELIX_ADMIN_TOKEN", "test-admin-token")
+    r = client.get("/api/ai/explain?asset=USDT", headers={"X-Admin-Token": "test-admin-token"})
+    assert r.status_code == 200
+
+
+def test_ai_no_auth_when_token_not_configured(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_MODE", "ai_lite")
+    monkeypatch.setenv("AI_REQUIRE_TOKEN", "true")
+    monkeypatch.delenv("HELIX_ADMIN_TOKEN", raising=False)
+    r = client.get("/api/ai/explain?asset=USDT")
+    assert r.status_code == 503

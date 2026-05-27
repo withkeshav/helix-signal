@@ -358,16 +358,17 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
         return {**cached, "cached": True}
 
     prompt, system, max_tokens = _build_prompt(feature, context)
+    estimated_tokens = max_tokens + len(prompt.split())
     errors: list[str] = []
 
     for provider_fn in _providers_for_mode(mode, priority=priority):
         try:
+            if not _deduct_tokens(estimated_tokens):
+                return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
             result = provider_fn(prompt, max_tokens, system=system)
             if result is None:
                 continue
             tokens_returned = int(result.get("tokens") or 0) or max_tokens
-            if not _deduct_tokens(tokens_returned):
-                return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
             now_dt = datetime.now(timezone.utc)
             payload = {
                 "available": True,

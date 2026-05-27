@@ -23,6 +23,10 @@
 ### Fixed
 
 - **Frontend version sync** — Footer pill `v3.5.1` → `v3.7.0` matching backend `HELIX_VERSION`
+- **AI auth gate** — `_require_ai_auth()` extracts `X-Admin-Token` from request headers (no FastAPI DI dependency); optional `AI_REQUIRE_TOKEN` env var with per-IP lockout after 20 failed attempts (Redis-backed with in-memory fallback)
+- **Pre-flight budget deduct** — Token reservation moved before provider call; accepts 1-2% overage for simplicity
+- **Rate limiter on `/api/ai/budget`** — 30/minute limit applied
+- **CI coverage floor** bumped from 60% → 65%
 
 ## 3.6.0 (2026-05-26)
 

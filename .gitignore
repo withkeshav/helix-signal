@@ -113,3 +113,6 @@ helix_signal_strategic_report.md
 
 # Internal planning docs — not for public consumption
 docs/grant-strategy.md
+
+# pytest coverage
+.coverage

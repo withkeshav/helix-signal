@@ -101,3 +101,27 @@ class TestContainerSecurity:
             block = content[idx: idx + 200]
             assert "no-new-privileges" in block, f"{service} missing no-new-privileges"
             assert "cap_drop" in block, f"{service} missing cap_drop"
+
+
+class TestSettingsAuth:
+    """PR1: GET /api/settings requires admin token."""
+
+    def test_get_settings_403_without_token(self, client):
+        resp = client.get("/api/settings")
+        assert resp.status_code == 403
+
+    def test_get_settings_200_with_token(self, client, admin_headers):
+        resp = client.get("/api/settings", headers=admin_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+
+    def test_get_settings_strips_key_env(self, client, admin_headers):
+        resp = client.get("/api/settings", headers=admin_headers)
+        assert resp.status_code == 200
+        for item in resp.json():
+            assert "key_env" not in item, f"{item.get('key')} still has key_env"
+
+    def test_put_settings_403_without_token(self, client):
+        resp = client.put("/api/settings", json={"key": "test", "value": True})
+        assert resp.status_code == 403

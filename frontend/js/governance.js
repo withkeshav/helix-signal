@@ -14,8 +14,10 @@ export function helixGovernance() {
     async loadSettings() {
       try {
         const r = await fetch('/api/settings', { cache: 'no-store', headers: this._adminHeaders() });
-        if (r.ok) this.settingsList = await r.json();
-      } catch (e) { this.settingsList = []; }
+        if (r.ok) { this.settingsList = await r.json(); return true; }
+        this.settingsList = [];
+        return false;
+      } catch (e) { this.settingsList = []; return false; }
     },
 
     async toggleSetting(key, value) {

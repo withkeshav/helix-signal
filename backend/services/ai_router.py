@@ -15,6 +15,76 @@ import httpx
 _AI_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "3600"))
 _LOCAL_DAILY_TOKENS = 0
+_LOCAL_TOKEN_DATE = ""
+_AI_REDIS_CACHE_PREFIX = "helix:ai:cache:"
+
+
+def _try_redis_cache() -> Any:
+    try:
+        from backend.core.cache_manager import cache
+        return cache
+    except Exception:
+        return None
+
+
+def _reset_local_if_new_day() -> None:
+    global _LOCAL_DAILY_TOKENS, _LOCAL_TOKEN_DATE
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if _LOCAL_TOKEN_DATE != today:
+        _LOCAL_DAILY_TOKENS = 0
+        _LOCAL_TOKEN_DATE = today
+
+
+def _deduct_tokens(count: int) -> bool:
+    global _LOCAL_DAILY_TOKENS
+    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
+    _reset_local_if_new_day()
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    if redis_url:
+        try:
+            from backend.core.cache_manager import cache
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            key = f"helix:ai:daily_tokens:{today}"
+            client = cache._redis
+            if client is None:
+                raise RuntimeError("redis_unavailable")
+            current = int(client.get(key) or 0)
+            if current + count > budget:
+                return False
+            pipe = client.pipeline()
+            pipe.incrby(key, count)
+            pipe.expire(key, 86400)
+            pipe.execute()
+            return True
+        except Exception:
+            pass
+    if _LOCAL_DAILY_TOKENS + count > budget:
+        return False
+    _LOCAL_DAILY_TOKENS += count
+    return True
+
+
+def get_budget_status() -> dict[str, Any]:
+    global _LOCAL_DAILY_TOKENS, _LOCAL_TOKEN_DATE
+    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
+    _reset_local_if_new_day()
+    redis_url = os.getenv("REDIS_URL", "").strip()
+    used = _LOCAL_DAILY_TOKENS
+    if redis_url:
+        try:
+            from backend.core.cache_manager import cache
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            client = cache._redis
+            if client is not None:
+                used = int(client.get(f"helix:ai:daily_tokens:{today}") or 0)
+        except Exception:
+            pass
+    return {
+        "daily_budget": budget,
+        "tokens_used_today": used,
+        "tokens_remaining": max(0, budget - used),
+        "pct_used": round(used / budget * 100, 1) if budget > 0 else 0,
+    }
 
 
 def ai_mode() -> str:
@@ -22,6 +92,11 @@ def ai_mode() -> str:
 
 
 def _cache_get(key: str) -> dict[str, Any] | None:
+    rc = _try_redis_cache()
+    if rc:
+        val = rc.get(_AI_REDIS_CACHE_PREFIX + key)
+        if val:
+            return val
     entry = _AI_CACHE.get(key)
     if not entry:
         return None
@@ -33,6 +108,9 @@ def _cache_get(key: str) -> dict[str, Any] | None:
 
 
 def _cache_set(key: str, payload: dict[str, Any]) -> None:
+    rc = _try_redis_cache()
+    if rc:
+        rc.set(_AI_REDIS_CACHE_PREFIX + key, payload, ttl=_CACHE_TTL_SECONDS)
     _AI_CACHE[key] = (time.time(), payload)
 
 
@@ -41,11 +119,13 @@ def _prompt_hash(feature: str, context: dict[str, Any]) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
-def _openrouter_lite(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
+def _openrouter_lite(
+    prompt: str, max_tokens: int, model: str | None = None, **kwargs
+) -> dict[str, Any] | None:
     api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not api_key:
         return None
-    model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -61,6 +141,9 @@ def _openrouter_lite(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] |
     text = data["choices"][0]["message"]["content"]
     usage = data.get("usage") or {}
     return {"provider": "openrouter", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
+
+
+_OPENROUTER_FREE_MODEL = os.getenv("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
 
 
 def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None) -> dict[str, Any] | None:
@@ -110,56 +193,27 @@ def _groq(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
 def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
     if mode == "ai_off":
         return []
+    or_free = partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL)
     primary = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
     fallback = os.getenv("OLLAMA_CLOUD_FALLBACK_MODEL", "qwen-2.5-7b-cloud")
     if mode == "ai_lite":
         return [
+            or_free,
             partial(_ollama_cloud, model=primary),
-            partial(_ollama_cloud, model=fallback),
         ]
     if priority:
         return [
+            or_free,
             partial(_ollama_cloud, model=fallback),
             partial(_ollama_cloud, model=primary),
             _groq,
-            _openrouter_lite,
         ]
     return [
+        or_free,
         partial(_ollama_cloud, model=primary),
         partial(_ollama_cloud, model=fallback),
-        _openrouter_lite,
         _groq,
     ]
-
-
-def _within_budget(additional_tokens: int) -> bool:
-    global _LOCAL_DAILY_TOKENS
-    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
-    redis_url = os.getenv("REDIS_URL", "").strip()
-    if redis_url:
-        try:
-            from backend.core.cache_manager import cache
-
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            key = f"helix:ai:daily_tokens:{today}"
-            client = cache._redis
-            if client is None:
-                raise RuntimeError("redis_unavailable")
-            current = client.get(key)
-            current_count = int(current) if current else 0
-            if current_count + additional_tokens > budget:
-                return False
-            pipe = client.pipeline()
-            pipe.incrby(key, additional_tokens)
-            pipe.expire(key, 86400)
-            pipe.execute()
-            return True
-        except Exception:
-            pass
-    if _LOCAL_DAILY_TOKENS + additional_tokens > budget:
-        return False
-    _LOCAL_DAILY_TOKENS += additional_tokens
-    return True
 
 
 _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
@@ -306,16 +360,14 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
     prompt, system, max_tokens = _build_prompt(feature, context)
     errors: list[str] = []
 
-    estimated_tokens = max_tokens + len(prompt.split())
-    if not _within_budget(estimated_tokens):
-        return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
-
     for provider_fn in _providers_for_mode(mode, priority=priority):
         try:
             result = provider_fn(prompt, max_tokens, system=system)
             if result is None:
                 continue
-            tokens_returned = int(result.get("tokens") or 0)
+            tokens_returned = int(result.get("tokens") or 0) or max_tokens
+            if not _deduct_tokens(tokens_returned):
+                return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
             now_dt = datetime.now(timezone.utc)
             payload = {
                 "available": True,

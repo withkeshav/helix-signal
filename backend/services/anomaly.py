@@ -35,18 +35,24 @@ def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 3
     }
 
 
-def zscore_detect(values: list[float], threshold: float = 3.0) -> list[dict[str, Any]]:
+STD_FLOOR = float(os.getenv("ANOMALY_STD_FLOOR", "0.001"))
+
+
+def zscore_detect(values: list[float], threshold: float = 3.0, min_bps: float = 0.0) -> list[dict[str, Any]]:
     if len(values) < 10:
         return []
     import numpy as np
     arr = np.array(values)
     mean = np.mean(arr)
-    std = np.std(arr)
+    std = max(np.std(arr), STD_FLOOR)
     if std == 0:
         return []
     z_scores = (arr - mean) / std
     anomalies = np.where(np.abs(z_scores) > threshold)[0]
-    return [{"index": int(i), "value": float(arr[i]), "z_score": float(z_scores[i]), "mean": float(mean), "std": float(std)} for i in anomalies]
+    result = [{"index": int(i), "value": float(arr[i]), "z_score": float(z_scores[i]), "mean": float(mean), "std": float(std)} for i in anomalies]
+    if min_bps > 0:
+        result = [r for r in result if abs((r["value"] - mean) / mean) * 10000 >= min_bps] if mean != 0 else result
+    return result
 
 
 def isolation_forest_detect(points: list[list[float]], contamination: float = 0.05) -> list[int]:
@@ -97,6 +103,20 @@ def _check_bridge_flow(db: Session, *, asset_symbol: str, threshold_pct: float =
     }
 
 
+def latest_zscore(values: list[float], threshold: float = 3.0, min_bps: float = 0.0) -> dict[str, Any]:
+    if len(values) < 10:
+        return {"z_score": 0, "std": 0, "mean": 0, "anomaly": False}
+    import numpy as np
+    arr = np.array(values)
+    mean = np.mean(arr)
+    std = max(np.std(arr), STD_FLOOR)
+    latest = float(arr[-1])
+    z = (latest - mean) / std if std > 0 else 0
+    bps = abs((latest - mean) / mean) * 10000 if mean != 0 else 0
+    is_anomaly = abs(z) > threshold and (bps >= min_bps if min_bps > 0 else True)
+    return {"z_score": float(z), "mean": float(mean), "std": float(std), "latest": latest, "bps": float(bps), "anomaly": is_anomaly}
+
+
 def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     if not ENABLED:
         return {"enabled": False, "note": "Anomaly detection is disabled. Set ENABLE_ANOMALY_DETECTION=true to enable."}
@@ -108,9 +128,13 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     bridge = _check_bridge_flow(db, asset_symbol=asset_symbol)
     results["bridge_flow"] = bridge
 
-    supply_anomalies = zscore_detect(history["supplies"])
-    price_anomalies = zscore_detect(history["prices"])
+    supply_anomalies = zscore_detect(history["supplies"], min_bps=10.0)
+    price_anomalies = zscore_detect(history["prices"], min_bps=10.0)
     results["z_score"] = {"supply": supply_anomalies, "price": price_anomalies}
+    results["latest_zscore"] = {
+        "supply": latest_zscore(history["supplies"], min_bps=10.0),
+        "price": latest_zscore(history["prices"], min_bps=10.0),
+    }
 
     features: list[list[float]] = []
     for i in range(len(history["timestamps"])):

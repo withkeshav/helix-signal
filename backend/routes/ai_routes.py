@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.ai_router import ai_mode, enrich_with_ai
+from services.ai_router import ai_mode, enrich_with_ai, get_budget_status
 from services.dashboard import build_dashboard_response
 from signal_engine.core import load_enabled_assets
 
@@ -27,6 +27,11 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
         "chain_count": len(dash.chains),
         "top_chain_share": dash.chain_concentration.top_chain_share_pct or 0,
     }
+
+
+@router.get("/ai/budget")
+def ai_budget_endpoint() -> dict[str, Any]:
+    return get_budget_status()
 
 
 @router.get("/ai/explain")
@@ -126,16 +131,7 @@ def ai_insights(
     return enrich_with_ai(feature="insight_summary", context=ctx)
 
 
-@router.get("/ai/market-overview")
-@limiter.limit("20/minute")
-def ai_market_overview(
-    request: Request,
-    db: Session = Depends(get_db),
-) -> dict[str, Any]:
-    mode = ai_mode()
-    if mode == "ai_off":
-        return {"available": False, "reason": "AI disabled; core metrics unchanged."}
-
+def _build_market_context(db: Session) -> dict[str, Any] | None:
     enabled = load_enabled_assets()
     assets_data = []
     for cfg in enabled:
@@ -144,15 +140,12 @@ def ai_market_overview(
         if ctx is None:
             continue
         assets_data.append(ctx)
-
     if not assets_data:
-        return {"available": False, "reason": "no_assets"}
-
+        return None
     avg_score = sum(a["signal_score"] for a in assets_data) / len(assets_data)
     bands = [a["signal_band"] for a in assets_data]
     total_chains = sum(a["chain_count"] for a in assets_data)
-
-    context = {
+    return {
         "asset_count": len(assets_data),
         "asset_list": ", ".join(a["asset_symbol"] for a in assets_data),
         "avg_signal_score": round(avg_score, 0),
@@ -162,5 +155,19 @@ def ai_market_overview(
             f"{a['asset_symbol']}: {a['supply_change_pct']:+.1f}%" for a in assets_data
         ),
     }
+
+
+@router.get("/ai/market-overview")
+@limiter.limit("20/minute")
+def ai_market_overview(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    context = _build_market_context(db)
+    if context is None:
+        return {"available": False, "reason": "no_assets"}
+    mode = ai_mode()
+    if mode == "ai_off":
+        return {"available": True, "generated_by": "engine", **context}
 
     return enrich_with_ai(feature="market_overview", context=context)

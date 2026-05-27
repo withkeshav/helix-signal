@@ -767,6 +767,43 @@
           </template>
         </div>
         <div class="insight-card" style="grid-column:1/-1">
+          <h2>AI &amp; Anomaly Detection</h2>
+          <div x-show="aiBudgetLoaded">
+            <div style="padding:6px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line)">
+              <span style="font-size:12px;color:var(--muted)">Daily Token Budget</span>
+              <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${aiBudget.tokens_used_today} / ${aiBudget.daily_budget} used (${aiBudget.pct_used}%)`"></span>
+            </div>
+            <div style="margin:6px 0;height:6px;background:var(--bg-accent);border-radius:3px;overflow:hidden">
+              <div style="height:100%;border-radius:3px;background:var(--spark);transition:width .5s" :style="`width:${Math.min(aiBudget.pct_used,100)}%`"></div>
+            </div>
+          </div>
+          <template x-for="s in settingsList" :key="s.key">
+            <div x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <span style="font-size:13px" x-text="s.label"></span>
+              <div x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
+                <label class="toggle">
+                  <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+              </div>
+              <div x-show="s.type === 'int'" style="display:flex;align-items:center;gap:6px">
+                <input type="number" :value="s.value" :min="s.min" :max="s.max" style="width:90px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
+                       @change="toggleSetting(s.key, parseInt($event.target.value))">
+                <button class="btn btn-muted" style="padding:3px 8px;font-size:11px" @click="toggleSetting(s.key, s.default)">Reset</button>
+              </div>
+              <div x-show="s.type === 'str'" style="display:flex;align-items:center;gap:6px">
+                <select :value="s.value" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
+                        @change="toggleSetting(s.key, $event.target.value)">
+                  <option value="ai_off">Off</option>
+                  <option value="ai_lite">Lite</option>
+                  <option value="ai_full">Full</option>
+                </select>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div class="insight-card" style="grid-column:1/-1">
           <h2>Admin Token</h2>
           <p class="kpi-sub" style="margin-bottom:8px">Required for refresh and settings changes when HELIX_ADMIN_TOKEN is set on the server.</p>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">

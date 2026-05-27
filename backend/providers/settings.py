@@ -21,6 +21,12 @@ _DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "feature_ai_summary": {"label": "AI Summary", "type": "bool", "default": True},
     "refresh_core_seconds": {"label": "Core data refresh interval", "type": "int", "default": 300, "min": 60, "max": 3600},
     "refresh_osint_minutes": {"label": "OSINT feed refresh interval", "type": "int", "default": 60, "min": 15, "max": 1440},
+    "ai_mode": {"label": "AI Mode", "type": "str", "default": "ai_off", "key_env": "AI_MODE"},
+    "ai_daily_token_budget": {"label": "AI Daily Token Budget", "type": "int", "default": 50000, "min": 1000, "max": 500000},
+    "ai_cache_ttl_seconds": {"label": "AI Cache TTL (seconds)", "type": "int", "default": 3600, "min": 60, "max": 86400},
+    "ai_web_search": {"label": "AI Web Search", "type": "bool", "default": False, "key_env": "AI_WEB_SEARCH"},
+    "ai_web_search_max_results": {"label": "AI Web Search Max Results", "type": "int", "default": 3, "min": 1, "max": 10, "key_env": "AI_WEB_SEARCH_MAX_RESULTS"},
+    "enable_anomaly_detection": {"label": "Anomaly Detection", "type": "bool", "default": False, "key_env": "ENABLE_ANOMALY_DETECTION"},
 }
 
 

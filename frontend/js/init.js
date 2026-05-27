@@ -252,7 +252,7 @@ Alpine.data('helixApp', () => {
       if (this.tab === 'events') await this.loadEvents(this.asset);
       if (this.tab === 'supply') await this.renderSupplyChart();
       if (this.tab === 'health') await this.loadEvents(this.asset);
-      if (this.tab === 'settings') this.adminOk = await this.loadSettings();
+      if (this.tab === 'settings') { this.adminOk = await this.loadSettings(); await this.loadAiBudget(); }
     },
 
     async refresh() {

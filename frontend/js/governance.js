@@ -2,6 +2,8 @@ export function helixGovernance() {
   return {
     adminToken: sessionStorage.getItem('helix_admin_token') || '',
     settingsList: [],
+    aiBudget: { daily_budget: 0, tokens_used_today: 0, tokens_remaining: 0, pct_used: 0 },
+    aiBudgetLoaded: false,
 
     saveAdminToken() {
       sessionStorage.setItem('helix_admin_token', this.adminToken || '');
@@ -18,6 +20,13 @@ export function helixGovernance() {
         this.settingsList = [];
         return false;
       } catch (e) { this.settingsList = []; return false; }
+    },
+
+    async loadAiBudget() {
+      try {
+        const r = await fetch('/api/ai/budget', { cache: 'no-store' });
+        if (r.ok) { this.aiBudget = await r.json(); this.aiBudgetLoaded = true; }
+      } catch (e) {}
     },
 
     async toggleSetting(key, value) {

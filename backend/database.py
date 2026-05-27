@@ -79,7 +79,7 @@ class SourceStatus(Base):
 
 
 class AssetFreshness(Base):
-    """Per-asset (and optionally per-chain) last-successful-fetch tracking."""
+    """Per-asset last-successful-fetch tracking."""
 
     __tablename__ = "asset_freshness"
 

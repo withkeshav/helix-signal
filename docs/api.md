@@ -116,7 +116,12 @@ All endpoints return JSON. Error responses follow:
   "redis_connected": false,
   "last_successful_fetch": "2026-05-27T12:00:00Z",
   "scheduler_running": true,
-  "version": "3.7.0"
+  "asset_freshness": {
+    "USDT": {"age_hours": 0.08, "last_fetch": "2026-05-27T12:00:00Z"},
+    "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
+  },
+  "worst_asset_age_hours": 0.17,
+  "version": "3.8.0"
 }
 ```
 
@@ -124,6 +129,8 @@ All endpoints return JSON. Error responses follow:
 - `redis_connected` — Redis reachability (`PING` via `cache._redis.ping()`), false when Redis not configured
 - `last_successful_fetch` — DeFiLlama source last OK fetch timestamp
 - `scheduler_running` — APScheduler background scheduler state
+- `asset_freshness` — Per-asset map of `{symbol: {age_hours, last_fetch}}` from `asset_freshness` table
+- `worst_asset_age_hours` — Highest age_hours across all tracked assets (null if none)
 - `version` — `HELIX_VERSION` from `backend/services/retention.py`
 
 ## Schema

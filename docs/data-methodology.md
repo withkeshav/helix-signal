@@ -201,7 +201,7 @@ The frontend displays this server payload to avoid client clock and parsing inco
 
 After each **successful** multi-asset refresh (DefiLlama source status `ok`), Helix stores:
 
-- **Asset trend snapshots** (`asset_trend_snapshots`): one row per enabled asset per 5-minute UTC bucket (`floor(epoch_seconds / 300)`), including total supply, price, Depeg Index, Helix Signal Score and band, concentration subscore, aggregate data confidence label, and source status.
+- **Asset trend snapshots** (`asset_trend_snapshots`): one row per enabled asset per 5-minute UTC bucket (`floor(epoch_seconds / 300)`), including total supply, price, Depeg Index, Helix Signal Score and band, concentration subscore, aggregate data confidence label, source status, and `cross_source_discrepancy` (agreement count + max discrepancy %) when multiple price sources are available.
 - **Chain trend snapshots** (`chain_trend_snapshots`): one row per configured chain row per asset per bucket, including supply, share percent, labeled chain aggregate TVL, chain signal score and band, and chain data confidence score.
 
 **Timing**: timestamps use the same UTC completion instant as `last_successful_fetch` for that pass.

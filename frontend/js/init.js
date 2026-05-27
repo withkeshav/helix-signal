@@ -294,7 +294,7 @@ Alpine.data('helixApp', () => {
       try {
         const assets = (this.enabledAssets || []).join(",");
         if (!assets) { this.rotation = { available: false, pairs: [] }; return; }
-        const r = await fetch(`/api/analytics/cross-asset-rotation?assets=${encodeURIComponent(assets)}`, { cache: 'no-store' });
+        const r = await fetch(`/api/analytics/rotation?assets=${encodeURIComponent(assets)}`, { cache: 'no-store' });
         if (!r.ok) { this.rotation = { available: false, pairs: [] }; return; }
         const d = await r.json();
         this.rotation = d;

@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.8.1 (2026-05-27)
+
+### Added
+
+- **Per-asset freshness tracking** — New `AssetFreshness` table records each asset's last successful fetch timestamp. Upserted after each successful refresh. Exposed via `/api/health` as `asset_freshness` map + `worst_asset_age_hours`.
+- **Cross-source discrepancy persistence** — `cross_source_discrepancy` JSON column added to `AssetTrendSnapshot`, populated from risk_kwargs during trend writes.
+- **Cross-asset rotation card** — New frontend card in Overview tab showing pairwise supply correlations and dominance shifts from `/api/analytics/rotation`.
+- **Composite indexes** — Added `(asset_symbol, timestamp)` and `(asset_symbol, chain_key, timestamp)` indexes on trend snapshot tables for faster range queries.
+
+### Changed
+
+- **UI layout** — Stress Leaderboard moved above AI cards for faster glance access to chain-level supply velocity.
+- **Empty state messages** — Made empty states actionable (e.g. "Needs 7 days of history on multiple assets").
+
+### Fixed
+
+- **Frontend rotation URL** — Fixed route mismatch: frontend now calls `/api/analytics/rotation` instead of the non-existent `/api/analytics/cross-asset-rotation`.
+
 ## 3.8.0 (2026-05-27)
 
 ### Added

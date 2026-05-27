@@ -35,6 +35,16 @@ Helix-Signal uses `X-Admin-Token` header-based auth for admin routes (settings, 
 
 Public endpoints (dashboard, health, trends, events, OSINT, forecasts, sources, AI explain) remain accessible. For additional edge protection, place a reverse proxy with basic-auth or OAuth in front.
 
+### X-Forwarded-For Trust
+
+Rate limiting and auth lockout use `X-Forwarded-For` to identify clients behind a reverse proxy.
+If your reverse proxy does not strip or validate incoming `X-Forwarded-For` headers, an attacker
+can spoof their IP to bypass per-IP limits.
+
+Set `TRUSTED_PROXY_CIDR` in `.env` (e.g., `TRUSTED_PROXY_CIDR=10.0.0.0/8`) to restrict XFF trust
+to direct connections from known proxy IPs. When set, clients connecting from outside the CIDR
+are identified by their direct connection IP and their XFF header is ignored.
+
 ### Content Security Policy
 
 A `Content-Security-Policy` header is applied to all backend responses and nginx static assets. Configure via `CONTENT_SECURITY_POLICY` env var. The default policy restricts scripts to `'self'` + CDN, blocks `frame-ancestors`, and restricts `form-action` and `base-uri`.

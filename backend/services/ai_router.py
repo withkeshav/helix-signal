@@ -18,6 +18,18 @@ _LOCAL_DAILY_TOKENS = 0
 _LOCAL_TOKEN_DATE = ""
 _AI_REDIS_CACHE_PREFIX = "helix:ai:cache:"
 
+_BUDGET_LUA_SCRIPT = """
+local current = redis.call('GET', KEYS[1])
+local budget = tonumber(ARGV[1])
+local count = tonumber(ARGV[2])
+local ttl = tonumber(ARGV[3])
+if current and tonumber(current) + count > budget then return 0 end
+if not current and count > budget then return 0 end
+redis.call('INCRBY', KEYS[1], count)
+redis.call('EXPIRE', KEYS[1], ttl)
+return 1
+"""
+
 
 def _try_redis_cache() -> Any:
     try:
@@ -48,14 +60,8 @@ def _deduct_tokens(count: int) -> bool:
             client = cache._redis
             if client is None:
                 raise RuntimeError("redis_unavailable")
-            current = int(client.get(key) or 0)
-            if current + count > budget:
-                return False
-            pipe = client.pipeline()
-            pipe.incrby(key, count)
-            pipe.expire(key, 86400)
-            pipe.execute()
-            return True
+            ok = client.eval(_BUDGET_LUA_SCRIPT, 1, key, budget, count, 86400)
+            return bool(ok)
         except Exception:
             pass
     if _LOCAL_DAILY_TOKENS + count > budget:
@@ -358,7 +364,8 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
         return {**cached, "cached": True}
 
     prompt, system, max_tokens = _build_prompt(feature, context)
-    estimated_tokens = max_tokens + len(prompt.split())
+    system_len = len(system.split()) if system else 0
+    estimated_tokens = max_tokens + int((len(prompt.split()) + system_len) * 1.3)
     errors: list[str] = []
 
     for provider_fn in _providers_for_mode(mode, priority=priority):

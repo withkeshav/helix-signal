@@ -36,6 +36,15 @@ jobs:
       - name: Pytest with coverage
         run: .venv/bin/pytest -v --cov=.. --cov-report=term --cov-fail-under=60
 
+      - name: Ruff lint
+        run: .venv/bin/ruff check --output-format=github .
+
+      - name: Bandit security scan
+        run: .venv/bin/bandit -r . -x tests,.venv --skip B101
+
+      - name: pip-audit
+        run: .venv/bin/pip-audit --requirement requirements.txt
+
   smoke:
     if: github.event_name != 'pull_request'
     needs: [test]

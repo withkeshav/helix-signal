@@ -1,5 +1,7 @@
 FROM python:3.12-slim
 
+RUN groupadd --gid 1001 helix && useradd --uid 1001 --gid helix --shell /bin/false helix
+
 WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
@@ -8,6 +10,10 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app/backend
 
 WORKDIR /app/backend
+
+RUN mkdir -p /data && chown helix:helix /data /tmp
+
+USER helix
 
 EXPOSE 8000
 

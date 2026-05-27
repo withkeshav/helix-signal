@@ -47,8 +47,8 @@ services:
       - ./docker/clickhouse/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     networks:
       - internal
-    ports:
-      - "8123:8123"
+    expose:
+      - "8123"
     mem_limit: 1g
 
   redis:

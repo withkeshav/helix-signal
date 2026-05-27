@@ -29,6 +29,7 @@ from schemas import (
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol
 from signal_engine.risk_inputs import build_risk_score_kwargs
+from services.velocity import compute_supply_velocity
 from utils import utc_normalize
 
 
@@ -103,6 +104,14 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         age_seconds=freshness_dict.get("age_seconds"),
         refresh_interval_seconds=refresh_interval,
     )
+    supply_velocity = compute_supply_velocity(db, asset_symbol=selected_symbol, window_hours=24)
+    if supply_velocity.get("available"):
+        vel = supply_velocity.get("velocity", {})
+        acc = supply_velocity.get("acceleration", {})
+        risk_kwargs["supply_velocity_1h"] = vel.get("1h")
+        risk_kwargs["supply_velocity_4h"] = vel.get("4h")
+        risk_kwargs["supply_accel_1h"] = acc.get("1h")
+
     conc_s, conc_detail = scoring.concentration_component(
         chain_shares,
         top3_dex_pool_share=risk_kwargs.get("top3_dex_pool_share"),

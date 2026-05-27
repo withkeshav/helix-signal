@@ -95,13 +95,52 @@ Higher scores mean more suggested monitoring attention (stress across dimensions
 
 **Weights** (see `signal_engine/scoring.py` and API `components`):
 
-- Peg stability: 35%
+- Peg stability: 30%
 - Liquidity depth: 25% (DEX slippage estimates, top-3 pool share; TVL change when historical TVL delta is available)
-- Supply stability: 15%
-- Concentration: 15%
+- Concentration: 20% (HHI + top-chain share — elevated per 2025/2026 LEGO & ASRI research on downstream concentration as a primary failure mode)
+- Supply stability: 15% (includes supply velocity 1h/4h acceleration as a leading indicator)
 - Observability: 10%
 
 Dashboard and trend pipelines share inputs via `signal_engine/risk_inputs.py`.
+
+### Supply Velocity Signal (v3.8)
+
+A **velocity/acceleration** signal is computed from the 5-minute `AssetTrendSnapshot` history:
+
+- **Velocity**: percentage change in total supply over 1h, 4h, 12h, and 24h rolling windows
+- **Acceleration**: second derivative (change in velocity) over 1h and 4h windows
+- Fast contraction (velocity < -2% in 1h) or rapid acceleration (>3% change in acceleration) contributes to the supply stability subscore
+- This captures "run on a chain" patterns that slower 24h deltas miss
+
+### Temporal Decay (v3.8)
+
+Supply deltas applied inside `supply_stability_component` use exponential decay weighting with a half-life of ~7 days (`_TEMPORAL_HALF_LIFE_HOURS = 168`). Older deltas contribute less to the risk score, giving more weight to recent supply movements during fast-moving stress events.
+
+### Regime Detection (v3.8)
+
+Three-state regime classifier (`services/analytics.py` `detect_regime()`):
+
+- **stable**: composite signal < 40 and depeg index < 60
+- **elevated**: composite signal >= 40 or depeg index >= 60
+- **crisis**: composite signal >= 70 or depeg index >= 85
+
+The regime tracks duration (how long in current state) and 48-hour transition count, exposed via `GET /api/analytics/regime`.
+
+### Cross-Asset Rotation Signals (v3.8)
+
+`cross_asset_rotation()` in `services/analytics.py` computes 7d rolling Pearson correlation of total supply changes between asset pairs. A dominance shift is flagged when one asset's supply grows >2% while another contracts >1%, indicating potential "flight to safety" patterns.
+
+### CUSUM Change-Point Detection (v3.8)
+
+Cumulative Sum (CUSUM) in `services/anomaly.py` detects sustained regime shifts in depeg index, supply, and concentration. Unlike fixed z-score, CUSUM accumulates deviation over time, catching gradual changes that signal building stress before a threshold breach.
+
+### Metric-Specific Anomaly Thresholds (v3.8)
+
+Different z-score sensitivities per metric to reduce false positives:
+
+- **Price depeg**: z > 2.5, min_bps = 5 (tightest — price stress is the primary signal)
+- **Supply**: z > 3.5, min_bps = 15 (wider — supply is more volatile across chains)
+- **Depeg index**: z > 2.5, min_bps = 5 (tight — tracks compounding peg pressure)
 
 ### Predictive layer (optional API)
 

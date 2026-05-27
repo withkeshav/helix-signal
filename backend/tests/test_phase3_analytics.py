@@ -234,3 +234,224 @@ class TestAnomalyDetection:
 
         count = get_recent_anomaly_count(db_session, asset_symbol="USDT", days=7)
         assert count == 1
+
+
+class TestSupplyVelocity:
+    def test_velocity_insufficient_data(self, db_session):
+        from services.velocity import compute_supply_velocity
+        result = compute_supply_velocity(db_session, asset_symbol="USDT", window_hours=24)
+        assert result["available"] is False
+
+    def test_velocity_with_data(self, db_session):
+        from services.velocity import compute_supply_velocity
+        _seed_trend_data(db_session)
+        result = compute_supply_velocity(db_session, asset_symbol="USDT", window_hours=24)
+        assert result["available"] is True
+        assert "velocity" in result
+        assert "1h" in result["velocity"]
+        assert "acceleration" in result
+        assert "direction" in result
+        assert result["asset_symbol"] == "USDT"
+
+    def test_velocity_component_scoring(self):
+        from services.velocity import supply_velocity_component
+        vel = {"1h": -0.5, "4h": -0.3, "12h": -0.1, "24h": -0.05}
+        acc = {"1h": -0.2, "4h": -0.1}
+        score, detail = supply_velocity_component(vel, acc)
+        assert isinstance(score, int)
+        assert 0 <= score <= 100
+        assert "1h_vel_pct" in detail
+        assert "1h_accel" in detail
+
+
+class TestRegimeDetection:
+    def test_regime_insufficient_data(self, db_session):
+        from services.analytics import detect_regime
+        result = detect_regime(db_session, asset_symbol="USDT", window_hours=48)
+        assert result["available"] is False
+
+    def test_regime_stable(self, db_session):
+        from services.analytics import detect_regime
+        now = datetime.now(timezone.utc)
+        for i in range(48):
+            ts = now - timedelta(hours=48 - i)
+            bucket = hash(f"reg_stable_{i}") & 0x7FFFFFFF
+            db_session.add(AssetTrendSnapshot(
+                asset_symbol="USDT", timestamp=ts, bucket_id=bucket,
+                total_supply=100_000_000_000.0, price=1.0001,
+                depeg_index=10, signal_score=15, signal_band="Normal",
+                concentration_score=20, data_confidence_label="High",
+                source_status="ok",
+            ))
+        db_session.commit()
+        result = detect_regime(db_session, asset_symbol="USDT", window_hours=48)
+        assert result["available"] is True
+        assert result["current_regime"] in ("stable", "elevated", "crisis")
+        assert "duration_hours" in result
+        assert "transitions_48h" in result
+
+    def test_regime_crisis(self, db_session):
+        from services.analytics import detect_regime
+        now = datetime.now(timezone.utc)
+        for i in range(48):
+            ts = now - timedelta(hours=48 - i)
+            bucket = hash(f"reg_crisis_{i}") & 0x7FFFFFFF
+            db_session.add(AssetTrendSnapshot(
+                asset_symbol="USDT", timestamp=ts, bucket_id=bucket,
+                total_supply=100_000_000_000.0, price=0.98,
+                depeg_index=88, signal_score=75, signal_band="Risk",
+                concentration_score=50, data_confidence_label="High",
+                source_status="ok",
+            ))
+        db_session.commit()
+        result = detect_regime(db_session, asset_symbol="USDT", window_hours=48)
+        assert result["available"] is True
+        assert result["current_regime"] == "crisis"
+
+    def test_regime_transitions(self, db_session):
+        from services.analytics import detect_regime
+        now = datetime.now(timezone.utc)
+        for i in range(48):
+            ts = now - timedelta(hours=48 - i)
+            bucket = hash(f"reg_trans_{i}") & 0x7FFFFFFF
+            depeg = 10 if i < 24 else 70
+            signal_s = 15 if i < 24 else 50
+            band = "Normal" if i < 24 else "Watch"
+            db_session.add(AssetTrendSnapshot(
+                asset_symbol="USDT", timestamp=ts, bucket_id=bucket,
+                total_supply=100_000_000_000.0, price=1.0,
+                depeg_index=depeg, signal_score=signal_s, signal_band=band,
+                concentration_score=20, data_confidence_label="High",
+                source_status="ok",
+            ))
+        db_session.commit()
+        result = detect_regime(db_session, asset_symbol="USDT", window_hours=48)
+        assert result["available"] is True
+        assert result["current_regime"] in ("elevated", "crisis")
+        assert result["transitions_48h"] >= 1
+
+
+class TestCrossAssetRotation:
+    def test_rotation_insufficient_assets(self, db_session):
+        from services.analytics import cross_asset_rotation
+        result = cross_asset_rotation(db_session, asset_symbols=["USDT"])
+        assert result["available"] is False
+
+    def test_rotation_two_assets(self, db_session):
+        from services.analytics import cross_asset_rotation
+        now = datetime.now(timezone.utc)
+        for sym in ("USDT", "USDC"):
+            for i in range(48):
+                ts = now - timedelta(hours=48 - i)
+                bucket = hash(f"rot_{sym}_{i}") & 0x7FFFFFFF
+                db_session.add(AssetTrendSnapshot(
+                    asset_symbol=sym, timestamp=ts, bucket_id=bucket,
+                    total_supply=100_000_000_000.0 + (i * 10_000_000),
+                    price=1.0, depeg_index=10, signal_score=15,
+                    signal_band="Normal", concentration_score=20,
+                    data_confidence_label="High", source_status="ok",
+                ))
+        db_session.commit()
+        result = cross_asset_rotation(db_session, asset_symbols=["USDT", "USDC"])
+        assert result["available"] is True
+        assert len(result["pairs"]) == 1
+        pair = result["pairs"][0]
+        assert pair["asset_a"] == "USDT"
+        assert pair["asset_b"] == "USDC"
+        assert "correlation_7d" in pair
+
+
+class TestCusumDetection:
+    def test_cusum_empty(self):
+        from services.anomaly import _cusum
+        assert _cusum([]) == []
+        assert _cusum([1, 2]) == []
+
+    def test_cusum_detects_change(self):
+        from services.anomaly import _cusum
+        values = [1.0] * 20 + [5.0] * 10
+        result = _cusum(values, threshold=3.0, drift=0.5)
+        assert len(result) >= 1
+
+    def test_change_points_endpoint(self, db_session):
+        from services.anomaly import detect_change_points
+        _seed_trend_data(db_session, hours=48)
+        result = detect_change_points(db_session, asset_symbol="USDT", window_days=2)
+        assert result["available"] is True
+        assert "change_points" in result
+        assert "supply" in result["change_points"]
+        assert "depeg_index" in result["change_points"]
+        assert "concentration" in result["change_points"]
+        assert result["total_change_points"] >= 0
+
+
+class TestStressLeaderboard:
+    def test_leaderboard_no_data(self, db_session):
+        from services.stress import build_stress_leaderboard
+        result = build_stress_leaderboard(db_session, asset_symbol="NONEXISTENT")
+        assert result["available"] is False
+
+    def test_leaderboard_with_chains(self, db_session):
+        from services.stress import build_stress_leaderboard
+        from database import AssetChainSnapshot
+        db_session.add(AssetChainSnapshot(
+            asset_symbol="USDT", chain_name="ethereum",
+            supply_current=50_000_000_000.0, supply_prev_day=49_000_000_000.0,
+            supply_prev_week=48_000_000_000.0, price=1.0, source_name="multi",
+            fetched_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        ))
+        db_session.add(AssetChainSnapshot(
+            asset_symbol="USDT", chain_name="tron",
+            supply_current=40_000_000_000.0, supply_prev_day=41_000_000_000.0,
+            supply_prev_week=42_000_000_000.0, price=1.0, source_name="multi",
+            fetched_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        ))
+        db_session.commit()
+        result = build_stress_leaderboard(db_session, asset_symbol="USDT")
+        assert result["available"] is True
+        assert result["chain_count"] == 2
+        assert len(result["leaderboard"]) == 2
+        assert result["leaderboard"][0]["stress_score"] >= result["leaderboard"][1]["stress_score"]
+
+
+class TestScoringWeights:
+    def test_new_weights_applied(self):
+        from signal_engine.scoring import compute_risk_score
+        result = compute_risk_score(
+            price=1.0, supply_current=100_000_000_000.0,
+            supply_prev_day=100_000_000_000.0, supply_prev_week=100_000_000_000.0,
+            supply_prev_month=100_000_000_000.0, chain_shares=[0.5, 0.3, 0.2],
+            source_ok=True, source_error=None, age_seconds=300,
+            refresh_interval_seconds=300,
+        )
+        comps = result["components"]
+        assert comps["peg_stability"]["weight"] == 0.30
+        assert comps["concentration"]["weight"] == 0.20
+        assert comps["supply_stability"]["weight"] == 0.15
+        assert comps["liquidity_depth"]["weight"] == 0.25
+        assert comps["observability"]["weight"] == 0.10
+
+    def test_velocity_integration_in_scoring(self):
+        from signal_engine.scoring import compute_risk_score
+        result = compute_risk_score(
+            price=1.0, supply_current=100_000_000_000.0,
+            supply_prev_day=100_000_000_000.0, supply_prev_week=100_000_000_000.0,
+            supply_prev_month=100_000_000_000.0, chain_shares=[0.5, 0.3, 0.2],
+            source_ok=True, source_error=None, age_seconds=300,
+            refresh_interval_seconds=300,
+            supply_velocity_1h=-3.0, supply_velocity_4h=-2.0, supply_accel_1h=-4.0,
+        )
+        sup_detail = result["components"]["supply_stability"]["detail"]
+        assert sup_detail.get("supply_velocity_1h") == -3.0
+        assert sup_detail.get("supply_velocity_4h") == -2.0
+        assert sup_detail.get("supply_accel_1h") == -4.0
+
+    def test_temporal_decay_applied(self):
+        from signal_engine.scoring import _temporal_weight
+        w24 = _temporal_weight(24)
+        w168 = _temporal_weight(168)
+        w336 = _temporal_weight(336)
+        assert w24 > w168 > w336
+        assert 0 < w24 <= 1.0

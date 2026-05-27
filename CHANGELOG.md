@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.8.0 (2026-05-27)
+
+### Added
+
+- **Supply velocity & acceleration signals** — New `services/velocity.py` computes 1h/4h/12h/24h rolling supply deltas and acceleration (second derivative) from existing 5-minute `AssetTrendSnapshot` buckets. Velocity feeds into scoring as a new risk component.
+- **Regime detection** — `detect_regime()` in `services/analytics.py` classifies current state as `stable` / `elevated` / `crisis` using composite score + depeg index thresholds. Tracks duration and 48h transition count. Exposed via `GET /api/analytics/regime`.
+- **Cross-asset rotation signals** — `cross_asset_rotation()` in `services/analytics.py` computes supply-change correlations between asset pairs (e.g. USDT vs USDC) to detect "flight to safety" patterns. Exposed via `GET /api/analytics/rotation?assets=USDT,USDC`.
+- **CUSUM change-point detection** — `detect_change_points()` in `services/anomaly.py` applies Cumulative Sum (CUSUM) on depeg index, supply, and concentration to detect sustained regime shifts missed by fixed z-score. Exposed via `GET /api/anomaly/change-points`.
+- **Stress Leaderboard** — `services/stress.py` ranks chains by supply velocity (24h/7d) with direction labels. New `GET /api/analytics/stress-leaderboard` endpoint + frontend card in Overview tab.
+- **Metric-specific anomaly thresholds** — Different z-score sensitivities per metric: price (z>2.5, min_bps=5), supply (z>3.5, min_bps=15), depeg index (z>2.5, min_bps=5), reducing false positives while catching earlier price stress.
+
+### Changed
+
+- **Risk score weights rebalanced** — Peg stability 35% → 30%, concentration 15% → 20% per 2025/2026 LEGO & ASRI research evidence on downstream concentration as a primary failure mode.
+- **Temporal decay on supply deltas** — Exponential decay (half-life ~7 days) applied to 24h and 7d supply changes inside `supply_stability_component`, weighting recent data higher than older history.
+- **Dashboard integration** — Supply velocity outputs merged into `risk_kwargs` before `compute_risk_score()` call, enabling velocity-aware scoring without breaking the existing API contract.
+- **Anomaly endpoint extended** — `z_score` results now include `depeg_index` alongside `supply` and `price` for unified monitoring.
+
 ## 3.7.0 (2026-05-27)
 
 ### Added

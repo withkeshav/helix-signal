@@ -73,6 +73,7 @@ Alpine.data('helixApp', () => {
     marketOverviewGeneratedAt: '',
     marketOverviewExpiresAt: '',
     tickerItems: [],
+    stressLeaderboard: [],
     adminOk: false,
     evidenceOpen: false,
     evidenceTitle: '',
@@ -203,6 +204,7 @@ Alpine.data('helixApp', () => {
         const pred = await this.loadPredictive();
         this.predictive = pred || {};
         this.tickerItems = await this.loadTicker();
+        await this.loadStressLeaderboard();
 
         if (!this.aiStillFresh(this.aiExpiresAt)) {
           const r = await this.loadAiExplain(this.asset); this.aiSummary = r.summary; this.aiGeneratedAt = r.generatedAt; this.aiExpiresAt = r.expiresAt;
@@ -273,6 +275,17 @@ Alpine.data('helixApp', () => {
     async switchAsset() {
       this._disposeAllCharts();
       await this.loadDashboard();
+    },
+
+    async loadStressLeaderboard() {
+      try {
+        const r = await fetch(`/api/analytics/stress-leaderboard?asset=${this.asset}`, { cache: 'no-store' });
+        if (!r.ok) return;
+        const d = await r.json();
+        this.stressLeaderboard = d.leaderboard || [];
+      } catch (e) {
+        this.stressLeaderboard = [];
+      }
     },
 
     loadChartRange() {

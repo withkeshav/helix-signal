@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from services.anomaly import detect_anomalies
-from services.analytics import compute_correlations, detect_patterns
+from services.analytics import compute_correlations, detect_patterns, detect_regime, cross_asset_rotation
 from services.compare import build_compare_payload
 
 from backend.core.limiter import limiter
@@ -69,10 +69,57 @@ def api_forecast_accuracy(
     return compute_forecast_accuracy(db, asset_symbol=asset)
 
 
+@router.get("/analytics/regime")
+@limiter.limit("60/minute")
+def api_regime(
+    request: Request,
+    asset: str = Query(...),
+    window_hours: int = Query(48, ge=12, le=168),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return detect_regime(db, asset_symbol=asset.upper(), window_hours=window_hours)
+
+
+@router.get("/analytics/rotation")
+@limiter.limit("30/minute")
+def api_rotation(
+    request: Request,
+    assets: str = Query(..., min_length=1),
+    window_days: int = Query(30, ge=7, le=90),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    symbols = [s.strip().upper() for s in assets.split(",") if s.strip()]
+    return cross_asset_rotation(db, asset_symbols=symbols, window_days=window_days)
+
+
 @router.get("/anomaly/detect")
 @limiter.limit("30/minute")
 def api_anomaly_detect(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
+    from services.anomaly import detect_anomalies
     return detect_anomalies(db, asset_symbol=asset)
+
+
+@router.get("/analytics/stress-leaderboard")
+@limiter.limit("30/minute")
+def api_stress_leaderboard(
+    request: Request,
+    asset: str = Query("USDT"),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.stress import build_stress_leaderboard
+    return build_stress_leaderboard(db, asset_symbol=asset.upper())
+
+
+@router.get("/anomaly/change-points")
+@limiter.limit("30/minute")
+def api_change_points(
+    request: Request,
+    asset: str = Query(...),
+    window_days: int = Query(14, ge=3, le=90),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.anomaly import detect_change_points
+    return detect_change_points(db, asset_symbol=asset.upper(), window_days=window_days)
 
 
 

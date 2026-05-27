@@ -96,17 +96,29 @@ def liquidity_depth_component(
     return (score, {"slippage_10k": slippage_10k_bps, "slippage_100k": slippage_100k_bps, "top3_pool_share": top3_pool_share_pct, "tvl_change_24h_pct": tvl_change_24h_pct})
 
 
+_TEMPORAL_HALF_LIFE_HOURS = 168
+
+
+def _temporal_weight(age_hours: float) -> float:
+    return 2.0 ** (-age_hours / _TEMPORAL_HALF_LIFE_HOURS)
+
+
 def supply_stability_component(
     *,
     supply_change_24h_pct: float | None = None,
     supply_change_7d_pct: float | None = None,
     bridged_share_pct: float | None = None,
     mint_burn_anomaly: bool = False,
+    supply_velocity_1h: float | None = None,
+    supply_velocity_4h: float | None = None,
+    supply_accel_1h: float | None = None,
 ) -> tuple[int, dict[str, Any]]:
     score = 0
-    for chg in (supply_change_24h_pct, supply_change_7d_pct):
+    for age_hours, chg in ((24, supply_change_24h_pct), (168, supply_change_7d_pct)):
         if chg is None:
             continue
+        decayed = chg * _temporal_weight(age_hours)
+        mag = abs(decayed)
         if abs(chg) > 10:
             score += 35
         elif abs(chg) > 5:
@@ -119,7 +131,25 @@ def supply_stability_component(
         score += 5
     if mint_burn_anomaly:
         score += 35
-    return (min(100, score), {"supply_change_24h_pct": supply_change_24h_pct, "supply_change_7d_pct": supply_change_7d_pct, "bridged_share_pct": bridged_share_pct, "mint_burn_anomaly": mint_burn_anomaly})
+    if supply_velocity_1h is not None and abs(supply_velocity_1h) > 2:
+        score += 15
+    elif supply_velocity_1h is not None and abs(supply_velocity_1h) > 0.5:
+        score += 8
+    if supply_velocity_4h is not None and abs(supply_velocity_4h) > 5:
+        score += 15
+    elif supply_velocity_4h is not None and abs(supply_velocity_4h) > 2:
+        score += 8
+    if supply_accel_1h is not None and abs(supply_accel_1h) > 3:
+        score += 10
+    return (min(100, score), {
+        "supply_change_24h_pct": supply_change_24h_pct,
+        "supply_change_7d_pct": supply_change_7d_pct,
+        "bridged_share_pct": bridged_share_pct,
+        "mint_burn_anomaly": mint_burn_anomaly,
+        "supply_velocity_1h": supply_velocity_1h,
+        "supply_velocity_4h": supply_velocity_4h,
+        "supply_accel_1h": supply_accel_1h,
+    })
 
 
 def concentration_component(shares: list[float], top3_dex_pool_share: float | None = None) -> tuple[int, dict[str, Any]]:
@@ -198,6 +228,9 @@ def compute_risk_score(
     cross_source_agreement: int = 0,
     attestation_age_days: float | None = None,
     cross_source_discrepancy_pct: float = 0.0,
+    supply_velocity_1h: float | None = None,
+    supply_velocity_4h: float | None = None,
+    supply_accel_1h: float | None = None,
 ) -> dict[str, Any]:
     peg_s, peg_d = peg_stability_component(price=price, depeg_duration_minutes=depeg_duration_minutes, depeg_frequency_7d=depeg_frequency_7d, venue_divergence_bps=venue_divergence_bps)
     liq_s, liq_d = liquidity_depth_component(slippage_10k_bps=slippage_10k_bps, slippage_100k_bps=slippage_100k_bps, top3_pool_share_pct=top3_pool_share_pct, tvl_change_24h_pct=tvl_change_24h_pct)
@@ -206,6 +239,9 @@ def compute_risk_score(
         supply_change_7d_pct=((supply_current - (supply_prev_week or 0)) / (supply_prev_week or 1) * 100) if supply_prev_week and supply_prev_week > 0 else None,
         bridged_share_pct=bridged_share_pct,
         mint_burn_anomaly=mint_burn_anomaly,
+        supply_velocity_1h=supply_velocity_1h,
+        supply_velocity_4h=supply_velocity_4h,
+        supply_accel_1h=supply_accel_1h,
     )
     conc_s, conc_d = concentration_component(chain_shares, top3_dex_pool_share=top3_dex_pool_share)
     obs_s, obs_label, obs_d = observability_component(
@@ -217,7 +253,7 @@ def compute_risk_score(
         attestation_age_days=attestation_age_days,
     )
 
-    composite = int(round(peg_s * 0.35 + liq_s * 0.25 + sup_s * 0.15 + conc_s * 0.15 + obs_s * 0.10))
+    composite = int(round(peg_s * 0.30 + liq_s * 0.25 + sup_s * 0.15 + conc_s * 0.20 + obs_s * 0.10))
     composite = max(0, min(100, composite))
 
     dev_abs, _ = peg_deviation(price)
@@ -234,10 +270,10 @@ def compute_risk_score(
         "score": composite,
         "band": composite_band(composite),
         "components": {
-            "peg_stability": {"score": peg_s, "weight": 0.35, "detail": peg_d},
+            "peg_stability": {"score": peg_s, "weight": 0.30, "detail": peg_d},
             "liquidity_depth": {"score": liq_s, "weight": 0.25, "detail": liq_d},
             "supply_stability": {"score": sup_s, "weight": 0.15, "detail": sup_d},
-            "concentration": {"score": conc_s, "weight": 0.15, "detail": conc_d},
+            "concentration": {"score": conc_s, "weight": 0.20, "detail": conc_d},
             "observability": {"score": obs_s, "weight": 0.10, "label": obs_label, "detail": obs_d},
         },
     }

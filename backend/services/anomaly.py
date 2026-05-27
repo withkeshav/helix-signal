@@ -128,12 +128,18 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     bridge = _check_bridge_flow(db, asset_symbol=asset_symbol)
     results["bridge_flow"] = bridge
 
-    supply_anomalies = zscore_detect(history["supplies"], min_bps=10.0)
-    price_anomalies = zscore_detect(history["prices"], min_bps=10.0)
-    results["z_score"] = {"supply": supply_anomalies, "price": price_anomalies}
+    supply_anomalies = zscore_detect(history["supplies"], threshold=3.5, min_bps=15.0)
+    price_anomalies = zscore_detect(history["prices"], threshold=2.5, min_bps=5.0)
+    depeg_anomalies = zscore_detect(history["depeg_indices"], threshold=2.5, min_bps=5.0)
+    results["z_score"] = {
+        "supply": supply_anomalies,
+        "price": price_anomalies,
+        "depeg_index": depeg_anomalies,
+    }
     results["latest_zscore"] = {
-        "supply": latest_zscore(history["supplies"], min_bps=10.0),
-        "price": latest_zscore(history["prices"], min_bps=10.0),
+        "supply": latest_zscore(history["supplies"], threshold=3.5, min_bps=15.0),
+        "price": latest_zscore(history["prices"], threshold=2.5, min_bps=5.0),
+        "depeg_index": latest_zscore(history["depeg_indices"], threshold=2.5, min_bps=5.0),
     }
 
     features: list[list[float]] = []
@@ -149,7 +155,11 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     results["isolation_forest"] = {"anomaly_indices": if_anomalies, "point_count": len(features)}
 
     normalized: list[dict[str, Any]] = []
-    for metric, items in (("supply", supply_anomalies), ("price", price_anomalies)):
+    for metric, items in (
+        ("supply", supply_anomalies),
+        ("price", price_anomalies),
+        ("depeg_index", depeg_anomalies),
+    ):
         for item in items:
             idx = item.get("index")
             if idx is None or idx >= len(history["timestamps"]):
@@ -188,6 +198,103 @@ def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, 
                 db.add(row)
                 count += 1
     return count
+
+
+def _cusum(values: list[float], threshold: float = 3.0, drift: float = 0.5) -> list[dict[str, Any]]:
+    """Simple CUSUM (Cumulative Sum) change-point detection.
+
+    Returns indices where cumulative deviation exceeds threshold.
+    """
+    if len(values) < 10:
+        return []
+    mean = sum(values) / len(values)
+    cusum_pos = 0.0
+    cusum_neg = 0.0
+    result: list[dict[str, Any]] = []
+    for i, v in enumerate(values):
+        cusum_pos = max(0.0, cusum_pos + (v - mean) - drift)
+        cusum_neg = max(0.0, cusum_neg - (v - mean) - drift)
+        if cusum_pos > threshold or cusum_neg > threshold:
+            result.append({
+                "index": i,
+                "value": v,
+                "cusum_pos": round(cusum_pos, 4),
+                "cusum_neg": round(cusum_neg, 4),
+                "direction": "positive" if cusum_pos > cusum_neg else "negative",
+            })
+            cusum_pos = 0.0
+            cusum_neg = 0.0
+    return result
+
+
+def detect_change_points(
+    db: Session,
+    *,
+    asset_symbol: str,
+    window_days: int = 14,
+) -> dict[str, Any]:
+    """Run CUSUM on depeg index and supply to detect regime shifts.
+
+    CUSUM is more sensitive to gradual changes than z-score. It detects
+    when cumulative deviation from the mean exceeds a threshold, which
+    corresponds to a sustained regime shift.
+    """
+    history = _fetch_trend_history(db, asset_symbol=asset_symbol, window_days=window_days)
+    if not history["prices"] or len(history["prices"]) < 10:
+        return {"asset": asset_symbol, "available": False, "note": "Insufficient history."}
+
+    supply_changes = _cusum(history["supplies"], threshold=3.0, drift=0.5)
+    depeg_changes = _cusum(history["depeg_indices"], threshold=3.0, drift=0.5)
+    conc_changes = _cusum(history["concentration_scores"], threshold=3.0, drift=0.5)
+
+    timestamps = history["timestamps"]
+    normalized_supply = []
+    for cp in supply_changes:
+        idx = cp["index"]
+        if idx < len(timestamps):
+            normalized_supply.append({
+                "metric": "supply",
+                "timestamp": timestamps[idx].isoformat() if hasattr(timestamps[idx], "isoformat") else str(timestamps[idx]),
+                "value": cp["value"],
+                "direction": cp["direction"],
+            })
+
+    normalized_depeg = []
+    for cp in depeg_changes:
+        idx = cp["index"]
+        if idx < len(timestamps):
+            normalized_depeg.append({
+                "metric": "depeg_index",
+                "timestamp": timestamps[idx].isoformat() if hasattr(timestamps[idx], "isoformat") else str(timestamps[idx]),
+                "value": cp["value"],
+                "direction": cp["direction"],
+            })
+
+    normalized_conc = []
+    for cp in conc_changes:
+        idx = cp["index"]
+        if idx < len(timestamps):
+            normalized_conc.append({
+                "metric": "concentration",
+                "timestamp": timestamps[idx].isoformat() if hasattr(timestamps[idx], "isoformat") else str(timestamps[idx]),
+                "value": cp["value"],
+                "direction": cp["direction"],
+            })
+
+    total_changes = len(normalized_supply) + len(normalized_depeg) + len(normalized_conc)
+
+    return {
+        "asset": asset_symbol,
+        "available": True,
+        "point_count": len(timestamps),
+        "change_points": {
+            "supply": normalized_supply,
+            "depeg_index": normalized_depeg,
+            "concentration": normalized_conc,
+        },
+        "total_change_points": total_changes,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
 
 
 def get_recent_anomaly_count(db: Session, *, asset_symbol: str, days: int = 7) -> int:

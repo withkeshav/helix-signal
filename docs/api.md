@@ -40,9 +40,13 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | GET | `/api/predictive?asset=USDT` | Predictive bundle (depeg probability, regime state, TimesFM integration) |
 | GET | `/api/analytics/correlations?asset=USDT&window_days=30` | Pearson correlation matrix across 5 metrics, ranked pairs |
 | GET | `/api/analytics/patterns?asset=USDT&window_days=30` | Trend direction, volatility, day-of-week seasonality detection |
+| GET | `/api/analytics/regime?asset=USDT&window_hours=48` | Three-state regime classifier (stable/elevated/crisis) with duration and transitions |
+| GET | `/api/analytics/rotation?assets=USDT,USDC&window_days=30` | Cross-asset supply rotation signals (correlation + dominance shift) |
+| GET | `/api/analytics/stress-leaderboard?asset=USDT` | Chains ranked by 24h/7d supply velocity with direction |
 | GET | `/api/analytics/finbert/sentiment?text=...` | On-demand FinBERT sentiment analysis |
 | GET | `/api/analytics/forecast-accuracy?asset=USDT` | Forecast accuracy vs actuals |
 | GET | `/api/anomaly/detect?asset=USDT` | Z-score + Isolation Forest anomaly detection |
+| GET | `/api/anomaly/change-points?asset=USDT&window_days=14` | CUSUM change-point detection on depeg, supply, concentration |
 | GET | `/api/forecasts?asset=USDT` | Latest forecast runs with historical actuals |
 
 ## OSINT

@@ -222,6 +222,31 @@
           <span class="kpi-sub">Analytics insights will appear once supply chain anomalies are detected</span>
         </div>
       </div>
+      <!-- Stress Leaderboard -->
+      <div class="insight-card glass" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Stress Leaderboard <span class="model-badge">&#916;</span></h2>
+          <span class="kpi-sub" style="font-size:10px">Chains ranked by supply velocity</span>
+        </div>
+        <div x-show="stressLeaderboard?.length" style="font-size:12px">
+          <template x-for="(row, i) in stressLeaderboard" :key="i">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+              <span>
+                <span style="font-weight:600" x-text="row.chain_name"></span>
+                <span :class="row.direction==='inflow'?'text-green':'text-red'" x-text="row.direction==='inflow'?'&#9650;':row.direction==='outflow'?'&#9660;':''"></span>
+              </span>
+              <span>
+                <span x-show="row.velocity_24h_pct != null" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="`${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}% 24h`"></span>
+              </span>
+            </div>
+          </template>
+        </div>
+        <div x-show="!stressLeaderboard?.length" class="empty-state">
+          <span class="empty-state-icon">&#128202;</span>
+          <span class="kpi-label">No chain velocity data yet</span>
+          <span class="kpi-sub">Stress leaderboard will show chain-level supply movements</span>
+        </div>
+      </div>
       <!-- Time Range Selector -->
       <div class="time-range">
         <span class="time-range-label">Range:</span>

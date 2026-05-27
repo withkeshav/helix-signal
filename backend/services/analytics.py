@@ -164,3 +164,145 @@ def detect_patterns(db: Session, *, asset_symbol: str, window_days: int = 30) ->
         "patterns": patterns,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
+
+
+def detect_regime(
+    db: Session,
+    *,
+    asset_symbol: str,
+    window_hours: int = 48,
+) -> dict[str, Any]:
+    """Three-state regime classifier: stable / elevated / crisis.
+
+    Uses composite signal score, depeg index, and supply velocity to
+    determine the current risk regime and how long it has been active.
+    """
+    series, timestamps = _fetch_history(db, asset_symbol=asset_symbol, window_days=max(1, window_hours // 24))
+    if len(timestamps) < 6:
+        return {
+            "asset": asset_symbol,
+            "available": False,
+            "note": "Insufficient history (need >=6 points).",
+        }
+
+    scores = series["signal_score"]
+    depeg = series["depeg_index"]
+    supplies = series["total_supply"]
+
+    def _classify(sig: float, dep: float, sup: float | None) -> str:
+        if sig >= 70 or dep >= 85:
+            return "crisis"
+        if sig >= 40 or dep >= 60:
+            return "elevated"
+        return "stable"
+
+    regime_series: list[str] = []
+    for i in range(len(timestamps)):
+        sup = supplies[i] if i < len(supplies) else None
+        regime_series.append(_classify(scores[i], depeg[i], sup))
+
+    current = regime_series[-1] if regime_series else "stable"
+
+    duration_hours = 0
+    for i in range(len(regime_series) - 2, -1, -1):
+        if regime_series[i] == current:
+            duration_hours += (timestamps[i + 1] - timestamps[i]).total_seconds() / 3600
+        else:
+            break
+
+    prev = "stable"
+    for r in reversed(regime_series[:-1]):
+        if r != current:
+            prev = r
+            break
+
+    transitions = 0
+    for i in range(1, len(regime_series)):
+        if regime_series[i] != regime_series[i - 1]:
+            transitions += 1
+
+    return {
+        "asset": asset_symbol,
+        "available": True,
+        "current_regime": current,
+        "previous_regime": prev,
+        "duration_hours": round(duration_hours, 1),
+        "transitions_48h": transitions,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def cross_asset_rotation(
+    db: Session,
+    *,
+    asset_symbols: list[str],
+    window_days: int = 30,
+) -> dict[str, Any]:
+    """Detect supply rotation between stablecoin assets.
+
+    Computes rolling correlation of total supply changes between pairs
+    of assets to identify "flight to safety" or dominance shifts.
+    """
+    if len(asset_symbols) < 2:
+        return {
+            "available": False,
+            "note": "Need at least 2 assets for cross-asset comparison.",
+        }
+
+    asset_data: dict[str, tuple[list[float], list[datetime]]] = {}
+    for sym in asset_symbols:
+        series, timestamps = _fetch_history(db, asset_symbol=sym.upper(), window_days=window_days)
+        if len(timestamps) >= 10:
+            asset_data[sym.upper()] = (series["total_supply"], timestamps)
+
+    if len(asset_data) < 2:
+        return {
+            "available": False,
+            "note": "Insufficient data for one or more assets.",
+        }
+
+    pairs: list[dict[str, Any]] = []
+    symbols = list(asset_data.keys())
+    for i in range(len(symbols)):
+        for j in range(i + 1, len(symbols)):
+            sa = symbols[i]
+            sb = symbols[j]
+            sup_a, _ = asset_data[sa]
+            sup_b, _ = asset_data[sb]
+            corr = _pearson(sup_a, sup_b)
+
+            latest_a = sup_a[-1] if sup_a else 0
+            latest_b = sup_b[-1] if sup_b else 0
+            prev_a = sup_a[0] if len(sup_a) > 1 else latest_a
+            prev_b = sup_b[0] if len(sup_b) > 1 else latest_b
+            chg_a = _pct_change(latest_a, prev_a) if prev_a != 0 else None
+            chg_b = _pct_change(latest_b, prev_b) if prev_b != 0 else None
+
+            dominance_shift = None
+            if chg_a is not None and chg_b is not None:
+                if chg_a > 2 and chg_b < -1:
+                    dominance_shift = f"{sa}_gaining_on_{sb}"
+                elif chg_b > 2 and chg_a < -1:
+                    dominance_shift = f"{sb}_gaining_on_{sa}"
+
+            pairs.append({
+                "asset_a": sa,
+                "asset_b": sb,
+                "correlation_7d": round(corr, 4),
+                "supply_change_a_pct": round(chg_a, 4) if chg_a is not None else None,
+                "supply_change_b_pct": round(chg_b, 4) if chg_b is not None else None,
+                "dominance_shift": dominance_shift,
+            })
+
+    return {
+        "available": True,
+        "point_count": min(len(v[0]) for v in asset_data.values()),
+        "pairs": pairs,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+
+
+def _pct_change(later: float, earlier: float) -> float:
+    if earlier == 0:
+        return 0.0
+    return ((later - earlier) / earlier) * 100.0

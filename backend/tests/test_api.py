@@ -13,6 +13,8 @@ def test_health(client):
     assert body["db_connected"] is True
     assert body["redis_connected"] is False
     assert "scheduler_running" in body
+    assert "asset_freshness" in body
+    assert "worst_asset_age_hours" in body
 
 
 def test_dashboard_empty_db(client):

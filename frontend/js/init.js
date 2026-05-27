@@ -6,7 +6,8 @@ import { helixForecast } from './forecast.js';
 import {
   _disposeChart, destroyCharts, destroyForecastCharts, _disposeAllCharts,
   _setupResizeHandler, renderCharts, loadTrendChart, _makeBar,
-  renderSentimentChart, renderForecastCharts, _renderForecastCanvas, renderSupplyChart,
+  renderSentimentChart, renderForecastCharts, _renderForecastChartsImpl,
+  _renderForecastCanvas, renderSupplyChart,
 } from './charts.js';
 import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js';
 
@@ -39,6 +40,7 @@ Alpine.data('helixApp', () => {
     _makeBar,
     renderSentimentChart,
     renderForecastCharts,
+    _renderForecastChartsImpl,
     _renderForecastCanvas,
     renderSupplyChart,
 

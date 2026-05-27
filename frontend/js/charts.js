@@ -109,15 +109,16 @@ export function renderSentimentChart(series) {
 
 export function renderForecastCharts() {
   if (typeof echarts === 'undefined') {
-    import('https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js')
-      .then(() => this._renderForecastChartsImpl())
-      .catch(() => {});
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js';
+    s.onload = () => this._renderForecastChartsImpl();
+    document.head.appendChild(s);
     return;
   }
   this._renderForecastChartsImpl();
 }
 
-function _renderForecastChartsImpl() {
+export function _renderForecastChartsImpl() {
   const elPeg = document.getElementById('chart-peg-forecast');
   const elSupply = document.getElementById('chart-supply-forecast');
   if (!elPeg || !elSupply) return;

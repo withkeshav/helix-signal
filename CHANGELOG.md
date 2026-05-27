@@ -45,6 +45,7 @@
 - **CI coverage floor** bumped from 60% → 65%
 - **Non-root nginx** — `frontend/Dockerfile` adds `USER nginx` with `chown` on static assets
 - **ClickHouse healthcheck** — Added `clickhouse-client --query="SELECT 1"` healthcheck to prevent rollover queries on unhealthy instance
+- **ECharts lazy-load bug** — Replaced broken `import()` UMD import with `<script>` injection that properly sets `window.echarts`; exported `_renderForecastChartsImpl` and wired into Alpine component
 
 ## 3.6.0 (2026-05-26)
 

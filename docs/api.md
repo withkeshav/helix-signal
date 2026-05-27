@@ -11,6 +11,8 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | GET | `/api/dashboard?asset=USDT` | Live risk monitoring payload | 60/min |
 | POST | `/api/refresh` | Trigger immediate data refresh | 10/min |
 | GET | `/api/metrics` | Prometheus metrics (internal, blocked at nginx in production) | — |
+| GET | `/api/settings` | Feature flags, provider toggles, intervals (requires X-Admin-Token) | 10/min |
+| PUT | `/api/settings` | Update a setting (`key`, `value`) (requires X-Admin-Token) | 5/min |
 
 ## Trends & Events
 
@@ -23,7 +25,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | GET | `/api/events/export?asset=USDT&window=7d&format=csv` | CSV export |
 | GET | `/api/compare?assets=USDT,USDC&window=7d` | Cross-asset aligned series (min 2, max 8 assets) |
 
-`window` param: `24h`, `7d` (default), `30d`
+`window` param: `24h`, `7d` (default), `30d`, `90d`
 
 ## Chains
 
@@ -39,9 +41,9 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | GET | `/api/analytics/correlations?asset=USDT&window_days=30` | Pearson correlation matrix across 5 metrics, ranked pairs |
 | GET | `/api/analytics/patterns?asset=USDT&window_days=30` | Trend direction, volatility, day-of-week seasonality detection |
 | GET | `/api/analytics/finbert/sentiment?text=...` | On-demand FinBERT sentiment analysis |
+| GET | `/api/analytics/forecast-accuracy?asset=USDT` | Forecast accuracy vs actuals |
 | GET | `/api/anomaly/detect?asset=USDT` | Z-score + Isolation Forest anomaly detection |
-| GET | `/api/anomaly/forecast?asset=USDT&hours=24` | Prophet supply forecast |
-| GET | `/api/forecasts` | Latest forecast runs (placeholder — real data requires TimesFM endpoint) |
+| GET | `/api/forecasts?asset=USDT` | Latest forecast runs with historical actuals |
 
 ## OSINT
 
@@ -68,9 +70,13 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 ## AI (optional)
 
-| Method | Endpoint | Description | Gate |
-|--------|----------|-------------|------|
-| GET | `/api/ai/explain?asset=USDT` | LLM-generated risk explanation | `AI_MODE != ai_off` |
+| Method | Endpoint | Description | Rate Limit | Gate |
+|--------|----------|-------------|------------|------|
+| GET | `/api/ai/explain?asset=USDT` | LLM-generated risk explanation | 30/min | `AI_MODE != ai_off` |
+| GET | `/api/ai/narrative?asset=USDT` | Market narrative with sentiment + events | 30/min | `AI_MODE != ai_off` |
+| GET | `/api/ai/insights?asset=USDT` | Supply, chain, and anomaly insights | 30/min | `AI_MODE != ai_off` |
+| GET | `/api/ai/market-overview` | Cross-asset market summary | 20/min | `AI_MODE != ai_off` (returns engine data when off) |
+| GET | `/api/ai/budget` | Daily token budget, used, remaining, pct | 60/min | Always available |
 
 ## Common Parameters
 

@@ -81,7 +81,8 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 ### Frontend (`frontend/`)
 
 - `index.html` — dashboard shell, Alpine.js bindings, CDN Chart.js + ECharts
-- `app.js` — Alpine component (`helixApp`), chart wiring, tab loaders
+- `js/init.js` — Alpine component (`helixApp`), chart wiring, tab loaders
+- `js/market.js`, `js/osint.js`, `js/governance.js`, `js/forecast.js` — feature modules spread into `helixApp`
 - nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
 
 ## Local development

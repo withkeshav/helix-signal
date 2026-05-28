@@ -7,6 +7,9 @@
 - **CI teardown timeout** — RPC Web3 listener and FRED poller tasks were fire-and-forget infinite loops never cancelled during lifespan shutdown, causing `TestClient` teardown to hang until pytest-timeout killed the process at 120s. Fixed by returning/capturing task handles and cancelling them in the `finally` block with `asyncio.gather(..., return_exceptions=True)`. Added `HELIX_DISABLE_BACKGROUND_TASKS` env var to skip both during tests (follows existing `HELIX_SKIP_STARTUP_REFRESH` pattern).
 - **Dockerfile curl version pin** — Replaced brittle `curl=8.14.1-2+deb13u3` exact version pin with `# hadolint ignore=DL3008` + unversioned `curl` install, preventing build failures when the base image apt index updates.
 - **`.process/` in `.gitignore`** — Added `.process/` entry to prevent accidental commit of internal session notes.
+- **CI smoke job profile + env vars** — Smoke job now runs `docker compose --profile data` (starts postgres/clickhouse/redis required by `depends_on`) with inline `POSTGRES_PASSWORD`/`CLICKHOUSE_PASSWORD` env vars to prevent `${POSTGRES_PASSWORD:?}` interpolation failure.
+- **CI smoke BASE_URL fix** — Smoke check now passes `BASE_URL=http://localhost` (port 80) matching the production compose mapping, instead of defaulting to dev port 3000.
+- **Trivy action tag** — Fixed `aquasecurity/trivy-action@0.30.0` → `@v0.36.0` (0.30.0 tag never existed, was causing action resolution failure).
 
 ## 3.8.1 (2026-05-27)
 

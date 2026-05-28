@@ -58,7 +58,7 @@ jobs:
 
       - name: Set up Docker Compose
         run: |
-          docker compose up -d --build
+          docker compose --profile data up -d --build
           echo "Waiting for services to become healthy..."
           for i in $(seq 1 60); do
             if curl -sf http://localhost/api/health > /dev/null 2>&1; then
@@ -67,11 +67,18 @@ jobs:
             fi
             sleep 2
           done
+        env:
+          POSTGRES_PASSWORD: "helix"
+          POSTGRES_USER: "helix"
+          POSTGRES_DB: "helix"
+          CLICKHOUSE_PASSWORD: ""
 
       - name: Run smoke check
         run: |
           chmod +x scripts/smoke-check.sh
-          ./scripts/smoke-check.sh
+          ./scripts/smoke-check.sh "${BASE_URL}"
+        env:
+          BASE_URL: "http://localhost"
 
       - name: Clean up
         run: docker compose down -v
@@ -126,7 +133,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:${{ steps.meta.outputs.version || 'latest' }}
           format: table

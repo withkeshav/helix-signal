@@ -70,7 +70,7 @@ jobs:
           done
           if ! curl -sf http://localhost/ > /dev/null 2>&1; then
             echo "FAILED: frontend never became healthy"
-            docker compose --profile data logs --tail=50 helix-signal-frontend-1
+            docker compose --profile data logs --tail=50 frontend
             exit 1
           fi
 

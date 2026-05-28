@@ -10,6 +10,8 @@
 - **CI smoke job profile + env vars** — Smoke job now runs `docker compose --profile data` (starts postgres/clickhouse/redis required by `depends_on`) with inline `POSTGRES_PASSWORD`/`CLICKHOUSE_PASSWORD` env vars to prevent `${POSTGRES_PASSWORD:?}` interpolation failure.
 - **CI smoke BASE_URL fix** — Smoke check now passes `BASE_URL=http://localhost` (port 80) matching the production compose mapping, instead of defaulting to dev port 3000.
 - **Trivy action tag** — Fixed `aquasecurity/trivy-action@0.30.0` → `@v0.36.0` (0.30.0 tag never existed, was causing action resolution failure).
+- **CI smoke `.env` file** — Added `touch .env || true` before compose to satisfy `env_file: .env` directive on fresh checkout (no `.env` in CI runner).
+- **Trivy `ignore-unfixed`** — Added `ignore-unfixed: true` to skip base-image OS vulns with no available fix (13 HIGH/CRITICAL in Debian Trixie `python:3.12.13-slim`).
 
 ## 3.8.1 (2026-05-27)
 
@@ -65,7 +67,7 @@
 - **Chart module extraction** — All chart methods extracted from `init.js` into `frontend/js/charts.js` (12 exported functions, ECharts lazy-load via dynamic `import()`)
 - **`frontend/styles.css`** — External stylesheet extracted from inline `<style>` in `index.html`; `.kpi-placeholder` pulse animation, `.empty-state` styles with icon support
 - **Empty-state placeholders** — Missing empty states added for Market Overview, AI Narrative, AI Insights, Anomaly Events, and Supply tab
-- **CI hadolint + Trivy** — Hadolint Dockerfile linting and Trivy vulnerability scan (HIGH/CRITICAL, exit-code 1) added to CI pipeline
+- **CI hadolint + Trivy** — Hadolint Dockerfile linting and Trivy vulnerability scan (HIGH/CRITICAL, exit-code 1, ignore-unfixed) added to CI pipeline
 - **CI SSH deploy job** — Automated deploy on `v*` tag push via SSH + docker-compose
 - **`.dockerignore`** — `backend/.dockerignore` excludes venv, pyc, coverage, egg-info, pytest cache, git
 

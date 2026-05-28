@@ -44,7 +44,7 @@ Alpine.data('helixApp', () => {
     _renderForecastCanvas,
     renderSupplyChart,
 
-    tab: 'overview',
+    tab: location.hash.slice(1) || 'overview',
     theme: 'light',
     searchQuery: '',
     searchResults: [],
@@ -99,6 +99,8 @@ Alpine.data('helixApp', () => {
         this.loadDashboard();
       }, 60000);
       this._setupResizeHandler();
+      this.$watch('tab', val => location.hash = val);
+      if (this.tab !== 'overview') await this.loadTab();
     },
 
     search() {

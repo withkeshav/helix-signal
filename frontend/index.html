@@ -45,6 +45,7 @@
         </select>
         <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" x-text="refreshing?'...':'⟳'"></button>
         <button class="btn btn-muted" @click="cycleTheme" x-text="theme==='light'?'☀':'🌙'" aria-label="Toggle dark/light theme" title="Toggle theme"></button>
+        <input type="password" x-model="adminToken" placeholder="Token" @keydown.enter="saveAdminToken()" style="width:90px;padding:4px 6px;font-size:11px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-family:monospace">
       </div>
     </nav>
 

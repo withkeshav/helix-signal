@@ -4,6 +4,7 @@ export function helixGovernance() {
     settingsList: [],
     aiBudget: { daily_budget: 0, tokens_used_today: 0, tokens_remaining: 0, pct_used: 0 },
     aiBudgetLoaded: false,
+    secretValues: {},
 
     saveAdminToken() {
       sessionStorage.setItem('helix_admin_token', this.adminToken || '');
@@ -38,9 +39,16 @@ export function helixGovernance() {
         });
         if (r.ok) {
           const item = this.settingsList.find(s => s.key === key);
-          if (item) item.value = value;
+          if (item) item.value = item.type === 'secret' ? true : value;
         }
       } catch (e) {}
+    },
+
+    async saveSecret(key) {
+      const val = this.secretValues[key];
+      if (!val) return;
+      await this.toggleSetting(key, val);
+      this.secretValues[key] = '';
     },
   };
 }

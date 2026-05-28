@@ -45,7 +45,6 @@
         </select>
         <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" x-text="refreshing?'...':'⟳'"></button>
         <button class="btn btn-muted" @click="cycleTheme" x-text="theme==='light'?'☀':'🌙'" aria-label="Toggle dark/light theme" title="Toggle theme"></button>
-        <input type="password" x-model="adminToken" placeholder="Token" @keydown.enter="saveAdminToken()" style="width:90px;padding:4px 6px;font-size:11px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-family:monospace">
       </div>
     </nav>
 
@@ -655,6 +654,24 @@
             <input type="password" x-model="adminToken" placeholder="X-Admin-Token" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
             <button class="btn btn-muted" @click="saveAdminToken()">Save</button>
           </div>
+        </div>
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>API Keys</h2>
+          <p class="kpi-sub" style="margin-bottom:8px">Values are stored in the database and never exposed via API. Backed by .env as fallback.</p>
+          <template x-for="s in settingsList" :key="s.key">
+            <div x-show="s.key.startsWith('secret_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:13px" x-text="s.label"></span>
+                <span x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
+                <span x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not configured</span>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="password" x-model="secretValues[s.key]" :placeholder="s.value ? 'Change key' : 'Enter key'" style="width:200px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
+                <button class="btn btn-muted" style="padding:3px 10px;font-size:11px" @click="saveSecret(s.key)" x-show="secretValues[s.key] && secretValues[s.key].length > 0">Save</button>
+              </div>
+            </div>
+          </template>
+          <div x-show="!settingsList.filter(s => s.key.startsWith('secret_')).length" class="kpi-sub" style="padding:8px 0">No API keys configured</div>
         </div>
         <div class="insight-card" style="grid-column:1/-1">
           <h2>Data Providers</h2>

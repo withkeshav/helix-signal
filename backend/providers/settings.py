@@ -27,6 +27,13 @@ _DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "ai_web_search": {"label": "AI Web Search", "type": "bool", "default": False, "key_env": "AI_WEB_SEARCH"},
     "ai_web_search_max_results": {"label": "AI Web Search Max Results", "type": "int", "default": 3, "min": 1, "max": 10, "key_env": "AI_WEB_SEARCH_MAX_RESULTS"},
     "enable_anomaly_detection": {"label": "Anomaly Detection", "type": "bool", "default": False, "key_env": "ENABLE_ANOMALY_DETECTION"},
+    "secret_cmc_api_key": {"label": "CoinMarketCap API Key", "type": "secret", "default": "", "key_env": "CMC_API_KEY"},
+    "secret_moralis_api_key": {"label": "Moralis API Key", "type": "secret", "default": "", "key_env": "MORALIS_API_KEY"},
+    "secret_ollama_api_key": {"label": "Ollama API Key", "type": "secret", "default": "", "key_env": "OLLAMA_API_KEY"},
+    "secret_openrouter_api_key": {"label": "OpenRouter API Key", "type": "secret", "default": "", "key_env": "OPENROUTER_API_KEY"},
+    "secret_groq_api_key": {"label": "Groq API Key", "type": "secret", "default": "", "key_env": "GROQ_API_KEY"},
+    "secret_etherscan_api_key": {"label": "Etherscan API Key", "type": "secret", "default": "", "key_env": "ETHERSCAN_API_KEY"},
+    "secret_fred_api_key": {"label": "FRED API Key", "type": "secret", "default": "", "key_env": "FRED_API_KEY"},
 }
 
 
@@ -41,6 +48,18 @@ def get_setting(key: str, db: Session | None = None) -> Any:
     meta = _DEFAULT_SETTINGS.get(key)
     if not meta:
         return None
+
+    if meta.get("type") == "secret":
+        if db:
+            row = db.query(Setting).filter(Setting.key == key).first()
+            if row and row.value:
+                return row.value
+        env_key = meta.get("key_env", "")
+        if env_key:
+            val = os.getenv(env_key, "").strip()
+            if val:
+                return val
+        return meta.get("default", "")
 
     env_val = os.getenv(meta.get("key_env", ""), "").strip() if meta.get("key_env") else None
     if env_val and env_val.lower() in ("1", "true", "yes"):
@@ -94,20 +113,26 @@ def get_all_settings(db: Session) -> list[dict[str, Any]]:
         else:
             env_val = os.getenv(meta.get("key_env", ""), "").strip() if meta.get("key_env") else None
             if env_val is not None and env_val:
-                typed = env_val if meta.get("type") == "str" else env_val.lower() in ("1", "true", "yes")
+                if meta.get("type") == "secret":
+                    typed = env_val
+                elif meta.get("type") == "str":
+                    typed = env_val
+                else:
+                    typed = env_val.lower() in ("1", "true", "yes")
             else:
                 typed = meta.get("default")
-        out.append({
+        out_item = {
             "key": key,
             "label": meta.get("label"),
             "type": meta.get("type", "bool"),
-            "value": typed,
+            "value": bool(typed) if meta.get("type") == "secret" else typed,
             "default": meta.get("default"),
             "always_active": meta.get("always_active", False),
             "key_env": meta.get("key_env"),
             "min": meta.get("min"),
             "max": meta.get("max"),
-        })
+        }
+        out.append(out_item)
     return out
 
 

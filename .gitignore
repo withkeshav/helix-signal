@@ -101,6 +101,7 @@ opencode.json
 internal research/
 internal research/**
 .progress/
+.process/
 research/
 docs/phase-tracking.md
 docs/vps-tuning.md

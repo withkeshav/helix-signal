@@ -30,10 +30,10 @@ echo "Connecting to ${REMOTE}..."
 ssh "${REMOTE}" bash -s << ENDSSH
   set -euo pipefail
 
-  cd /opt/helix-signal || {
+  cd /apps/helix-signal || {
     echo "First time — cloning repo..."
-    git clone https://github.com/withkeshav/helix-signal.git /opt/helix-signal
-    cd /opt/helix-signal
+    git clone https://github.com/withkeshav/helix-signal.git /apps/helix-signal
+    cd /apps/helix-signal
   }
 
   git fetch origin

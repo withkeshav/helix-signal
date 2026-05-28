@@ -648,6 +648,14 @@
     <div class="tab-content" :class="tab === 'settings' && 'active'">
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
+          <h2>Admin Token</h2>
+          <p class="kpi-sub" style="margin-bottom:8px">Required for refresh and settings changes when HELIX_ADMIN_TOKEN is set on the server.</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="password" x-model="adminToken" placeholder="X-Admin-Token" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
+            <button class="btn btn-muted" @click="saveAdminToken()">Save</button>
+          </div>
+        </div>
+        <div class="insight-card" style="grid-column:1/-1">
           <h2>Data Providers</h2>
           <template x-for="s in settingsList" :key="s.key">
             <div x-show="s.key.startsWith('provider_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -733,14 +741,6 @@
               </div>
             </div>
           </template>
-        </div>
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>Admin Token</h2>
-          <p class="kpi-sub" style="margin-bottom:8px">Required for refresh and settings changes when HELIX_ADMIN_TOKEN is set on the server.</p>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="password" x-model="adminToken" placeholder="X-Admin-Token" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
-            <button class="btn btn-muted" @click="saveAdminToken()">Save</button>
-          </div>
         </div>
       </div>
     </div>

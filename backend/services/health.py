@@ -53,7 +53,10 @@ def build_health_payload(
     for af in asset_freshness_rows:
         if af.last_successful_fetch is None:
             continue
-        age = (datetime.now(timezone.utc) - af.last_successful_fetch).total_seconds() / 3600
+        ts = af.last_successful_fetch
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
         asset_freshness[af.asset_symbol] = {"age_hours": round(age, 2), "last_fetch": af.last_successful_fetch.isoformat()}
         if oldest is None or age > oldest:
             oldest = age

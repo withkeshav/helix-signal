@@ -96,7 +96,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-sqlite:///data/helix.db}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/helix.db}
       HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}

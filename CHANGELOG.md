@@ -12,6 +12,9 @@
 - **Trivy action tag** — Fixed `aquasecurity/trivy-action@0.30.0` → `@v0.36.0` (0.30.0 tag never existed, was causing action resolution failure).
 - **CI smoke `.env` file** — Added `touch .env || true` before compose to satisfy `env_file: .env` directive on fresh checkout (no `.env` in CI runner).
 - **Trivy `ignore-unfixed`** — Added `ignore-unfixed: true` to skip base-image OS vulns with no available fix (13 HIGH/CRITICAL in Debian Trixie `python:3.12.13-slim`).
+- **SQLite path 3→4 slashes** — Fixed `sqlite:///data/helix.db` → `sqlite:////data/helix.db` in `docker-compose.yml` so the database path resolves as absolute `/data/helix.db` instead of CWD-relative `/app/backend/data/helix.db` on the read-only filesystem. This was the primary cause of backend container crashes in CI.
+- **Timezone-aware datetime guard** — Added `tzinfo` check in `health.py` for `AssetFreshness.last_successful_fetch` timestamps (SQLite returns naive datetimes), matching the existing guard for `SourceStatus`. Prevents `TypeError` on `/api/health` endpoint.
+- **Override volume mount path** — Fixed `docker-compose.override.yml` to mount `./backend:/app/backend` instead of `./backend:/app`, matching the Dockerfile's `WORKDIR /app/backend`.
 
 ## 3.8.1 (2026-05-27)
 

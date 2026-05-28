@@ -68,11 +68,11 @@ jobs:
             fi
             sleep 2
           done
-        env:
-          POSTGRES_PASSWORD: "helix"
-          POSTGRES_USER: "helix"
-          POSTGRES_DB: "helix"
-          CLICKHOUSE_PASSWORD: ""
+          if ! curl -sf http://localhost/ > /dev/null 2>&1; then
+            echo "FAILED: frontend never became healthy"
+            docker compose --profile data logs --tail=50 helix-signal-frontend-1
+            exit 1
+          fi
 
       - name: Run smoke check
         run: |

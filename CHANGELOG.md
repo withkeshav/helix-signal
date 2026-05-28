@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.8.1.2 (2026-05-28)
+
+### Fixed
+
+- **Frontend nginx container crash in CI** — Frontend nginx ran as `USER nginx` with `cap_drop: ALL` but couldn't write its PID file to `/run` (owned by root). Added `/run` and `/var/cache/nginx` directories to the `chown nginx:nginx` line in `frontend/Dockerfile`.
+- **Smoke-check SIGPIPE flakiness** — `grep -Fq` with `pipefail` caused SIGPIPE (exit 141) when grep closed its stdin early. Changed to `grep -F >/dev/null` to consume full input.
+- **CI health check loop silent timeout** — The smoke job's 60-iteration wait loop completed with exit 0 even when all health checks failed, hiding frontend failures. Added explicit `curl http://localhost/` guard with `exit 1` on failure.
+
 ## 3.8.1.1 (2026-05-28)
 
 ### Fixed

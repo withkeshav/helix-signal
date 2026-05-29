@@ -10,6 +10,15 @@
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" integrity="sha384-o5uz97et3bErHvpKfD4Jz4n0JfhJDWABFuF4NP+iEEDxE1VwMWJ19QGR0lqFZnr6" crossorigin="anonymous" defer></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "alpinejs": "https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/module.esm.js",
+      "stores/": "/js/stores/",
+      "composables/": "/js/composables/"
+    }
+  }
+  </script>
   <script type="module" src="/js/init.js"></script>
   </head>
 <body>
@@ -164,7 +173,7 @@
     </div>
 
     <!-- Tab: Overview -->
-    <div class="tab-content" :class="tab === 'overview' && 'active'">
+    <div class="tab-content" :class="tab === 'overview' && 'active'" x-data="market">
       <!-- Error Banner -->
       <div x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
       <!-- Market Overview -->
@@ -431,8 +440,7 @@
     </div>
 
     <!-- Tab: Forecast -->
-    <div class="tab-content" :class="tab === 'forecast' && 'active'"
-         x-init="$watch('tab', val => { if(val === 'forecast') $nextTick(() => renderForecastCharts()); })">
+    <div class="tab-content" :class="tab === 'forecast' && 'active'" x-data="forecast">
       <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
       <div class="chart-card">
         <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
@@ -523,7 +531,7 @@
     </div>
 
     <!-- Tab: Events -->
-    <div class="tab-content" :class="tab === 'events' && 'active'">
+    <div class="tab-content" :class="tab === 'events' && 'active'" x-data="osint">
       <div x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
       <div class="insight-grid">
         <div class="insight-card">
@@ -568,7 +576,7 @@
     </div>
 
     <!-- Tab: Intel -->
-    <div class="tab-content" :class="tab === 'intel' && 'active'">
+    <div class="tab-content" :class="tab === 'intel' && 'active'" x-data="osint">
       <div class="insight-grid">
         <div class="insight-card">
           <h2>Attestation Reports</h2>
@@ -687,7 +695,7 @@
     </div>
 
     <!-- Tab: Settings -->
-    <div class="tab-content" :class="tab === 'settings' && 'active'">
+    <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" x-init="loadSettings(); loadAiBudget();">
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
           <h2>Admin Token</h2>

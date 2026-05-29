@@ -233,6 +233,27 @@ class SignalEvent(Base):
     )
 
 
+class SourceUsage(Base):
+    """Per-source daily API call counters for rate limit visibility."""
+
+    __tablename__ = "source_usage"
+    __table_args__ = (
+        UniqueConstraint("source_name", "usage_date", name="uq_source_usage_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    source_name: Mapped[str] = mapped_column(String(64), index=True)
+    usage_date: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD
+    call_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_call_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
 
 
 

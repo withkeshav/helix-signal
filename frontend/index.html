@@ -151,6 +151,9 @@
     <!-- Stale Warning -->
     <div class="warning-banner" :class="staleWarning ? 'visible' : ''" x-text="staleWarning"></div>
 
+    <!-- Rate Limit Warning -->
+    <div class="warning-banner" :class="rateLimitWarning ? 'visible' : ''" x-text="rateLimitWarning"></div>
+
     <!-- Event Ticker -->
     <div class="event-ticker glass" x-show="tickerItems.length">
       <div class="event-ticker-inner">
@@ -162,6 +165,8 @@
 
     <!-- Tab: Overview -->
     <div class="tab-content" :class="tab === 'overview' && 'active'">
+      <!-- Error Banner -->
+      <div x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
       <!-- Market Overview -->
       <div class="insight-card glass" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
@@ -305,10 +310,16 @@
               <div class="token-bar-inner">
                 <template x-for="(c,i) in (chains||[]).slice(0,5)" :key="i">
                   <div :style="`flex:${c.chain_share_pct||0};background:${['#3b82f6','#2dd4bf','#f59e0b','#ef4444','#8b5cf6'][i%5]};min-width:4px`" :title="`${c.chain_name}: ${(c.chain_share_pct||0).toFixed(1)}%`"></div>
-                </template>
-              </div>
-            </div>
-          </div>
+          </template>
+        </div>
+      </div>
+      <div class="insight-card" style="grid-column:1/-1">
+        <h2>Diagnostics</h2>
+        <p class="kpi-sub" style="margin-bottom:8px">Download a JSON snapshot of system state for debugging.</p>
+        <button class="btn btn-muted" x-show="adminToken" @click="downloadDiagnostics()">Export Diagnostics</button>
+        <span x-show="!adminToken" class="kpi-sub">Set Admin Token above to export diagnostics</span>
+      </div>
+    </div>
         </template>
       </div>
       <!-- Charts row -->
@@ -348,9 +359,14 @@
                   <span class="kpi-sub" x-show="crossSource.avg_price != null" x-text="` · avg: $${crossSource.avg_price.toFixed(6)}`"></span>
                 </div>
               </div>
-            </div>
-          </div>
         </div>
+      </div>
+      <div x-show="!chains?.length && !errorOverview && !_loadingDashboard" class="empty-state" style="margin-top:12px">
+        <span class="empty-state-icon">&#128202;</span>
+        <span class="kpi-label">No chain data available</span>
+        <span class="kpi-sub">Chain metrics will appear once data is fetched</span>
+      </div>
+    </div>
       </div>
       <!-- Anomaly Events -->
       <div class="insight-card">
@@ -420,11 +436,17 @@
       <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
       <div class="chart-card">
         <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
-        <div class="chart-wrap xl" id="chart-peg-forecast"></div>
+        <div class="chart-wrap xl" id="chart-peg-forecast" style="position:relative">
+          <div x-show="loadingForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
+          <div x-show="!loadingForecast && !errorForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data</div>
+        </div>
       </div>
       <div class="chart-card">
         <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
-        <div class="chart-wrap xl" id="chart-supply-forecast"></div>
+        <div class="chart-wrap xl" id="chart-supply-forecast" style="position:relative">
+          <div x-show="loadingForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
+          <div x-show="!loadingForecast && !errorForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data</div>
+        </div>
       </div>
       <div class="insight-grid">
         <div class="insight-card">
@@ -473,7 +495,11 @@
 
     <!-- Tab: Supply -->
     <div class="tab-content" :class="tab === 'supply' && 'active'">
-      <div x-show="!totalSupply" class="empty-state" style="margin-bottom:12px">
+      <div x-show="!totalSupply && _loadingDashboard" class="empty-state" style="margin-bottom:12px">
+        <span class="loading-spinner" style="width:32px;height:32px;border-width:3px;margin-bottom:4px"></span>
+        <span class="kpi-label">Loading supply data...</span>
+      </div>
+      <div x-show="!totalSupply && !_loadingDashboard" class="empty-state" style="margin-bottom:12px">
         <span class="empty-state-icon">&#128202;</span>
         <span class="kpi-label">No supply data available</span>
         <span class="kpi-sub">Supply metrics will populate once chain data is fetched</span>
@@ -510,7 +536,8 @@
                 <div class="event-summary" x-text="ev.summary"></div>
               </div>
             </template>
-            <div x-show="!events.filter(e=>e.severity!=='debug').length" class="kpi-sub" style="padding:12px">No events in window</div>
+            <div x-show="!events.filter(e=>e.severity!=='debug').length && !loadingEvents && !errorEvents" class="kpi-sub" style="padding:12px">No events in window</div>
+            <div x-show="!events.filter(e=>e.severity!=='debug').length && loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
           </div>
         </div>
         <div class="insight-card">
@@ -530,7 +557,7 @@
               </div>
             </template>
             <div x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
-            <div x-show="loadingEvents" class="kpi-sub" style="padding:12px">Loading...</div>
+            <div x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
           </div>
         </div>
       </div>
@@ -602,6 +629,21 @@
             </div>
           </template>
           <div x-show="!sources.length" class="kpi-sub" style="padding:8px 0">No source data</div>
+        </div>
+        <div class="insight-card">
+          <h2>Source Usage (Today)</h2>
+          <div x-show="sourceUsage" style="font-size:13px;line-height:1.7">
+            <div><span class="kpi-label">Total API calls:</span> <span x-text="sourceUsage?.total_calls || 0"></span></div>
+            <div style="margin-top:8px">
+              <template x-for="(data, source) in (sourceUsage?.sources || {})" :key="source">
+                <div style="padding:4px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between">
+                  <span x-text="source"></span>
+                  <span x-text="`${data.call_count} calls`"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+          <div x-show="!sourceUsage" class="kpi-sub" style="padding:8px 0">No usage data</div>
         </div>
         <div class="insight-card">
           <h2>Data Freshness</h2>
@@ -766,10 +808,12 @@
     <!-- Footer -->
     <footer class="footer">
       <span x-text="`Generated ${generatedAt}`"></span>
+      <span x-show="freshness.status === 'Stale'" class="pill source-down">stale</span>
+      <span x-show="freshness.status === 'Fresh'" class="pill source-ok">fresh</span>
       <template x-for="s in sources" :key="s.source_name">
         <span class="pill" :class="`source-${s.status}`" x-text="`${s.source_name}: ${s.status}`"></span>
       </template>
-      <span class="pill">v3.7.0</span>
+      <span class="pill" x-text="'v' + version"></span>
     </footer>
   </main>
 </body>

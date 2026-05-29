@@ -16,6 +16,7 @@ from sources.coingecko import CoinGeckoSource
 from sources.dexscreener import DexScreenerSource
 from sources.base import AbstractSource
 from backend.core.registry import get_source
+from services.source_usage import increment_source_usage
 from structlog import get_logger
 
 log = get_logger(__name__)
@@ -139,6 +140,9 @@ def _upsert_source_status(
         row.last_successful_fetch = successful_at
     row.last_error = last_error
     row.updated_at = datetime.now(timezone.utc)
+    
+    # Increment usage counter for this source
+    increment_source_usage(db, source_name)
 
 
 async def refresh_chain_data(db: Session) -> None:

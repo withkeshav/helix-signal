@@ -7,6 +7,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | Method | Endpoint | Description | Rate Limit |
 |--------|----------|-------------|------------|
 | GET | `/api/health` | Operational status, DB ping, scheduler state, version | 60/min |
+| GET | `/api/version` | Application version string | 60/min |
 | GET | `/api/assets` | Available assets with metadata | 60/min |
 | GET | `/api/dashboard?asset=USDT` | Live risk monitoring payload | 60/min |
 | POST | `/api/refresh` | Trigger immediate data refresh | 10/min |
@@ -63,6 +64,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/sources/status` | Circuit breaker state for all registered sources |
+| GET | `/api/sources/usage` | Per-source API call counts for current day (daily granularity) |
 | GET | `/api/sources/{name}/config` | Configuration schema for a source |
 | GET | `/api/alerts/config` | Active alert rule definitions |
 
@@ -71,6 +73,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | Method | Endpoint | Description | Gate |
 |--------|----------|-------------|------|
 | POST | `/api/admin/backfill?asset=USDT&days=7` | Synthetic historical backfill | `ALLOW_BACKFILL=true` |
+| GET | `/api/admin/diagnostics` | Full system snapshot (version, health, sources, usage, settings, DB stats) | Requires admin token |
 
 ## AI (optional)
 
@@ -121,7 +124,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "3.8.0"
+  "version": "3.8.1.3"
 }
 ```
 
@@ -140,7 +143,9 @@ Typed Pydantic response models in `backend/schemas.py`:
 | Model | Endpoint |
 |-------|----------|
 | `DashboardResponse` | `/api/dashboard` |
+| `VersionResponse` | `/api/version` |
 | `TrendResponseOut` | `/api/trends` |
 | `ChainTrendResponseOut` | `/api/trends/chains` |
 | `SignalEventsResponseOut` | `/api/events` |
 | `SourceStatusOut` | `/api/sources/status` |
+| `SourceUsageResponse` | `/api/sources/usage` (raw dict, not a Pydantic model) |

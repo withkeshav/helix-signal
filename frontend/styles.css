@@ -123,6 +123,8 @@ code{background:var(--bg-accent);padding:4px 8px;border-radius:4px;font-size:12p
 .evidence-drawer{width:100vw;max-width:100vw}
 .chart-wrap,.chart-wrap.tall,.chart-wrap.xl{height:160px}
 }
+.loading-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--spark);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:480px){
 .kpi-row{grid-template-columns:1fr 1fr;gap:3px}
 .kpi-value{font-size:.9rem}

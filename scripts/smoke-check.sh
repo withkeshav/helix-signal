@@ -24,12 +24,30 @@ echo "OK: /js/init.js reachable"
 health_json="$(curl -fsSL "${BASE_URL}/api/health")"
 python3 -c 'import json,sys; d=json.load(sys.stdin); assert "status" in d and "version" in d; print("OK: /api/health -> status={}, version={}".format(d.get("status"), d.get("version")))' <<< "${health_json}"
 
+version_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/version")"
+if [[ "${version_code}" != "200" ]]; then
+  echo "FAILED: /api/version returned ${version_code}"
+  exit 1
+fi
+version_json="$(curl -fsSL "${BASE_URL}/api/version")"
+python3 -c 'import json,sys; d=json.load(sys.stdin); assert "version" in d; print("OK: /api/version -> {}".format(d.get("version")))' <<< "${version_json}"
+echo "OK: /api/version reachable"
+
 dashboard_status="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/dashboard?asset=USDT")"
 if [[ "${dashboard_status}" != "200" ]]; then
   echo "FAILED: /api/dashboard returned ${dashboard_status}"
   exit 1
 fi
 echo "OK: /api/dashboard reachable"
+
+usage_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/sources/usage")"
+if [[ "${usage_code}" != "200" ]]; then
+  echo "FAILED: /api/sources/usage returned ${usage_code}"
+  exit 1
+fi
+usage_json="$(curl -fsSL "${BASE_URL}/api/sources/usage")"
+python3 -c 'import json,sys; d=json.load(sys.stdin); assert "total_calls" in d; print("OK: /api/sources/usage -> total_calls={}".format(d.get("total_calls")))' <<< "${usage_json}"
+echo "OK: /api/sources/usage reachable"
 
 settings_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/settings")"
 if [[ "${settings_code}" != "403" && "${settings_code}" != "503" ]]; then
@@ -44,6 +62,13 @@ if [[ "${governance_code}" != "403" && "${governance_code}" != "503" ]]; then
   exit 1
 fi
 echo "OK: /api/governance requires auth (${governance_code})"
+
+diagnostics_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/admin/diagnostics")"
+if [[ "${diagnostics_code}" != "403" && "${diagnostics_code}" != "503" ]]; then
+  echo "FAILED: /api/admin/diagnostics should require admin token (got ${diagnostics_code})"
+  exit 1
+fi
+echo "OK: /api/admin/diagnostics requires auth (${diagnostics_code})"
 
 metrics_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/metrics")"
 if [[ "${metrics_code}" == "200" ]]; then

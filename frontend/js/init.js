@@ -82,6 +82,10 @@ Alpine.data('helixApp', () => {
     evidenceSources: {},
     dataQualityHistory: [],
     rotation: {},
+    version: '',
+    rateLimitWarning: '',
+    sourceUsage: null,
+    errorOverview: '',
 
     aiStillFresh(expiresAt) {
       if (!expiresAt) return false;
@@ -94,6 +98,22 @@ Alpine.data('helixApp', () => {
       await this.loadAssets();
       await this.loadDashboard();
       await this.loadAttestation();
+      
+      // Load version from API
+      try {
+        const r = await fetch('/api/version', { cache: 'no-store' });
+        if (r.ok) {
+          const data = await r.json();
+          this.version = data.version || '?';
+        } else {
+          this.version = '?';
+        }
+      } catch (e) {
+        this.version = '?';
+      }
+      
+      await this.loadSourceUsage();
+      
       this._timer = setInterval(() => {
         if (document.hidden) return;
         this.loadDashboard();
@@ -164,6 +184,7 @@ Alpine.data('helixApp', () => {
     async loadDashboard() {
       if (this._loadingDashboard) return;
       this._loadingDashboard = true;
+      this.errorOverview = '';
       try {
         const r = await fetch(`/api/dashboard?asset=${this.asset}`, { cache: 'no-store' });
         if (!r.ok) throw Error(`HTTP ${r.status}`);
@@ -232,7 +253,7 @@ Alpine.data('helixApp', () => {
         if (this.tab === 'events') await this.loadEvents(this.asset);
         else if (this._sentimentSeries.length) this.renderSentimentChart(this._sentimentSeries);
         if (this.tab === 'forecast') { await this.loadForecastData(this.asset); await this.loadForecastAccuracy(this.asset); }
-      } catch (e) { this.staleWarning = `Dashboard error: ${e.message}`; }
+      } catch (e) { this.staleWarning = `Dashboard error: ${e.message}`; this.errorOverview = `Failed to load dashboard data: ${e.message}`; }
       finally { this._loadingDashboard = false; }
     },
 
@@ -302,6 +323,56 @@ Alpine.data('helixApp', () => {
         this.rotation = d;
       } catch (e) {
         this.rotation = { available: false, pairs: [] };
+      }
+    },
+
+    async loadSourceUsage() {
+      try {
+        const r = await fetch('/api/sources/usage', { cache: 'no-store' });
+        if (!r.ok) return;
+        const d = await r.json();
+        this.sourceUsage = d;
+        
+        // Check for high usage warnings (threshold: 80% of typical free tier limits)
+        const warnings = [];
+        const limits = {
+          'defillama': 1000,
+          'coingecko': 100,
+          'dexscreener': 1000,
+        };
+        
+        for (const [source, data] of Object.entries(d.sources || {})) {
+          const limit = limits[source];
+          if (limit && data.call_count > limit * 0.8) {
+            warnings.push(`${source}: ${data.call_count}/${limit} calls today`);
+          }
+        }
+        
+        this.rateLimitWarning = warnings.length > 0 
+          ? `Rate limit warning: ${warnings.join(', ')}`
+          : '';
+      } catch (e) {
+        this.sourceUsage = null;
+      }
+    },
+
+    async downloadDiagnostics() {
+      try {
+        const r = await fetch('/api/admin/diagnostics', {
+          headers: this._adminHeaders(),
+          cache: 'no-store'
+        });
+        if (!r.ok) throw Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `helix-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        this.staleWarning = `Diagnostics export failed: ${e.message}`;
       }
     },
 

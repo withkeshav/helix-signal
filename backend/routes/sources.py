@@ -1,7 +1,12 @@
 """Source health and status endpoints."""
 
-from fastapi import APIRouter, HTTPException, Request
+from typing import Any
 
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+
+from database import get_db
+from services.source_usage import get_source_usage, get_source_usage_summary
 from backend.core.limiter import limiter
 from backend.core.registry import SOURCES_REGISTRY, get_source
 
@@ -25,6 +30,13 @@ def get_source_status(request: Request):
         ),
         "total_count": len(statuses),
     }
+
+
+@router.get("/sources/usage")
+@limiter.limit("60/minute")
+def get_sources_usage(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Get usage stats for all data sources."""
+    return get_source_usage_summary(db)
 
 
 @router.get("/sources/{name}/config")

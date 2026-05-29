@@ -8,7 +8,7 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "3.8.1.2"
+    assert body["version"] == "3.8.1.4"
     assert "db" in body
     assert body["db_connected"] is True
     assert body["redis_connected"] is False
@@ -56,3 +56,10 @@ def test_compare_two_assets(client):
 def test_backfill_disabled_by_default(client):
     response = client.post("/api/admin/backfill?asset=USDT&days=7")
     assert response.status_code == 403
+
+
+def test_diagnostics_requires_auth(client):
+    response = client.get("/api/admin/diagnostics")
+    assert response.status_code in (403, 503)
+    response_no_token = client.get("/api/admin/diagnostics", headers={"X-Admin-Token": ""})
+    assert response_no_token.status_code in (403, 503)

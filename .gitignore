@@ -117,3 +117,4 @@ docs/grant-strategy.md
 
 # pytest coverage
 .coverage
+.progress/NEXT_STEPS.md

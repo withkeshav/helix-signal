@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import partial
@@ -19,14 +20,38 @@ from typing import Any
 import httpx
 
 # ---------------------------------------------------------------------------
-# Cache
+# Cache: exact-match (SHA-256) + semantic (trigram similarity)
 # ---------------------------------------------------------------------------
 
-_AI_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_AI_CACHE: OrderedDict[str, tuple[float, str, dict[str, Any]]] = OrderedDict()
 _CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "3600"))
 _LOCAL_DAILY_TOKENS = 0
 _LOCAL_TOKEN_DATE = ""
 _AI_REDIS_CACHE_PREFIX = "helix:ai:cache:"
+
+# Per-feature TTL overrides (seconds) — fall back to _CACHE_TTL_SECONDS
+_FEATURE_CACHE_TTL: dict[str, int] = {
+    "risk_explain": 3600,
+    "market_narrative": 3000,
+    "anomaly_investigation": 1800,
+    "market_overview": 1200,
+    "insight_summary": 3600,
+}
+
+# Hit / miss / eviction tracking
+_CACHE_HITS = 0
+_CACHE_MISSES = 0
+_CACHE_EVICTIONS = 0
+_CACHE_TOKENS_SAVED = 0
+
+# In-memory LRU limits
+_MAX_CACHE_ENTRIES = int(os.getenv("AI_CACHE_MAX_ENTRIES", "1000"))
+
+# Semantic cache (trigram-based prompt similarity, off by default)
+_SEMANTIC_CACHE: OrderedDict[str, str] = OrderedDict()  # cache_key -> prompt_text
+_SEMANTIC_CACHE_ENABLED = os.getenv("AI_CACHE_SEMANTIC_ENABLED", "").strip().lower() in ("1", "true", "yes")
+_SEMANTIC_CACHE_THRESHOLD = float(os.getenv("AI_CACHE_SEMANTIC_THRESHOLD", "0.90"))
+_MAX_SEMANTIC_CACHE_ENTRIES = 200
 
 _BUDGET_LUA_SCRIPT = """
 local current = redis.call('GET', KEYS[1])
@@ -122,12 +147,13 @@ def get_budget_status() -> dict[str, Any]:
 def ai_mode() -> str:
     return os.getenv("AI_MODE", "ai_off").strip().lower()
 
+# ---------------------------------------------------------------------------
+# Cache helpers — exact-match (SHA-256), LRU, per-feature TTL
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Cache helpers
-# ---------------------------------------------------------------------------
 
 def _cache_get(key: str) -> dict[str, Any] | None:
+    """Exact-match lookup with per-feature TTL and LRU promotion."""
     rc = _try_redis_cache()
     if rc:
         val = rc.get(_AI_REDIS_CACHE_PREFIX + key)
@@ -136,23 +162,118 @@ def _cache_get(key: str) -> dict[str, Any] | None:
     entry = _AI_CACHE.get(key)
     if not entry:
         return None
-    ts, payload = entry
-    if time.time() - ts > _CACHE_TTL_SECONDS:
+    ts, feature, payload = entry
+    ttl = _FEATURE_CACHE_TTL.get(feature, _CACHE_TTL_SECONDS)
+    if time.time() - ts > ttl:
         _AI_CACHE.pop(key, None)
+        global _CACHE_EVICTIONS
+        _CACHE_EVICTIONS += 1
         return None
+    _AI_CACHE.move_to_end(key)
     return payload
 
 
-def _cache_set(key: str, payload: dict[str, Any]) -> None:
+def _cache_set(key: str, feature: str, prompt: str, payload: dict[str, Any]) -> None:
+    """Store in exact-match cache with per-feature TTL and LRU eviction."""
+    global _CACHE_EVICTIONS
     rc = _try_redis_cache()
     if rc:
         rc.set(_AI_REDIS_CACHE_PREFIX + key, payload, ttl=_CACHE_TTL_SECONDS)
-    _AI_CACHE[key] = (time.time(), payload)
+    now = time.time()
+    if key in _AI_CACHE:
+        _AI_CACHE.move_to_end(key)
+        _AI_CACHE[key] = (now, feature, payload)
+    else:
+        if len(_AI_CACHE) >= _MAX_CACHE_ENTRIES:
+            _AI_CACHE.popitem(last=False)
+            _CACHE_EVICTIONS += 1
+        _AI_CACHE[key] = (now, feature, payload)
+    if prompt:
+        _semantic_cache_store(key, prompt)
 
 
 def _prompt_hash(feature: str, context: dict[str, Any]) -> str:
     blob = json.dumps({"feature": feature, "context": context}, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Semantic cache — character trigram Jaccard similarity
+# ---------------------------------------------------------------------------
+
+
+def _text_trigrams(text: str) -> set[tuple[str, str, str]]:
+    """Character trigrams from lowercased, normalized text."""
+    normalized = " ".join(text.lower().split())
+    return {(normalized[i], normalized[i + 1], normalized[i + 2]) for i in range(len(normalized) - 2)}
+
+
+def _trigram_similarity(a: str, b: str) -> float:
+    """Jaccard similarity of character trigrams (0.0 – 1.0)."""
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    ta = _text_trigrams(a)
+    tb = _text_trigrams(b)
+    intersection = len(ta & tb)
+    union = len(ta | tb)
+    return intersection / union if union else 0.0
+
+
+def _semantic_cache_store(cache_key: str, prompt_text: str) -> None:
+    """Store prompt text for future semantic matching."""
+    if not _SEMANTIC_CACHE_ENABLED:
+        return
+    if cache_key in _SEMANTIC_CACHE:
+        _SEMANTIC_CACHE.move_to_end(cache_key)
+        _SEMANTIC_CACHE[cache_key] = prompt_text
+    else:
+        if len(_SEMANTIC_CACHE) >= _MAX_SEMANTIC_CACHE_ENTRIES:
+            _SEMANTIC_CACHE.popitem(last=False)
+        _SEMANTIC_CACHE[cache_key] = prompt_text
+
+
+def _semantic_cache_lookup(cache_key: str, prompt_text: str) -> dict[str, Any] | None:
+    """Return cached payload if a semantically similar prompt exists."""
+    if not _SEMANTIC_CACHE_ENABLED or not prompt_text:
+        return None
+    best_sim = 0.0
+    best_key: str | None = None
+    for stored_key, stored_prompt in _SEMANTIC_CACHE.items():
+        if stored_key == cache_key:
+            continue
+        sim = _trigram_similarity(prompt_text, stored_prompt)
+        if sim > best_sim:
+            best_sim = sim
+            best_key = stored_key
+    if best_sim >= _SEMANTIC_CACHE_THRESHOLD and best_key:
+        entry = _AI_CACHE.get(best_key)
+        if entry:
+            ts, feat, payload = entry
+            ttl = _FEATURE_CACHE_TTL.get(feat, _CACHE_TTL_SECONDS)
+            if time.time() - ts <= ttl:
+                return payload
+    return None
+
+
+def get_cache_stats() -> dict[str, Any]:
+    """Return cache performance metrics for observability."""
+    total = _CACHE_HITS + _CACHE_MISSES
+    return {
+        "hits": _CACHE_HITS,
+        "misses": _CACHE_MISSES,
+        "hit_rate": round(_CACHE_HITS / total * 100, 1) if total > 0 else 0.0,
+        "tokens_saved": _CACHE_TOKENS_SAVED,
+        "entries": len(_AI_CACHE),
+        "max_entries": _MAX_CACHE_ENTRIES,
+        "evictions": _CACHE_EVICTIONS,
+        "semantic_entries": len(_SEMANTIC_CACHE) if _SEMANTIC_CACHE_ENABLED else 0,
+        "semantic_enabled": _SEMANTIC_CACHE_ENABLED,
+        "semantic_threshold": _SEMANTIC_CACHE_THRESHOLD,
+        "default_ttl_seconds": _CACHE_TTL_SECONDS,
+        "feature_ttl_overrides": dict(_FEATURE_CACHE_TTL),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -598,6 +719,30 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
 
 
 # ---------------------------------------------------------------------------
+# Cache settings sync from DB
+# ---------------------------------------------------------------------------
+
+
+def _read_cache_settings_from_db(db: Any) -> None:
+    """Override cache globals from Settings DB when available."""
+    global _SEMANTIC_CACHE_ENABLED, _SEMANTIC_CACHE_THRESHOLD, _MAX_CACHE_ENTRIES
+    try:
+        from providers.settings import get_setting
+        val = get_setting("ai_cache_semantic_enabled", db)
+        if val is not None:
+            _SEMANTIC_CACHE_ENABLED = bool(val)
+        val = get_setting("ai_cache_semantic_threshold", db)
+        if val is not None:
+            parsed = float(val) if isinstance(val, str) else float(val)
+            _SEMANTIC_CACHE_THRESHOLD = max(0.5, min(1.0, parsed))
+        val = get_setting("ai_cache_max_entries", db)
+        if val is not None:
+            _MAX_CACHE_ENTRIES = int(val)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Main enrichment entry point
 # ---------------------------------------------------------------------------
 
@@ -627,12 +772,30 @@ def enrich_with_ai(
     if mode == "ai_off":
         return {"available": False, "mode": mode, "reason": "AI disabled; core metrics unchanged."}
 
+    global _CACHE_HITS, _CACHE_MISSES, _CACHE_TOKENS_SAVED
+
+    if db is not None:
+        _read_cache_settings_from_db(db)
+
     cache_key = _prompt_hash(feature, context)
+
+    # 1. Exact-match cache
     cached = _cache_get(cache_key)
     if cached:
+        _CACHE_HITS += 1
+        _CACHE_TOKENS_SAVED += cached.get("tokens", 0)
         return {**cached, "cached": True}
 
     prompt, system, max_tokens = _build_prompt(feature, context)
+
+    # 2. Semantic cache (trigram similarity)
+    cached = _semantic_cache_lookup(cache_key, prompt)
+    if cached:
+        _CACHE_HITS += 1
+        _CACHE_TOKENS_SAVED += cached.get("tokens", 0)
+        return {**cached, "cached": True}
+
+    _CACHE_MISSES += 1
     system_len = len(system.split()) if system else 0
     estimated_tokens = max_tokens + int((len(prompt.split()) + system_len) * 1.3)
     errors: list[str] = []
@@ -685,7 +848,7 @@ def enrich_with_ai(
                 "generated_at": now_dt.isoformat(),
                 "expires_at": datetime.fromtimestamp(now_dt.timestamp() + _CACHE_TTL_SECONDS, tz=timezone.utc).isoformat(),
             }
-            _cache_set(cache_key, payload)
+            _cache_set(cache_key, feature, prompt, payload)
             return payload
         except Exception as exc:
             _record_fallback(pname)

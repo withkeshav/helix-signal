@@ -58,7 +58,7 @@ def ai_explain(
     ctx = _build_context(asset, db)
     if ctx is None:
         return {"available": False, "reason": "asset_not_found"}
-    return enrich_with_ai(feature="risk_explain", context=ctx)
+    return enrich_with_ai(feature="risk_explain", context=ctx, db=db)
 
 
 @router.get("/ai/narrative")
@@ -110,7 +110,7 @@ def ai_narrative(
         ctx["depeg_1h"] = "?"
         ctx["depeg_24h"] = "?"
 
-    return enrich_with_ai(feature="market_narrative", context=ctx)
+    return enrich_with_ai(feature="market_narrative", context=ctx, db=db)
 
 
 @router.get("/ai/insights")
@@ -141,7 +141,7 @@ def ai_insights(
     except Exception:
         ctx["anomaly_count"] = 0
 
-    return enrich_with_ai(feature="insight_summary", context=ctx)
+    return enrich_with_ai(feature="insight_summary", context=ctx, db=db)
 
 
 def _build_market_context(db: Session) -> dict[str, Any] | None:
@@ -184,4 +184,4 @@ def ai_market_overview(
     if mode == "ai_off":
         return {"available": True, "generated_by": "engine", **context}
 
-    return enrich_with_ai(feature="market_overview", context=context)
+    return enrich_with_ai(feature="market_overview", context=context, db=db)

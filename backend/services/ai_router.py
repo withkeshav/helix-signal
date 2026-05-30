@@ -1,4 +1,9 @@
-"""Optional LLM router — add-on only; core platform must run with AI_MODE=ai_off."""
+"""Optional LLM router — add-on only; core platform must run with AI_MODE=ai_off.
+
+Dynamic provider chains driven by Settings metadata. Tiered routing:
+Cache -> Groq (cheapest) -> Ollama Cloud -> OpenRouter Free -> OpenRouter Paid.
+Rate-limit-aware, cost-aware, fully fallback-safe.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +11,16 @@ import hashlib
 import json
 import os
 import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 
 import httpx
+
+# ---------------------------------------------------------------------------
+# Cache
+# ---------------------------------------------------------------------------
 
 _AI_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "3600"))
@@ -47,6 +57,10 @@ def _reset_local_if_new_day() -> None:
         _LOCAL_TOKEN_DATE = today
 
 
+# ---------------------------------------------------------------------------
+# Budget helpers
+# ---------------------------------------------------------------------------
+
 def _deduct_tokens(count: int) -> bool:
     global _LOCAL_DAILY_TOKENS
     budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
@@ -68,6 +82,18 @@ def _deduct_tokens(count: int) -> bool:
         return False
     _LOCAL_DAILY_TOKENS += count
     return True
+
+
+def _within_budget(count: int) -> bool:
+    """Check if estimated tokens fit within daily budget (no deduction).
+
+    Used by sentiment.py and osint.py as a pre-check before work begins.
+    Local-only check; the real guard is *deduct_tokens* which handles Redis.
+    """
+    global _LOCAL_DAILY_TOKENS
+    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
+    _reset_local_if_new_day()
+    return _LOCAL_DAILY_TOKENS + count <= budget
 
 
 def get_budget_status() -> dict[str, Any]:
@@ -97,6 +123,10 @@ def ai_mode() -> str:
     return os.getenv("AI_MODE", "ai_off").strip().lower()
 
 
+# ---------------------------------------------------------------------------
+# Cache helpers
+# ---------------------------------------------------------------------------
+
 def _cache_get(key: str) -> dict[str, Any] | None:
     rc = _try_redis_cache()
     if rc:
@@ -124,6 +154,10 @@ def _prompt_hash(feature: str, context: dict[str, Any]) -> str:
     blob = json.dumps({"feature": feature, "context": context}, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode()).hexdigest()
 
+
+# ---------------------------------------------------------------------------
+# Provider functions (one per service)
+# ---------------------------------------------------------------------------
 
 def _openrouter_lite(
     prompt: str, max_tokens: int, model: str | None = None, **kwargs
@@ -196,31 +230,239 @@ def _groq(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
     return {"provider": "groq", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
-def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
+# ---------------------------------------------------------------------------
+# Provider metadata — maps logical names to specs
+# ---------------------------------------------------------------------------
+
+PROVIDER_METADATA: dict[str, dict[str, Any]] = {
+    "groq": {
+        "label": "Groq",
+        "default_model": "llama-3.1-8b-instant",
+        "env_key": "GROQ_API_KEY",
+        "cost_per_million": 0.05,
+        "rate_limit_rpm": 30,
+        "free_tier_calls": 0,
+        "max_tokens": 8192,
+        "models": ["llama-3.1-8b-instant"],
+    },
+    "ollama_cloud": {
+        "label": "Ollama Cloud",
+        "default_model": "ministral-3:8b-cloud",
+        "fallback_model": "qwen-2.5-7b-cloud",
+        "env_key": "OLLAMA_API_KEY",
+        "cost_per_million": 0.15,
+        "rate_limit_rpm": 60,
+        "free_tier_calls": 0,
+        "max_tokens": 4096,
+        "models": ["ministral-3:8b-cloud", "qwen-2.5-7b-cloud"],
+    },
+    "openrouter_free": {
+        "label": "OpenRouter Free",
+        "default_model": "openrouter/free",
+        "env_key": "OPENROUTER_API_KEY",
+        "cost_per_million": 0.0,
+        "rate_limit_rpm": 20,
+        "free_tier_calls": 1000,
+        "max_tokens": 4096,
+        "models": ["openrouter/free"],
+    },
+    "openrouter_paid": {
+        "label": "OpenRouter Paid",
+        "default_model": "openai/gpt-4o-mini",
+        "env_key": "OPENROUTER_API_KEY",
+        "cost_per_million": 0.6,
+        "rate_limit_rpm": 100,
+        "free_tier_calls": 0,
+        "max_tokens": 4096,
+        "models": ["openai/gpt-4o-mini"],
+    },
+}
+
+# Default priority order when no Settings override is present
+_DEFAULT_PROVIDER_PRIORITY = ["groq", "ollama_cloud", "openrouter_free", "openrouter_paid"]
+_DEFAULT_LITE_PRIORITY = ["openrouter_free", "ollama_cloud"]
+_DEFAULT_PRIORITY_PRIORITY = ["openrouter_free", "ollama_cloud", "groq"]
+
+# Map provider names to env var keys for API key presence check
+_PROVIDER_ENV_KEYS: dict[str, str] = {
+    "groq": "GROQ_API_KEY",
+    "ollama_cloud": "OLLAMA_API_KEY",
+    "openrouter_free": "OPENROUTER_API_KEY",
+    "openrouter_paid": "OPENROUTER_API_KEY",
+}
+
+# In-memory rate-limit tracker: provider_name -> list of call timestamps
+_PROVIDER_RATE_LIMITS: dict[str, list[float]] = {}
+# Fallback tracking: how many times each provider was used as fallback
+_PROVIDER_FALLBACK_COUNTS: dict[str, int] = {}
+
+
+def _check_rate_limit(name: str, rpm: int) -> bool:
+    """Return True if the provider is within its rate limit."""
+    if rpm <= 0:
+        return True
+    now = time.time()
+    window = 60.0
+    timestamps = _PROVIDER_RATE_LIMITS.get(name, [])
+    # Purge timestamps older than the window
+    timestamps = [t for t in timestamps if now - t < window]
+    _PROVIDER_RATE_LIMITS[name] = timestamps
+    return len(timestamps) < rpm
+
+
+def _record_call(name: str) -> None:
+    """Record a successful call to a provider."""
+    if name not in _PROVIDER_RATE_LIMITS:
+        _PROVIDER_RATE_LIMITS[name] = []
+    _PROVIDER_RATE_LIMITS[name].append(time.time())
+
+
+def _record_fallback(name: str) -> None:
+    """Increment fallback counter for a provider."""
+    _PROVIDER_FALLBACK_COUNTS[name] = _PROVIDER_FALLBACK_COUNTS.get(name, 0) + 1
+
+
+# ---------------------------------------------------------------------------
+# Provider chain construction
+# ---------------------------------------------------------------------------
+
+def _get_provider_priority_list(db: Any = None) -> list[str]:
+    """Read ordered provider priority list from Settings DB or fall back to env.
+
+    When *db* is provided the function reads from the Settings table using
+    ``providers.settings.get_setting``.  Otherwise it uses ``AI_MODE`` + env
+    vars to produce a backward-compatible list.
+    """
+    mode = ai_mode()
     if mode == "ai_off":
         return []
-    or_free = partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL)
-    primary = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
-    fallback = os.getenv("OLLAMA_CLOUD_FALLBACK_MODEL", "qwen-2.5-7b-cloud")
+
+    if db is not None:
+        try:
+            from providers.settings import get_setting
+            raw = get_setting("ai_provider_priority", db)
+            if raw:
+                parsed = json.loads(raw) if isinstance(raw, str) else raw
+                if isinstance(parsed, list) and parsed:
+                    return parsed
+        except Exception:
+            pass
+
+    return _env_based_priority(mode)
+
+
+def _env_based_priority(mode: str) -> list[str]:
+    """Build a priority list from env vars (backward-compat path)."""
     if mode == "ai_lite":
-        return [
-            or_free,
-            partial(_ollama_cloud, model=primary),
-        ]
-    if priority:
+        return list(_DEFAULT_LITE_PRIORITY)
+    return list(_DEFAULT_PROVIDER_PRIORITY)
+
+
+def _build_provider_callable(name: str) -> Callable[..., dict[str, Any] | None] | None:
+    """Return the appropriate provider function for *name*, or None if the
+    required API key is not configured."""
+    meta = PROVIDER_METADATA.get(name)
+    if not meta:
+        return None
+
+    env_key = meta["env_key"]
+    if not os.getenv(env_key, "").strip():
+        return None
+
+    if name == "groq":
+        return _groq
+    if name == "ollama_cloud":
+        model = os.getenv("OLLAMA_CLOUD_MODEL", meta["default_model"])
+        return partial(_ollama_cloud, model=model)
+    if name == "openrouter_free":
+        return partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL)
+    if name == "openrouter_paid":
+        model = os.getenv("OPENROUTER_MODEL", meta["default_model"])
+        return partial(_openrouter_lite, model=model)
+
+    return None
+
+
+def get_ai_provider_chain(db: Any = None, mode: str | None = None) -> list[Callable[..., dict[str, Any] | None]]:
+    """Build a dynamic provider chain from Settings metadata.
+
+    Returns a list of callables ordered by priority.  Each callable accepts
+    ``(prompt, max_tokens, system=None, **kwargs)`` and returns a result dict
+    or ``None`` on failure.
+
+    *db* — optional SQLAlchemy session for Settings lookups (falls back to env vars)
+    *mode* — override AI mode (defaults to ``ai_mode()``)
+    """
+    mode = mode or ai_mode()
+    if mode == "ai_off":
+        return []
+
+    priority = _get_provider_priority_list(db)
+    chain: list[Callable[..., dict[str, Any] | None]] = []
+    for name in priority:
+        fn = _build_provider_callable(name)
+        if fn is not None:
+            fn._provider_name = name
+            chain.append(fn)
+    return chain
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatible _providers_for_mode (delegates to new system)
+# ---------------------------------------------------------------------------
+
+def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
+    """Legacy provider list — retained for backward compatibility.
+
+    Delegates to the new Settings-driven chain when *db* is available, or
+    falls back to env-vars-only mode.
+    """
+    if mode == "ai_off":
+        return []
+
+    if priority and mode != "ai_lite":
+        or_free = partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL)
+        primary = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
+        fallback = os.getenv("OLLAMA_CLOUD_FALLBACK_MODEL", "qwen-2.5-7b-cloud")
         return [
             or_free,
             partial(_ollama_cloud, model=fallback),
             partial(_ollama_cloud, model=primary),
             _groq,
         ]
-    return [
-        or_free,
-        partial(_ollama_cloud, model=primary),
-        partial(_ollama_cloud, model=fallback),
-        _groq,
-    ]
 
+    return get_ai_provider_chain(mode=mode)
+
+
+# ---------------------------------------------------------------------------
+# Provider stats & observability
+# ---------------------------------------------------------------------------
+
+def get_provider_stats() -> dict[str, Any]:
+    """Return per-provider usage statistics for observability.
+
+    Includes call counts, fallback frequency, and current rate-limit state.
+    """
+    stats: dict[str, dict[str, Any]] = {}
+    for name, meta in PROVIDER_METADATA.items():
+        timestamps = _PROVIDER_RATE_LIMITS.get(name, [])
+        now = time.time()
+        recent = [t for t in timestamps if now - t < 60]
+        stats[name] = {
+            "label": meta["label"],
+            "cost_per_million": meta["cost_per_million"],
+            "rate_limit_rpm": meta["rate_limit_rpm"],
+            "calls_last_minute": len(recent),
+            "total_calls_today": len(timestamps),
+            "fallback_count": _PROVIDER_FALLBACK_COUNTS.get(name, 0),
+            "api_key_configured": bool(os.getenv(meta["env_key"], "").strip()),
+        }
+    return stats
+
+
+# ---------------------------------------------------------------------------
+# Feature prompts
+# ---------------------------------------------------------------------------
 
 _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
     "risk_explain": {
@@ -345,15 +587,42 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
         }
     template = config["user"]
     available = {k: v for k, v in context.items() if f"{{{k}}}" in template}
-    for k in ("asset_symbol", "signal_score", "signal_band", "regime", "web_search_results"):
+    for k in ("feature", "asset_symbol", "signal_score", "signal_band", "regime", "web_search_results"):
         available.setdefault(k, "?")
+    if "feature" in template:
+        available.setdefault("feature", feature)
     prompt = template.format(**available)
     mode = ai_mode()
     max_tokens = config["max_tokens_lite"] if mode == "ai_lite" else config["max_tokens_full"]
     return prompt, config["system"], max_tokens
 
 
-def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = False) -> dict[str, Any]:
+# ---------------------------------------------------------------------------
+# Main enrichment entry point
+# ---------------------------------------------------------------------------
+
+def enrich_with_ai(
+    *,
+    feature: str,
+    context: dict[str, Any],
+    priority: bool = False,
+    db: Any = None,
+) -> dict[str, Any]:
+    """Generate AI text for *feature* using the dynamic provider chain.
+
+    Parameters
+    ----------
+    feature : str
+        One of the keys in ``_FEATURE_PROMPTS``.
+    context : dict
+        Template variables for prompt construction.
+    priority : bool
+        Legacy flag — when True uses a slightly different ordering
+        (only relevant in env-var fallback mode).
+    db : Session or None
+        Optional DB session for reading provider priority from Settings.
+        When ``None`` the function falls back to env vars.
+    """
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "mode": mode, "reason": "AI disabled; core metrics unchanged."}
@@ -368,13 +637,40 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
     estimated_tokens = max_tokens + int((len(prompt.split()) + system_len) * 1.3)
     errors: list[str] = []
 
-    for provider_fn in _providers_for_mode(mode, priority=priority):
+    if db is not None:
+        provider_chain = get_ai_provider_chain(db=db)
+    else:
+        provider_chain = _providers_for_mode(mode, priority=priority)
+
+    preferred_provider: str | None = None
+
+    for provider_fn in provider_chain:
+        pname = getattr(provider_fn, "_provider_name",
+                        getattr(provider_fn, "func", provider_fn).__name__)
+
         try:
+            # Rate-limit guard
+            meta = PROVIDER_METADATA.get(pname)
+            rpm = meta["rate_limit_rpm"] if meta else 0
+            if not _check_rate_limit(pname, rpm):
+                _record_fallback(pname)
+                errors.append(f"{pname}:rate_limited")
+                continue
+
             if not _deduct_tokens(estimated_tokens):
                 return {"available": False, "mode": mode, "reason": "daily_token_budget_exceeded"}
+
             result = provider_fn(prompt, max_tokens, system=system)
             if result is None:
+                _record_fallback(pname)
+                errors.append(f"{pname}:no_api_key")
                 continue
+
+            _record_call(pname)
+
+            if preferred_provider and pname != preferred_provider:
+                _record_fallback(pname)
+
             tokens_returned = int(result.get("tokens") or 0) or max_tokens
             now_dt = datetime.now(timezone.utc)
             payload = {
@@ -392,6 +688,7 @@ def enrich_with_ai(*, feature: str, context: dict[str, Any], priority: bool = Fa
             _cache_set(cache_key, payload)
             return payload
         except Exception as exc:
-            errors.append(f"{provider_fn.__name__}:{exc}")
+            _record_fallback(pname)
+            errors.append(f"{pname}:{exc}")
 
     return {"available": False, "mode": mode, "reason": "all_providers_failed", "errors": errors}

@@ -1,8 +1,15 @@
 import os
+import sys
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+
+# Ensure repo root is on sys.path so backend. prefix imports resolve
+_repo_root = str(Path(__file__).resolve().parent.parent.parent)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["REFRESH_INTERVAL_SECONDS"] = "300"

@@ -439,6 +439,14 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
         pass
 
 
+def mask_secret(value: str) -> str:
+    """Return a display-safe value for secret-type settings.
+
+    Never returns the actual secret — only indicates whether it is configured.
+    """
+    return "configured" if value else "not_set"
+
+
 def get_all_settings(db: Session) -> list[dict[str, Any]]:
     rows = {r.key: r.value for r in db.query(Setting).all()}
     out: list[dict[str, Any]] = []
@@ -465,7 +473,7 @@ def get_all_settings(db: Session) -> list[dict[str, Any]]:
             "key": key,
             "label": meta.get("label"),
             "type": meta.get("type", "bool"),
-            "value": bool(typed) if meta.get("type") == "secret" else typed,
+            "value": mask_secret(typed) if meta.get("type") == "secret" else typed,
             "default": meta.get("default"),
             "always_active": meta.get("always_active", False),
             "key_env": meta.get("key_env"),

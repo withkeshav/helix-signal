@@ -1,10 +1,26 @@
 # Changelog
 
+## 3.8.3 (2026-06-01)
+
+### Fixed
+
+- **Secret leak in settings API** — `get_all_settings()` now masks secret-type values via `mask_secret()` instead of `bool(typed)`, preventing plaintext secret exposure in API responses.
+- **AI env bypass** — Added `_resolve_api_key()` to AI router — checks settings DB first via `get_setting()`, falls back to `os.environ`. Eliminates the settings-vs-env dual path that could bypass stored API keys.
+- **Telegram bot wiring** — `create_bot_application()` and `add_digest_scheduler()` wired into FastAPI lifespan in `main.py`, gated by `feature_telegram_bot` setting. Bot polling runs as background asyncio task with clean shutdown.
+- **Orphan removal** — `backend/mcp_server.py` deleted (was a no-op with dead `_db_session()` and zero consumers).
+- **Offset-naive datetime** — Fixed `datetime.utcnow()` → `datetime.now(timezone.utc)` in `signal_engine/components/composite_scoring.py` to prevent `TypeError` when subtracting timezone-aware timestamps.
+- **conftest.py path resolution** — Fixed repo root detection from `backend/tests/conftest.py` — `.parent.parent.parent` instead of `.parent.parent` resolves to the correct repo root.
+
+### Changelog
+
+- **Version bumped** — 3.8.2.1 → 3.8.3
+- **README refreshed** — Removed stale `backend/mcp_server.py` entry; updated test count.
+
 ## 3.8.2.1 (2026-06-01)
 
 ### Added
 
-- **Telegram bot integration** — New Telegram bot for alert notifications and user management. Includes `backend/telegram/` module, `backend/routes/telegram.py`, `backend/database.py` schema changes, and Alembic migration for `telegram_users` table.
+- **Telegram bot integration** — New Telegram bot for alert notifications and user management. Includes `backend/helix_telegram/` module, `backend/routes/telegram.py`, `backend/database.py` schema changes, and Alembic migration for `telegram_users` table.
 - **Data quality monitoring** — New `backend/data_quality/` module with routes at `backend/routes/data_quality.py`. Tracks cross-source discrepancies, data freshness, and source reliability.
 - **Settings audit & import/export** — `backend/routes/settings_audit.py`, `backend/routes/settings_import_export.py`, `backend/services/settings_audit.py`, `backend/services/settings_import_export.py` for tracking setting changes and bulk configuration management.
 - **User service & permissions** — `backend/services/user_service.py`, `backend/services/permissions.py`, `backend/routes/users.py` for user management and role-based access control.

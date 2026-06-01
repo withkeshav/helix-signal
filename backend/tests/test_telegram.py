@@ -126,7 +126,7 @@ def test_format_system_status():
         "status": "ok",
         "db": True,
         "sources_down": 0,
-        "version": "3.8.2.1"
+        "version": "3.8.3"
     }
     
     message = TelegramTemplates.format_system_status(status_data)
@@ -135,7 +135,7 @@ def test_format_system_status():
     assert "✅" in message
     assert "System Status Update" in message
     assert "OK" in message
-    assert "3.8.2.1" in message
+    assert "3.8.3" in message
 
 def test_format_forecast_update():
     """Test formatting of forecast updates."""

@@ -1,7 +1,7 @@
 """Composite scoring components for risk assessment."""
 
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 def compute_risk_score(**kwargs) -> Dict[str, Any]:
     """Compute composite risk score from component scores.
@@ -118,7 +118,7 @@ def compute_freshness(
         }
     
     # Calculate age
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     age_seconds = (now - basis_timestamp).total_seconds()
     age_minutes = age_seconds / 60
     

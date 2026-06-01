@@ -285,7 +285,7 @@ def get_cache_stats() -> dict[str, Any]:
 def _openrouter_lite(
     prompt: str, max_tokens: int, model: str | None = None, **kwargs
 ) -> dict[str, Any] | None:
-    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key") or os.getenv("OPENROUTER_API_KEY", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
@@ -309,8 +309,8 @@ def _openrouter_lite(
 _OPENROUTER_FREE_MODEL = os.getenv("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
 
 
-def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None) -> dict[str, Any] | None:
-    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None, **kwargs) -> dict[str, Any] | None:
+    api_key = kwargs.get("_resolved_api_key") or os.getenv("OLLAMA_API_KEY", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
@@ -332,7 +332,7 @@ def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model
 
 
 def _groq(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key") or os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         return None
     model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
@@ -481,7 +481,27 @@ def _env_based_priority(mode: str) -> list[str]:
     return list(_DEFAULT_PROVIDER_PRIORITY)
 
 
-def _build_provider_callable(name: str) -> Callable[..., dict[str, Any] | None] | None:
+def _resolve_api_key(env_key: str, db: Any = None) -> str:
+    """Resolve an API key from the settings system, falling back to env vars.
+
+    When *db* is provided the function checks the ``secret_*`` setting
+    corresponding to *env_key* via ``get_setting()``.  Otherwise (or as a
+    fallback) it reads ``os.environ``.
+    """
+    if db is not None:
+        try:
+            from providers.settings import get_setting
+            key_lower = env_key.lower()
+            secret_key = f"secret_{key_lower}"
+            val = get_setting(secret_key, db)
+            if val:
+                return val
+        except Exception:
+            pass
+    return os.getenv(env_key, "").strip()
+
+
+def _build_provider_callable(name: str, db: Any = None) -> Callable[..., dict[str, Any] | None] | None:
     """Return the appropriate provider function for *name*, or None if the
     required API key is not configured."""
     meta = PROVIDER_METADATA.get(name)
@@ -489,19 +509,20 @@ def _build_provider_callable(name: str) -> Callable[..., dict[str, Any] | None] 
         return None
 
     env_key = meta["env_key"]
-    if not os.getenv(env_key, "").strip():
+    api_key = _resolve_api_key(env_key, db=db)
+    if not api_key:
         return None
 
     if name == "groq":
-        return _groq
+        return partial(_groq, _resolved_api_key=api_key)
     if name == "ollama_cloud":
         model = os.getenv("OLLAMA_CLOUD_MODEL", meta["default_model"])
-        return partial(_ollama_cloud, model=model)
+        return partial(_ollama_cloud, model=model, _resolved_api_key=api_key)
     if name == "openrouter_free":
-        return partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL)
+        return partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL, _resolved_api_key=api_key)
     if name == "openrouter_paid":
         model = os.getenv("OPENROUTER_MODEL", meta["default_model"])
-        return partial(_openrouter_lite, model=model)
+        return partial(_openrouter_lite, model=model, _resolved_api_key=api_key)
 
     return None
 
@@ -523,7 +544,7 @@ def get_ai_provider_chain(db: Any = None, mode: str | None = None) -> list[Calla
     priority = _get_provider_priority_list(db)
     chain: list[Callable[..., dict[str, Any] | None]] = []
     for name in priority:
-        fn = _build_provider_callable(name)
+        fn = _build_provider_callable(name, db=db)
         if fn is not None:
             fn._provider_name = name
             chain.append(fn)

@@ -3,6 +3,7 @@ from typing import Any
 
 from backend.core.circuit_breaker import CircuitBreaker
 from backend.core.registry import register_source
+from services.source_usage import increment_source_usage
 from sources.base import AbstractSource
 from sources.coingecko import CoinGeckoSource as _LegacyCoinGeckoSource
 
@@ -17,13 +18,18 @@ class CoinGeckoSource(AbstractSource):
         self.circuit_breaker = CircuitBreaker(name="coingecko", failure_threshold=3)
 
     def fetch(self, **kwargs: Any) -> dict[str, Any]:
+        db = kwargs.pop("db", None)
+
         def _do_fetch():
             return self._inner.fetch(**kwargs)
 
         def _fallback():
             return {"status": "degraded", "source": "coingecko", "data": None}
 
-        return self.circuit_breaker.call(_do_fetch, fallback=_fallback)
+        result = self.circuit_breaker.call(_do_fetch, fallback=_fallback)
+        if db is not None:
+            increment_source_usage(db, self.name)
+        return result
 
     def transform(self, raw: dict[str, Any]) -> dict[str, Any]:
         return self._inner.transform(raw)

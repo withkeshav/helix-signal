@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 
-from sources.base import AbstractSource, SourceError
+from sources.base import AbstractSource, SourceError, http_get_with_retry, async_http_get_with_retry
+from services.source_usage import _check_source_rate_limit, _record_source_call
 
 DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
 DEXSCREENER_PAIRS_URL = "https://api.dexscreener.com/latest/dex/pairs"
@@ -67,8 +70,11 @@ class DexScreenerSource(AbstractSource):
                     f"{DEXSCREENER_SEARCH_URL}?q={addr}",
                 ]
                 for url in urls:
+                    while not _check_source_rate_limit(self.name):
+                        time.sleep(1)
                     try:
-                        resp = session.get(url, timeout=DEFAULT_TIMEOUT)
+                        _record_source_call(self.name)
+                        resp = http_get_with_retry(url, timeout=DEFAULT_TIMEOUT)
                         if resp.status_code != 200:
                             continue
                         data = resp.json()
@@ -97,8 +103,11 @@ class DexScreenerSource(AbstractSource):
                     f"{DEXSCREENER_SEARCH_URL}?q={addr}",
                 ]
                 for url in urls:
+                    while not _check_source_rate_limit(self.name):
+                        await asyncio.sleep(1)
                     try:
-                        resp = await client.get(url, timeout=DEFAULT_TIMEOUT)
+                        _record_source_call(self.name)
+                        resp = await async_http_get_with_retry(url, timeout=DEFAULT_TIMEOUT)
                         if resp.status_code != 200:
                             continue
                         data = resp.json()

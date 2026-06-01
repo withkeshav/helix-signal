@@ -444,6 +444,78 @@ def _coerce(val: str, typ: str) -> Any:
     return val
 
 
+PLAYBOOKS: dict[str, dict[str, Any]] = {
+    "max_free": {
+        "label": "Maximum Free Tier",
+        "description": "Zero API cost — uses only free providers, minimal AI features",
+        "settings": {
+            "ai_mode": "ai_lite",
+            "ai_daily_token_budget": 10000,
+            "ai_provider_priority": '["openrouter_free", "ollama_cloud"]',
+            "ai_cache_ttl_seconds": 7200,
+            "ai_cache_semantic_enabled": True,
+            "ai_cache_max_entries": 500,
+            "ai_web_search": False,
+            "feature_ai_summary": True,
+        },
+    },
+    "balanced": {
+        "label": "Balanced",
+        "description": "Good quality with reasonable cost — uses cheap providers with caching",
+        "settings": {
+            "ai_mode": "ai_full",
+            "ai_daily_token_budget": 50000,
+            "ai_provider_priority": '["groq", "ollama_cloud", "openrouter_free", "openrouter_paid"]',
+            "ai_cache_ttl_seconds": 3600,
+            "ai_cache_semantic_enabled": True,
+            "ai_cache_max_entries": 1000,
+            "ai_web_search": True,
+            "ai_web_search_max_results": 3,
+            "feature_ai_summary": True,
+        },
+    },
+    "quality": {
+        "label": "Maximum Quality",
+        "description": "Best results — uses paid providers, full AI features, web search",
+        "settings": {
+            "ai_mode": "ai_full",
+            "ai_daily_token_budget": 200000,
+            "ai_provider_priority": '["openrouter_paid", "groq", "ollama_cloud"]',
+            "ai_cache_ttl_seconds": 1800,
+            "ai_cache_semantic_enabled": False,
+            "ai_cache_max_entries": 2000,
+            "ai_web_search": True,
+            "ai_web_search_max_results": 5,
+            "feature_ai_summary": True,
+        },
+    },
+}
+
+
+def get_playbooks() -> dict[str, dict[str, Any]]:
+    """Return all playbook definitions (metadata only, no current values)."""
+    return {
+        name: {
+            "name": name,
+            "label": pb["label"],
+            "description": pb["description"],
+            "settings": dict(pb["settings"]),
+        }
+        for name, pb in PLAYBOOKS.items()
+    }
+
+
+def apply_playbook(name: str, db: Session) -> list[dict[str, Any]]:
+    pb = PLAYBOOKS.get(name)
+    if pb is None:
+        raise ValueError(f"Unknown playbook: {name}")
+    changes: list[dict[str, Any]] = []
+    for key, value in pb["settings"].items():
+        set_setting(key, value, db)
+        changes.append({"key": key, "value": value})
+    return changes
+
+
 def get_current_usage(key: str, db: Session) -> Any:
     """Get current usage for a setting that tracks usage."""
     try:

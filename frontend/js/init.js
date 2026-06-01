@@ -29,6 +29,8 @@ Alpine.data('helixApp', () => ({
   version: '', // Needed by footer
   refreshing: false, // Needed by refresh button
   staleWarning: '',
+  rateLimitWarning: '',
+  warnings: [],
   _timer: null,
   _loadingDashboard: false,
   _refreshingStale: false,
@@ -60,6 +62,7 @@ Alpine.data('helixApp', () => ({
     this._timer = setInterval(() => {
       if (document.hidden) return;
       this.$dispatch('global-refresh');
+      this._loadWarnings();
     }, 60000);
     
     // Watch for tab changes
@@ -67,6 +70,27 @@ Alpine.data('helixApp', () => ({
     
     // Load source usage
     await this._loadSourceUsage();
+    // Load warnings
+    await this._loadWarnings();
+  },
+
+  async _loadWarnings() {
+    try {
+      const r = await fetch('/api/ai/warnings', { cache: 'no-store' });
+      if (r.ok) {
+        this.warnings = await r.json();
+        this.rateLimitWarning = this._formatWarningBanner(this.warnings);
+      }
+    } catch (e) {}
+  },
+
+  _formatWarningBanner(warnings) {
+    const critical = warnings.filter(w => w.severity === 'critical');
+    const normal = warnings.filter(w => w.severity === 'warning');
+    const parts = [];
+    for (const w of critical) parts.push(`[CRITICAL] ${w.message}`);
+    for (const w of normal) parts.push(`[WARN] ${w.message}`);
+    return parts.join(' | ') || '';
   },
 
   // Essential coordination methods only

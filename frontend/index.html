@@ -781,7 +781,7 @@
               <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${aiBudget.tokens_used_today} / ${aiBudget.daily_budget} used (${aiBudget.pct_used}%)`"></span>
             </div>
             <div style="margin:6px 0;height:6px;background:var(--bg-accent);border-radius:3px;overflow:hidden">
-              <div style="height:100%;border-radius:3px;background:var(--spark);transition:width .5s" :style="`width:${Math.min(aiBudget.pct_used,100)}%`"></div>
+              <div style="height:100%;border-radius:3px;transition:width .5s" :style="`width:${Math.min(aiBudget.pct_used,100)}%;background:${aiBudget.pct_used >= 80 ? '#e44' : aiBudget.pct_used >= 50 ? '#ea0' : 'var(--spark)'}`"></div>
             </div>
           </div>
           <template x-for="s in settingsList" :key="s.key">

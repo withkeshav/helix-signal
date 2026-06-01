@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 
+from services.ai_usage import increment_ai_usage
+
 import httpx
 
 # ---------------------------------------------------------------------------
@@ -849,6 +851,18 @@ def enrich_with_ai(
                 "expires_at": datetime.fromtimestamp(now_dt.timestamp() + _CACHE_TTL_SECONDS, tz=timezone.utc).isoformat(),
             }
             _cache_set(cache_key, feature, prompt, payload)
+            # Track AI provider usage if DB is available
+            if db is not None:
+                meta = PROVIDER_METADATA.get(result.get("provider", pname), {})
+                cpm = meta.get("cost_per_million", 0)
+                cost = (tokens_returned / 1_000_000) * cpm
+                increment_ai_usage(
+                    db=db,
+                    provider=result.get("provider", pname),
+                    model=result.get("model", ""),
+                    tokens=tokens_returned,
+                    cost=cost,
+                )
             return payload
         except Exception as exc:
             _record_fallback(pname)

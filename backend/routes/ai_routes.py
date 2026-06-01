@@ -1,11 +1,14 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.ai_router import ai_mode, enrich_with_ai, get_budget_status
+from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
+from providers.settings import apply_playbook, get_playbooks
+from services.ai_usage import get_ai_usage_summary
 from services.dashboard import build_dashboard_response
+from services.warning_engine import check_warnings
 from signal_engine.core import load_enabled_assets
 
 from backend.core.admin_auth import require_admin_token
@@ -42,6 +45,31 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
 @limiter.limit("30/minute")
 def ai_budget_endpoint(request: Request) -> dict[str, Any]:
     return get_budget_status()
+
+
+@router.get("/ai/usage")
+@limiter.limit("30/minute")
+def ai_usage_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    per_provider = get_ai_usage_summary(db)
+    provider_stats = get_provider_stats()
+    budget = get_budget_status()
+    return {
+        **per_provider,
+        "budget": budget,
+        "provider_stats": provider_stats,
+    }
+
+
+@router.get("/ai/warnings")
+@limiter.limit("30/minute")
+def ai_warnings_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    return check_warnings(db=db)
 
 
 @router.get("/ai/explain")
@@ -185,3 +213,27 @@ def ai_market_overview(
         return {"available": True, "generated_by": "engine", **context}
 
     return enrich_with_ai(feature="market_overview", context=context, db=db)
+
+
+@router.get("/ai/playbooks")
+@limiter.limit("10/minute")
+def ai_list_playbooks(
+    request: Request,
+    _auth=Depends(require_admin_token),
+) -> dict[str, Any]:
+    return {"playbooks": list(get_playbooks().values())}
+
+
+@router.post("/ai/playbook/{name}")
+@limiter.limit("5/minute")
+def ai_apply_playbook(
+    request: Request,
+    name: str,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+) -> dict[str, Any]:
+    try:
+        changes = apply_playbook(name, db)
+        return {"ok": True, "playbook": name, "changes": changes}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

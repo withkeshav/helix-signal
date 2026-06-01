@@ -1,5 +1,6 @@
-"""Source usage tracking — persistent per-source API call counters."""
+"""Source usage tracking — persistent per-source API call counters and rate limiting."""
 
+import time
 from datetime import datetime, timezone, date
 from typing import Any
 
@@ -7,6 +8,35 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import SourceUsage
+
+
+# In-memory sliding-window rate limit tracker for data sources
+_SOURCE_RATE_LIMITS: dict[str, list[float]] = {}
+
+
+def _check_source_rate_limit(source_name: str) -> bool:
+    """Return True if the source is within its configured rate limit.
+    Reads rate_limit_rpm from settings metadata defaults.
+    """
+    from providers.settings import _DEFAULT_SETTINGS
+    setting_key = f"provider_{source_name}"
+    meta = _DEFAULT_SETTINGS.get(setting_key, {})
+    rpm = meta.get("rate_limit_rpm", 0)
+    if rpm <= 0:
+        return True
+    now = time.time()
+    window = 60.0
+    timestamps = _SOURCE_RATE_LIMITS.get(source_name, [])
+    timestamps = [t for t in timestamps if now - t < window]
+    _SOURCE_RATE_LIMITS[source_name] = timestamps
+    return len(timestamps) < rpm
+
+
+def _record_source_call(source_name: str) -> None:
+    """Record a call timestamp for rate limit tracking."""
+    if source_name not in _SOURCE_RATE_LIMITS:
+        _SOURCE_RATE_LIMITS[source_name] = []
+    _SOURCE_RATE_LIMITS[source_name].append(time.time())
 
 
 def increment_source_usage(db: Session, source_name: str) -> None:

@@ -256,6 +256,31 @@ class SourceUsage(Base):
     )
 
 
+class AiUsage(Base):
+    """Per-AI-provider daily usage tracking: calls, tokens, cost."""
+
+    __tablename__ = "ai_usage"
+    __table_args__ = (
+        UniqueConstraint("provider", "model", "usage_date", name="uq_ai_usage_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    provider: Mapped[str] = mapped_column(String(64), index=True)
+    model: Mapped[str] = mapped_column(String(64), default="")
+    usage_date: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    estimated_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 
 def get_db():
     db = SessionLocal()

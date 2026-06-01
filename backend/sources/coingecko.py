@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Any
 
-import httpx
-
-from sources.base import AbstractSource
+from sources.base import AbstractSource, http_get_with_retry, async_http_get_with_retry
+from services.source_usage import _check_source_rate_limit, _record_source_call
 
 COINGECKO_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
 COINGECKO_MARKET_URL = "https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
@@ -20,14 +21,15 @@ def _load_coin_ids() -> dict[str, str]:
     global _COINGECKO_IDS, _COINGECKO_IDS_LOADED
     if _COINGECKO_IDS_LOADED:
         return _COINGECKO_IDS
-    with httpx.Client(timeout=httpx.Timeout(DEFAULT_TIMEOUT)) as client:
-        resp = client.get(COINGECKO_ASSET_URL)
-        resp.raise_for_status()
-        for coin in resp.json():
-            sym = str(coin.get("symbol", "")).upper()
-            cid = str(coin.get("id", ""))
-            if sym and cid:
-                _COINGECKO_IDS[sym] = cid
+    while not _check_source_rate_limit("coingecko"):
+        time.sleep(1)
+    _record_source_call("coingecko")
+    resp = http_get_with_retry(COINGECKO_ASSET_URL, timeout=DEFAULT_TIMEOUT)
+    for coin in resp.json():
+        sym = str(coin.get("symbol", "")).upper()
+        cid = str(coin.get("id", ""))
+        if sym and cid:
+            _COINGECKO_IDS[sym] = cid
     _COINGECKO_IDS_LOADED = True
     return _COINGECKO_IDS
 
@@ -36,14 +38,15 @@ async def _load_coin_ids_async() -> dict[str, str]:
     global _COINGECKO_IDS, _COINGECKO_IDS_LOADED
     if _COINGECKO_IDS_LOADED:
         return _COINGECKO_IDS
-    async with httpx.AsyncClient(timeout=httpx.Timeout(DEFAULT_TIMEOUT)) as client:
-        resp = await client.get(COINGECKO_ASSET_URL)
-        resp.raise_for_status()
-        for coin in resp.json():
-            sym = str(coin.get("symbol", "")).upper()
-            cid = str(coin.get("id", ""))
-            if sym and cid:
-                _COINGECKO_IDS[sym] = cid
+    while not _check_source_rate_limit("coingecko"):
+        await asyncio.sleep(1)
+    _record_source_call("coingecko")
+    resp = await async_http_get_with_retry(COINGECKO_ASSET_URL, timeout=DEFAULT_TIMEOUT)
+    for coin in resp.json():
+        sym = str(coin.get("symbol", "")).upper()
+        cid = str(coin.get("id", ""))
+        if sym and cid:
+            _COINGECKO_IDS[sym] = cid
     _COINGECKO_IDS_LOADED = True
     return _COINGECKO_IDS
 
@@ -53,22 +56,24 @@ class CoinGeckoSource(AbstractSource):
 
     def fetch(self, **kwargs: Any) -> dict[str, Any]:
         symbols = kwargs.get("symbols", ["USDT", "USDC", "DAI", "PYUSD"])
-        session = self.get_http_session()
         coin_ids = _load_coin_ids()
         ids = ",".join(coin_ids.get(s, s.lower()) for s in symbols)
         url = f"{COINGECKO_PRICE_URL}?ids={ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true"
-        resp = session.get(url, timeout=DEFAULT_TIMEOUT)
-        resp.raise_for_status()
+        while not _check_source_rate_limit(self.name):
+            time.sleep(1)
+        _record_source_call(self.name)
+        resp = http_get_with_retry(url, timeout=DEFAULT_TIMEOUT)
         return resp.json()
 
     async def async_fetch(self, **kwargs: Any) -> dict[str, Any]:
         symbols = kwargs.get("symbols", ["USDT", "USDC", "DAI", "PYUSD"])
-        client = await self.get_async_http_session()
         coin_ids = await _load_coin_ids_async()
         ids = ",".join(coin_ids.get(s, s.lower()) for s in symbols)
         url = f"{COINGECKO_PRICE_URL}?ids={ids}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true"
-        resp = await client.get(url, timeout=DEFAULT_TIMEOUT)
-        resp.raise_for_status()
+        while not _check_source_rate_limit(self.name):
+            await asyncio.sleep(1)
+        _record_source_call(self.name)
+        resp = await async_http_get_with_retry(url, timeout=DEFAULT_TIMEOUT)
         return resp.json()
 
     def transform(self, raw: dict[str, Any]) -> dict[str, Any]:

@@ -143,8 +143,9 @@ Copy `.env.example` to `.env` and adjust:
 - `CORS_ORIGINS` — comma-separated allowed origins (default `*`); set in production
 - `CONTENT_SECURITY_POLICY` — Content-Security-Policy header (set on backend + nginx)
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
-- `ENABLE_ANOMALY_DETECTION` (default `false`) — enables ML anomaly detection (requires scikit-learn, numpy, pandas, statsforecast)
-- `ENABLE_NLP` (default `false`) — enables FinBERT sentiment scoring (requires transformers + PyTorch)
+- `feature_multi_user` — enable multi-user support with authentication and role-based access (default: `false`). Disabled by default — all admin operations use the shared admin token. Enable via Settings UI when user accounts are needed.
+- `feature_telegram_bot` — enable Telegram bot integration for alerts and notifications (default: `false`). Set `TELEGRAM_BOT_TOKEN` env var with your bot token.
+- ` telegram_channel` — Telegram channel name for broadcast alerts (e.g., `@helixsignal`). Set `TELEGRAM_CHANNEL` env var.
 - `ENABLE_DYNAMIC_CHAINS` (default `false`) — auto-discovers chains from DefiLlama instead of static config
 - `ETHERSCAN_API_KEY` — for governance monitoring
 - `ALERT_WEBHOOK_URL`, `ALERT_DISCORD_WEBHOOK`, `ALERT_TELEGRAM_BOT_TOKEN` — alert dispatch channels
@@ -185,9 +186,20 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/osint/sentiment` | Sentiment time-series |
 | `GET /api/osint/attestation` | Issuer report age + DefiLlama supply feed freshness (per asset) |
 | `GET /api/osint/correlate` | Sentiment-depeg correlation |
+| `GET /api/data-quality/overview` | Data quality overview (admin token required) |
+| `GET /api/data-quality/report` | Complete data quality report (admin token required) |
+| `GET /api/data-quality/sources` | Source quality metrics (admin token required) |
+| `GET /api/data-quality/assets` | Asset quality metrics (admin token required) |
 | `GET /api/governance` | Governance monitoring |
 | `GET /api/sources/status` | Source health dashboard with circuit breaker states |
 | `GET /api/ai/explain` | LLM-generated risk explanation (env-gated) |
+| `GET /api/settings/audit` | Settings audit log (admin token required) |
+| `GET /api/settings/audit/history/{key}` | Change history for a specific setting (admin token required) |
+| `GET /api/settings/export/json` | Export all settings as downloadable JSON (admin token required) |
+| `POST /api/settings/import/json` | Import settings from uploaded JSON file (admin token required) |
+| `POST /api/users` | Create user (admin token + multi-user enabled required) |
+| `GET /api/users` | List all users (admin token + multi-user enabled required) |
+| `POST /api/auth/login` | Authenticate user and return token (multi-user enabled required) |
 | `GET /metrics` | Internal Prometheus metrics (blocked at nginx in production) |
 
 ## Project Structure
@@ -219,6 +231,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - Plugin development: [`docs/plugins.md`](docs/plugins.md)
 - API reference: [`docs/api.md`](docs/api.md)
 - Grant strategy: [`docs/grant-strategy.md`](docs/grant-strategy.md)
+- Code quality improvements: [`docs/phase6_code_quality.md`](docs/phase6_code_quality.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)

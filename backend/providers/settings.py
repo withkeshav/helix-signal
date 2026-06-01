@@ -212,6 +212,35 @@ _DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "requires_restart": False,
         "affects_rate_limits": False,
     },
+    "feature_multi_user": {
+        "label": "Multi-User Support",
+        "type": "bool",
+        "default": False,
+        "group": "Features",
+        "description": "Enable multi-user authentication with role-based access control. When disabled, only admin token is used.",
+        "requires_restart": False,
+        "affects_rate_limits": False,
+    },
+    "feature_telegram_bot": {
+        "label": "Telegram Bot",
+        "type": "bool",
+        "default": False,
+        "group": "Features",
+        "description": "Enable Telegram bot integration for alerts and notifications",
+        "requires_restart": True,
+        "affects_rate_limits": False,
+        "key_env": "TELEGRAM_BOT_TOKEN"
+    },
+    "telegram_channel": {
+        "label": "Telegram Channel",
+        "type": "str",
+        "default": "",
+        "group": "Features",
+        "description": "Telegram channel name for broadcast alerts (e.g., @helixsignal)",
+        "requires_restart": False,
+        "affects_rate_limits": False,
+        "key_env": "TELEGRAM_CHANNEL"
+    },
     "enable_anomaly_detection": {
         "label": "Anomaly Detection",
         "type": "bool",
@@ -362,7 +391,7 @@ def get_setting(key: str, db: Session | None = None) -> Any:
     return meta.get("default")
 
 
-def set_setting(key: str, value: Any, db: Session) -> None:
+def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address: str = None, user_agent: str = None) -> None:
     meta = _DEFAULT_SETTINGS.get(key)
     if not meta:
         raise ValueError(f"Unknown setting: {key}")
@@ -380,12 +409,34 @@ def set_setting(key: str, value: Any, db: Session) -> None:
         if max_val is not None and int_val > max_val:
             raise ValueError(f"Setting '{key}' must be <= {max_val}")
         value = int_val
-    row = db.query(Setting).filter(Setting.key == key).first()
-    if row:
-        row.value = str(value)
+    
+    # Get the old value for audit logging
+    old_row = db.query(Setting).filter(Setting.key == key).first()
+    old_value = old_row.value if old_row else None
+    
+    # Update or create the setting
+    if old_row:
+        old_row.value = str(value)
     else:
         db.add(Setting(key=key, value=str(value)))
+    
     db.commit()
+    
+    # Log the change to the audit log
+    try:
+        from services.settings_audit import log_settings_change
+        log_settings_change(
+            db=db,
+            setting_key=key,
+            old_value=old_value,
+            new_value=str(value),
+            user=user,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    except Exception:
+        # Don't fail the settings update if audit logging fails
+        pass
 
 
 def get_all_settings(db: Session) -> list[dict[str, Any]]:

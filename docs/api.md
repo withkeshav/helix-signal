@@ -75,6 +75,33 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | POST | `/api/admin/backfill?asset=USDT&days=7` | Synthetic historical backfill | `ALLOW_BACKFILL=true` |
 | GET | `/api/admin/diagnostics` | Full system snapshot (version, health, sources, usage, settings, DB stats) | Requires admin token |
 
+## Settings Management
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/settings/audit` | Settings change audit log (supports `?setting_key=`, `?user_id=`, `?limit=`, `?offset=`) | Admin token |
+| GET | `/api/settings/audit/history/{setting_key}` | Full change history for a single setting | Admin token |
+| GET | `/api/settings/audit/user/{user_id}` | All changes made by a specific user | Admin token |
+| GET | `/api/settings/audit/recent` | Most recent settings changes | Admin token |
+| GET | `/api/settings/export/json` | Export all settings as downloadable JSON file | Admin token |
+| POST | `/api/settings/import/json` | Import settings from uploaded JSON file | Admin token |
+
+## Data Quality Dashboard (Phase 5)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/data-quality/overview` | Get overall data quality metrics and scores | Admin token |
+| GET | `/api/data-quality/report` | Get complete data quality report with detailed metrics | Admin token |
+| GET | `/api/data-quality/sources` | Get detailed source quality metrics by provider | Admin token |
+| GET | `/api/data-quality/assets` | Get asset-specific data quality metrics | Admin token (supports `?asset=USDT` parameter) |
+
+Data Quality Dashboard provides comprehensive monitoring of:
+- Source health and reliability metrics
+- Data completeness and consistency scores  
+- Freshness and timeliness metrics
+- API usage and performance tracking
+- Cross-source validation and discrepancy detection
+
 ## AI (optional)
 
 | Method | Endpoint | Description | Rate Limit | Gate |
@@ -124,7 +151,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "3.8.1.3"
+  "version": "3.8.2.1"
 }
 ```
 

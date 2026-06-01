@@ -44,6 +44,7 @@
         <button class="nav-link" role="tab" :class="tab==='forecast'&&'active'" :aria-selected="tab==='forecast'" @click="tab='forecast';loadTab()">Forecast</button>
         <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()">Intel</button>
         <button class="nav-link" role="tab" :class="tab==='health'&&'active'" :aria-selected="tab==='health'" @click="tab='health';loadTab()">Health</button>
+        <button class="nav-link" role="tab" :class="tab==='quality'&&'active'" :aria-selected="tab==='quality'" @click="tab='quality';loadTab()">Quality</button>
         <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()">&#9881;</button>
       </div>
       <div class="nav-controls">
@@ -695,120 +696,412 @@
     </div>
 
     <!-- Tab: Settings -->
-    <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" x-init="loadSettings(); loadAiBudget();">
+    <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" x-init="filterSettings(); loadAiBudget();">
       <div class="insight-grid">
+        <!-- Settings Header with Search and Filters -->
         <div class="insight-card" style="grid-column:1/-1">
-          <h2>Admin Token</h2>
-          <p class="kpi-sub" style="margin-bottom:8px">Required for refresh and settings changes when HELIX_ADMIN_TOKEN is set on the server.</p>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <input type="password" x-model="adminToken" placeholder="X-Admin-Token" style="flex:1;min-width:220px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
-            <button class="btn btn-muted" @click="saveAdminToken()">Save</button>
-          </div>
-        </div>
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>API Keys</h2>
-          <p class="kpi-sub" style="margin-bottom:8px">Values are stored in the database and never exposed via API. Backed by .env as fallback.</p>
-          <template x-for="s in settingsList" :key="s.key">
-            <div x-show="s.key.startsWith('secret_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-size:13px" x-text="s.label"></span>
-                <span x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
-                <span x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not configured</span>
-              </div>
-              <div style="display:flex;gap:6px;align-items:center">
-                <input type="password" x-model="secretValues[s.key]" :placeholder="s.value ? 'Change key' : 'Enter key'" style="width:200px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
-                <button class="btn btn-muted" style="padding:3px 10px;font-size:11px" @click="saveSecret(s.key)" x-show="secretValues[s.key] && secretValues[s.key].length > 0">Save</button>
-              </div>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <h1 style="margin:0 0 8px 0">System Settings</h1>
+              <p class="kpi-sub" style="margin:0">Configure Helix Signal behavior, data sources, and AI features</p>
             </div>
-          </template>
-          <div x-show="!settingsList.filter(s => s.key.startsWith('secret_')).length" class="kpi-sub" style="padding:8px 0">No API keys configured</div>
-        </div>
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>Data Providers</h2>
-          <template x-for="s in settingsList" :key="s.key">
-            <div x-show="s.key.startsWith('provider_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <div>
-                <span style="font-weight:600;font-size:13px" x-text="s.label"></span>
-                <span x-show="s.always_active" class="pill source-ok" style="margin-left:6px">always active</span>
-                <span x-show="s.key_env && !s.always_active" style="font-size:11px;color:var(--muted);margin-left:6px" x-text="`(${s.key_env})`"></span>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+              <div style="position:relative">
+                <input type="text" x-model="settingsSearch" placeholder="Search settings..." @input.debounce.300ms="filterSettings" 
+                       style="padding:8px 12px 8px 32px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;min-width:240px">
+                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)">🔍</span>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <label class="toggle" x-show="!s.always_active">
-                  <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
-                  <span class="toggle-slider"></span>
-                </label>
-                <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
-              </div>
-            </div>
-          </template>
-          <div x-show="!settingsList.filter(s => s.key.startsWith('provider_')).length" class="kpi-sub" style="padding:8px 0">Loading providers...</div>
-        </div>
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>Features</h2>
-          <template x-for="s in settingsList" :key="s.key">
-            <div x-show="s.key.startsWith('feature_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span style="font-size:13px" x-text="s.label"></span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <label class="toggle">
-                  <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
-                  <span class="toggle-slider"></span>
-                </label>
-                <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
-              </div>
-            </div>
-          </template>
-          <div x-show="!settingsList.filter(s => s.key.startsWith('feature_')).length" class="kpi-sub" style="padding:8px 0">Loading features...</div>
-        </div>
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>Refresh Intervals</h2>
-          <template x-for="s in settingsList" :key="s.key">
-            <div x-show="s.key.startsWith('refresh_')" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span style="font-size:13px" x-text="s.label"></span>
-              <div style="display:flex;align-items:center;gap:6px">
-                <input type="number" :value="s.value" :min="s.min" :max="s.max" style="width:80px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
-                       @change="toggleSetting(s.key, parseInt($event.target.value))">
-                <span style="font-size:11px;color:var(--muted)" x-text="s.key.includes('_seconds') ? 'sec' : 'min'"></span>
-                <button class="btn btn-muted" style="padding:3px 8px;font-size:11px" @click="toggleSetting(s.key, s.default)">Reset</button>
-              </div>
-            </div>
-          </template>
-        </div>
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>AI &amp; Anomaly Detection</h2>
-          <div x-show="aiBudgetLoaded">
-            <div style="padding:6px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line)">
-              <span style="font-size:12px;color:var(--muted)">Daily Token Budget</span>
-              <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${aiBudget.tokens_used_today} / ${aiBudget.daily_budget} used (${aiBudget.pct_used}%)`"></span>
-            </div>
-            <div style="margin:6px 0;height:6px;background:var(--bg-accent);border-radius:3px;overflow:hidden">
-              <div style="height:100%;border-radius:3px;transition:width .5s" :style="`width:${Math.min(aiBudget.pct_used,100)}%;background:${aiBudget.pct_used >= 80 ? '#e44' : aiBudget.pct_used >= 50 ? '#ea0' : 'var(--spark)'}`"></div>
+              <select x-model="settingsGroupFilter" @change="filterSettings" 
+                      style="padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;min-width:160px">
+                <option value="">All Categories</option>
+                <template x-for="group in settingsGroups" :key="group">
+                  <option :value="group" x-text="group"></option>
+                </template>
+              </select>
+              <button class="btn btn-muted" @click="clearFilters" style="padding:8px 16px">Clear Filters</button>
             </div>
           </div>
-          <template x-for="s in settingsList" :key="s.key">
-            <div x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-              <span style="font-size:13px" x-text="s.label"></span>
-              <div x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
-                <label class="toggle">
-                  <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
-                  <span class="toggle-slider"></span>
-                </label>
-                <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
-              </div>
-              <div x-show="s.type === 'int'" style="display:flex;align-items:center;gap:6px">
-                <input type="number" :value="s.value" :min="s.min" :max="s.max" style="width:90px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
-                       @change="toggleSetting(s.key, parseInt($event.target.value))">
-                <button class="btn btn-muted" style="padding:3px 8px;font-size:11px" @click="toggleSetting(s.key, s.default)">Reset</button>
-              </div>
-              <div x-show="s.type === 'str'" style="display:flex;align-items:center;gap:6px">
-                <select :value="s.value" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
-                        @change="toggleSetting(s.key, $event.target.value)">
-                  <option value="ai_off">Off</option>
-                  <option value="ai_lite">Lite</option>
-                  <option value="ai_full">Full</option>
-                </select>
+          
+          <div x-show="settingsSearch || settingsGroupFilter" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
+            <span x-show="settingsSearch">Searching for: <strong x-text="settingsSearch"></strong></span>
+            <span x-show="settingsSearch && settingsGroupFilter"> • </span>
+            <span x-show="settingsGroupFilter">Category: <strong x-text="settingsGroupFilter"></strong></span>
+            <span> • Showing <strong x-text="filteredSettings.length"></strong> of <strong x-text="settingsList.length"></strong> settings</span>
+          </div>
+        </div>
+        
+        <!-- Admin Token Section -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <div style="display:flex;align-items:flex-start;gap:16px">
+            <div style="flex:1">
+              <h2 style="margin:0 0 8px 0">🔒 Admin Authentication</h2>
+              <p class="kpi-sub" style="margin:0 0 16px 0">Required for refresh operations and settings changes when HELIX_ADMIN_TOKEN is configured on the server.</p>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <input type="password" x-model="adminToken" placeholder="Enter admin token" 
+                       style="flex:1;min-width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:monospace">
+                <button class="btn btn-primary" @click="saveAdminToken()" style="padding:10px 20px">Save Token</button>
               </div>
             </div>
-          </template>
+            <div style="background:var(--warn-bg);padding:16px;border-radius:8px;min-width:200px">
+              <h3 style="margin:0 0 8px 0;color:var(--neutral)">Security Note</h3>
+              <p style="margin:0;font-size:12px;color:var(--neutral)">Tokens are stored in browser session storage and never sent to the server unless required for API requests.</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Settings Sections -->
+        <template x-if="filteredSettings.filter(s => s.key.startsWith('secret_')).length">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+              <span>🔑</span> API Keys & Secrets
+            </h2>
+            <p class="kpi-sub" style="margin:0 0 16px 0">Configure API keys for external services. Values are encrypted at rest and never exposed via API.</p>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px">
+              <template x-for="s in filteredSettings" :key="s.key">
+                <div x-show="s.key.startsWith('secret_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
+                    <span x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
+                    <span x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not set</span>
+                  </div>
+                  
+                  <div style="margin-bottom:12px">
+                    <p style="margin:0 0 8px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                    <div x-show="s.key_env" style="font-size:11px;background:var(--bg-accent);padding:4px 8px;border-radius:4px;display:inline-block">
+                      Environment variable: <code x-text="s.key_env"></code>
+                    </div>
+                  </div>
+                  
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <input type="password" x-model="secretValues[s.key]" :placeholder="s.value ? 'Enter new key' : 'Enter key'" 
+                           style="flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
+                    <button class="btn btn-muted" style="padding:8px 16px;font-size:12px" 
+                            @click="saveSecret(s.key)" 
+                            x-show="secretValues[s.key] && secretValues[s.key].length > 0">Save</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        
+        <template x-if="filteredSettings.filter(s => s.key.startsWith('provider_')).length">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+              <span>🌐</span> Data Providers
+            </h2>
+            <p class="kpi-sub" style="margin:0 0 16px 0">Enable or disable data sources for asset analytics and monitoring.</p>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
+              <template x-for="s in filteredSettings" :key="s.key">
+                <div x-show="s.key.startsWith('provider_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+                    <div>
+                      <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600" x-text="s.label"></h3>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <span x-show="s.always_active" class="pill source-ok" style="font-size:10px">always active</span>
+                        <span x-show="s.affects_rate_limits" class="pill" style="font-size:10px;background:var(--warn-bg);color:var(--neutral)">rate limited</span>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <label class="toggle" x-show="!s.always_active">
+                        <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                        <span class="toggle-slider"></span>
+                      </label>
+                      <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+                    </div>
+                  </div>
+                  
+                  <p style="margin:0 0 12px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  
+                  <div x-show="s.rate_limit_rpm" style="font-size:11px;background:var(--bg-accent);padding:6px 10px;border-radius:4px;display:inline-block">
+                    Rate limit: <strong x-text="s.rate_limit_rpm"></strong> requests/minute
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        
+        <template x-if="filteredSettings.filter(s => s.key.startsWith('feature_')).length">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+              <span>⚙️</span> Feature Toggles
+            </h2>
+            <p class="kpi-sub" style="margin:0 0 16px 0">Enable or disable specific application features.</p>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
+              <template x-for="s in filteredSettings" :key="s.key">
+                <div x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <label class="toggle">
+                        <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                        <span class="toggle-slider"></span>
+                      </label>
+                      <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+                    </div>
+                  </div>
+                  
+                  <p style="margin:0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        
+        <template x-if="filteredSettings.filter(s => s.key.startsWith('refresh_')).length">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+              <span>⏱️</span> Refresh Intervals
+            </h2>
+            <p class="kpi-sub" style="margin:0 0 16px 0">Configure how frequently different data types are refreshed.</p>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
+              <template x-for="s in filteredSettings" :key="s.key">
+                <div x-show="s.key.startsWith('refresh_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
+                  </div>
+                  
+                  <p style="margin:0 0 16px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <input type="number" :value="s.value" :min="s.min" :max="s.max" 
+                           style="flex:1;max-width:100px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px"
+                           @change="toggleSetting(s.key, parseInt($event.target.value))">
+                    <span style="font-size:13px;color:var(--text)" x-text="s.key.includes('_seconds') ? 'seconds' : 'minutes'"></span>
+                    <button class="btn btn-muted" style="padding:8px 16px;font-size:12px" @click="toggleSetting(s.key, s.default)">Reset</button>
+                  </div>
+                  
+                  <div style="margin-top:12px;font-size:11px;color:var(--muted)">
+                    Range: <span x-text="s.min"></span> – <span x-text="s.max"></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        
+        <template x-if="filteredSettings.filter(s => s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection').length">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+              <span>🤖</span> AI & Intelligence
+            </h2>
+            <p class="kpi-sub" style="margin:0 0 16px 0">Configure AI-powered features and anomaly detection.</p>
+            
+            <!-- AI Budget Visualization -->
+            <div x-show="aiBudgetLoaded" style="margin-bottom:24px;padding:16px;background:var(--bg-accent);border-radius:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <h3 style="margin:0;font-size:14px;font-weight:600">Daily AI Token Budget</h3>
+                <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${aiBudget.tokens_used_today} / ${aiBudget.daily_budget} used (${aiBudget.pct_used}%)`"></span>
+              </div>
+              <div style="height:8px;background:var(--line);border-radius:4px;overflow:hidden">
+                <div style="height:100%;border-radius:4px;transition:width .5s" 
+                     :style="`width:${Math.min(aiBudget.pct_used,100)}%;background:${aiBudget.pct_used >= 80 ? '#e44' : aiBudget.pct_used >= 50 ? '#ea0' : 'var(--spark)'}`"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted)">
+                <span>0</span>
+                <span x-text="`${aiBudget.daily_budget/2}`"></span>
+                <span x-text="aiBudget.daily_budget"></span>
+              </div>
+            </div>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
+              <template x-for="s in filteredSettings" :key="s.key">
+                <div x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                    <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
+                    <div x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
+                      <label class="toggle">
+                        <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                        <span class="toggle-slider"></span>
+                      </label>
+                      <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+                    </div>
+                  </div>
+                  
+                  <p style="margin:0 0 16px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  
+                  <div x-show="s.type === 'int'" style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                    <input type="number" :value="s.value" :min="s.min" :max="s.max" 
+                           style="flex:1;max-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px"
+                           @change="toggleSetting(s.key, parseInt($event.target.value))">
+                    <button class="btn btn-muted" style="padding:8px 16px;font-size:12px" @click="toggleSetting(s.key, s.default)">Reset</button>
+                  </div>
+                  
+                  <div x-show="s.type === 'str'" style="margin-bottom:16px">
+                    <select :value="s.value" 
+                            style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px"
+                            @change="toggleSetting(s.key, $event.target.value)">
+                      <option value="ai_off">Off - Disable AI features</option>
+                      <option value="ai_lite">Lite - Basic AI features</option>
+                      <option value="ai_full">Full - All AI features enabled</option>
+                    </select>
+                  </div>
+                  
+                  <div x-show="s.min !== undefined || s.max !== undefined" style="font-size:11px;color:var(--muted)">
+                    <span x-show="s.min !== undefined">Min: <span x-text="s.min"></span></span>
+                    <span x-show="s.min !== undefined && s.max !== undefined"> • </span>
+                    <span x-show="s.max !== undefined">Max: <span x-text="s.max"></span></span>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+        
+        <!-- Settings Management Section -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <span>📥</span> Settings Management
+          </h2>
+          <p class="kpi-sub" style="margin:0 0 16px 0">Import or export your configuration settings.</p>
+          
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <div style="padding:20px;border:1px solid var(--line);border-radius:8px">
+              <h3 style="margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
+                <span>📤</span> Export Settings
+              </h3>
+              <p style="margin:0 0 16px 0;font-size:13px;color:var(--muted)">Download a backup of your current configuration.</p>
+              <button class="btn btn-primary" style="padding:10px 20px" @click="exportSettings()">Export Configuration</button>
+            </div>
+            
+            <div style="padding:20px;border:1px solid var(--line);border-radius:8px">
+              <h3 style="margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
+                <span>📥</span> Import Settings
+              </h3>
+              <p style="margin:0 0 16px 0;font-size:13px;color:var(--muted)">Upload a configuration file to restore settings.</p>
+              <div style="display:flex;gap:12px;align-items:center">
+                <input type="file" accept=".json" @change="importSettings" style="flex:1">
+                <button class="btn btn-muted" style="padding:10px 20px" @click="triggerImport()">Import</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Data Quality -->
+    <div class="tab-content" :class="tab === 'quality' && 'active'" x-data="qualityDashboard" x-init="loadQualityData()" style="display:none" x-show="tab === 'quality'">
+      <div class="insight-grid">
+        <!-- Quality Dashboard Header -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <h1 style="margin:0 0 8px 0">Data Quality Dashboard</h1>
+              <p class="kpi-sub" style="margin:0">Monitor the health and quality of your data sources and system metrics</p>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+              <button class="btn btn-primary" @click="refreshQualityData()" style="padding:10px 20px">Refresh Data</button>
+            </div>
+          </div>
+          
+          <div x-show="lastUpdated" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
+            Last updated: <strong x-text="lastUpdated"></strong>
+          </div>
+        </div>
+        
+        <!-- Overall Quality Score -->
+        <div class="insight-card">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <span>🏆</span> Overall Data Quality
+          </h2>
+          
+          <div style="text-align:center;padding:20px 0">
+            <div style="font-size:48px;font-weight:700;margin:0 0 8px 0" 
+                 :style="`color:${overallQualityScore >= 80 ? 'var(--spark)' : overallQualityScore >= 60 ? 'var(--neutral)' : 'var(--down)'}`"
+                 x-text="overallQualityScore !== null ? overallQualityScore + '%' : 'Loading...'">
+            </div>
+            <div style="font-size:14px;color:var(--muted)">Data Quality Score</div>
+          </div>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin-top:20px">
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="sourceHealthScore !== null ? sourceHealthScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Source Health</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="assetCompletenessScore !== null ? assetCompletenessScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Completeness</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="consistencyScore !== null ? consistencyScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Consistency</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="freshnessScore !== null ? freshnessScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Freshness</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Source Health Status -->
+        <div class="insight-card">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <span>📡</span> Data Sources Health
+          </h2>
+          
+          <div x-show="sourcesByStatus" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+            <template x-for="(count, status) in sourcesByStatus" :key="status">
+              <div style="text-align:center;padding:16px;background:var(--bg-accent);border-radius:8px">
+                <div style="font-size:24px;font-weight:700" x-text="count"></div>
+                <div style="font-size:14px;text-transform:capitalize" 
+                     :style="status === 'ok' ? 'color:var(--spark)' : status === 'degraded' ? 'color:var(--neutral)' : 'color:var(--down)'"
+                     x-text="status"></div>
+              </div>
+            </template>
+          </div>
+          
+          <div x-show="Object.keys(sourcesByStatus).length === 0" class="kpi-sub" style="padding:20px 0;text-align:center">
+            Loading source health data...
+          </div>
+        </div>
+        
+        <!-- Data Quality Details -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <span>📊</span> Data Quality Details
+          </h2>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+            <div>
+              <h3 style="margin:0 0 12px 0;font-size:16px">API Usage</h3>
+              <div x-show="totalApiCalls !== null">
+                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalApiCalls?.toLocaleString()"></div>
+                <div style="font-size:13px;color:var(--muted)">Total API calls today</div>
+              </div>
+              <div x-show="totalApiCalls === null" class="kpi-sub">
+                Loading...
+              </div>
+            </div>
+            
+            <div>
+              <h3 style="margin:0 0 12px 0;font-size:16px">AI Usage</h3>
+              <div x-show="totalAiTokens !== null">
+                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalAiTokens?.toLocaleString()"></div>
+                <div style="font-size:13px;color:var(--muted)">AI tokens consumed today</div>
+              </div>
+              <div x-show="totalAiTokens === null" class="kpi-sub">
+                Loading...
+              </div>
+            </div>
+            
+            <div>
+              <h3 style="margin:0 0 12px 0;font-size:16px">System Health</h3>
+              <div x-show="healthySources !== null">
+                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" 
+                     :style="healthySources > (totalSources * 0.8) ? 'color:var(--spark)' : 'color:var(--down)'" 
+                     x-text="healthySources + '/' + totalSources"></div>
+                <div style="font-size:13px;color:var(--muted)">Healthy data sources</div>
+              </div>
+              <div x-show="healthySources === null" class="kpi-sub">
+                Loading...
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

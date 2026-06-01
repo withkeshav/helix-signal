@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.8.2.1 (2026-06-01)
+
+### Added
+
+- **Telegram bot integration** — New Telegram bot for alert notifications and user management. Includes `backend/telegram/` module, `backend/routes/telegram.py`, `backend/database.py` schema changes, and Alembic migration for `telegram_users` table.
+- **Data quality monitoring** — New `backend/data_quality/` module with routes at `backend/routes/data_quality.py`. Tracks cross-source discrepancies, data freshness, and source reliability.
+- **Settings audit & import/export** — `backend/routes/settings_audit.py`, `backend/routes/settings_import_export.py`, `backend/services/settings_audit.py`, `backend/services/settings_import_export.py` for tracking setting changes and bulk configuration management.
+- **User service & permissions** — `backend/services/user_service.py`, `backend/services/permissions.py`, `backend/routes/users.py` for user management and role-based access control.
+- **Settings metadata & dynamic AI router chains** — Rich metadata (groups, labels, descriptions) on all settings; dynamic AI provider chain configuration (Phase 2 Tasks 1+2).
+- **Multi-layer AI cache** — Enhanced exact-match cache with per-feature TTL (`_FEATURE_CACHE_TTL`), `OrderedDict`-based LRU eviction at `_MAX_CACHE_ENTRIES` (default 1000). Semantic cache layer with character trigram Jaccard similarity (`_trigram_similarity`), off by default (`_SEMANTIC_CACHE_ENABLED`), configurable threshold, separate LRU. Cache observability via `get_cache_stats()` with hits, misses, hit rate, tokens_saved, evictions, and semantic stats.
+- **Rate limiting & AI cost control** — Per-endpoint rate limiting, AI daily token budget tracking, token usage deduplication, and cost dashboards (Phase 2 Tasks 2.4-2.5).
+- **Warning engine** — `backend/services/warning_engine.py` for configurable alerting rules with 9 rule types, persistence tracking, and multi-channel dispatch (Phase 2 Task 2.6).
+- **Admin audit features** — Audit trail for admin actions, source usage tracking, rate limit monitoring, and CI pipeline hardening (Phase 2 Tasks 2.7-2.8).
+- **Phase 6 — Signal Engine componentization** — `signal_engine/scoring.py` refactored into focused component modules at `signal_engine/components/`: `peg_analysis.py` (peg stability), `concentration.py` (HHI concentration), `supply_momentum.py` (supply velocity), `data_confidence.py` (data quality), `composite_scoring.py` (overall risk). Each module has single responsibility, independent testability, and module-level documentation.
+- **Phase 6 — AI service modularization** — AI router components reorganized into `services/components/ai/`: `cache.py` (cache management), `budget.py` (token budget tracking). Clearer interfaces and improved maintainability.
+- **Documentation** — New `docs/phase6_code_quality.md` documenting architecture improvements; component README files for modularized modules; updated `docs/api.md` with new endpoints.
+- **Alembic migrations** — Added migrations for `telegram_users`, `source_usage`, `asset_freshness`, and `cross_source_discrepancy` tables.
+
+### Changed
+
+- **Version bumped** — 3.8.x → 3.8.2.1
+- **Updated README** — Added links to new documentation, Phase 6 code quality docs.
+- **Updated .gitignore** — Excluded temporary test files, logs, and development artifacts.
+
+### Fixed
+
+- **Ruff import cleanup** — Removed unused imports in `migrate_sqlite_to_postgres.py` and `train_depeg_model.py`.
+
 ## 3.8.1.2 (2026-05-28)
 
 ### Fixed

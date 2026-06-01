@@ -1,12 +1,25 @@
+"""Main FastAPI application for Helix Signal.
+
+This is the entry point for the Helix Signal backend. It sets up the FastAPI
+application with all required routes, middleware, and background tasks.
+
+Key components:
+- FastAPI application setup
+- Background job scheduling (data refresh, retention, OSINT)
+- Route registration
+- Middleware configuration
+- Application lifecycle management
+
+The application follows a modular architecture where routes are registered
+from separate modules in the routes/ directory.
+"""
+
 import asyncio
 import os
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

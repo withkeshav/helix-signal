@@ -1,4 +1,15 @@
-"""Dashboard response assembly (read-only; no behavior change from v2.4)."""
+"""Dashboard response assembly service.
+
+This module provides functions for building dashboard responses that aggregate
+data from multiple sources and compute risk metrics. It serves as the primary
+interface between the data layer and the frontend dashboard.
+
+Key responsibilities:
+- Building comprehensive dashboard responses
+- Computing risk scores and metrics
+- Aggregating data from various sources
+- Ensuring data consistency and completeness
+"""
 
 from __future__ import annotations
 

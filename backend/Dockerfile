@@ -16,14 +16,7 @@ WORKDIR /app/backend
 
 RUN mkdir -p /data && chown helix:helix /data /tmp
 
-COPY <<"EOF" /app/docker-entrypoint.sh
-#!/bin/sh
-chown helix:helix /data 2>/dev/null || true
-exec gosu helix "$@"
-EOF
-RUN chmod +x /app/docker-entrypoint.sh
-
 EXPOSE 8000
 
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+USER helix
 CMD ["uvicorn", "main:app", "--app-dir", "/app/backend", "--host", "0.0.0.0", "--port", "8000"]

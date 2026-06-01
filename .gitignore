@@ -45,6 +45,8 @@ docker-compose.override.yml
 # --- Test Artifacts ---
 tests/cassettes/
 backend/tests/cassettes/
+/test_*.py
+backend.log
 
 # --- IDEs and OS Metadata ---
 .vscode/
@@ -111,9 +113,6 @@ helix_signal_strategic_report.md
 *.plan.md
 .cursor/
 .code-review-graph/
-
-# Internal planning docs — not for public consumption
-docs/grant-strategy.md
 
 # pytest coverage
 .coverage

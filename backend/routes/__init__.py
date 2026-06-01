@@ -14,7 +14,12 @@ def register_routes(app):
     from routes.chain_detail import router as chain_detail_router
     from routes.sources import router as sources_router
     from routes.settings import router as settings_router
+    from routes.settings_audit import router as settings_audit_router
+    from routes.settings_import_export import router as settings_import_export_router
     from routes.ai_routes import router as ai_router
+    from routes.users import router as users_router
+    from routes.telegram import router as telegram_router
+    from routes.data_quality import router as data_quality_router
 
     app.include_router(dashboard_router, prefix="/api")
     app.include_router(ai_router, prefix="/api")
@@ -29,3 +34,8 @@ def register_routes(app):
     app.include_router(chain_detail_router, prefix="/api")
     app.include_router(sources_router, prefix="/api")
     app.include_router(settings_router, prefix="/api")
+    app.include_router(settings_audit_router, prefix="/api")
+    app.include_router(settings_import_export_router, prefix="/api")
+    app.include_router(users_router, prefix="/api")
+    app.include_router(telegram_router, prefix="/api")
+    app.include_router(data_quality_router, prefix="/api")

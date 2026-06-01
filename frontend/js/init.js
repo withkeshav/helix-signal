@@ -7,6 +7,7 @@ import { useGovernance } from 'composables/useGovernance.js';
 import { useOSINT } from 'composables/useOSINT.js';
 import { useForecast } from 'composables/useForecast.js';
 import { useMarket } from 'composables/useMarket.js';
+import { useQuality } from 'composables/useQuality.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -17,6 +18,7 @@ Alpine.data('governance', useGovernance);
 Alpine.data('osint', useOSINT);
 Alpine.data('forecast', useForecast);
 Alpine.data('market', useMarket);
+Alpine.data('qualityDashboard', useQuality);
 
 // Minimal root application component
 Alpine.data('helixApp', () => ({

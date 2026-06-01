@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
+# Add review queue imports
+from helix_telegram.review import review_queue, ReviewItem
+
 from database import get_db
 from backend.core.admin_auth import require_admin_token
 from helix_telegram.models import TelegramUser, get_all_users, get_user_by_id, update_user
@@ -49,6 +52,24 @@ class TelegramUserUpdate(BaseModel):
 
 class SendTestDigestRequest(BaseModel):
     user_id: int
+
+class ReviewItemResponse(BaseModel):
+    id: str
+    alert_data: dict
+    created_at: float
+    score: float
+    reviewed: bool
+    approved: Optional[bool]
+    reviewed_at: Optional[float]
+
+class ReviewStatsResponse(BaseModel):
+    total: int
+    pending: int
+    approved: int
+    rejected: int
+
+class ReviewActionRequest(BaseModel):
+    action: str  # "approve" or "reject"
 
 @router.get("/telegram/stats", response_model=TelegramStatsResponse)
 def get_telegram_stats_endpoint(
@@ -154,8 +175,8 @@ async def send_test_digest(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Get mock market data
-    market_data = DigestService._get_mock_market_data()
+    # Fetch real market data
+    market_data = DigestService._fetch_real_market_data(db)
     
     # Send test digest
     success = await DigestService.send_daily_digest(user, market_data)
@@ -183,3 +204,59 @@ def _user_to_response(user: TelegramUser) -> TelegramUserResponse:
         created_at=user.created_at.isoformat(),
         updated_at=user.updated_at.isoformat(),
     )
+
+# ===================================================================
+# Review Queue Endpoints
+# ===================================================================
+
+@router.get("/telegram/review/pending", response_model=List[ReviewItemResponse])
+def get_pending_reviews(
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+):
+    """Get all pending review items (admin only)."""
+    pending_items = review_queue.get_pending()
+    return [
+        ReviewItemResponse(
+            id=item.id,
+            alert_data=item.alert_data,
+            created_at=item.created_at,
+            score=item.score,
+            reviewed=item.reviewed,
+            approved=item.approved,
+            reviewed_at=item.reviewed_at
+        )
+        for item in pending_items
+    ]
+
+@router.post("/telegram/review/{review_id}/action")
+def review_action(
+    review_id: str,
+    request: ReviewActionRequest,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+):
+    """Approve or reject a review item (admin only)."""
+    if request.action == "approve":
+        success = review_queue.approve(review_id)
+        if success:
+            return {"ok": True, "message": "Review approved"}
+        else:
+            raise HTTPException(status_code=404, detail="Review not found or already processed")
+    elif request.action == "reject":
+        success = review_queue.reject(review_id)
+        if success:
+            return {"ok": True, "message": "Review rejected"}
+        else:
+            raise HTTPException(status_code=404, detail="Review not found or already processed")
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'reject'")
+
+@router.get("/telegram/review/stats", response_model=ReviewStatsResponse)
+def get_review_stats(
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+):
+    """Get review queue statistics (admin only)."""
+    stats = review_queue.get_stats()
+    return ReviewStatsResponse(**stats)

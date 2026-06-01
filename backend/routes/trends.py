@@ -117,7 +117,7 @@ def trends(request: Request, asset: str, window: str = Query("7d"), db: Session 
         for r in rows
     ]
 
-    from routes.dashboard import _build_trend_summary as _build_ts
+    from services.dashboard import build_trend_summary as _build_ts
 
     summary = _build_ts(points, window=w, now=now)
     return TrendResponseOut(

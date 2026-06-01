@@ -1,5 +1,6 @@
 export function useGovernance() {
   return {
+    // --- State from original ---
     settingsList: [],
     filteredSettings: [],
     settingsGroups: [],
@@ -8,6 +9,43 @@ export function useGovernance() {
     aiBudget: { daily_budget: 0, tokens_used_today: 0, tokens_remaining: 0, pct_used: 0 },
     aiBudgetLoaded: false,
     secretValues: {},
+
+    // --- A1: Playbook state ---
+    playbookLoading: null,
+
+    // --- A2: Audit log state ---
+    auditLog: [],
+    auditFilter: '',
+    auditSortField: 'created_at',
+    auditSortAsc: false,
+    auditHistory: [],
+    auditHistoryModal: false,
+    auditHistoryKey: '',
+    auditHistoryLoading: false,
+    auditPollTimer: null,
+
+    // --- A3: Per-feature budget state ---
+    featureBudgets: [
+      { name: 'risk_explain', label: 'Risk Explain', share: 30, tokens: 0, sliderVal: 30 },
+      { name: 'market_narrative', label: 'Market Narrative', share: 25, tokens: 0, sliderVal: 25 },
+      { name: 'insight_summary', label: 'Insight Summary', share: 25, tokens: 0, sliderVal: 25 },
+      { name: 'anomaly_detection', label: 'Anomaly Detection', share: 20, tokens: 0, sliderVal: 20 },
+    ],
+    totalBudgetSlider: 50000,
+
+    // --- A4: Provider priority DnD state ---
+    providers: [],
+    dragIndex: null,
+    dragOverIndex: null,
+
+    // --- A5: Safe defaults state ---
+    showConfirmDefaults: false,
+
+    // --- Toast system ---
+    toastMessage: '',
+    toastType: '',
+    toastVisible: false,
+    toastTimer: null,
 
     get adminToken() {
       return this.$store.ui.adminToken;
@@ -21,30 +59,326 @@ export function useGovernance() {
       return this.$store.ui.adminHeaders();
     },
 
+    // --- Init: keyboard shortcuts + polling ---
+    init() {
+      this._bindKeyboard();
+      this.startAuditPolling();
+      this.initProviders();
+    },
+
+    destroy() {
+      this.stopAuditPolling();
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+    },
+
+    // --- Toast ---
+    showToast(msg, type) {
+      this.toastMessage = msg;
+      this.toastType = type || 'success';
+      this.toastVisible = true;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 4000);
+    },
+
+    hideToast() {
+      this.toastVisible = false;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+    },
+
+    // --- A7: Keyboard shortcuts ---
+    _bindKeyboard() {
+      document.addEventListener('keydown', (e) => {
+        if (this.$root && this.$root.style.display === 'none') return;
+        const isMod = e.ctrlKey || e.metaKey;
+        if (isMod && e.key === 's') {
+          e.preventDefault();
+          this.$dispatch('settings-save');
+        }
+        if (e.key === 'Escape') {
+          this.auditHistoryModal = false;
+          this.showConfirmDefaults = false;
+        }
+        if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          const active = document.activeElement;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+          e.preventDefault();
+          const btn = this.$root.querySelector('.playbook-btn');
+          if (btn) btn.focus();
+        }
+      });
+    },
+
+    // ===================================================================
+    // A1: Playbook presets
+    // ===================================================================
+    async applyPlaybook(name) {
+      this.playbookLoading = name;
+      try {
+        const r = await fetch(`/api/ai/playbook/${name}`, {
+          method: 'POST',
+          headers: this._adminHeaders(),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const count = data.changes?.length || 0;
+          this.showToast(`Playbook "${name}" applied — ${count} settings updated`, 'success');
+          await this.loadSettings();
+          await this.loadAiBudget();
+          this.loadFeatureBudgets();
+        } else {
+          const err = await r.text();
+          this.showToast(`Failed to apply playbook: ${err}`, 'error');
+        }
+      } catch (e) {
+        this.showToast(`Error: ${e.message}`, 'error');
+      } finally {
+        this.playbookLoading = null;
+      }
+    },
+
+    // ===================================================================
+    // A2: Audit log
+    // ===================================================================
+    startAuditPolling() {
+      this.stopAuditPolling();
+      this.auditPollTimer = setInterval(() => { this.loadAuditLog(); }, 30000);
+    },
+
+    stopAuditPolling() {
+      if (this.auditPollTimer) { clearInterval(this.auditPollTimer); this.auditPollTimer = null; }
+    },
+
+    async loadAuditLog() {
+      try {
+        const params = new URLSearchParams();
+        params.set('limit', '100');
+        if (this.auditFilter) params.set('setting_key', this.auditFilter);
+        const r = await fetch(`/api/settings/audit?${params.toString()}`, {
+          headers: this._adminHeaders(),
+        });
+        if (r.ok) {
+          this.auditLog = await r.json();
+          this.sortAuditLog();
+        }
+      } catch (e) {}
+    },
+
+    toggleAuditSort(field) {
+      if (this.auditSortField === field) {
+        this.auditSortAsc = !this.auditSortAsc;
+      } else {
+        this.auditSortField = field;
+        this.auditSortAsc = false;
+      }
+      this.sortAuditLog();
+    },
+
+    sortAuditLog() {
+      const f = this.auditSortField;
+      const asc = this.auditSortAsc;
+      this.auditLog.sort((a, b) => {
+        const va = a[f] ?? '';
+        const vb = b[f] ?? '';
+        const cmp = typeof va === 'string' ? va.localeCompare(vb) : (va > vb ? 1 : -1);
+        return asc ? cmp : -cmp;
+      });
+    },
+
+    async openAuditHistory(key) {
+      this.auditHistoryKey = key;
+      this.auditHistoryLoading = true;
+      this.auditHistoryModal = true;
+      try {
+        const r = await fetch(`/api/settings/audit/history/${encodeURIComponent(key)}`, {
+          headers: this._adminHeaders(),
+        });
+        if (r.ok) this.auditHistory = await r.json();
+        else this.auditHistory = [];
+      } catch (e) {
+        this.auditHistory = [];
+      } finally {
+        this.auditHistoryLoading = false;
+      }
+    },
+
+    closeAuditHistory() {
+      this.auditHistoryModal = false;
+      this.auditHistory = [];
+      this.auditHistoryKey = '';
+    },
+
+    // ===================================================================
+    // A3: Per-feature budget sliders
+    // ===================================================================
+    loadFeatureBudgets() {
+      const total = this.aiBudget.daily_budget || 50000;
+      this.totalBudgetSlider = total;
+      for (const fb of this.featureBudgets) {
+        fb.tokens = Math.round(total * fb.share / 100);
+        fb.sliderVal = fb.share;
+      }
+    },
+
+    updateFeatureBudget(fb, val) {
+      const v = parseInt(val, 10) || 0;
+      fb.sliderVal = Math.max(0, Math.min(100, v));
+    },
+
+    recalculateFeatureBudgets() {
+      let totalPct = 0;
+      for (const fb of this.featureBudgets) totalPct += fb.sliderVal;
+      if (totalPct === 0) {
+        for (const fb of this.featureBudgets) fb.sliderVal = 25;
+        totalPct = 100;
+      }
+      const scale = totalPct > 0 ? 100 / totalPct : 1;
+      for (const fb of this.featureBudgets) {
+        fb.share = Math.round(fb.sliderVal * scale);
+        fb.tokens = Math.round(this.totalBudgetSlider * fb.share / 100);
+      }
+    },
+
+    async saveTotalBudget() {
+      await this.toggleSetting('ai_daily_token_budget', this.totalBudgetSlider);
+      this.recalculateFeatureBudgets();
+      this.showToast('Budget updated', 'success');
+    },
+
+    // ===================================================================
+    // A4: Provider priority drag-and-drop
+    // ===================================================================
+    initProviders() {
+      const priorityStr = this.settingsList.find(s => s.key === 'ai_provider_priority')?.value;
+      if (!priorityStr) return;
+      try {
+        const names = JSON.parse(typeof priorityStr === 'string' ? priorityStr : '[]');
+        const PROVIDER_META = {
+          groq: { label: 'Groq', cost: '$0.05/M', rpm: 30, model: 'llama-3.1-8b-instant' },
+          ollama_cloud: { label: 'Ollama Cloud', cost: '$0.15/M', rpm: 60, model: 'ministral-3:8b-cloud' },
+          openrouter_free: { label: 'OpenRouter Free', cost: 'Free', rpm: 20, model: 'openrouter/free' },
+          openrouter_paid: { label: 'OpenRouter Paid', cost: '$0.60/M', rpm: 100, model: 'openai/gpt-4o-mini' },
+        };
+        this.providers = names.map((n, i) => ({
+          name: n,
+          ...(PROVIDER_META[n] || { label: n, cost: '?', rpm: '?', model: '?' }),
+          index: i,
+        }));
+      } catch (e) {
+        this.providers = [];
+      }
+    },
+
+    handleDragStart(index) {
+      this.dragIndex = index;
+    },
+
+    handleDragOver(index) {
+      if (this.dragIndex === null || this.dragIndex === index) return;
+      this.dragOverIndex = index;
+      const items = [...this.providers];
+      const [moved] = items.splice(this.dragIndex, 1);
+      items.splice(index, 0, moved);
+      this.providers = items.map((p, i) => ({ ...p, index: i }));
+      this.dragIndex = index;
+    },
+
+    handleDragEnd() {
+      this.dragIndex = null;
+      this.dragOverIndex = null;
+      this.saveProviderPriority();
+    },
+
+    async saveProviderPriority() {
+      const names = this.providers.map(p => p.name);
+      try {
+        const r = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
+          body: JSON.stringify({ key: 'ai_provider_priority', value: JSON.stringify(names) }),
+        });
+        if (r.ok) {
+          this.showToast('Provider priority updated', 'success');
+        } else {
+          this.showToast('Failed to save priority', 'error');
+        }
+      } catch (e) {
+        this.showToast(`Error: ${e.message}`, 'error');
+      }
+    },
+
+    // ===================================================================
+    // A5: Apply Safe Defaults
+    // ===================================================================
+    openConfirmDefaults() {
+      this.showConfirmDefaults = true;
+    },
+
+    closeConfirmDefaults() {
+      this.showConfirmDefaults = false;
+    },
+
+    async applySafeDefaults() {
+      this.showConfirmDefaults = false;
+      let updated = 0;
+      const errors = [];
+      for (const s of this.settingsList) {
+        if (s.always_active) continue;
+        if (s.key === 'ai_daily_token_budget') continue;
+        if (s.default === undefined) continue;
+        try {
+          const r = await fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
+            body: JSON.stringify({ key: s.key, value: s.default }),
+          });
+          if (r.ok) updated++;
+          else errors.push(s.key);
+        } catch (e) {
+          errors.push(s.key);
+        }
+      }
+      if (errors.length) {
+        this.showToast(`Defaults applied: ${updated} ok, ${errors.length} failed`, 'error');
+      } else {
+        this.showToast(`All ${updated} settings reset to defaults`, 'success');
+      }
+      await this.loadSettings();
+      await this.loadAiBudget();
+      this.loadFeatureBudgets();
+      this.initProviders();
+    },
+
+    // ===================================================================
+    // A6: Setting helpers (display indicators)
+    // ===================================================================
+    isGrayedOut(s) {
+      if (!s.depends_on) return false;
+      const dep = this.settingsList.find(d => d.key === s.depends_on);
+      return dep ? !dep.value : false;
+    },
+
+    // ===================================================================
+    // Existing methods (unchanged from original, extended)
+    // ===================================================================
     async loadSettings() {
       try {
-        // Build query parameters
         const params = new URLSearchParams();
         if (this.settingsSearch) params.append('search', this.settingsSearch);
         if (this.settingsGroupFilter) params.append('group', this.settingsGroupFilter);
-        
-        const r = await fetch(`/api/settings?${params.toString()}`, { 
-          cache: 'no-store', 
-          headers: this._adminHeaders() 
-        });
-        if (r.ok) { 
-          this.settingsList = await r.json();
-          this.filteredSettings = this.settingsList;
-          
-          // Extract unique groups
-          this.settingsGroups = [...new Set(this.settingsList.map(s => s.group).filter(Boolean))].sort();
-          
+        const r = await fetch(`/api/settings?${params.toString()}`, { cache: 'no-store', headers: this._adminHeaders() });
+        if (r.ok) {
+          const data = await r.json();
+          this.settingsList = data;
+          this.filteredSettings = data;
+          this.settingsGroups = [...new Set(data.map(s => s.group).filter(Boolean))].sort();
+          this.loadFeatureBudgets();
+          this.initProviders();
           return true;
         }
         this.settingsList = [];
         this.filteredSettings = [];
         return false;
-      } catch (e) { 
+      } catch (e) {
         this.settingsList = [];
         this.filteredSettings = [];
         return false;
@@ -52,7 +386,6 @@ export function useGovernance() {
     },
 
     async filterSettings() {
-      // Debounce by using a small delay
       await new Promise(resolve => setTimeout(resolve, 100));
       await this.loadSettings();
     },
@@ -65,9 +398,7 @@ export function useGovernance() {
 
     async exportSettings() {
       try {
-        const r = await fetch('/api/settings/export/json', {
-          headers: this._adminHeaders()
-        });
+        const r = await fetch('/api/settings/export/json', { headers: this._adminHeaders() });
         if (r.ok) {
           const data = await r.json();
           const blob = new Blob([data.content], { type: 'application/json' });
@@ -80,49 +411,48 @@ export function useGovernance() {
           window.URL.revokeObjectURL(url);
           document.body.removeChild(a);
         } else {
-          alert('Export failed: ' + (await r.text()));
+          this.showToast('Export failed: ' + (await r.text()), 'error');
         }
       } catch (e) {
-        alert('Export failed: ' + e.message);
+        this.showToast('Export failed: ' + e.message, 'error');
       }
     },
 
     async importSettings(event) {
       const file = event.target.files[0];
       if (!file) return;
-      
       try {
         const formData = new FormData();
         formData.append('file', file);
-        
         const r = await fetch('/api/settings/import/json', {
           method: 'POST',
           headers: this._adminHeaders(),
-          body: formData
+          body: formData,
         });
-        
         if (r.ok) {
           const result = await r.json();
-          alert(`Import successful: ${result.imported} settings imported, ${result.skipped} skipped.`);
-          // Refresh settings
+          this.showToast(`Import: ${result.imported} imported, ${result.skipped} skipped`, 'success');
           await this.loadSettings();
         } else {
-          alert('Import failed: ' + (await r.text()));
+          this.showToast('Import failed: ' + (await r.text()), 'error');
         }
       } catch (e) {
-        alert('Import failed: ' + e.message);
+        this.showToast('Import failed: ' + e.message, 'error');
       }
     },
 
     triggerImport() {
-      // Trigger the file input click
       document.querySelector('input[type="file"]').click();
     },
 
     async loadAiBudget() {
       try {
         const r = await fetch('/api/ai/budget', { cache: 'no-store' });
-        if (r.ok) { this.aiBudget = await r.json(); this.aiBudgetLoaded = true; }
+        if (r.ok) {
+          this.aiBudget = await r.json();
+          this.aiBudgetLoaded = true;
+          this.loadFeatureBudgets();
+        }
       } catch (e) {}
     },
 
@@ -136,8 +466,14 @@ export function useGovernance() {
         if (r.ok) {
           const item = this.settingsList.find(s => s.key === key);
           if (item) item.value = item.type === 'secret' ? true : value;
+          this.showToast(`Setting "${key}" updated`, 'success');
+        } else {
+          const err = await r.text();
+          this.showToast(`Update failed: ${err}`, 'error');
         }
-      } catch (e) {}
+      } catch (e) {
+        this.showToast(`Error: ${e.message}`, 'error');
+      }
     },
 
     async saveSecret(key) {

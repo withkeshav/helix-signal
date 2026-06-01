@@ -696,7 +696,8 @@
     </div>
 
     <!-- Tab: Settings -->
-    <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" x-init="filterSettings(); loadAiBudget();">
+    <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
+         x-init="filterSettings(); loadAiBudget();">
       <div class="insight-grid">
         <!-- Settings Header with Search and Filters -->
         <div class="insight-card" style="grid-column:1/-1">
@@ -719,6 +720,36 @@
                 </template>
               </select>
               <button class="btn btn-muted" @click="clearFilters" style="padding:8px 16px">Clear Filters</button>
+            </div>
+          </div>
+          
+          <!-- A1: Playbook Presets Banner -->
+          <div style="padding:16px;background:var(--bg-accent);border-radius:8px;margin-bottom:16px">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+              <div>
+                <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600">AI Playbook Presets</h3>
+                <p style="margin:0;font-size:12px;color:var(--muted)">One-click presets to reconfigure all AI budget and provider settings</p>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="playbook-btn btn" :class="playbookLoading==='max_free'?'btn-muted':''"
+                        :style="playbookLoading==='max_free'?'opacity:0.6':'background:#065f46;color:#fff;border-color:#065f46'"
+                        @click="applyPlaybook('max_free')" :disabled="playbookLoading !== null">
+                  <span x-show="playbookLoading==='max_free'" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
+                  Max Free
+                </button>
+                <button class="playbook-btn btn" :class="playbookLoading==='balanced'?'btn-muted':''"
+                        :style="playbookLoading==='balanced'?'opacity:0.6':'background:#1e40af;color:#fff;border-color:#1e40af'"
+                        @click="applyPlaybook('balanced')" :disabled="playbookLoading !== null">
+                  <span x-show="playbookLoading==='balanced'" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
+                  Balanced
+                </button>
+                <button class="playbook-btn btn" :class="playbookLoading==='quality'?'btn-muted':''"
+                        :style="playbookLoading==='quality'?'opacity:0.6':'background:#7c3aed;color:#fff;border-color:#7c3aed'"
+                        @click="applyPlaybook('quality')" :disabled="playbookLoading !== null">
+                  <span x-show="playbookLoading==='quality'" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
+                  Quality
+                </button>
+              </div>
             </div>
           </div>
           
@@ -762,8 +793,12 @@
                 <div x-show="s.key.startsWith('secret_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
-                    <span x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
-                    <span x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not set</span>
+                    <div style="display:flex;gap:4px;align-items:center">
+                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                      <span x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
+                      <span x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not set</span>
+                    </div>
                   </div>
                   
                   <div style="margin-bottom:12px">
@@ -799,21 +834,23 @@
                   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
                     <div>
                       <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600" x-text="s.label"></h3>
-                      <div style="display:flex;align-items:center;gap:8px">
-                        <span x-show="s.always_active" class="pill source-ok" style="font-size:10px">always active</span>
-                        <span x-show="s.affects_rate_limits" class="pill" style="font-size:10px;background:var(--warn-bg);color:var(--neutral)">rate limited</span>
-                      </div>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:8px">
-                      <label class="toggle" x-show="!s.always_active">
-                        <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
-                        <span class="toggle-slider"></span>
-                      </label>
-                      <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
-                    </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span x-show="s.always_active" class="pill source-ok" style="font-size:10px">always active</span>
+                    <span x-show="s.affects_rate_limits" class="pill" style="font-size:10px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate limited</span>
+                    <span x-show="s.requires_restart" class="pill" style="font-size:10px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb; restart</span>
                   </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <label class="toggle" x-show="!s.always_active">
+                    <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+                </div>
+              </div>
                   
                   <p style="margin:0 0 12px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  <p x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                   
                   <div x-show="s.rate_limit_rpm" style="font-size:11px;background:var(--bg-accent);padding:6px 10px;border-radius:4px;display:inline-block">
                     Rate limit: <strong x-text="s.rate_limit_rpm"></strong> requests/minute
@@ -833,10 +870,13 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                <div x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                     :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
                     <div style="display:flex;align-items:center;gap:8px">
+                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
                       <label class="toggle">
                         <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
                         <span class="toggle-slider"></span>
@@ -846,6 +886,7 @@
                   </div>
                   
                   <p style="margin:0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  <p x-show="s.depends_on" style="margin:8px 0 0;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                 </div>
               </template>
             </div>
@@ -861,12 +902,18 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('refresh_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                <div x-show="s.key.startsWith('refresh_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                     :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
+                    <div style="display:flex;gap:4px">
+                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                    </div>
                   </div>
                   
                   <p style="margin:0 0 16px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  <p x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                   
                   <div style="display:flex;align-items:center;gap:12px">
                     <input type="number" :value="s.value" :min="s.min" :max="s.max" 
@@ -893,7 +940,7 @@
             <p class="kpi-sub" style="margin:0 0 16px 0">Configure AI-powered features and anomaly detection.</p>
             
             <!-- AI Budget Visualization -->
-            <div x-show="aiBudgetLoaded" style="margin-bottom:24px;padding:16px;background:var(--bg-accent);border-radius:8px">
+            <div x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <h3 style="margin:0;font-size:14px;font-weight:600">Daily AI Token Budget</h3>
                 <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${aiBudget.tokens_used_today} / ${aiBudget.daily_budget} used (${aiBudget.pct_used}%)`"></span>
@@ -909,21 +956,84 @@
               </div>
             </div>
             
+            <!-- A3: Per-Feature Budget Sliders -->
+            <div x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <h3 style="margin:0;font-size:14px;font-weight:600">Per-Feature Budget Allocation</h3>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span style="font-size:12px;color:var(--muted)">Total:</span>
+                  <input type="number" x-model="totalBudgetSlider" :min="1000" :max="500000" step="1000"
+                         style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
+                  <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" @click="saveTotalBudget()">Save</button>
+                </div>
+              </div>
+              <template x-for="fb in featureBudgets" :key="fb.name">
+                <div style="margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div>
+                      <span style="font-weight:600;font-size:13px" x-text="fb.label"></span>
+                      <span style="font-size:11px;color:var(--muted);margin-left:6px" x-text="`(${fb.share}%)`"></span>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${fb.tokens.toLocaleString()} tokens/day`"></span>
+                  </div>
+                  <input type="range" :value="fb.sliderVal" min="0" max="100" step="1"
+                         style="width:100%;accent-color:var(--spark);cursor:pointer"
+                         @input="updateFeatureBudget(fb, $event.target.value); recalculateFeatureBudgets()">
+                  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+                    <span>0%</span>
+                    <span x-text="`${fb.sliderVal}%`"></span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- A4: Provider Priority Drag-and-Drop -->
+            <div style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
+              <h3 style="margin:0 0 12px 0;font-size:14px;font-weight:600">AI Provider Priority</h3>
+              <p style="margin:0 0 12px 0;font-size:12px;color:var(--muted)">Drag to reorder provider fallback priority</p>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <template x-for="(p, i) in providers" :key="p.name">
+                  <div draggable="true"
+                       @dragstart="handleDragStart(i)"
+                       @dragover.prevent="handleDragOver(i)"
+                       @dragend="handleDragEnd"
+                       :style="`display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:${dragOverIndex === i ? 'var(--warn-bg)' : 'var(--panel)'};cursor:grab;transition:background .15s;user-select:none`">
+                    <span style="font-size:16px;color:var(--muted);cursor:grab">&#9776;</span>
+                    <div style="flex:1">
+                      <span style="font-weight:600;font-size:13px" x-text="p.label"></span>
+                      <span style="font-size:11px;color:var(--muted);margin-left:6px" x-text="`#${i+1}`"></span>
+                    </div>
+                    <span style="font-size:11px;color:var(--muted)" x-text="p.cost"></span>
+                    <span style="font-size:11px;color:var(--muted)" x-text="`${p.rpm} rpm`"></span>
+                    <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--ok-bg);color:var(--up)" x-text="'active'"></span>
+                  </div>
+                </template>
+              </div>
+              <div x-show="!providers.length" class="kpi-sub" style="padding:12px;text-align:center">Load settings to see provider priority</div>
+            </div>
+            
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                <div x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                     :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
-                    <div x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
-                      <label class="toggle">
-                        <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
-                        <span class="toggle-slider"></span>
-                      </label>
-                      <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                      <div x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
+                        <label class="toggle">
+                          <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
+                          <span class="toggle-slider"></span>
+                        </label>
+                        <span :class="s.value ? 'text-green' : 'text-muted'" style="font-size:12px;font-weight:600" x-text="s.value ? 'ON' : 'OFF'"></span>
+                      </div>
                     </div>
                   </div>
                   
                   <p style="margin:0 0 16px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
+                  <p x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                   
                   <div x-show="s.type === 'int'" style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
                     <input type="number" :value="s.value" :min="s.min" :max="s.max" 
@@ -953,6 +1063,120 @@
           </div>
         </template>
         
+        <!-- A2: Audit Log Section -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h2 style="margin:0;display:flex;align-items:center;gap:8px">
+              <span>📋</span> Settings Audit Log
+            </h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" x-model="auditFilter" placeholder="Filter by setting key..."
+                     @input.debounce.500ms="loadAuditLog()"
+                     style="padding:6px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;min-width:180px">
+              <button class="btn btn-muted" style="padding:6px 12px;font-size:12px" @click="loadAuditLog()">Refresh</button>
+            </div>
+          </div>
+          <p class="kpi-sub" style="margin:0 0 12px 0">Auto-refreshes every 30 seconds. Shows the last 100 changes.</p>
+          
+          <div style="overflow-x:auto;font-size:12px">
+            <table style="width:100%;border-collapse:collapse" x-show="auditLog.length">
+              <thead>
+                <tr style="border-bottom:2px solid var(--line);font-size:11px;text-transform:uppercase;color:var(--muted)">
+                  <th style="padding:8px 6px;text-align:left;cursor:pointer" @click="toggleAuditSort('created_at')">
+                    Timestamp <span x-show="auditSortField==='created_at'" x-text="auditSortAsc?'&#9650;':'&#9660;'"></span>
+                  </th>
+                  <th style="padding:8px 6px;text-align:left;cursor:pointer" @click="toggleAuditSort('user_username')">
+                    User <span x-show="auditSortField==='user_username'" x-text="auditSortAsc?'&#9650;':'&#9660;'"></span>
+                  </th>
+                  <th style="padding:8px 6px;text-align:left;cursor:pointer" @click="toggleAuditSort('setting_key')">
+                    Setting <span x-show="auditSortField==='setting_key'" x-text="auditSortAsc?'&#9650;':'&#9660;'"></span>
+                  </th>
+                  <th style="padding:8px 6px;text-align:left">Old Value</th>
+                  <th style="padding:8px 6px;text-align:left">New Value</th>
+                  <th style="padding:8px 6px;text-align:center">History</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="entry in auditLog" :key="entry.id">
+                  <tr style="border-bottom:1px solid var(--line)">
+                    <td style="padding:6px;white-space:nowrap;font-size:11px;color:var(--muted)" x-text="new Date(entry.created_at).toLocaleString()"></td>
+                    <td style="padding:6px" x-text="entry.user_username || 'system'"></td>
+                    <td style="padding:6px;font-family:monospace;font-size:11px" x-text="entry.setting_key"></td>
+                    <td style="padding:6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)" x-text="entry.old_value || '-'"></td>
+                    <td style="padding:6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:600" x-text="entry.new_value || '-'"></td>
+                    <td style="padding:6px;text-align:center">
+                      <button class="btn btn-muted" style="padding:4px 8px;font-size:10px" @click="openAuditHistory(entry.setting_key)">View</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <div x-show="!auditLog.length" class="kpi-sub" style="padding:16px;text-align:center">No audit entries. Make changes to settings to see them here.</div>
+          </div>
+        </div>
+        
+        <!-- A2: Audit History Modal -->
+        <div x-show="auditHistoryModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeAuditHistory()">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <h3 style="margin:0;font-size:15px">Change History: <code x-text="auditHistoryKey" style="font-size:13px"></code></h3>
+              <button class="btn btn-muted" style="padding:4px 10px;font-size:11px" @click="closeAuditHistory()">Close</button>
+            </div>
+            <div x-show="auditHistoryLoading" class="kpi-sub" style="padding:16px;text-align:center">
+              <span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span> Loading history...
+            </div>
+            <div x-show="!auditHistoryLoading && !auditHistory.length" class="kpi-sub" style="padding:16px;text-align:center">No change history for this setting.</div>
+            <table x-show="!auditHistoryLoading && auditHistory.length" style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="border-bottom:2px solid var(--line);font-size:11px;text-transform:uppercase;color:var(--muted)">
+                  <th style="padding:8px 6px;text-align:left">Timestamp</th>
+                  <th style="padding:8px 6px;text-align:left">User</th>
+                  <th style="padding:8px 6px;text-align:left">Old</th>
+                  <th style="padding:8px 6px;text-align:left">New</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="h in auditHistory" :key="h.id">
+                  <tr style="border-bottom:1px solid var(--line)">
+                    <td style="padding:6px;font-size:11px;color:var(--muted);white-space:nowrap" x-text="new Date(h.created_at).toLocaleString()"></td>
+                    <td style="padding:6px" x-text="h.user_username || 'system'"></td>
+                    <td style="padding:6px;font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis" x-text="h.old_value || '-'"></td>
+                    <td style="padding:6px;font-size:11px;font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis" x-text="h.new_value || '-'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- A5: Apply Safe Defaults -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div>
+              <h2 style="margin:0 0 4px 0;display:flex;align-items:center;gap:8px">
+                <span>🔁</span> Reset to Safe Defaults
+              </h2>
+              <p class="kpi-sub" style="margin:0">Reset all settings (except API keys and budget) to their factory defaults.</p>
+            </div>
+            <button class="btn" style="padding:10px 20px;background:var(--down);color:#fff;border-color:var(--down)" @click="openConfirmDefaults()">Apply Safe Defaults</button>
+          </div>
+        </div>
+        
+        <!-- A5: Safe Defaults Confirmation Modal -->
+        <div x-show="showConfirmDefaults" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeConfirmDefaults()">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
+            <h3 style="margin:0 0 12px 0;font-size:16px;color:var(--down)">Reset All Settings to Defaults?</h3>
+            <p style="margin:0 0 16px 0;font-size:13px;line-height:1.5;color:var(--muted)">
+              This will reset every setting (except API keys/credentials and AI daily budget) to its factory default value. 
+              This action cannot be undone.
+            </p>
+            <div style="display:flex;gap:12px;justify-content:flex-end">
+              <button class="btn btn-muted" style="padding:10px 20px" @click="closeConfirmDefaults()">Cancel</button>
+              <button class="btn" style="padding:10px 20px;background:var(--down);color:#fff;border-color:var(--down)" @click="applySafeDefaults()">Confirm Reset</button>
+            </div>
+          </div>
+        </div>
+        
         <!-- Settings Management Section -->
         <div class="insight-card" style="grid-column:1/-1">
           <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
@@ -980,6 +1204,13 @@
               </div>
             </div>
           </div>
+        </div>
+        
+        <!-- A7: Toast Notification -->
+        <div x-show="toastVisible" style="position:fixed;bottom:24px;right:24px;z-index:500;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;transition:opacity .3s"
+             :style="`background:${toastType === 'error' ? 'var(--alert-bg)' : 'var(--ok-bg)'};color:${toastType === 'error' ? 'var(--down)' : 'var(--up)'};border:1px solid ${toastType === 'error' ? 'var(--down)' : 'var(--up)'}`"
+             @click="hideToast()">
+          <span x-text="toastMessage"></span>
         </div>
       </div>
     </div>

@@ -1,14 +1,18 @@
 """Daily/weekly digest service for Telegram bot."""
 
 import logging
-from datetime import datetime
-from typing import Dict, List
+from datetime import datetime, timezone
+from typing import Any, Dict, List
+
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from database import SessionLocal
+from database import AssetTrendSnapshot, ForecastRun, SessionLocal, SignalEvent
 from helix_telegram.models import TelegramUser, get_subscribed_users
 from helix_telegram.templates import TelegramTemplates
 from helix_telegram.bot import send_alert_to_user
+from services.dashboard import build_dashboard_response
+from signal_engine.core import load_enabled_assets
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -163,8 +167,8 @@ class DigestService:
                 
                 logger.info(f"Found {len(users_with_digest)} users with digest enabled")
                 
-                # For now, use mock market data
-                market_data = DigestService._get_mock_market_data()
+                # Fetch real market data
+                market_data = DigestService._fetch_real_market_data(db)
                 
                 # Send digest to each user
                 for user in users_with_digest:
@@ -203,36 +207,52 @@ class DigestService:
             return current_utc_time == "09:00"  # Default
     
     @staticmethod
-    def _get_mock_market_data() -> Dict:
-        """Get mock market data for testing."""
-        return {
-            "assets": {
-                "USDT": {
-                    "signal_score": 85,
-                    "price": 1.0002,
-                    "supply": 125000000,
-                    "depeg": 1.0002
-                },
-                "USDC": {
-                    "signal_score": 92,
-                    "price": 1.0001,
-                    "supply": 32000000,
-                    "depeg": 1.0001
-                },
-                "DAI": {
-                    "signal_score": 78,
-                    "price": 0.9998,
-                    "supply": 5500000,
-                    "depeg": 0.9998
-                }
-            },
-            "top_events": [
-                {"title": "High Concentration on Ethereum", "severity": "high"},
-                {"title": "Minor Depeg Detected on BSC", "severity": "medium"},
-                {"title": "New Stablecoin Launched", "severity": "info"}
-            ],
-            "market_overview": "The stablecoin market showed stability this week with minor fluctuations. USDT maintains dominance while algorithmic stablecoins show increased activity."
-        }
+    def _fetch_real_market_data(db: Session) -> Dict[str, Any]:
+        """Fetch real market data from the database and signal engine."""
+        data: Dict[str, Any] = {"assets": {}, "top_events": [], "market_overview": ""}
+
+        try:
+            enabled_assets = [a for a in load_enabled_assets() if a.get("symbol")]
+            for asset_cfg in enabled_assets:
+                sym = str(asset_cfg["symbol"]).upper()
+                try:
+                    dash = build_dashboard_response(db, sym)
+                    chain = dash.chains[0] if dash.chains else None
+                    data["assets"][sym] = {
+                        "signal_score": dash.asset_signal.score,
+                        "price": chain.price if chain else None,
+                        "supply": dash.total_supply_current,
+                        "depeg": dash.depeg_index.current_price,
+                    }
+                except Exception:
+                    logger.warning(f"Could not build dashboard for asset {sym}", exc_info=True)
+
+            recent_events = (
+                db.query(SignalEvent)
+                .order_by(desc(SignalEvent.timestamp))
+                .limit(10)
+                .all()
+            )
+            data["top_events"] = [
+                {"title": e.title, "severity": e.severity, "summary": e.summary}
+                for e in recent_events
+            ]
+
+            asset_list_str = ", ".join(
+                f"{s['symbol']}: score {data['assets'].get(s['symbol'], {}).get('signal_score', '?')}"
+                for s in enabled_assets
+                if s.get("symbol") in data["assets"]
+            )
+            event_count = len(recent_events)
+            data["market_overview"] = (
+                f"Monitoring {len(enabled_assets)} assets. "
+                f"{asset_list_str}. "
+                f"{event_count} recent signal events recorded."
+            )
+        except Exception as e:
+            logger.error(f"Error fetching real market data: {e}")
+
+        return data
 
 # Scheduler functions for APScheduler
 async def send_daily_digests():

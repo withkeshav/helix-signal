@@ -7,8 +7,13 @@ from typing import Optional
 from telegram import Update as TelegramUpdate, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
+# Aliases for convenience
+Update = TelegramUpdate
+
 from database import SessionLocal
 from helix_telegram.models import TelegramUser, get_user_by_telegram_id, create_user, update_user_subscription
+from helix_telegram.commands import signal_command, brief_command, price_command, refer_command
+from helix_telegram.middleware import telegram_middleware
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -232,10 +237,15 @@ async def digest_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_T
                         db.commit()
                         message = "🔕 Daily digest disabled."
                     elif action == "test":
-                        # Send test digest
+                        # Send test digest with real data
+                        from database import SessionLocal
                         from helix_telegram.digest import DigestService
-                        market_data = DigestService._get_mock_market_data()
-                        success = await DigestService.send_daily_digest(user, market_data)
+                        test_db = SessionLocal()
+                        try:
+                            market_data = DigestService._fetch_real_market_data(test_db)
+                            success = await DigestService.send_daily_digest(user, market_data)
+                        finally:
+                            test_db.close()
                         if success:
                             message = "✅ Test digest sent!"
                         else:
@@ -313,6 +323,10 @@ def create_bot_application() -> Optional[Application]:
         application.add_handler(CommandHandler("settings", settings_command))
         application.add_handler(CommandHandler("digest", digest_command))
         application.add_handler(CommandHandler("alerts", alerts_command))
+        application.add_handler(CommandHandler("signal", rate_limited_signal_command))
+        application.add_handler(CommandHandler("brief", rate_limited_brief_command))
+        application.add_handler(CommandHandler("price", rate_limited_price_command))
+        application.add_handler(CommandHandler("refer", rate_limited_refer_command))
         
         # Add message handler for regular text
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_message))
@@ -321,6 +335,27 @@ def create_bot_application() -> Optional[Application]:
     except Exception as e:
         logger.error(f"Error creating bot application: {e}")
         return None
+
+# Rate-limited command wrappers
+async def rate_limited_signal_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Rate-limited wrapper for /signal command."""
+    if await telegram_middleware.check_rate_limit(update, context):
+        await signal_command(update, context)
+
+async def rate_limited_brief_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Rate-limited wrapper for /brief command."""
+    if await telegram_middleware.check_rate_limit(update, context):
+        await brief_command(update, context)
+
+async def rate_limited_price_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Rate-limited wrapper for /price command."""
+    if await telegram_middleware.check_rate_limit(update, context):
+        await price_command(update, context)
+
+async def rate_limited_refer_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Rate-limited wrapper for /refer command."""
+    if await telegram_middleware.check_rate_limit(update, context):
+        await refer_command(update, context)
 
 async def send_alert_to_user(telegram_id: int, alert_message: str, alert_type: str = "info") -> bool:
     """Send an alert message to a specific user."""

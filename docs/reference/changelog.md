@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.9.0 (2026-06-01)
+
+### Added
+
+- **Phase A — Technical Debt Cleanup**:
+  - `services/dashboard.py` extraction — moved all dashboard computation logic out of `routes/dashboard.py` (now 32 lines vs 384 lines before)
+  - `helix_telegram/commands/` package with 4 new bot commands:
+    - `/signal <asset>` — Returns current risk score breakdown for a specific asset
+    - `/brief` — Returns market brief (top signals, recent alerts, sentiment summary)
+    - `/price <asset>` — Returns current price from multiple sources with peg deviation
+    - `/refer` — Returns system health and reference links
+  - `helix_telegram/ratelimit.py` — In-memory rate limiting middleware with configurable limits
+  - `helix_telegram/review.py` — Review queue system for human-in-the-loop moderation of alerts
+  - 4 new Telegram API endpoints for review queue management at `/api/telegram/review/*`
+  - Anti-abuse rate limiting middleware for all bot commands
+
+- **Phase B — Settings Frontend Completion**:
+  - Playbook preset buttons (Max Free, Balanced, Quality) with one-click apply
+  - Settings audit log frontend tab with real-time display and filtering
+  - Per-feature AI budget sliders for granular cost control
+  - Provider priority drag-and-drop UI for visual configuration
+  - "Apply Safe Defaults" button with confirmation modal
+  - Setting dependency indicators (grayed out when dependency off, rate limit badges, restart badges)
+  - Keyboard shortcuts and enhanced UI polish (Esc to close modals, toast notifications)
+  - Enhanced settings search and filtering capabilities
+
+### Changelog
+
+- **Version bumped** — 3.8.3 → 3.9.0
+- **README refreshed** — Updated with new features and functionality descriptions
+
 ## 3.8.3 (2026-06-01)
 
 ### Fixed

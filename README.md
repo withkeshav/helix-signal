@@ -8,33 +8,7 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**129 regression tests pass.** Zero paid API dependencies for core operation.
-
-## v3.7.0 Highlights
-
-- **AI Settings UI** — New AI & Anomaly Detection card in Settings tab: mode select (Off/Lite/Full), token budget bar, toggle switches, number inputs
-- **Token budget endpoint** — `GET /api/ai/budget` exposes daily usage with real-time progress bar in frontend
-- **OpenRouter free tier** — `openrouter/free` added as primary provider in `ai_lite`/`ai_full` chains
-- **6 new DB-backed settings** — AI mode, token budget, cache TTL, web search, anomaly detection all editable via Settings UI
-- **Anomaly detection enhanced** — `latest_zscore()`, `min_bps` filter, `STD_FLOOR` env var
-- **sync-env.sh** — Utility to merge `.env.example` keys into `.env` preserving existing values
-- **Docker hardened** — All images pinned to immutable versions, `POSTGRES_PASSWORD` required (no default fallback), resource limits, health conditions, ClickHouse healthcheck, non-root nginx, `.dockerignore`
-- **CI pipeline** — Hadolint Dockerfile lint, Trivy vulnerability scan (HIGH/CRITICAL), SSH auto-deploy on `v*` tags, polling loop for service readiness
-- **Frontend refactored** — Chart module extracted to `frontend/js/charts.js` (12 exported functions), CSS externalized to `styles.css`, ARIA tab roles, deferred CDN scripts, empty-state placeholders, AI loader helper
-- **Health endpoint** — `redis_connected` and `db_connected` fields in `/api/health`
-- **129 regression tests pass**
-
-## v3.3 Highlights
-
-- **Traefik/Prometheus/Grafana removed** — lighter stack, no TLS secrets or Cloudflare token needed
-- **Forecast charts wired to API** — `renderForecastCharts()` uses real `ForecastRun`/`ForecastPoint` data, mock arrays removed
-- **Auto-backfill on first run** — fresh databases get 7 days of historical data seeded automatically
-- **`LOG_LEVEL` filtering** — `LOG_LEVEL=ERROR` now actually suppresses debug output
-- **`previous_status` for source recovery** — alert rule `source transitions error` now fires correctly
-- **Compose health conditions** — `frontend` waits for `backend: service_healthy`, redis has `redis-cli ping` healthcheck
-- **90d window support** — `window_delta()`, middleware, and compare service all accept `90d`
-- **Alembic migration for `previous_status`** — Postgres users don't hit column-missing errors on refresh
-- **P0–P3 audit fixes** — 15+ items across behavior, hardening, and cleanup (see CHANGELOG for full list)
+**345+ regression tests pass.** Zero paid API dependencies for core operation.
 
 ## V3 Highlights
 
@@ -145,7 +119,7 @@ Copy `.env.example` to `.env` and adjust:
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
 - `feature_multi_user` — enable multi-user support with authentication and role-based access (default: `false`). Disabled by default — all admin operations use the shared admin token. Enable via Settings UI when user accounts are needed.
 - `feature_telegram_bot` — enable Telegram bot integration for alerts and notifications (default: `false`). Set `TELEGRAM_BOT_TOKEN` env var with your bot token.
-- ` telegram_channel` — Telegram channel name for broadcast alerts (e.g., `@helixsignal`). Set `TELEGRAM_CHANNEL` env var.
+- `TELEGRAM_CHANNEL` — Telegram channel name for broadcast alerts (e.g., `@helixsignal`). Set `TELEGRAM_CHANNEL` env var.
 - `ENABLE_DYNAMIC_CHAINS` (default `false`) — auto-discovers chains from DefiLlama instead of static config
 - `ETHERSCAN_API_KEY` — for governance monitoring
 - `ALERT_WEBHOOK_URL`, `ALERT_DISCORD_WEBHOOK`, `ALERT_TELEGRAM_BOT_TOKEN` — alert dispatch channels
@@ -190,7 +164,6 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/data-quality/report` | Complete data quality report (admin token required) |
 | `GET /api/data-quality/sources` | Source quality metrics (admin token required) |
 | `GET /api/data-quality/assets` | Asset quality metrics (admin token required) |
-| `GET /api/governance` | Governance monitoring |
 | `GET /api/sources/status` | Source health dashboard with circuit breaker states |
 | `GET /api/ai/explain` | LLM-generated risk explanation (env-gated) |
 | `GET /api/settings/audit` | Settings audit log (admin token required) |
@@ -200,7 +173,6 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `POST /api/users` | Create user (admin token + multi-user enabled required) |
 | `GET /api/users` | List all users (admin token + multi-user enabled required) |
 | `POST /api/auth/login` | Authenticate user and return token (multi-user enabled required) |
-| `GET /metrics` | Internal Prometheus metrics (blocked at nginx in production) |
 
 ## Project Structure
 
@@ -217,24 +189,24 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast) + 3 Web Components
 - `config/` — chain, asset, and alert configuration
 - `docker/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
-- `docs/` — architecture, data methodology, adding-asset, adding-chain, plugins, API ref, grant strategy
+- `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories
 - `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration
 
 **SQLite → Postgres on a server:** run [`scripts/migrate_sqlite_to_postgres.py`](scripts/migrate_sqlite_to_postgres.py) with backups and `--verify-only` before cutover.
 
 ## Documentation (in repo)
 
+- 📖 [Documentation index](docs/README.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
-- Data methodology: [`docs/data-methodology.md`](docs/data-methodology.md)
-- Adding a stablecoin: [`docs/adding-asset.md`](docs/adding-asset.md)
-- Adding a chain: [`docs/adding-chain.md`](docs/adding-chain.md)
-- Plugin development: [`docs/plugins.md`](docs/plugins.md)
 - API reference: [`docs/api.md`](docs/api.md)
-- Grant strategy: [`docs/grant-strategy.md`](docs/grant-strategy.md)
-- Code quality improvements: [`docs/phase6_code_quality.md`](docs/phase6_code_quality.md)
+- Data methodology: [`docs/concepts/data-methodology.md`](docs/concepts/data-methodology.md)
+- Adding a stablecoin: [`docs/guides/adding-asset.md`](docs/guides/adding-asset.md)
+- Adding a chain: [`docs/guides/adding-chain.md`](docs/guides/adding-chain.md)
+- Plugin development: [`docs/guides/plugins.md`](docs/guides/plugins.md)
+- Code quality improvements: [`docs/reference/phase6_code_quality.md`](docs/reference/phase6_code_quality.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- Changelog: [`docs/reference/changelog.md`](docs/reference/changelog.md)
 - Backup script: [`scripts/backup.sh`](scripts/backup.sh)
 
 ## Not Investment Advice

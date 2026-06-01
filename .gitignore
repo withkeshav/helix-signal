@@ -97,9 +97,9 @@ frontend/app.js
 .antigravitycli/
 .code-review-graph/
 .opencode/
-opencode.json
 
 # --- Internal / local docs and tracking (never commit) ---
+.internal/
 internal research/
 internal research/**
 .progress/
@@ -107,6 +107,7 @@ internal research/**
 research/
 docs/phase-tracking.md
 docs/vps-tuning.md
+docs/grant-strategy.md
 *strategic_report*
 *STRATEGIC_REPORT*
 helix_signal_strategic_report.md

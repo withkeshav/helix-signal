@@ -63,7 +63,6 @@ def _load_training_data(window_days: int = 30) -> list[list[float]]:
 
 
 def _generate_labels(features: list[list[float]]) -> list[list[float]]:
-    import math
 
     labels: list[list[float]] = []
     for feats in features:

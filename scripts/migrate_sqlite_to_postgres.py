@@ -41,7 +41,6 @@ from database import (
     OsintArticle,
     SignalEvent,
     SourceStatus,
-    upgrade_db,
 )
 
 MODELS_IN_ORDER = [

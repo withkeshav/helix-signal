@@ -98,12 +98,19 @@ frontend/app.js
 .code-review-graph/
 .opencode/
 
-# --- Internal / local docs and tracking (never commit) ---
+# Internal / local docs and tracking (never commit)
 .internal/
+.internal/README.md
+.internal/deployment-guide.md
+.internal/grant-strategy.md
 internal research/
 internal research/**
 .progress/
+.progress/README.md
 .process/
+.process/README.md
+.process/transcript.txt
+.process/*.pdf
 research/
 docs/phase-tracking.md
 docs/vps-tuning.md
@@ -117,5 +124,12 @@ helix_signal_strategic_report.md
 
 # pytest coverage
 .coverage
-.progress/NEXT_STEPS.md
+
+# Old progress files (superseded by ROADMAP.md, but patterns for safety)
+.progress/opencode_*.md
+.progress/grok_*.md
+.progress/session_startup.md
 .progress/START_HERE.md
+.progress/NEXT_STEPS.md
+.progress/NEXT_SESSION_PROMPT.md
+.progress/README.md

@@ -8,7 +8,7 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "3.9.0"
+    assert body["version"] == "3.9.1"
     assert "db" in body
     assert body["db_connected"] is True
     assert body["redis_connected"] is False
@@ -141,15 +141,15 @@ def test_analytics_endpoints_load(client):
 
 
 def test_ai_endpoints_load(client):
-    # Test AI endpoints (may return 404 if AI disabled)
+    # Test AI endpoints (may return 404 if AI disabled, 403 if token required)
     response = client.get("/api/ai/explain?asset=USDT")
-    assert response.status_code in [200, 404, 501]  # 501 if AI disabled
+    assert response.status_code in [200, 403, 404, 501]
     
     response = client.get("/api/ai/narrative?asset=USDT")
-    assert response.status_code in [200, 404, 501]
+    assert response.status_code in [200, 403, 404, 501]
     
     response = client.get("/api/ai/insights?asset=USDT")
-    assert response.status_code in [200, 404, 501]
+    assert response.status_code in [200, 403, 404, 501]
     
     response = client.get("/api/ai/market-overview")
-    assert response.status_code in [200, 404, 501]
+    assert response.status_code in [200, 403, 404, 501]

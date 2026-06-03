@@ -1,4 +1,4 @@
-"""Tests for Phase 4 — Database Optimization & ClickHouse Migration."""
+"""Tests for Phase 4 — Database Optimization."""
 
 import os
 
@@ -7,7 +7,6 @@ import pytest
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
 os.environ["HELIX_SKIP_STARTUP_REFRESH"] = "1"
-os.environ["CLICKHOUSE_HOST"] = ""
 
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
@@ -36,22 +35,6 @@ class TestDatabaseManager:
     def test_singleton_exists(self):
         from backend.core.database_manager import dbm
         assert dbm is not None
-
-    def test_has_olap_disabled_by_default(self):
-        from backend.core.database_manager import DatabaseManager
-        dm = DatabaseManager()
-        assert dm.has_olap is False
-
-    def test_olap_query_returns_empty_when_disabled(self):
-        from backend.core.database_manager import DatabaseManager
-        dm = DatabaseManager()
-        result = dm.olap_query("SELECT 1")
-        assert result == []
-
-    def test_write_snapshot_noop_when_disabled(self):
-        from backend.core.database_manager import DatabaseManager
-        dm = DatabaseManager()
-        dm.write_snapshot_batch("test", [{"a": 1}])
 
     def test_get_trend_history_falls_back_to_oltp(self):
         init_db()
@@ -106,23 +89,6 @@ class TestDatabaseManager:
             assert rows == []
         finally:
             db.close()
-
-    def test_olap_client_handles_import_error(self):
-        import sys
-        old_module = sys.modules.get("clickhouse_connect")
-        try:
-            sys.modules["clickhouse_connect"] = None
-            from backend.core.database_manager import DatabaseManager
-            dm = DatabaseManager()
-            dm.olap_host = "localhost"
-            client = dm._get_olap_client()
-            assert client is None
-        finally:
-            if old_module is not None:
-                sys.modules["clickhouse_connect"] = old_module
-            else:
-                sys.modules.pop("clickhouse_connect", None)
-
 
 class TestRetentionPolicy:
     def test_prune_empty_tables(self):
@@ -228,44 +194,3 @@ class TestRetentionPolicy:
             db.close()
 
 
-class TestDockerComposeConfig:
-    def test_clickhouse_schema_exists(self):
-        import os
-        schema_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "docker", "clickhouse", "schema.sql"
-        )
-        assert os.path.exists(schema_path)
-
-    def test_clickhouse_schema_has_tables(self):
-        import os
-        schema_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "docker", "clickhouse", "schema.sql"
-        )
-        with open(schema_path) as f:
-            content = f.read()
-        assert "asset_trend_snapshots" in content
-        assert "chain_trend_snapshots" in content
-        assert "ReplacingMergeTree" in content
-        assert "FIN" in content
-
-    def test_docker_compose_has_clickhouse(self):
-        import os
-        compose_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", "docker-compose.yml"
-        )
-        with open(compose_path) as f:
-            content = f.read()
-        assert "clickhouse" in content
-        assert "docker/clickhouse/schema.sql" in content
-        assert "clickhouse_data" in content
-
-    def test_env_example_has_clickhouse_vars(self):
-        import os
-        env_path = os.path.join(
-            os.path.dirname(__file__), "..", "..", ".env.example"
-        )
-        with open(env_path) as f:
-            content = f.read()
-        assert "CLICKHOUSE_HOST=" in content
-        assert "CLICKHOUSE_PORT=" in content
-        assert "OSINT_RETENTION_DAYS=" in content

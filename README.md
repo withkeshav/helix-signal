@@ -8,18 +8,18 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**330+ regression tests pass.** Zero paid API dependencies for core operation.
+**328 regression tests pass.** Zero paid API dependencies for core operation.
 
 ## V3 Highlights
 
-- **V3 Risk Score**: 5-component composite (peg stability 35%, liquidity depth 25%, supply stability 15%, concentration 15%, observability 10%) with hard overrides
+- **V3 Risk Score**: Composite (depeg 35%, concentration 25%, velocity 20%, age penalty 20%) with source health modifier
 - **Multi-source engine**: DefiLlama (supply, TVL, peg) + CoinGecko (price, market cap, volume) + DEX Screener (liquidity depth, pool concentration, slippage)
 - **Cross-source price validator**: flags discrepancies >0.5% between sources
 - **Alerting system**: 9 rule types with persistence tracking, dedup, 4 dispatch channels (dashboard, webhook, Discord, Telegram)
-- **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + CryptoPanic API + FinBERT sentiment scoring
+- **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + LLM-powered sentiment scoring (Ollama Cloud)
 - **Attestation & supply feed**: issuer report age (when parseable) plus DefiLlama on-chain supply feed freshness — no synthetic dates
 - **Governance monitoring**: contract upgrade tracking via Etherscan API
-- **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enabled via `ENABLE_ANOMALY_DETECTION=true`
+- **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enable via Settings UI
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
 - **Alpine.js + Chart.js + ECharts frontend**: 6-tab layout (Market, Forecast, Supply, Events, Intel, Health), no build step, CDN-loaded
@@ -114,21 +114,13 @@ Auto-generate a new migration after model changes:
 Copy `.env.example` to `.env` and adjust:
 
 - `HELIX_DOMAIN` — public hostname (default `helix.local`)
-- `CORS_ORIGINS` — comma-separated allowed origins (default `*`); set in production
 - `CONTENT_SECURITY_POLICY` — Content-Security-Policy header (set on backend + nginx)
-- `REFRESH_INTERVAL_SECONDS` (default `300`)
-- `feature_multi_user` — enable multi-user support with authentication and role-based access (default: `false`). Disabled by default — all admin operations use the shared admin token. Enable via Settings UI when user accounts are needed.
-- `feature_telegram_bot` — enable Telegram bot integration for alerts and notifications (default: `false`). Set `TELEGRAM_BOT_TOKEN` env var with your bot token.
-- `TELEGRAM_CHANNEL` — Telegram channel name for broadcast alerts (e.g., `@helixsignal`). Set `TELEGRAM_CHANNEL` env var.
-- `ENABLE_DYNAMIC_CHAINS` (default `false`) — auto-discovers chains from DefiLlama instead of static config
-- `ETHERSCAN_API_KEY` — for governance monitoring
-- `ALERT_WEBHOOK_URL`, `ALERT_DISCORD_WEBHOOK`, `ALERT_TELEGRAM_BOT_TOKEN` — alert dispatch channels
-- `CRYPTOPANIC_API_KEY` — for news feed
 - `LOG_LEVEL` (default `INFO`) — set to `DEBUG` for verbose logging
 - `LOG_FORMAT` (default `dev`) — set to `json` for structured JSON logs in production
 - `HELIX_ADMIN_TOKEN` — required for admin routes (settings, refresh, backfill, metrics, governance)
-- `AI_REQUIRE_TOKEN` — set to `true` to require `X-Admin-Token` on AI endpoints (default: off, for backward compatibility)
 - `RATE_LIMITER_STORAGE_URI` — Redis URL for multi-worker rate limiting (optional)
+
+All user-facing configuration (API keys, models, feature toggles, alert dispatch, refresh intervals, CORS origins) is managed from the Settings UI at `/settings` — no `.env` edits needed.
 
 Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `config/alerts.json`.
 
@@ -144,7 +136,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/chains/{chain_key}` | Chain drill-down |
 | `GET /api/events` | Signal feed |
 | `GET /api/forecasts` | Latest forecast runs |
-| `GET /api/predictive` | Predictive bundle (depeg probability, regime, TimesFM) |
+| `GET /api/predictive` | Predictive bundle (depeg probability, regime, forecast) |
 | `GET /api/analytics/correlations` | Pearson correlation matrix (5 metrics, ranked pairs) |
 | `GET /api/analytics/patterns` | Trend/volatility/seasonality detection |
 | `GET /api/analytics/finbert/sentiment` | On-demand FinBERT sentiment |
@@ -179,7 +171,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/` — FastAPI app, multi-source ingestion, analytics engine, alerts, OSINT, ML models
 - `backend/agents/` — event-driven agents (anomaly detection, forecast, alert dispatch)
 - `backend/chain/` — blockchain data retrieval layer
-- `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter, OLAP)
+- `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter)
 - `backend/middleware/` — security validation + observability middleware
 - `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, etc.)
 - `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener) with circuit breakers
@@ -187,7 +179,6 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `frontend/` — pure static HTML, Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
 - `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast) + 3 Web Components
 - `config/` — chain, asset, and alert configuration
-- `docker/clickhouse/` — ClickHouse schema for OLAP deployment (optional)
 - `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories
 - `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration
 

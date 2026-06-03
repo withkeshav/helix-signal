@@ -60,7 +60,7 @@ def test_within_budget_zero_budget(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_provider_metadata_has_all_fields() -> None:
-    required = {"groq", "ollama_cloud", "openrouter_free", "openrouter_paid"}
+    required = {"groq", "ollama_cloud", "cloudflare", "openrouter_free", "openrouter_paid"}
     assert set(PROVIDER_METADATA.keys()) == required
 
 
@@ -94,7 +94,7 @@ def test_openrouter_free_is_free() -> None:
 
 
 def test_default_priority_includes_all() -> None:
-    assert set(_DEFAULT_PROVIDER_PRIORITY) == {"groq", "ollama_cloud", "openrouter_free", "openrouter_paid"}
+    assert set(_DEFAULT_PROVIDER_PRIORITY) == {"groq", "ollama_cloud", "cloudflare", "openrouter_free", "openrouter_paid"}
 
 
 def test_groq_is_first_in_default() -> None:
@@ -102,7 +102,7 @@ def test_groq_is_first_in_default() -> None:
 
 
 def test_lite_priority() -> None:
-    assert _DEFAULT_LITE_PRIORITY == ["openrouter_free", "ollama_cloud"]
+    assert _DEFAULT_LITE_PRIORITY == ["openrouter_free", "ollama_cloud", "cloudflare"]
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ def test_fallback_counting() -> None:
 
 def test_get_provider_stats_shape() -> None:
     stats = get_provider_stats()
-    assert set(stats.keys()) == {"groq", "ollama_cloud", "openrouter_free", "openrouter_paid"}
+    assert set(stats.keys()) == {"groq", "ollama_cloud", "cloudflare", "openrouter_free", "openrouter_paid"}
     for name, data in stats.items():
         assert "label" in data
         assert "cost_per_million" in data

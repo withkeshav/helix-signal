@@ -12,8 +12,13 @@ from helix_telegram.bot import send_alert_to_user, send_alert_to_channel
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Get channel name from environment
-TELEGRAM_CHANNEL = os.getenv("TELEGRAM_CHANNEL", "").strip()
+# Get channel name from settings
+TELEGRAM_CHANNEL = ""
+try:
+    from providers.settings import get_setting
+    TELEGRAM_CHANNEL = get_setting("telegram_channel") or ""
+except Exception:
+    TELEGRAM_CHANNEL = os.getenv("TELEGRAM_CHANNEL", "").strip()
 
 def format_alert_message(alert_data: dict) -> str:
     """Format an alert into a readable Telegram message."""

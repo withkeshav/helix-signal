@@ -18,18 +18,11 @@ MAX_BACKFILL_DAYS = 30
 MIN_BACKFILL_DAYS = 7
 
 
-def _backfill_allowed() -> bool:
-    return os.getenv("ALLOW_BACKFILL", "").strip().lower() in ("1", "true", "yes")
-
-
-def _day_start(dt: datetime) -> datetime:
-    u = dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-    return u.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
 def run_backfill(db: Session, *, asset: str, days: int, _internal: bool = False) -> dict[str, Any]:
-    if not _internal and not _backfill_allowed():
-        raise HTTPException(status_code=403, detail="Backfill is disabled. Set ALLOW_BACKFILL=true to enable.")
+    if not _internal:
+        from providers.settings import get_setting
+        if not get_setting("allow_backfill", db):
+            raise HTTPException(status_code=403, detail="Backfill is disabled. Enable in Settings (Features group).")
 
     sym = asset.strip().upper()
     selected = get_asset_by_symbol(sym)

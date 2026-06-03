@@ -21,24 +21,7 @@ from services.ai_usage import increment_ai_usage
 
 import httpx
 
-# ---------------------------------------------------------------------------
-# Cache: exact-match (SHA-256) + semantic (trigram similarity)
-# ---------------------------------------------------------------------------
-
-_AI_CACHE: OrderedDict[str, tuple[float, str, dict[str, Any]]] = OrderedDict()
-_CACHE_TTL_SECONDS = int(os.getenv("AI_CACHE_TTL_SECONDS", "3600"))
-_LOCAL_DAILY_TOKENS = 0
-_LOCAL_TOKEN_DATE = ""
-_AI_REDIS_CACHE_PREFIX = "helix:ai:cache:"
-
-# Per-feature TTL overrides (seconds) — fall back to _CACHE_TTL_SECONDS
-_FEATURE_CACHE_TTL: dict[str, int] = {
-    "risk_explain": 3600,
-    "market_narrative": 3000,
-    "anomaly_investigation": 1800,
-    "market_overview": 1200,
-    "insight_summary": 3600,
-}
+import services.components.ai.cache as _cache_mod
 
 # Hit / miss / eviction tracking
 _CACHE_HITS = 0
@@ -84,114 +67,44 @@ def _reset_local_if_new_day() -> None:
         _LOCAL_TOKEN_DATE = today
 
 
-# ---------------------------------------------------------------------------
-# Budget helpers
-# ---------------------------------------------------------------------------
+from services.components.ai.cache import _AI_CACHE, _CACHE_EVICTIONS, _CACHE_TTL_SECONDS, _FEATURE_CACHE_TTL, cache_get_enhanced, cache_set_enhanced, semantic_cache_search, get_cache_stats as get_component_cache_stats
+from services.components.ai.budget import _deduct_tokens, _within_budget, get_budget_status
 
-def _deduct_tokens(count: int) -> bool:
-    global _LOCAL_DAILY_TOKENS
-    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
-    _reset_local_if_new_day()
-    redis_url = os.getenv("REDIS_URL", "").strip()
-    if redis_url:
-        try:
-            from backend.core.cache_manager import cache
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            key = f"helix:ai:daily_tokens:{today}"
-            client = cache._redis
-            if client is None:
-                raise RuntimeError("redis_unavailable")
-            ok = client.eval(_BUDGET_LUA_SCRIPT, 1, key, budget, count, 86400)
-            return bool(ok)
-        except Exception:
-            pass
-    if _LOCAL_DAILY_TOKENS + count > budget:
-        return False
-    _LOCAL_DAILY_TOKENS += count
-    return True
-
-
-def _within_budget(count: int) -> bool:
-    """Check if estimated tokens fit within daily budget (no deduction).
-
-    Used by sentiment.py and osint.py as a pre-check before work begins.
-    Local-only check; the real guard is *deduct_tokens* which handles Redis.
-    """
-    global _LOCAL_DAILY_TOKENS
-    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
-    _reset_local_if_new_day()
-    return _LOCAL_DAILY_TOKENS + count <= budget
-
-
-def get_budget_status() -> dict[str, Any]:
-    global _LOCAL_DAILY_TOKENS, _LOCAL_TOKEN_DATE
-    budget = int(os.getenv("AI_DAILY_TOKEN_BUDGET", "50000"))
-    _reset_local_if_new_day()
-    redis_url = os.getenv("REDIS_URL", "").strip()
-    used = _LOCAL_DAILY_TOKENS
-    if redis_url:
-        try:
-            from backend.core.cache_manager import cache
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            client = cache._redis
-            if client is not None:
-                used = int(client.get(f"helix:ai:daily_tokens:{today}") or 0)
-        except Exception:
-            pass
-    return {
-        "daily_budget": budget,
-        "tokens_used_today": used,
-        "tokens_remaining": max(0, budget - used),
-        "pct_used": round(used / budget * 100, 1) if budget > 0 else 0,
-    }
-
-
-def ai_mode() -> str:
-    return os.getenv("AI_MODE", "ai_off").strip().lower()
 
 # ---------------------------------------------------------------------------
 # Cache helpers — exact-match (SHA-256), LRU, per-feature TTL
 # ---------------------------------------------------------------------------
-
+# Cache helpers — exact-match (SHA-256), LRU, per-feature TTL
+# ---------------------------------------------------------------------------
 
 def _cache_get(key: str) -> dict[str, Any] | None:
     """Exact-match lookup with per-feature TTL and LRU promotion."""
-    rc = _try_redis_cache()
-    if rc:
-        val = rc.get(_AI_REDIS_CACHE_PREFIX + key)
-        if val:
-            return val
-    entry = _AI_CACHE.get(key)
-    if not entry:
-        return None
-    ts, feature, payload = entry
-    ttl = _FEATURE_CACHE_TTL.get(feature, _CACHE_TTL_SECONDS)
-    if time.time() - ts > ttl:
-        _AI_CACHE.pop(key, None)
-        global _CACHE_EVICTIONS
-        _CACHE_EVICTIONS += 1
-        return None
-    _AI_CACHE.move_to_end(key)
-    return payload
-
+    # Extract feature from cache key if possible (for backward compatibility)
+    # In practice, we'd need to pass the feature through the call chain
+    feature = None  # This would need to be extracted or passed
+    return cache_get_enhanced(key, feature)
 
 def _cache_set(key: str, feature: str, prompt: str, payload: dict[str, Any]) -> None:
     """Store in exact-match cache with per-feature TTL and LRU eviction."""
-    global _CACHE_EVICTIONS
-    rc = _try_redis_cache()
-    if rc:
-        rc.set(_AI_REDIS_CACHE_PREFIX + key, payload, ttl=_CACHE_TTL_SECONDS)
+    cache_set_enhanced(key, feature, prompt, payload)
+
+def _semantic_cache_lookup(cache_key: str, prompt_text: str) -> dict[str, Any] | None:
+    """Return cached payload if a semantically similar prompt exists (any feature)."""
+    if not _cache_mod._SEMANTIC_CACHE_ENABLED or not prompt_text:
+        return None
+    threshold = _cache_mod._SEMANTIC_CACHE_THRESHOLD
+    best_sim = 0.0
+    best_payload: dict[str, Any] | None = None
     now = time.time()
-    if key in _AI_CACHE:
-        _AI_CACHE.move_to_end(key)
-        _AI_CACHE[key] = (now, feature, payload)
-    else:
-        if len(_AI_CACHE) >= _MAX_CACHE_ENTRIES:
-            _AI_CACHE.popitem(last=False)
-            _CACHE_EVICTIONS += 1
-        _AI_CACHE[key] = (now, feature, payload)
-    if prompt:
-        _semantic_cache_store(key, prompt)
+    for sem_key, entry in _cache_mod._AI_SEMANTIC_CACHE.items():
+        expiry, _feat, stored_prompt, payload, _exact_key = entry
+        if now > expiry:
+            continue
+        sim = _trigram_similarity(prompt_text, stored_prompt)
+        if sim > best_sim and sim >= threshold:
+            best_sim = sim
+            best_payload = payload
+    return best_payload
 
 
 def _prompt_hash(feature: str, context: dict[str, Any]) -> str:
@@ -223,40 +136,11 @@ def _trigram_similarity(a: str, b: str) -> float:
     return intersection / union if union else 0.0
 
 
-def _semantic_cache_store(cache_key: str, prompt_text: str) -> None:
-    """Store prompt text for future semantic matching."""
-    if not _SEMANTIC_CACHE_ENABLED:
-        return
-    if cache_key in _SEMANTIC_CACHE:
-        _SEMANTIC_CACHE.move_to_end(cache_key)
-        _SEMANTIC_CACHE[cache_key] = prompt_text
-    else:
-        if len(_SEMANTIC_CACHE) >= _MAX_SEMANTIC_CACHE_ENTRIES:
-            _SEMANTIC_CACHE.popitem(last=False)
-        _SEMANTIC_CACHE[cache_key] = prompt_text
 
 
-def _semantic_cache_lookup(cache_key: str, prompt_text: str) -> dict[str, Any] | None:
-    """Return cached payload if a semantically similar prompt exists."""
-    if not _SEMANTIC_CACHE_ENABLED or not prompt_text:
-        return None
-    best_sim = 0.0
-    best_key: str | None = None
-    for stored_key, stored_prompt in _SEMANTIC_CACHE.items():
-        if stored_key == cache_key:
-            continue
-        sim = _trigram_similarity(prompt_text, stored_prompt)
-        if sim > best_sim:
-            best_sim = sim
-            best_key = stored_key
-    if best_sim >= _SEMANTIC_CACHE_THRESHOLD and best_key:
-        entry = _AI_CACHE.get(best_key)
-        if entry:
-            ts, feat, payload = entry
-            ttl = _FEATURE_CACHE_TTL.get(feat, _CACHE_TTL_SECONDS)
-            if time.time() - ts <= ttl:
-                return payload
-    return None
+def ai_mode() -> str:
+    """Get current AI mode from environment or settings."""
+    return os.getenv("AI_MODE", "ai_off").strip().lower()
 
 
 def get_cache_stats() -> dict[str, Any]:
@@ -269,7 +153,7 @@ def get_cache_stats() -> dict[str, Any]:
         "tokens_saved": _CACHE_TOKENS_SAVED,
         "entries": len(_AI_CACHE),
         "max_entries": _MAX_CACHE_ENTRIES,
-        "evictions": _CACHE_EVICTIONS,
+        "evictions": _cache_mod._CACHE_EVICTIONS,
         "semantic_entries": len(_SEMANTIC_CACHE) if _SEMANTIC_CACHE_ENABLED else 0,
         "semantic_enabled": _SEMANTIC_CACHE_ENABLED,
         "semantic_threshold": _SEMANTIC_CACHE_THRESHOLD,
@@ -278,36 +162,15 @@ def get_cache_stats() -> dict[str, Any]:
     }
 
 
-# ---------------------------------------------------------------------------
-# Provider functions (one per service)
-# ---------------------------------------------------------------------------
+# Import provider implementations from components
+from services.components.ai.providers import (
+    ollama_cloud as _ollama_cloud_impl,
+    groq as _groq_impl,
+    cloudflare_ai as _cloudflare_ai_impl,
+    openrouter_lite as _openrouter_lite_impl
+)
 
-def _openrouter_lite(
-    prompt: str, max_tokens: int, model: str | None = None, **kwargs
-) -> dict[str, Any] | None:
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("OPENROUTER_API_KEY", "").strip()
-    if not api_key:
-        return None
-    model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={
-                "model": model,
-                "max_tokens": max_tokens,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    text = data["choices"][0]["message"]["content"]
-    usage = data.get("usage") or {}
-    return {"provider": "openrouter", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
-
-
-_OPENROUTER_FREE_MODEL = os.getenv("OPENROUTER_FREE_MODEL", "openrouter/free").strip()
-
+_openrouter_lite = _openrouter_lite_impl  # alias for backward compat
 
 def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None, **kwargs) -> dict[str, Any] | None:
     api_key = kwargs.get("_resolved_api_key") or os.getenv("OLLAMA_API_KEY", "").strip()
@@ -331,11 +194,11 @@ def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model
     return {"provider": "ollama_cloud", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
-def _groq(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
+def _groq(prompt: str, max_tokens: int, model: str | None = None, **kwargs) -> dict[str, Any] | None:
     api_key = kwargs.get("_resolved_api_key") or os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         return None
-    model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    model = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -351,6 +214,30 @@ def _groq(prompt: str, max_tokens: int, **kwargs) -> dict[str, Any] | None:
     text = data["choices"][0]["message"]["content"]
     usage = data.get("usage") or {}
     return {"provider": "groq", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
+
+
+def _cloudflare_ai(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None, **kwargs) -> dict[str, Any] | None:
+    api_key = kwargs.get("_resolved_api_key") or os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
+    account_id = kwargs.get("_resolved_account_id") or os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    if not api_key or not account_id:
+        return None
+    model = model or os.getenv("CLOUDFLARE_AI_MODEL", "@cf/meta/llama-3.1-8b-instruct")
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1/chat/completions"
+    with httpx.Client(timeout=60.0) as client:
+        resp = client.post(
+            url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": model, "messages": messages, "max_tokens": max_tokens},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    text = data["choices"][0]["message"]["content"]
+    usage = data.get("usage") or {}
+    return {"provider": "cloudflare", "model": model, "text": text, "tokens": usage.get("total_tokens", 0)}
 
 
 # ---------------------------------------------------------------------------
@@ -399,17 +286,28 @@ PROVIDER_METADATA: dict[str, dict[str, Any]] = {
         "max_tokens": 4096,
         "models": ["openai/gpt-4o-mini"],
     },
+    "cloudflare": {
+        "label": "Cloudflare Workers AI",
+        "default_model": "@cf/meta/llama-3.1-8b-instruct",
+        "env_key": "CLOUDFLARE_API_TOKEN",
+        "cost_per_million": 0.0,
+        "rate_limit_rpm": 50,
+        "free_tier_calls": 100000,
+        "max_tokens": 4096,
+        "models": ["@cf/meta/llama-3.1-8b-instruct", "@cf/mistral/mistral-7b-instruct-v0.1"],
+    },
 }
 
 # Default priority order when no Settings override is present
-_DEFAULT_PROVIDER_PRIORITY = ["groq", "ollama_cloud", "openrouter_free", "openrouter_paid"]
-_DEFAULT_LITE_PRIORITY = ["openrouter_free", "ollama_cloud"]
-_DEFAULT_PRIORITY_PRIORITY = ["openrouter_free", "ollama_cloud", "groq"]
+_DEFAULT_PROVIDER_PRIORITY = ["groq", "ollama_cloud", "cloudflare", "openrouter_free", "openrouter_paid"]
+_DEFAULT_LITE_PRIORITY = ["openrouter_free", "ollama_cloud", "cloudflare"]
+_DEFAULT_PRIORITY_PRIORITY = ["openrouter_free", "ollama_cloud", "groq", "cloudflare"]
 
 # Map provider names to env var keys for API key presence check
 _PROVIDER_ENV_KEYS: dict[str, str] = {
     "groq": "GROQ_API_KEY",
     "ollama_cloud": "OLLAMA_API_KEY",
+    "cloudflare": "CLOUDFLARE_API_TOKEN",
     "openrouter_free": "OPENROUTER_API_KEY",
     "openrouter_paid": "OPENROUTER_API_KEY",
 }
@@ -513,16 +411,24 @@ def _build_provider_callable(name: str, db: Any = None) -> Callable[..., dict[st
     if not api_key:
         return None
 
+    from providers.settings import get_setting
+
     if name == "groq":
-        return partial(_groq, _resolved_api_key=api_key)
+        model = get_setting("groq_model", db) or meta["default_model"]
+        return partial(_groq, model=model, _resolved_api_key=api_key)
     if name == "ollama_cloud":
-        model = os.getenv("OLLAMA_CLOUD_MODEL", meta["default_model"])
+        model = get_setting("ollama_cloud_model", db) or meta["default_model"]
         return partial(_ollama_cloud, model=model, _resolved_api_key=api_key)
     if name == "openrouter_free":
-        return partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL, _resolved_api_key=api_key)
-    if name == "openrouter_paid":
-        model = os.getenv("OPENROUTER_MODEL", meta["default_model"])
+        model = get_setting("openrouter_free_model", db) or "openrouter/free"
         return partial(_openrouter_lite, model=model, _resolved_api_key=api_key)
+    if name == "openrouter_paid":
+        model = get_setting("openrouter_model", db) or meta["default_model"]
+        return partial(_openrouter_lite, model=model, _resolved_api_key=api_key)
+    if name == "cloudflare":
+        model = get_setting("cloudflare_ai_model", db) or meta["default_model"]
+        account_id = get_setting("cloudflare_account_id", db) or os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+        return partial(_cloudflare_ai, model=model, _resolved_api_key=api_key, _resolved_account_id=account_id)
 
     return None
 
@@ -565,7 +471,7 @@ def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
         return []
 
     if priority and mode != "ai_lite":
-        or_free = partial(_openrouter_lite, model=_OPENROUTER_FREE_MODEL)
+        or_free = partial(_openrouter_lite, model="openrouter/free")
         primary = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
         fallback = os.getenv("OLLAMA_CLOUD_FALLBACK_MODEL", "qwen-2.5-7b-cloud")
         return [
@@ -731,7 +637,9 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
         }
     template = config["user"]
     available = {k: v for k, v in context.items() if f"{{{k}}}" in template}
-    for k in ("feature", "asset_symbol", "signal_score", "signal_band", "regime", "web_search_results"):
+    for k in ("feature", "asset_symbol", "signal_score", "signal_band", "regime",
+              "web_search_results", "depeg_1h", "depeg_24h",
+              "sentiment_label", "sentiment_score", "recent_events"):
         available.setdefault(k, "?")
     if "feature" in template:
         available.setdefault("feature", feature)
@@ -748,7 +656,7 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
 
 def _read_cache_settings_from_db(db: Any) -> None:
     """Override cache globals from Settings DB when available."""
-    global _SEMANTIC_CACHE_ENABLED, _SEMANTIC_CACHE_THRESHOLD, _MAX_CACHE_ENTRIES
+    global _SEMANTIC_CACHE_ENABLED, _SEMANTIC_CACHE_THRESHOLD, _MAX_CACHE_ENTRIES, _MAX_SEMANTIC_CACHE_ENTRIES
     try:
         from providers.settings import get_setting
         val = get_setting("ai_cache_semantic_enabled", db)
@@ -761,6 +669,9 @@ def _read_cache_settings_from_db(db: Any) -> None:
         val = get_setting("ai_cache_max_entries", db)
         if val is not None:
             _MAX_CACHE_ENTRIES = int(val)
+        val = get_setting("ai_cache_max_semantic_entries", db)
+        if val is not None:
+            _MAX_SEMANTIC_CACHE_ENTRIES = int(val)
     except Exception:
         pass
 

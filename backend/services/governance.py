@@ -21,7 +21,12 @@ def build_governance_payload(db: Session, *, asset: str) -> dict[str, Any]:
     selected = get_asset_by_symbol(sym)
     if selected is None or not bool(selected.get("enabled")):
         raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
-    api_key = os.getenv("ETHERSCAN_API_KEY", "")
+    api_key = ""
+    try:
+        from providers.settings import get_setting
+        api_key = get_setting("secret_etherscan_api_key") or ""
+    except Exception:
+        api_key = os.getenv("ETHERSCAN_API_KEY", "")
     result: dict[str, Any] = {
         "asset": sym,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),

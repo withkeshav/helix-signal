@@ -20,15 +20,6 @@ if docker compose exec postgres pg_isready -U helix >/dev/null 2>&1; then
   echo "  PostgreSQL: done ($(du -sh "$BACKUP_DIR/$DATE/postgres.sql.gz" | cut -f1))"
 fi
 
-# ClickHouse (if running)
-if docker compose exec clickhouse clickhouse-client --query "SELECT 1" >/dev/null 2>&1; then
-  echo "  Backing up ClickHouse snapshots..."
-  docker compose exec clickhouse clickhouse-client \
-    --query "SELECT * FROM asset_trend_snapshots FORMAT CSV" | \
-    gzip > "$BACKUP_DIR/$DATE/clickhouse_snapshots.csv.gz"
-  echo "  ClickHouse: done ($(du -sh "$BACKUP_DIR/$DATE/clickhouse_snapshots.csv.gz" | cut -f1))"
-fi
-
 # Redis (if running)
 if docker compose exec redis redis-cli PING >/dev/null 2>&1; then
   echo "  Backing up Redis..."

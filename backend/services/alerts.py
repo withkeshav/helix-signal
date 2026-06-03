@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Callable
@@ -184,7 +183,7 @@ def evaluate_alerts(db: Session, *, bundle: dict[str, Any], asset_symbol: str, n
             dedup_key = f"{asset_symbol}:{rule['type']}:{rule['severity']}"
             if not _recently_fired(db, dedup_key, rule.get("cooldown_minutes", 60), now):
                 _log_alert_fire(db, asset_symbol=asset_symbol, rule=rule, meta=dict(meta), now=now, dedup_key=dedup_key)
-                _dispatch_alert(rule, asset_symbol=asset_symbol, meta=dict(meta))
+                _dispatch_alert(rule, asset_symbol=asset_symbol, meta=dict(meta), db=db)
                 fired.append({"type": rule["type"], "severity": rule["severity"], "asset": asset_symbol, "meta": dict(meta)})
         else:
             _CONDTION_PERSISTENCE.pop(persist_key, None)
@@ -221,21 +220,22 @@ def _log_alert_fire(db: Session, *, asset_symbol: str, rule: dict, meta: dict, n
     db.flush()
 
 
-def _dispatch_alert(rule: dict, *, asset_symbol: str, meta: dict) -> None:
+def _dispatch_alert(rule: dict, *, asset_symbol: str, meta: dict, db: Session | None = None) -> None:
     channels = rule.get("channels", ["dashboard"])
     for channel in channels:
         if channel == "webhook":
-            _dispatch_webhook(asset_symbol, rule, meta)
+            _dispatch_webhook(asset_symbol, rule, meta, db)
         elif channel == "discord":
-            _dispatch_discord(asset_symbol, rule, meta)
+            _dispatch_discord(asset_symbol, rule, meta, db)
         elif channel == "telegram":
-            _dispatch_telegram(asset_symbol, rule, meta)
+            _dispatch_telegram(asset_symbol, rule, meta, db)
         elif channel == "email":
-            _dispatch_email(asset_symbol, rule, meta)
+            _dispatch_email(asset_symbol, rule, meta, db)
 
 
-def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict) -> None:
-    url = os.getenv("ALERT_WEBHOOK_URL", "")
+def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
+    from providers.settings import get_setting
+    url = get_setting("alert_webhook_url", db) or ""
     if not url:
         return
     try:
@@ -245,8 +245,9 @@ def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict) -> None:
         log.warning("webhook_failed", error=str(exc))
 
 
-def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict) -> None:
-    url = os.getenv("ALERT_DISCORD_WEBHOOK", "")
+def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
+    from providers.settings import get_setting
+    url = get_setting("alert_discord_webhook", db) or ""
     if not url:
         return
     try:
@@ -256,9 +257,10 @@ def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict) -> None:
         log.warning("discord_failed", error=str(exc))
 
 
-def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict) -> None:
-    token = os.getenv("ALERT_TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("ALERT_TELEGRAM_CHAT_ID", "")
+def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
+    from providers.settings import get_setting
+    token = get_setting("alert_telegram_bot_token", db) or ""
+    chat_id = get_setting("alert_telegram_chat_id", db) or ""
     if not token or not chat_id:
         return
     try:
@@ -269,13 +271,14 @@ def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict) -> None:
         log.warning("telegram_failed", error=str(exc))
 
 
-def _dispatch_email(asset_symbol: str, rule: dict, meta: dict) -> None:
-    smtp_host = os.getenv("ALERT_SMTP_HOST", "")
-    smtp_port = int(os.getenv("ALERT_SMTP_PORT", "587"))
-    smtp_user = os.getenv("ALERT_SMTP_USER", "")
-    smtp_pass = os.getenv("ALERT_SMTP_PASS", "")
-    mail_to = os.getenv("ALERT_EMAIL_TO", "")
-    mail_from = os.getenv("ALERT_EMAIL_FROM", smtp_user)
+def _dispatch_email(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
+    from providers.settings import get_setting
+    smtp_host = get_setting("alert_smtp_host", db) or ""
+    smtp_port = int(get_setting("alert_smtp_port", db) or "587")
+    smtp_user = get_setting("alert_smtp_user", db) or ""
+    smtp_pass = get_setting("alert_smtp_pass", db) or ""
+    mail_to = get_setting("alert_email_to", db) or ""
+    mail_from = (get_setting("alert_email_from", db) or "").strip() or smtp_user
     if not smtp_host or not smtp_user or not smtp_pass or not mail_to:
         log.warning("email_skipped", reason="missing_smtp_config")
         return

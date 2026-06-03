@@ -7,7 +7,6 @@ from typing import Any, Callable
 
 from backend.core.cache_manager import cache
 
-_CACHE_ENABLED = os.getenv("ENABLE_REDIS_CACHE", "").strip().lower() in ("1", "true", "yes")
 _TTL_SECONDS = int(os.getenv("REDIS_CACHE_TTL_SECONDS", "45"))
 
 CACHE_TTL = {
@@ -19,20 +18,28 @@ CACHE_TTL = {
 }
 
 
+def _cache_enabled() -> bool:
+    from providers.settings import get_setting
+    try:
+        return bool(get_setting("enable_redis_cache"))
+    except Exception:
+        return os.getenv("ENABLE_REDIS_CACHE", "").strip().lower() in ("1", "true", "yes")
+
+
 def cache_get(key: str) -> dict[str, Any] | None:
-    if not _CACHE_ENABLED:
+    if not _cache_enabled():
         return None
     return cache.get(key)
 
 
 def cache_set(key: str, payload: dict[str, Any], ttl: int | None = None) -> None:
-    if not _CACHE_ENABLED:
+    if not _cache_enabled():
         return
     cache.set(key, payload, ttl or _TTL_SECONDS)
 
 
 def invalidate_dashboard(asset: str | None) -> None:
-    if not _CACHE_ENABLED:
+    if not _cache_enabled():
         return
     sym = (asset or "DEFAULT").upper()
     cache.delete(f"helix:dashboard:{sym}")

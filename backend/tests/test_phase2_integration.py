@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 import services.ai_router as r
+import services.components.ai.budget as budget_mod
+import services.components.ai.cache as cache_mod
 from core.circuit_breaker import CircuitBreaker, CircuitState
 from providers.rate_limiter import TokenBucket
 from providers.settings import PLAYBOOKS, apply_playbook, get_playbooks, set_setting
@@ -52,25 +54,6 @@ def _truncate_usage_tables():
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-@pytest.fixture(autouse=True)
-def _reset_globals() -> None:
-    """Reset all module-level global state before each test."""
-    r._AI_CACHE.clear()
-    r._SEMANTIC_CACHE.clear()
-    r._CACHE_HITS = 0
-    r._CACHE_MISSES = 0
-    r._CACHE_EVICTIONS = 0
-    r._CACHE_TOKENS_SAVED = 0
-    r._LOCAL_DAILY_TOKENS = 0
-    r._LOCAL_TOKEN_DATE = ""
-    r._SEMANTIC_CACHE_ENABLED = False
-    r._SEMANTIC_CACHE_THRESHOLD = 0.90
-    r._MAX_CACHE_ENTRIES = 1000
-    _PROVIDER_RATE_LIMITS.clear()
-    _PROVIDER_FALLBACK_COUNTS.clear()
-    _SOURCE_RATE_LIMITS.clear()
-
 
 @pytest.fixture()
 def _enrich_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -215,8 +198,8 @@ class TestEnrichmentFlow:
 
     def test_enrich_with_ai_semantic_cache(self, monkeypatch):
         """Semantic cache returns hit for similar prompts."""
-        r._SEMANTIC_CACHE_ENABLED = True
-        r._SEMANTIC_CACHE_THRESHOLD = 0.80
+        cache_mod._SEMANTIC_CACHE_ENABLED = True
+        cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.80
 
         monkeypatch.setattr(r, "_openrouter_lite", _mock_provider(
             text="Semantic cached response", tokens=30
@@ -341,8 +324,8 @@ class TestApiEndpoints:
     def test_api_ai_warnings_with_high_usage(self, monkeypatch, client):
         """Increment AI usage past threshold, verify warning appears."""
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-        r._LOCAL_DAILY_TOKENS = 900
-        r._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        budget_mod._LOCAL_DAILY_TOKENS = 900
+        budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         resp = client.get("/api/ai/warnings")
         assert resp.status_code == 200
@@ -418,8 +401,8 @@ class TestWarningEngineIntegration:
     def test_warning_engine_budget_warning(self, monkeypatch, db_session):
         """Token usage past 80% threshold generates budget warning."""
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-        r._LOCAL_DAILY_TOKENS = 850
-        r._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        budget_mod._LOCAL_DAILY_TOKENS = 850
+        budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         warnings = check_warnings(db=db_session)
         ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
@@ -652,7 +635,7 @@ class TestCacheMonitoring:
         monkeypatch.setenv("AI_MODE", "ai_lite")
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "50000")
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-        r._MAX_CACHE_ENTRIES = 3
+        cache_mod._MAX_CACHE_ENTRIES = 3
 
         monkeypatch.setattr(r, "_openrouter_lite", _mock_provider(tokens=10))
         monkeypatch.setattr(r, "_ollama_cloud", _mock_failing_provider())
@@ -665,15 +648,15 @@ class TestCacheMonitoring:
 
         stats = get_cache_stats()
         assert stats["evictions"] > 0
-        assert stats["entries"] <= r._MAX_CACHE_ENTRIES
+        assert stats["entries"] <= cache_mod._MAX_CACHE_ENTRIES
 
     def test_semantic_cache_hit_chain(self, monkeypatch):
         """Enable semantic cache; similar prompts across features hit cache."""
         monkeypatch.setenv("AI_MODE", "ai_lite")
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "50000")
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-        r._SEMANTIC_CACHE_ENABLED = True
-        r._SEMANTIC_CACHE_THRESHOLD = 0.75
+        cache_mod._SEMANTIC_CACHE_ENABLED = True
+        cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.75
 
         monkeypatch.setattr(r, "_openrouter_lite", _mock_provider(
             text="Semantic chain response", tokens=40

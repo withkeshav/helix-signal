@@ -40,7 +40,11 @@ def _depeg_zone(score: int) -> str:
 
 
 def _refresh_interval() -> int:
-    return int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
+    try:
+        from providers.settings import get_setting
+        return int(get_setting("refresh_core_seconds") or 300)
+    except Exception:
+        return int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
 
 
 def _previous_asset_snapshot(db: Session, *, asset_symbol: str, bucket_id: int) -> AssetTrendSnapshot | None:

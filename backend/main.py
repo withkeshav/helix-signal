@@ -86,13 +86,22 @@ def _osint_job() -> None:
         if not get_setting("feature_osint_feed", db):
             return
         count = ingest_osint_feed(db)
-        refresh_attestation_reports(force=True)
         if count:
             log.info("osint_job.complete", articles_ingested=count)
     except Exception:
         log.exception("osint_job.failed")
     finally:
         db.close()
+
+
+async def _osint_attestation_refresh() -> None:
+    """Async background job to keep attestation cache fresh."""
+    try:
+        from services.osint import _refresh_attestation_reports_async
+        await _refresh_attestation_reports_async()
+        log.info("osint_attestation_refresh.complete", cache_fresh=True)
+    except Exception:
+        log.exception("osint_attestation_refresh.failed")
 
 
 @asynccontextmanager
@@ -130,6 +139,13 @@ async def lifespan(app: FastAPI):
         "interval",
         minutes=osint_minutes,
         id="osint-ingest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _osint_attestation_refresh,
+        "interval",
+        minutes=osint_minutes,
+        id="osint-attestation-refresh",
         replace_existing=True,
     )
     scheduler.start()
@@ -218,7 +234,12 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityValidationMiddleware)
 app.add_middleware(ObservabilityMiddleware)
-_cors_origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost").split(",") if o.strip()]
+try:
+    from providers.settings import get_setting
+    _cors_raw = get_setting("cors_origins") or os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost")
+except Exception:
+    _cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost")
+_cors_origins = [o.strip() for o in str(_cors_raw).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,

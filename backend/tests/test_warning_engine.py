@@ -21,6 +21,7 @@ os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 from database import Base, engine, init_db, AiUsage  # noqa: E402
 from services.ai_usage import increment_ai_usage, get_ai_usage_summary  # noqa: E402
 from services.warning_engine import check_warnings, _get_warning_threshold  # noqa: E402
+import services.components.ai.budget as budget_mod  # noqa: E402
 import main  # noqa: E402
 
 
@@ -95,10 +96,8 @@ def test_check_warnings_empty_on_low_usage(db_session) -> None:
 def test_check_warnings_ai_budget_threshold(monkeypatch, db_session) -> None:
     """AI budget warning triggers when usage exceeds warning_threshold."""
     monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-    from services.ai_router import _LOCAL_DAILY_TOKENS
-    import services.ai_router as r
-    r._LOCAL_DAILY_TOKENS = 850
-    r._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    budget_mod._LOCAL_DAILY_TOKENS = 850
+    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     warnings = check_warnings(db=db_session)
     ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
@@ -106,36 +105,34 @@ def test_check_warnings_ai_budget_threshold(monkeypatch, db_session) -> None:
     assert ai_warnings[0]["severity"] in ("warning", "critical")
     assert ai_warnings[0]["current_value"] == 850
 
-    r._LOCAL_DAILY_TOKENS = 0
+    budget_mod._LOCAL_DAILY_TOKENS = 0
 
 
 def test_check_warnings_ai_budget_critical(monkeypatch, db_session) -> None:
     """Critical severity when usage >= 95%."""
     monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-    import services.ai_router as r
-    r._LOCAL_DAILY_TOKENS = 980
-    r._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    budget_mod._LOCAL_DAILY_TOKENS = 980
+    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     warnings = check_warnings(db=db_session)
     ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
     assert len(ai_warnings) >= 1
     assert ai_warnings[0]["severity"] == "critical"
 
-    r._LOCAL_DAILY_TOKENS = 0
+    budget_mod._LOCAL_DAILY_TOKENS = 0
 
 
 def test_check_warnings_ai_budget_below_threshold(monkeypatch, db_session) -> None:
     """No AI budget warning when usage is below threshold."""
     monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-    import services.ai_router as r
-    r._LOCAL_DAILY_TOKENS = 100
-    r._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    budget_mod._LOCAL_DAILY_TOKENS = 100
+    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     warnings = check_warnings(db=db_session)
     ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
     assert len(ai_warnings) == 0
 
-    r._LOCAL_DAILY_TOKENS = 0
+    budget_mod._LOCAL_DAILY_TOKENS = 0
 
 
 # ---------------------------------------------------------------------------
@@ -206,9 +203,8 @@ def test_ai_usage_endpoint_with_data(db_session, client) -> None:
 def test_warning_structure(monkeypatch, db_session) -> None:
     """Warning dicts have the expected fields."""
     monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "100")
-    import services.ai_router as r
-    r._LOCAL_DAILY_TOKENS = 90
-    r._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    budget_mod._LOCAL_DAILY_TOKENS = 90
+    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     warnings = check_warnings(db=db_session)
     for w in warnings:
@@ -219,4 +215,4 @@ def test_warning_structure(monkeypatch, db_session) -> None:
         assert "threshold" in w
         assert "setting_key" in w
 
-    r._LOCAL_DAILY_TOKENS = 0
+    budget_mod._LOCAL_DAILY_TOKENS = 0

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html as html_mod
 import json
 import os
@@ -235,9 +236,23 @@ ATTESTATION_CHECKLIST: dict[str, dict[str, Any]] = {
 }
 
 _ATTESTATION_CACHE: dict[str, Any] = {"fetched_at": None, "reports": {}}
-_ATTESTATION_CACHE_TTL = int(os.getenv("ATTESTATION_CACHE_TTL_SECONDS", "21600"))
 _LLM_EXTRACT_CACHE: dict[str, tuple[float, datetime | None]] = {}
-_LLM_EXTRACT_CACHE_TTL = int(os.getenv("LLM_EXTRACT_CACHE_TTL", "86400"))
+_ATTESTATION_CACHE_TTL_SECONDS: int = 21600
+
+
+def _attestation_cache_ttl() -> int:
+    return _ATTESTATION_CACHE_TTL_SECONDS
+
+
+def _llm_extract_cache_ttl() -> int:
+    from providers.settings import get_setting
+    try:
+        val = get_setting("llm_extract_cache_ttl")
+        if val is not None:
+            return int(val)
+    except Exception:
+        pass
+    return int(os.getenv("LLM_EXTRACT_CACHE_TTL", "86400"))
 _ATTESTATION_HINT_WORDS = ("attestation", "reserve", "transparency", "report", "proof")
 _MONTH_NAMES = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December"
 _DATE_PATTERNS = (
@@ -405,7 +420,7 @@ def _extract_report_date_via_llm(raw_html: str) -> datetime | None:
     cached = _LLM_EXTRACT_CACHE.get(url_hash)
     if cached is not None:
         ts, result = cached
-        if time.time() - ts < _LLM_EXTRACT_CACHE_TTL:
+        if time.time() - ts < _llm_extract_cache_ttl():
             return result
     model = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
     dense = _dense_text_from_html(raw_html)
@@ -462,7 +477,7 @@ def refresh_attestation_reports(*, force: bool = False) -> dict[str, datetime | 
     fetched_at = _ATTESTATION_CACHE.get("fetched_at")
     now = datetime.now(timezone.utc)
     if not force and isinstance(fetched_at, datetime):
-        if (now - fetched_at).total_seconds() < _ATTESTATION_CACHE_TTL:
+        if (now - fetched_at).total_seconds() < _attestation_cache_ttl():
             return dict(_ATTESTATION_CACHE.get("reports") or {})
 
     reports: dict[str, datetime | None] = {}
@@ -475,6 +490,32 @@ def refresh_attestation_reports(*, force: bool = False) -> dict[str, datetime | 
     _ATTESTATION_CACHE["fetched_at"] = now
     _ATTESTATION_CACHE["reports"] = reports
     return dict(reports)
+
+
+async def _fetch_attestation_report_background(sym: str, info: dict[str, Any]) -> tuple[str, datetime | None]:
+    if info.get("observability") != "attestation":
+        return (sym, None)
+    url = str(info.get("url") or "")
+    try:
+        result = await asyncio.to_thread(_fetch_last_report_date, url)
+        return (sym, result)
+    except Exception:
+        return (sym, None)
+
+
+async def _refresh_attestation_reports_async() -> None:
+    """Async background refresh - updates _ATTESTATION_CACHE."""
+    reports: dict[str, datetime | None] = {}
+    tasks = [
+        _fetch_attestation_report_background(sym, info)
+        for sym, info in ATTESTATION_CHECKLIST.items()
+    ]
+    for task in asyncio.as_completed(tasks):
+        sym, report = await task
+        reports[sym] = report
+
+    _ATTESTATION_CACHE["fetched_at"] = datetime.now(timezone.utc)
+    _ATTESTATION_CACHE["reports"] = reports
 
 
 def _attestation_status_from_age_days(age_days: int | None) -> str:
@@ -515,7 +556,12 @@ def _supply_feed_block(defillama: SourceStatus | None, *, now: datetime) -> dict
 
 def get_attestation_status(db: Session | None = None) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
-    report_map = refresh_attestation_reports()
+    cached_reports = _ATTESTATION_CACHE.get("reports")
+    if cached_reports is not None:
+        report_map = cached_reports
+    else:
+        report_map = {}
+    
     defillama = None
     if db is not None:
         defillama = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()

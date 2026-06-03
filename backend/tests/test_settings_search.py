@@ -1,4 +1,5 @@
 import os
+import tempfile
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -7,13 +8,20 @@ from database import Base, get_db
 from main import app
 from providers.settings import Setting, get_all_settings
 
-# Set admin token for tests
-os.environ["HELIX_ADMIN_TOKEN"] = "test_token"
+_tmpdb_path = None
+_orig_token = None
 
 @pytest.fixture(scope="module")
 def test_app():
-    # Create a test database
-    SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+    global _tmpdb_path, _orig_token
+    # Save + set admin token (conftest may have overridden it)
+    _orig_token = os.environ.get("HELIX_ADMIN_TOKEN")
+    os.environ["HELIX_ADMIN_TOKEN"] = "test_token"
+    # Use a temp file so all sessions share the same database
+    _tmpdb = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    _tmpdb.close()
+    _tmpdb_path = _tmpdb.name
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{_tmpdb.name}"
     engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -53,6 +61,13 @@ def test_app():
     # Clean up
     Base.metadata.drop_all(bind=engine)
     app.dependency_overrides.clear()
+    if _tmpdb_path and os.path.exists(_tmpdb_path):
+        os.unlink(_tmpdb_path)
+    # Restore original admin token
+    if _orig_token is not None:
+        os.environ["HELIX_ADMIN_TOKEN"] = _orig_token
+    else:
+        os.environ.pop("HELIX_ADMIN_TOKEN", None)
 
 @pytest.fixture
 def client(test_app):

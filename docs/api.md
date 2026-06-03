@@ -38,13 +38,13 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/predictive?asset=USDT` | Predictive bundle (depeg probability, regime state, TimesFM integration) |
+| GET | `/api/predictive?asset=USDT` | Predictive bundle (depeg probability, regime state, forecast) |
 | GET | `/api/analytics/correlations?asset=USDT&window_days=30` | Pearson correlation matrix across 5 metrics, ranked pairs |
 | GET | `/api/analytics/patterns?asset=USDT&window_days=30` | Trend direction, volatility, day-of-week seasonality detection |
 | GET | `/api/analytics/regime?asset=USDT&window_hours=48` | Three-state regime classifier (stable/elevated/crisis) with duration and transitions |
 | GET | `/api/analytics/rotation?assets=USDT,USDC&window_days=30` | Cross-asset supply rotation signals (correlation + dominance shift) |
 | GET | `/api/analytics/stress-leaderboard?asset=USDT` | Chains ranked by 24h/7d supply velocity with direction |
-| GET | `/api/analytics/finbert/sentiment?text=...` | On-demand FinBERT sentiment analysis |
+| GET | `/api/analytics/sentiment?text=...` | On-demand LLM-powered sentiment analysis (Ollama Cloud) |
 | GET | `/api/analytics/forecast-accuracy?asset=USDT` | Forecast accuracy vs actuals |
 | GET | `/api/anomaly/detect?asset=USDT` | Z-score + Isolation Forest anomaly detection |
 | GET | `/api/anomaly/change-points?asset=USDT&window_days=14` | CUSUM change-point detection on depeg, supply, concentration |
@@ -54,7 +54,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/osint/feed?asset=USDT&limit=20` | Recent news articles with FinBERT sentiment |
+| GET | `/api/osint/feed?asset=USDT&limit=20` | Recent news articles with LLM-powered sentiment (Ollama Cloud) |
 | GET | `/api/osint/sentiment?asset=USDT&window_days=7` | Daily-aggregated sentiment time-series |
 | GET | `/api/osint/attestation` | Issuer report age + DefiLlama supply feed freshness per asset |
 | GET | `/api/osint/correlate?asset=USDT&window_hours=24` | Sentiment-depeg event correlation |
@@ -72,7 +72,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 | Method | Endpoint | Description | Gate |
 |--------|----------|-------------|------|
-| POST | `/api/admin/backfill?asset=USDT&days=7` | Synthetic historical backfill | `ALLOW_BACKFILL=true` |
+| POST | `/api/admin/backfill?asset=USDT&days=7` | Synthetic historical backfill | `allow_backfill` in Settings UI |
 | GET | `/api/admin/diagnostics` | Full system snapshot (version, health, sources, usage, settings, DB stats) | Requires admin token |
 
 ## Settings Management
@@ -112,7 +112,7 @@ Data Quality Dashboard provides comprehensive monitoring of:
 | GET | `/api/ai/market-overview` | Cross-asset market summary | 20/min | `AI_MODE != ai_off` (returns engine data when off) |
 | GET | `/api/ai/budget` | Daily token budget, used, remaining, pct | 30/min | Always available |
 
-AI endpoints can optionally require `X-Admin-Token` by setting `AI_REQUIRE_TOKEN=true` in `.env`.
+AI endpoints can optionally require `X-Admin-Token` — enable `ai_require_token` in Settings UI.
 When enabled, failed auth triggers a per-IP lockout after 20 failed attempts (15-minute window).
 Lockout uses Redis when available, falling back to in-memory tracking.
 
@@ -151,7 +151,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "3.8.3"
+  "version": "3.9.0"
 }
 ```
 

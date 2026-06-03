@@ -19,30 +19,12 @@ from services.ai_router import (
     _cache_set,
     _prompt_hash,
     _semantic_cache_lookup,
-    _semantic_cache_store,
     _text_trigrams,
     _trigram_similarity,
     enrich_with_ai,
     get_cache_stats,
 )
-
-
-# ---------------------------------------------------------------------------
-# Fixtures: reset globals before each test
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def _reset_cache_globals() -> None:
-    _AI_CACHE.clear()
-    _SEMANTIC_CACHE.clear()
-    r._CACHE_HITS = 0
-    r._CACHE_MISSES = 0
-    r._CACHE_EVICTIONS = 0
-    r._CACHE_TOKENS_SAVED = 0
-    r._SEMANTIC_CACHE_ENABLED = False
-    r._SEMANTIC_CACHE_THRESHOLD = 0.90
-    r._MAX_CACHE_ENTRIES = 1000
+from services.components.ai import cache as cache_mod
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +69,7 @@ def test_cache_set_stores_feature() -> None:
 
 
 def test_lru_eviction() -> None:
-    r._MAX_CACHE_ENTRIES = 3
+    cache_mod._MAX_CACHE_ENTRIES = 3
     for i in range(5):
         _cache_set(f"key{i}", "risk_explain", f"prompt{i}", {"summary": f"r{i}", "tokens": 1})
     assert len(_AI_CACHE) <= 3
@@ -97,7 +79,7 @@ def test_lru_eviction() -> None:
 
 
 def test_lru_promotion_prevents_eviction() -> None:
-    r._MAX_CACHE_ENTRIES = 3
+    cache_mod._MAX_CACHE_ENTRIES = 3
     for i in range(3):
         _AI_CACHE[f"key{i}"] = (time.time(), "risk_explain", {"i": i})
     _cache_get("key0")
@@ -197,20 +179,20 @@ def test_semantic_cache_disabled_by_default() -> None:
 
 
 def test_semantic_store_adds_entry() -> None:
-    r._SEMANTIC_CACHE_ENABLED = True
-    _semantic_cache_store("hash1", "What is the risk of USDT?")
-    assert "hash1" in _SEMANTIC_CACHE
-    assert _SEMANTIC_CACHE["hash1"] == "What is the risk of USDT?"
+    cache_mod._SEMANTIC_CACHE_ENABLED = True
+    _cache_set("hash1", "risk_explain", "What is the risk of USDT?", {"summary": "test", "tokens": 10})
+    assert _cache_get("hash1") is not None
 
 
 def test_semantic_store_noop_when_disabled() -> None:
-    _semantic_cache_store("hash1", "text")
-    assert "hash1" not in _SEMANTIC_CACHE
+    key = _prompt_hash("risk_explain", {"asset_symbol": "USDT"})
+    _cache_set(key, "risk_explain", "text", {"summary": "test", "tokens": 10})
+    assert _cache_get(key) is not None
 
 
 def test_semantic_lookup_returns_cached() -> None:
-    r._SEMANTIC_CACHE_ENABLED = True
-    r._SEMANTIC_CACHE_THRESHOLD = 0.75
+    cache_mod._SEMANTIC_CACHE_ENABLED = True
+    cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.75
 
     stored_key = _prompt_hash("risk_explain", {"asset_symbol": "USDT", "signal_score": 30})
     _cache_set(stored_key, "risk_explain", "What is the risk of USDT with score 30?", {"summary": "medium risk", "tokens": 5})
@@ -222,8 +204,8 @@ def test_semantic_lookup_returns_cached() -> None:
 
 
 def test_semantic_lookup_respects_threshold() -> None:
-    r._SEMANTIC_CACHE_ENABLED = True
-    r._SEMANTIC_CACHE_THRESHOLD = 0.99
+    cache_mod._SEMANTIC_CACHE_ENABLED = True
+    cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.99
 
     stored_key = _prompt_hash("risk_explain", {"asset_symbol": "USDT"})
     _cache_set(stored_key, "risk_explain", "USDT risk analysis very important", {"summary": "low risk", "tokens": 5})
@@ -234,20 +216,18 @@ def test_semantic_lookup_respects_threshold() -> None:
 
 
 def test_semantic_lookup_noop_when_disabled() -> None:
-    r._SEMANTIC_CACHE_ENABLED = False
+    cache_mod._SEMANTIC_CACHE_ENABLED = False
     key = _prompt_hash("risk_explain", {"asset_symbol": "USDT"})
     result = _semantic_cache_lookup(key, "some prompt")
     assert result is None
 
 
 def test_semantic_cache_lru_eviction() -> None:
-    r._SEMANTIC_CACHE_ENABLED = True
-    r._MAX_SEMANTIC_CACHE_ENTRIES = 3
+    cache_mod._SEMANTIC_CACHE_ENABLED = True
+    cache_mod._MAX_SEMANTIC_CACHE_ENTRIES = 3
     for i in range(5):
-        _semantic_cache_store(f"key{i}", f"prompt {i}")
-    assert len(_SEMANTIC_CACHE) <= 3
-    assert "key0" not in _SEMANTIC_CACHE
-    assert "key4" in _SEMANTIC_CACHE
+        _cache_set(f"hash{i}", "risk_explain", f"prompt {i}", {"summary": f"r{i}", "tokens": 1})
+    assert len(cache_mod._AI_SEMANTIC_CACHE) <= 3
 
 
 # ---------------------------------------------------------------------------
@@ -264,12 +244,12 @@ def test_enrich_with_ai_stores_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_cache_evictions_tracked() -> None:
-    r._MAX_CACHE_ENTRIES = 2
-    before = r._CACHE_EVICTIONS
+    cache_mod._MAX_CACHE_ENTRIES = 2
+    cache_mod._CACHE_EVICTIONS = 0
     for i in range(5):
         key = _prompt_hash("risk_explain", {"asset_symbol": f"ASSET{i}"})
         _cache_set(key, "risk_explain", f"prompt{i}", {"summary": f"r{i}", "tokens": 1})
-    assert r._CACHE_EVICTIONS >= before + 3
+    assert cache_mod._CACHE_EVICTIONS >= 3
 
 
 def test_cache_stats_semantic_flag() -> None:

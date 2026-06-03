@@ -20,6 +20,6 @@ def test_concentration_hhi_single_chain():
 
 
 def test_composite_bands():
-    assert scoring.composite_band(10) == "Normal"
+    assert scoring.composite_band(10) == "Healthy"
     assert scoring.composite_band(50) == "Watch"
-    assert scoring.composite_band(80) == "Risk"
+    assert scoring.composite_band(80) == "Alert"

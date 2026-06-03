@@ -17,9 +17,9 @@ from backend.core.limiter import limiter
 router = APIRouter()
 
 
-def _require_ai_auth(request: Request) -> None:
-    import os
-    if os.getenv("AI_REQUIRE_TOKEN", "").strip().lower() not in ("1", "true", "yes"):
+def _require_ai_auth(request: Request, db: Session | None = None) -> None:
+    from providers.settings import get_setting
+    if not get_setting("ai_require_token", db):
         return
     token = request.headers.get("X-Admin-Token")
     require_admin_token(request, token=token)
@@ -79,7 +79,7 @@ def ai_explain(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    _require_ai_auth(request)
+    _require_ai_auth(request, db)
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
@@ -96,7 +96,7 @@ def ai_narrative(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    _require_ai_auth(request)
+    _require_ai_auth(request, db)
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
@@ -114,8 +114,9 @@ def ai_narrative(
                 ctx["sentiment_label"] = "positive" if avg_s > 0.15 else ("negative" if avg_s < -0.15 else "neutral")
                 ctx["sentiment_score"] = f"{avg_s:.2f}"
     except Exception:
-        ctx["sentiment_label"] = "?"
-        ctx["sentiment_score"] = "?"
+        pass
+    ctx.setdefault("sentiment_label", "?")
+    ctx.setdefault("sentiment_score", "?")
 
     try:
         from routes.events import get_recent_events
@@ -148,7 +149,7 @@ def ai_insights(
     asset: str = Query(...),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    _require_ai_auth(request)
+    _require_ai_auth(request, db)
     mode = ai_mode()
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
@@ -204,7 +205,7 @@ def ai_market_overview(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    _require_ai_auth(request)
+    _require_ai_auth(request, db)
     context = _build_market_context(db)
     if context is None:
         return {"available": False, "reason": "no_assets"}

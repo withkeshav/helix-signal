@@ -89,7 +89,7 @@ def run_predictive_bundle(
         source_ok=bundle.source_ok,
         source_error=bundle.source_error,
         age_seconds=bundle.freshness_age_seconds,
-        refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")),
+        refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300") or "300"),
     )
     liq_component = int((risk.get("components") or {}).get("liquidity_depth", {}).get("score") or 0)
     returns = _historical_price_returns(db, sym)
@@ -99,7 +99,7 @@ def run_predictive_bundle(
         source_ok=bundle.source_ok,
         source_error=bundle.source_error,
         age_seconds=bundle.freshness_age_seconds,
-        refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")),
+        refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300") or "300"),
     )
     features = build_feature_vector(
         price=bundle.price,
@@ -115,7 +115,8 @@ def run_predictive_bundle(
     )
     regime = _regime_state(signal_score=bundle.signal_score, depeg_index=bundle.depeg_index)
 
-    enabled = os.getenv("ENABLE_PREDICTIVE", "true").strip().lower() not in ("0", "false", "no")
+    from providers.settings import get_setting
+    enabled = get_setting("enable_predictive", db)
 
     return {
         "asset_symbol": bundle.asset_symbol,

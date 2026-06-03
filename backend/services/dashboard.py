@@ -130,7 +130,7 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
     if selected_asset is None or not bool(selected_asset.get("enabled")):
         raise HTTPException(status_code=404, detail=f"Asset '{selected_symbol}' is not enabled")
 
-    refresh_interval = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
+    refresh_interval = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300") or "300")
 
     chains_orm = (
         db.query(AssetChainSnapshot)

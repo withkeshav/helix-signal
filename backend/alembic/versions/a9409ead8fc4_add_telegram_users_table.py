@@ -1,6 +1,6 @@
 """Add telegram_users table
 
-Revision ID: 20260601_175529_add_telegram_users
+Revision ID: a9409ead8fc4
 Revises: a9409ead8fc3
 Create Date: 2026-06-01 17:55:29.327
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '20260601_175529_add_telegram_users'
+revision: str = 'a9409ead8fc4'
 down_revision: Union[str, None] = 'a9409ead8fc3'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

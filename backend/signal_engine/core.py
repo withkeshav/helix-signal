@@ -24,9 +24,6 @@ log = get_logger(__name__)
 CHAINS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "chains.json"
 ASSETS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "assets.json"
 
-ENABLE_CHAINLINK = os.getenv("ENABLE_CHAINLINK", "").strip().lower() in ("1", "true", "yes")
-
-
 class SourceRegistry:
     def __init__(self) -> None:
         self._sources: dict[str, AbstractSource] = {}
@@ -44,7 +41,7 @@ class SourceRegistry:
         return list(self._sources.keys())
 
 
-def build_default_registry() -> SourceRegistry:
+def build_default_registry(db: Session | None = None) -> SourceRegistry:
     r = SourceRegistry()
     plugin_src = get_source("defillama")
     if plugin_src is not None:
@@ -53,7 +50,8 @@ def build_default_registry() -> SourceRegistry:
         r.register(_DefiLlamaSource())
     r.register(CoinGeckoSource())
     r.register(DexScreenerSource())
-    if ENABLE_CHAINLINK:
+    from providers.settings import get_setting
+    if get_setting("enable_chainlink", db):
         from sources.chainlink import ChainlinkSource
         r.register(ChainlinkSource())
     return r
@@ -75,9 +73,9 @@ def cross_source_price_check(prices: dict[str, float | None]) -> dict[str, Any]:
         "price_mean": round(sum(vals) / len(vals), 6),
     }
 
-
-def load_configured_chains() -> list[dict]:
-    use_dynamic = os.getenv("ENABLE_DYNAMIC_CHAINS", "").strip().lower() in ("1", "true", "yes")
+def load_configured_chains(db: Session | None = None) -> list[dict]:
+    from providers.settings import get_setting
+    use_dynamic = get_setting("enable_dynamic_chains", db)
     if use_dynamic:
         discovered = _discover_chain_ids()
         if discovered:
@@ -149,7 +147,7 @@ async def refresh_chain_data(db: Session) -> None:
     attempted_at = datetime.now(timezone.utc)
     prior_row = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
     prior_source_status = prior_row.status if prior_row else None
-    configured = load_configured_chains()
+    configured = load_configured_chains(db)
     chain_ids = [str(item["defillama_id"]) for item in configured]
     enabled_assets = load_enabled_assets()
     if not enabled_assets:
@@ -159,7 +157,7 @@ async def refresh_chain_data(db: Session) -> None:
         db.commit()
         return
 
-    registry = build_default_registry()
+    registry = build_default_registry(db)
     defillama_src = registry.get("defillama")
     coingecko_src = registry.get("coingecko")
     dexscreener_src = registry.get("dexscreener")

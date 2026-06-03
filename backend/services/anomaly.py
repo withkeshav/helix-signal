@@ -35,7 +35,15 @@ def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 3
     }
 
 
-STD_FLOOR = float(os.getenv("ANOMALY_STD_FLOOR", "0.001"))
+def _std_floor() -> float:
+    from providers.settings import get_setting
+    try:
+        val = get_setting("anomaly_std_floor")
+        if val is not None:
+            return float(val)
+    except Exception:
+        pass
+    return float(os.getenv("ANOMALY_STD_FLOOR", "0.001"))
 
 
 def zscore_detect(values: list[float], threshold: float = 3.0, min_bps: float = 0.0) -> list[dict[str, Any]]:
@@ -44,7 +52,7 @@ def zscore_detect(values: list[float], threshold: float = 3.0, min_bps: float = 
     import numpy as np
     arr = np.array(values)
     mean = np.mean(arr)
-    std = max(np.std(arr), STD_FLOOR)
+    std = max(np.std(arr), _std_floor())
     if std == 0:
         return []
     z_scores = (arr - mean) / std

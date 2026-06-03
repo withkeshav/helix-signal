@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.9.1 (2026-06-03)
+
+### Added
+
+- **Test pollution fix** — Single comprehensive `autouse=True` fixture `_reset_shared_globals` in `backend/tests/conftest.py` resets ALL cross-module mutable globals (`r.*`, `cache_mod.*`, `budget_mod.*`, `_PROVIDER_*`, `_SOURCE_RATE_LIMITS`) across `services.ai_router`, `services.components.ai.cache`, `services.components.ai.budget`, and `services.source_usage`. Removed per-file `_reset_globals` / `_reset_cache_globals` fixtures from `test_phase2_integration.py` and `test_ai_cache.py` to prevent overlapping subsets causing state leaks. 107/107 tests pass when core test files run together in a single process.
+
+- **AI Market Narrative cache TTL setting** — New `ai_cache_ttl_market_narrative` setting controls cache TTL for Market Narrative AI responses (default 3000 seconds / 50 minutes). Configurable via Settings UI (`/settings`), env var `AI_CACHE_TTL_MARKET_NARRATIVE`, or playbook preset. Enables tuning cache freshness vs. AI cost tradeoff without code changes.
+
+- **Runtime configurable AI feature TTLs** — Per-feature cache TTL overrides now read from settings DB via `_get_feature_cache_ttl()` in `backend/services/components/ai/cache.py`, allowing `ai_cache_ttl_market_narrative` to dynamically override the hardcoded `3000` value. Other features retain hardcoded defaults unless explicitly added.
+
+### Changed
+
+- **Test suite reliability** — Combined run of `test_ai_cache.py`, `test_ai_router.py`, `test_phase2_integration.py` now passes 107/107 tests consistently without fixture pollution between files.
+
+- **Market Narrative refresh control** — No automatic background refresh; user manually triggers via `/api/ai/narrative` endpoint or refresh button. TTL setting now controls how long cached responses are reused before recomputing.
+
+### Fixed
+
+- **Production `/api/osint/attestation` blocking** — Removed synchronous `refresh_attestation_reports()` call from `get_attestation_status()` endpoint. Endpoint now returns cached/stale data immediately without blocking on HTTP fetches to Tether/Circle/Paxos (up to 90+ seconds worst-case). Cache is kept fresh via scheduled job and can be manually refreshed if needed. Addresses production latency spike on uncached endpoint calls.
+
+### Infrastructure
+
+- **Version bumped** — 3.9.0 → 3.9.1
+
 ## 3.9.0 (2026-06-01)
 
 ### Added
@@ -30,6 +54,30 @@
 
 - **Version bumped** — 3.8.3 → 3.9.0
 - **README refreshed** — Updated with new features and functionality descriptions
+
+## 3.9.1 (2026-06-02)
+
+### Added
+
+- **Phase 3 — Alert Config Migration** — 11 alert settings moved from env vars to Settings UI:
+  - `alert_webhook_url`, `alert_discord_webhook`, `alert_telegram_bot_token`, `alert_telegram_chat_id` — dispatch channel credentials
+  - `alert_smtp_host`, `alert_smtp_port`, `alert_smtp_user`, `alert_smtp_pass`, `alert_email_to`, `alert_email_from` — SMTP dispatch
+  - `alert_slack_webhook` — Slack dispatch channel
+  - All dispatch functions in `services/alerts.py` read from DB via `get_setting()`, thread `db` through dispatch chain
+  - Removed `import os` from `services/alerts.py`
+
+- **Phase 4 — Adjustable Params Migration** — 5 runtime parameters moved from env vars to Settings UI:
+  - `cors_origins` — CORS origins (requires restart)
+  - `sentiment_max_articles_per_batch` — batch size for sentiment analysis
+  - `attestation_cache_ttl_seconds` — attestation report freshness cache TTL
+  - `llm_extract_cache_ttl` — LLM extraction cache TTL
+  - `anomaly_std_floor` — z-score standard deviation floor
+
+### Changed
+
+- **Configuration UX** — All user-facing settings now manageable from Settings UI instead of `.env`. `.env.example` reduced to infrastructure-only vars (admin token, log level, database URL).
+- **README refreshed** — V3 highlight weights corrected to match code (depeg 35%, concentration 25%, velocity 20%, age penalty 20%). FinBERT reference updated to "LLM-powered sentiment scoring". TimesFM claim removed. Env var list condensed to infrastructure-only.
+- **ClickHouse removed** — Fully removed from compose, codebase, tests, and docs (mop-up from prior session).
 
 ## 3.8.3 (2026-06-01)
 
@@ -90,7 +138,7 @@
 - **CI teardown timeout** — RPC Web3 listener and FRED poller tasks were fire-and-forget infinite loops never cancelled during lifespan shutdown, causing `TestClient` teardown to hang until pytest-timeout killed the process at 120s. Fixed by returning/capturing task handles and cancelling them in the `finally` block with `asyncio.gather(..., return_exceptions=True)`. Added `HELIX_DISABLE_BACKGROUND_TASKS` env var to skip both during tests (follows existing `HELIX_SKIP_STARTUP_REFRESH` pattern).
 - **Dockerfile curl version pin** — Replaced brittle `curl=8.14.1-2+deb13u3` exact version pin with `# hadolint ignore=DL3008` + unversioned `curl` install, preventing build failures when the base image apt index updates.
 - **`.process/` in `.gitignore`** — Added `.process/` entry to prevent accidental commit of internal session notes.
-- **CI smoke job profile + env vars** — Smoke job now runs `docker compose --profile data` (starts postgres/clickhouse/redis required by `depends_on`) with inline `POSTGRES_PASSWORD`/`CLICKHOUSE_PASSWORD` env vars to prevent `${POSTGRES_PASSWORD:?}` interpolation failure.
+- **CI smoke job profile + env vars** — Smoke job now runs `docker compose --profile data` (starts postgres/redis required by `depends_on`) with inline `POSTGRES_PASSWORD` env vars to prevent `${POSTGRES_PASSWORD:?}` interpolation failure.
 - **CI smoke BASE_URL fix** — Smoke check now passes `BASE_URL=http://localhost` (port 80) matching the production compose mapping, instead of defaulting to dev port 3000.
 - **Trivy action tag** — Fixed `aquasecurity/trivy-action@0.30.0` → `@v0.36.0` (0.30.0 tag never existed, was causing action resolution failure).
 - **CI smoke `.env` file** — Added `touch .env || true` before compose to satisfy `env_file: .env` directive on fresh checkout (no `.env` in CI runner).
@@ -162,7 +210,7 @@
 - **Budget tracking refactored** — `_deduct_tokens()` replaces `_within_budget()`: deducts actual tokens returned (not estimated pre-pay), supports Redis and local modes uniformly
 - **Provider chain reordered** — OpenRouter free → Ollama Cloud → Groq in `ai_lite`; free → fallback → primary → Groq in `ai_full` priority mode
 - **`.env.example`** — AI section reorganized with OpenRouter first, `AI_CACHE_TTL_SECONDS` default bumped from 1800→3600
-- **Docker images pinned** — `timescaledb:2.26.4-pg16`, `clickhouse-server:26.3.10.60-alpine`, `redis:7.4.9-alpine`, `python:3.12.13-slim`, `nginx:1.30.1-alpine` — all immutable minor versions
+- **Docker images pinned** — `timescaledb:2.26.4-pg16`, `redis:7.4.9-alpine`, `python:3.12.13-slim`, `nginx:1.30.1-alpine` — all immutable minor versions
 - **`POSTGRES_PASSWORD` required** — Docker errors on empty password (`${POSTGRES_PASSWORD:?}`) instead of defaulting to `helix`
 - **Docker healthchecks** — Switched from `python -c` to `curl -f`; added `depends_on` with health conditions for all data services
 - **Resource limits** — Backend capped at 768M memory, frontend at 128M via `deploy.resources`
@@ -179,7 +227,6 @@
 - **Rate limiter on `/api/ai/budget`** — 30/minute limit applied
 - **CI coverage floor** bumped from 60% → 65%
 - **Non-root nginx** — `frontend/Dockerfile` adds `USER nginx` with `chown` on static assets
-- **ClickHouse healthcheck** — Added `clickhouse-client --query="SELECT 1"` healthcheck to prevent rollover queries on unhealthy instance
 - **ECharts lazy-load bug** — Replaced broken `import()` UMD import with `<script>` injection that properly sets `window.echarts`; exported `_renderForecastChartsImpl` and wired into Alpine component
 
 ## 3.6.0 (2026-05-26)
@@ -322,10 +369,6 @@
 - **Analytics engine** (`services/analytics.py`) — `compute_correlations()` (Pearson matrix + pair ranking), `detect_patterns()` (trend slope, volatility, day-of-week seasonality), `_pearson()` with edge case handling
 - **Analytics routes** — `GET /analytics/correlations`, `GET /analytics/patterns`, `GET /analytics/finbert/sentiment`
 - **Anomaly detector guard** — `predict()` returns safe fallback when `self.trained=False` (was crashing on sklearn `NotFittedError`)
-- **ClickHouse schema** (`data/clickhouse/schema.sql`) — `ReplacingMergeTree` tables for asset/chain snapshots and forecast points
-- **DatabaseManager** (`core/database_manager.py`) — lazy `clickhouse_connect` client with LZ4, `get_trend_history()` OLAP→OLTP fallback, batch writes
-- **Data retention** — 6-table pruning with per-table env TTLs, ClickHouse `ALTER TABLE DELETE` path
-- **Docker Compose ClickHouse service** — `clickhouse/clickhouse-server:24-alpine`, `data` profile, 1GB limit, initdb schema auto-load
 - **Security middleware** — `SecurityValidationMiddleware` validates `asset` (A-Z0-9, 2-16 chars) and `window` (24h/7d/30d/90d), `sanitize_query_params()` redacts secrets
 - **Observability middleware** — 5 Prometheus metrics (`helix_http_requests_total`, `helix_http_request_duration_seconds`, `helix_source_health`, `helix_model_inference_seconds`, `helix_cache_hit_ratio`), structlog structured request logging
 - **Container hardening** — `no-new-privileges:true`, `cap_drop: ALL`, `read_only: true`, `tmpfs` on backend, celery-beat, celery-worker, timesfm

@@ -427,11 +427,10 @@ class TestScoringWeights:
             refresh_interval_seconds=300,
         )
         comps = result["components"]
-        assert comps["peg_stability"]["weight"] == 0.30
-        assert comps["concentration"]["weight"] == 0.20
-        assert comps["supply_stability"]["weight"] == 0.15
-        assert comps["liquidity_depth"]["weight"] == 0.25
-        assert comps["observability"]["weight"] == 0.10
+        assert comps["depeg_index"]["weight"] == 0.35
+        assert comps["concentration"]["weight"] == 0.25
+        assert comps["velocity"]["weight"] == 0.20
+        assert comps["age_penalty"]["weight"] == 0.20
 
     def test_velocity_integration_in_scoring(self):
         from signal_engine.scoring import compute_risk_score
@@ -443,15 +442,20 @@ class TestScoringWeights:
             refresh_interval_seconds=300,
             supply_velocity_1h=-3.0, supply_velocity_4h=-2.0, supply_accel_1h=-4.0,
         )
-        sup_detail = result["components"]["supply_stability"]["detail"]
-        assert sup_detail.get("supply_velocity_1h") == -3.0
-        assert sup_detail.get("supply_velocity_4h") == -2.0
-        assert sup_detail.get("supply_accel_1h") == -4.0
+        vel_detail = result["components"]["velocity"]["detail"]
+        assert vel_detail.get("supply_velocity_1h") == -3.0
+        assert vel_detail.get("supply_velocity_4h") == -2.0
+        assert vel_detail.get("supply_accel_1h") == -4.0
 
     def test_temporal_decay_applied(self):
-        from signal_engine.scoring import _temporal_weight
-        w24 = _temporal_weight(24)
-        w168 = _temporal_weight(168)
-        w336 = _temporal_weight(336)
-        assert w24 > w168 > w336
-        assert 0 < w24 <= 1.0
+        from signal_engine.scoring import compute_risk_score
+        result_non_aging = compute_risk_score(
+            price=1.0, chain_shares=[0.5, 0.3, 0.2],
+            source_ok=True, age_seconds=300,
+        )
+        result_aging = compute_risk_score(
+            price=1.0, chain_shares=[0.5, 0.3, 0.2],
+            source_ok=True, age_seconds=7200,
+        )
+        assert result_aging["components"]["age_penalty"]["score"] > 0
+        assert result_non_aging["components"]["age_penalty"]["score"] == 0

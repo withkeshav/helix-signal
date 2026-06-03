@@ -93,13 +93,14 @@ The composite **V3 Risk Score** is 0 to 100 with bands:
 
 Higher scores mean more suggested monitoring attention (stress across dimensions), not a prediction of failure.
 
-**Weights** (see `signal_engine/scoring.py` and API `components`):
+**Weights** (see `signal_engine/components/composite_scoring.py` and API `components`):
 
-- Peg stability: 30%
-- Liquidity depth: 25% (DEX slippage estimates, top-3 pool share; TVL change when historical TVL delta is available)
-- Concentration: 20% (HHI + top-chain share — elevated per 2025/2026 LEGO & ASRI research on downstream concentration as a primary failure mode)
-- Supply stability: 15% (includes supply velocity 1h/4h acceleration as a leading indicator)
-- Observability: 10%
+- Depeg index: 35% — peg deviation from $1 anchor
+- Concentration: 25% — HHI + top-chain share (elevated per 2025/2026 LEGO & ASRI research on downstream concentration as a primary failure mode)
+- Supply velocity: 20% — 1h/4h supply change acceleration as a leading indicator
+- Data age penalty: 20% — older data increases risk score, capped at 20 points
+
+A source health modifier applies a 50% penalty when data sources are degraded (factor of 0.5).
 
 Dashboard and trend pipelines share inputs via `signal_engine/risk_inputs.py`.
 
@@ -173,7 +174,7 @@ Sparklines:
 
 ## Refresh and Freshness
 
-- Scheduler interval: `REFRESH_INTERVAL_SECONDS` (default 300s)
+- Scheduler interval: `refresh_core_seconds` setting in Settings UI (default 300s)
 - On each refresh:
   - attempt DefiLlama fetch for each enabled asset
   - upsert asset-chain rows in SQLite
@@ -238,7 +239,7 @@ Fresh installs with little history are unaffected beyond normal low-data messagi
 
 ## Optional synthetic backfill (V2.5)
 
-When `ALLOW_BACKFILL=true`, `POST /api/admin/backfill?asset=SYMBOL&days=7` may insert **coarse daily** points from DefiLlama circulating charts. Rows use `source_status=synthetic_backfill` and do not overwrite calendar days that already have live ingest snapshots. Compare and export consumers may exclude synthetic rows where noted. This is for faster chart context on new installs, not a full historical re-score.
+When `allow_backfill` is enabled in Settings UI, `POST /api/admin/backfill?asset=SYMBOL&days=7` may insert **coarse daily** points from DefiLlama circulating charts. Rows use `source_status=synthetic_backfill` and do not overwrite calendar days that already have live ingest snapshots. Compare and export consumers may exclude synthetic rows where noted. This is for faster chart context on new installs, not a full historical re-score.
 
 ## Attestation and supply feed (OSINT)
 

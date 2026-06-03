@@ -59,7 +59,11 @@ def compute_asset_metric_bundle(
 ) -> AssetMetricBundle | None:
     """Replicate dashboard signal inputs for one enabled asset (read-only on db)."""
     if refresh_interval_seconds is None:
-        refresh_interval_seconds = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
+        try:
+            from providers.settings import get_setting
+            refresh_interval_seconds = int(get_setting("refresh_core_seconds") or 300)
+        except Exception:
+            refresh_interval_seconds = int(os.getenv("REFRESH_INTERVAL_SECONDS", "300"))
 
     sym = asset_symbol.upper()
     selected_asset = get_asset_by_symbol(sym)

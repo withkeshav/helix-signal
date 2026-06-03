@@ -13,7 +13,15 @@ OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 OLLAMA_MODEL = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
 _SENTIMENT_CACHE: dict[str, dict[str, Any]] = {}
 
-_SENTIMENT_MAX_INPUT_ARTICLES = int(os.getenv("SENTIMENT_MAX_ARTICLES_PER_BATCH", "15"))
+def _sentiment_max_articles() -> int:
+    from providers.settings import get_setting
+    try:
+        val = get_setting("sentiment_max_articles_per_batch")
+        if val is not None:
+            return int(val)
+    except Exception:
+        pass
+    return int(os.getenv("SENTIMENT_MAX_ARTICLES_PER_BATCH", "15"))
 
 
 def _within_sentiment_budget(estimated_tokens: int) -> bool:
@@ -32,7 +40,7 @@ def _make_request(titles: list[str]) -> list[dict[str, Any]]:
     if not OLLAMA_API_KEY:
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
-    titles = titles[:_SENTIMENT_MAX_INPUT_ARTICLES]
+    titles = titles[:_sentiment_max_articles()]
     if not titles:
         return []
 

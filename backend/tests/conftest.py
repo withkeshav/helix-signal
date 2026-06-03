@@ -17,8 +17,15 @@ os.environ["HELIX_SKIP_STARTUP_REFRESH"] = "1"
 os.environ["HELIX_ADMIN_TOKEN"] = "test-admin-token"
 os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 
+import providers.settings  # noqa: E402,F401 — registers Setting model with Base.metadata
 from database import Base, engine, init_db  # noqa: E402
 import main  # noqa: E402
+
+# Module references for global state reset (avoid "reset pollution" across test files)
+import services.ai_router as _r
+import services.components.ai.budget as _budget_mod
+import services.components.ai.cache as _cache_mod
+from services.source_usage import _SOURCE_RATE_LIMITS
 
 _TABLES = [
     "asset_chain_snapshots",
@@ -36,6 +43,47 @@ def _truncate_tables():
     with engine.begin() as conn:
         for t in _TABLES:
             conn.execute(text(f"DELETE FROM {t}"))
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_globals() -> None:
+    """Reset ALL module-level mutable globals before every test.
+
+    Each test file used to carry its own ``autouse`` fixture, but they set
+    overlapping *and* incomplete subsets — when the full suite runs in a
+    single process state leaks between files.  This single fixture replaces
+    all of them.
+    """
+    # -- services.ai_router (legacy copies) --
+    _r._AI_CACHE.clear()
+    _r._SEMANTIC_CACHE.clear()
+    _r._CACHE_HITS = 0
+    _r._CACHE_MISSES = 0
+    _r._CACHE_EVICTIONS = 0
+    _r._CACHE_TOKENS_SAVED = 0
+    _r._MAX_CACHE_ENTRIES = 1000
+    _r._SEMANTIC_CACHE_ENABLED = False
+    _r._SEMANTIC_CACHE_THRESHOLD = 0.90
+    _r._LOCAL_DAILY_TOKENS = 0
+    _r._LOCAL_TOKEN_DATE = ""
+
+    # -- services.components.ai.cache (authoritative copies) --
+    _cache_mod._AI_CACHE.clear()
+    _cache_mod._AI_SEMANTIC_CACHE.clear()
+    _cache_mod._CACHE_EVICTIONS = 0
+    _cache_mod._CACHE_TTL_SECONDS = 3600
+    _cache_mod._MAX_CACHE_ENTRIES = 1000
+    _cache_mod._SEMANTIC_CACHE_ENABLED = False
+    _cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.90
+
+    # -- services.components.ai.budget --
+    _budget_mod._LOCAL_DAILY_TOKENS = 0
+    _budget_mod._LOCAL_TOKEN_DATE = ""
+
+    # -- Provider / source rate-limit counters --
+    _r._PROVIDER_RATE_LIMITS.clear()
+    _r._PROVIDER_FALLBACK_COUNTS.clear()
+    _SOURCE_RATE_LIMITS.clear()
 
 
 @pytest.fixture()

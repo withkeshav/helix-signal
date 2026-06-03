@@ -1,4 +1,4 @@
-"""Data retention pruning — OLTP + OLAP aware."""
+"""Data retention pruning — OLTP aware."""
 
 from __future__ import annotations
 
@@ -15,11 +15,10 @@ from database import (
     OsintArticle,
     SignalEvent,
 )
-from backend.core.database_manager import dbm
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "3.9.0"
+HELIX_VERSION = "3.9.1"
 
 RETENTION_DEFAULTS: dict[str, int] = {
     "asset_trend_snapshots": 90,
@@ -82,24 +81,8 @@ def prune_old_history(db: Session) -> dict[str, Any]:
         "generated_at": now.isoformat().replace("+00:00", "Z"),
     }
 
-    if dbm.has_olap:
-        result["clickhouse"] = _prune_olap(now)
-
     log.info("retention_pruned", **result)
     return result
-
-
-def _prune_olap(now: datetime) -> dict[str, Any]:
-    try:
-        for table in ("asset_trend_snapshots", "chain_trend_snapshots"):
-            retention = _retention_days(table)
-            cutoff = (now - timedelta(days=retention)).strftime("%Y-%m-%d %H:%M:%S")
-            dbm.olap_query(
-                f"ALTER TABLE {table} DELETE WHERE timestamp < parseDateTime64BestEffort('{cutoff}') NO DELAY",
-            )
-        return {"status": "pruned"}
-    except Exception as exc:
-        return {"status": "error", "detail": str(exc)}
 
 
 def prune_all(db: Session) -> dict[str, Any]:

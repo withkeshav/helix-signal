@@ -106,7 +106,7 @@ class TestSourceRateLimit:
         assert _check_source_rate_limit("nonexistent_source")
 
     def test_dexscreener_limit(self):
-        for _ in range(299):
+        for _ in range(59):
             _record_source_call("dexscreener")
         assert _check_source_rate_limit("dexscreener")
         _record_source_call("dexscreener")

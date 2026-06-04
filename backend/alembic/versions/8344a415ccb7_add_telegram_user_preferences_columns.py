@@ -35,7 +35,7 @@ def upgrade() -> None:
     op.execute("UPDATE telegram_users SET alert_types = 'signal,anomaly,osint' WHERE alert_types IS NULL")
     op.execute("UPDATE telegram_users SET min_severity = 'medium' WHERE min_severity IS NULL")
     op.execute("UPDATE telegram_users SET timezone = 'UTC' WHERE timezone IS NULL")
-    op.execute("UPDATE telegram_users SET receive_digest = 1 WHERE receive_digest IS NULL")
+    op.execute("UPDATE telegram_users SET receive_digest = TRUE WHERE receive_digest IS NULL")
     op.execute("UPDATE telegram_users SET digest_time = '09:00' WHERE digest_time IS NULL")
 
 

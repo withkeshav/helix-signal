@@ -5,14 +5,15 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
-from providers.settings import apply_playbook, get_playbooks
+from providers.settings import get_playbooks as get_builtin_playbooks
+from routes.playbooks import apply_playbook_by_name, get_all_playbooks, seed_builtin_playbooks
 from services.ai_usage import get_ai_usage_summary
 from services.dashboard import build_dashboard_response
 from services.warning_engine import check_warnings
 from signal_engine.core import load_enabled_assets
 
-from backend.core.admin_auth import require_admin_token
-from backend.core.limiter import limiter
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
 
 router = APIRouter()
 
@@ -220,9 +221,14 @@ def ai_market_overview(
 @limiter.limit("10/minute")
 def ai_list_playbooks(
     request: Request,
+    db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ) -> dict[str, Any]:
-    return {"playbooks": list(get_playbooks().values())}
+    try:
+        seed_builtin_playbooks(db)
+    except Exception:
+        pass
+    return {"playbooks": get_all_playbooks(db)}
 
 
 @router.post("/ai/playbook/{name}")
@@ -234,7 +240,7 @@ def ai_apply_playbook(
     _auth=Depends(require_admin_token),
 ) -> dict[str, Any]:
     try:
-        changes = apply_playbook(name, db)
+        changes = apply_playbook_by_name(name, db)
         return {"ok": True, "playbook": name, "changes": changes}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

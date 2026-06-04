@@ -175,7 +175,7 @@ class DataQualityMetrics:
             metrics["total_ai_tokens"] = total_ai_tokens
             
             # Performance metrics based on rate limiting
-            from backend.core.limiter import limiter
+            from core.limiter import limiter
             if hasattr(limiter, '_window_stats'):
                 metrics["performance_metrics"]["rate_limit_stats"] = limiter._window_stats
             

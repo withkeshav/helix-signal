@@ -78,18 +78,20 @@ def run_predictive_bundle(
     *,
     asset_symbol: str,
 ) -> dict[str, Any]:
+    from providers.settings import get_setting
     sym = asset_symbol.upper()
     bundle = compute_asset_metric_bundle(db, asset_symbol=sym)
     if bundle is None:
         return {"asset_symbol": sym, "available": False}
 
     chains = db.query(AssetChainSnapshot).filter(AssetChainSnapshot.asset_symbol == bundle.asset_symbol).all()
+    _refresh_interval = int(get_setting("refresh_core_seconds", db) or 300)
     risk = compute_unified_risk_score(
         chains,
         source_ok=bundle.source_ok,
         source_error=bundle.source_error,
         age_seconds=bundle.freshness_age_seconds,
-        refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300") or "300"),
+        refresh_interval_seconds=_refresh_interval,
     )
     liq_component = int((risk.get("components") or {}).get("liquidity_depth", {}).get("score") or 0)
     returns = _historical_price_returns(db, sym)
@@ -99,7 +101,7 @@ def run_predictive_bundle(
         source_ok=bundle.source_ok,
         source_error=bundle.source_error,
         age_seconds=bundle.freshness_age_seconds,
-        refresh_interval_seconds=int(os.getenv("REFRESH_INTERVAL_SECONDS", "300") or "300"),
+        refresh_interval_seconds=_refresh_interval,
     )
     features = build_feature_vector(
         price=bundle.price,

@@ -10,16 +10,23 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.core.admin_auth import require_admin_token
-from backend.core.limiter import limiter
-from backend.services.retention import HELIX_VERSION
+# Safe env vars — allowlist only, never expose secrets
+_DIAGNOSTICS_ALLOWLIST = frozenset({
+    "HELIX_VERSION", "HELIX_ENV", "AI_MODE", "PYTHON_VERSION",
+    "FEATURE_TELEGRAM_BOT", "ENABLE_CHAINLINK", "ENABLE_REDIS_CACHE",
+    "HELIX_DISABLE_BACKGROUND_TASKS",
+})
+
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
+from services.retention import HELIX_VERSION
 from database import get_db
 from providers.settings import get_all_settings
 from services.alerts import load_alert_rules
 from services.backfill import run_backfill
 from services.governance import build_governance_payload
 from services.source_usage import get_source_usage_summary
-from backend.core.registry import SOURCES_REGISTRY, get_source
+from core.registry import SOURCES_REGISTRY, get_source
 
 router = APIRouter()
 
@@ -54,7 +61,7 @@ def _build_diagnostics(db: Session) -> dict[str, Any]:
         "environment": {
             key: os.getenv(key, "")
             for key in sorted(os.environ.keys())
-            if not any(s in key.lower() for s in ["token", "secret", "key", "password", "passwd", "auth", "api_key"])
+            if key in _DIAGNOSTICS_ALLOWLIST
         },
         "health": health,
         "sources": _get_source_statuses(),
@@ -74,17 +81,12 @@ def _get_health(db: Session) -> dict[str, Any]:
     except Exception:
         pass
     try:
-        from backend.core.cache_manager import cache
+        from core.cache_manager import cache
         if cache._redis:
             redis_connected = True
     except Exception:
         pass
-    try:
-        from backend.scheduler import scheduler
-        if scheduler and hasattr(scheduler, "running"):
-            scheduler_running = scheduler.running
-    except Exception:
-        pass
+    pass  # scheduler status unavailable — no standalone scheduler module
     return {
         "db": db_ok,
         "redis_connected": redis_connected,

@@ -11,7 +11,7 @@ from services.osint import (
     correlate_sentiment_depeg,
 )
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

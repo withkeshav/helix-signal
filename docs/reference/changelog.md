@@ -1,6 +1,64 @@
 # Changelog
 
+## 3.9.2 (2026-06-04)
+
+### Added
+
+- **Settings Registry expansion** — 18 new settings added: `cors_origins`, `feature_nlp_sentiment`, `llm_extract_cache_ttl`, `openrouter_free_model`, `anomaly_std_floor`, `sentiment_max_articles_per_batch`, `alert_discord_webhook`, `alert_telegram_bot_token`, `alert_telegram_chat_id`, `alert_smtp_host/port/user/pass`, `allow_backfill`, `enable_redis_cache`, `enable_chainlink`, `enable_dynamic_chains`, `feature_multi_user`
+- **Rate limit decorators** — 26 admin endpoints now rate-limited (30/min data quality, 30/min audit, 5-30/min import/export, 30/min telegram, 10/min login)
+- **AI Configuration Guide** — New `docs/guides/ai-configuration.md` with comprehensive setup instructions
+
+### Changed
+
+- **Import scheme unified** — All `from backend.xxx` imports converted to `from xxx` across 33 files (app runs with `WORKDIR /app/backend`, PYTHONPATH includes `/app/backend`)
+- **Diagnostics allowlist** — Environment variables in `/api/admin/diagnostics` filtered by explicit allowlist (`_DIAGNOSTICS_ALLOWLIST`) instead of blocklist, preventing accidental secret exposure
+- **Config wiring** — `ai_mode()` falls back to DB `get_setting("ai_mode")` instead of env-only defaults; `REFRESH_INTERVAL_SECONDS` reads from settings DB; module-level secret globals converted to lazy-load functions
+- **Chainlink stub** — Legacy `backend/sources/chainlink.py` now delegates to plugin registry via `get_source("chainlink")`
+- **Dockerfile PYTHONPATH** — Changed from `PYTHONPATH=/app` to `PYTHONPATH=/app/backend:/app` to support the unified import scheme
+- **Auth lockout test** — Updated to account for rate limit decorators (429 accepted alongside 403)
+- **`.env.example`** — Expanded with 18 new setting entries for alert dispatch, feature flags, and provider keys
+
+### Fixed
+
+- **Diagnostics env var leak** — Blocklist filter replaced with explicit allowlist to prevent secret exposure
+- **Test regression in backfill endpoint** — Restored `POST /api/admin/backfill` endpoint in `admin.py` that was accidentally dropped during route cleanup
+- **Scheduler status** — Removed dangling import of non-existent `backend/scheduler` module in `admin.py` health check
+
+### Infrastructure
+
+- **Version bumped** — 3.9.1 → 3.9.2
+
 ## 3.9.1 (2026-06-03)
+
+### Added
+
+- **Per-feature AI model overrides** — New settings allow specifying different AI models for different features:
+  - `ai_model_risk_explain` — Model for risk explanation feature
+  - `ai_model_market_narrative` — Model for market narrative feature  
+  - `ai_model_insight_summary` — Model for insight summary feature
+  - `ai_model_predictive` — Model for predictive analytics feature
+- **AI Model Discovery API** — New endpoints for discovering available models from AI providers:
+  - `GET /api/admin/ai/providers` — List all available AI providers
+  - `GET /api/admin/ai/providers/{provider_id}/models` — List models for a specific provider
+- **Granular per-feature settings** — Detailed configuration options for AI features:
+  - Predictive analytics: `predictive_enable_depeg`, `predictive_enable_regime`, `predictive_depeg_horizons`, `predictive_confidence_threshold`
+  - AI summaries: `ai_summary_max_length`, `ai_summary_detail_level`
+  - AI explanations: `ai_explain_max_factors`, `ai_explain_confidence_min`
+  - AI insights: `ai_insights_max_assets`, `ai_insights_correlation_min`
+  - OSINT features: `osint_enable_sentiment`, `osint_enable_entity_extraction`
+- **Dynamic model selection in Settings UI** — Dropdown menus now show available models from configured AI providers
+- **AI Configuration Guide** — New documentation at `docs/guides/ai-configuration.md` with comprehensive setup instructions
+
+### Changed
+
+- **Enhanced Settings UI** — Model selection dropdowns now dynamically fetch available models from AI providers
+- **Improved AI Router** — Backend routing logic updated to support per-feature model overrides
+- **Settings Registry** — Added 18 new settings for AI model management and feature configuration
+
+### Fixed
+
+- **Model Selection UX** — Settings UI now properly displays available models for each provider
+- **Feature Configuration** — Per-feature settings are now properly applied to their respective AI functions
 
 ### Added
 

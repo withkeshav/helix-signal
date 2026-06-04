@@ -16,10 +16,7 @@ from separate modules in the routes/ directory.
 
 import asyncio
 import os
-import sys
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from pathlib import Path
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,18 +26,18 @@ from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
-from database import AssetTrendSnapshot, Base, SessionLocal, get_db, init_db
+from database import AssetTrendSnapshot, SessionLocal, get_db, init_db
 from logging_config import configure_logging
 from middleware.security import SecurityValidationMiddleware
 from middleware.observability import ObservabilityMiddleware
 from services.backfill import run_backfill
-from services.osint import ingest_osint_feed, refresh_attestation_reports
+from services.osint import ingest_osint_feed
 from services.retention import prune_old_history
 from signal_engine.core import load_enabled_assets, refresh_chain_data
 
-from backend.core.admin_auth import require_admin_token
-from backend.core.limiter import limiter
-from backend.core.registry import discover_plugins
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
+from core.registry import discover_plugins
 from routes import register_routes
 
 configure_logging()

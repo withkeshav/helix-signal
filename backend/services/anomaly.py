@@ -184,28 +184,7 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     return results
 
 
-def emit_anomaly_events(db: Session, *, asset_symbol: str, anomalies: dict[str, Any]) -> int:
-    count = 0
-    for z_type, z_data in anomalies.get("z_score", {}).items():
-        if isinstance(z_data, list) and z_data:
-            for a in z_data[:3]:
-                row = SignalEvent(
-                    asset_symbol=asset_symbol,
-                    chain_key=None,
-                    event_type="anomaly_detected",
-                    severity="warning",
-                    title=f"{asset_symbol} {z_type} anomaly (z={a['z_score']:.1f})",
-                    summary=f"{z_type} at {a['value']:.2f} is {a['z_score']:.1f}σ from rolling mean {a['mean']:.2f}",
-                    old_value=None,
-                    new_value=None,
-                    delta=str(round(a["z_score"], 2)),
-                    threshold="3σ",
-                    timestamp=datetime.now(timezone.utc),
-                    metadata_json=json.dumps(a),
-                )
-                db.add(row)
-                count += 1
-    return count
+
 
 
 def _cusum(values: list[float], threshold: float = 3.0, drift: float = 0.5) -> list[dict[str, Any]]:

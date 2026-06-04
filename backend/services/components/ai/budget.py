@@ -58,7 +58,7 @@ def _deduct_tokens(count: int) -> bool:
     redis_url = os.getenv("REDIS_URL", "").strip()
     if redis_url:
         try:
-            from backend.core.cache_manager import cache
+            from core.cache_manager import cache
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             key = f"helix:ai:daily_tokens:{today}"
             client = cache._redis
@@ -82,7 +82,7 @@ def _within_budget(count: int) -> bool:
     redis_url = os.getenv("REDIS_URL", "").strip()
     if redis_url:
         try:
-            from backend.core.cache_manager import cache
+            from core.cache_manager import cache
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             key = f"helix:ai:daily_tokens:{today}"
             client = cache._redis
@@ -105,7 +105,7 @@ def get_budget_status() -> Dict[str, Any]:
     
     if redis_url:
         try:
-            from backend.core.cache_manager import cache
+            from core.cache_manager import cache
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             key = f"helix:ai:daily_tokens:{today}"
             client = cache._redis

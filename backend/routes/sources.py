@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from services.source_usage import get_source_usage, get_source_usage_summary
-from backend.core.limiter import limiter
-from backend.core.registry import SOURCES_REGISTRY, get_source
+from core.limiter import limiter
+from core.registry import SOURCES_REGISTRY, get_source
 
 router = APIRouter()
 

@@ -9,7 +9,7 @@ from services.exports import events_export
 from signal_engine.core import get_asset_by_symbol
 from utils import signal_event_rows_to_out
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

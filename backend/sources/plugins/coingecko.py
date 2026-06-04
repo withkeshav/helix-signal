@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from backend.core.circuit_breaker import CircuitBreaker
-from backend.core.registry import register_source
+from core.circuit_breaker import CircuitBreaker
+from core.registry import register_source
 from services.source_usage import increment_source_usage
 from sources.base import AbstractSource
 from sources.coingecko import CoinGeckoSource as _LegacyCoinGeckoSource

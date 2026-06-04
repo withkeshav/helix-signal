@@ -10,7 +10,7 @@ def openrouter_lite(
     prompt: str, max_tokens: int, model: Optional[str] = None, **kwargs
 ) -> Optional[Dict[str, Any]]:
     """Call OpenRouter Lite API."""
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("OPENROUTER_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")

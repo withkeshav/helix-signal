@@ -1,7 +1,7 @@
 """Anomaly detection plugin — Isolation Forest."""
 
-from backend.core.registry import register_model
-from backend.core.plugin_base import AbstractModel
+from core.registry import register_model
+from core.plugin_base import AbstractModel
 
 
 @register_model("anomaly")

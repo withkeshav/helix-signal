@@ -7,7 +7,7 @@ from database import AssetTrendSnapshot, SourceStatus, get_db
 from services.health import build_health_payload
 from services.retention import HELIX_VERSION
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

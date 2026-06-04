@@ -11,7 +11,7 @@ from services.exports import trends_export
 from signal_engine.core import get_asset_by_symbol
 from utils import window_delta
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

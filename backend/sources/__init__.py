@@ -1,5 +1,5 @@
 """External data source clients."""
-from sources.base import AbstractSource, SourceError
+from sources.base import AbstractSource
 from sources.defillama import (
     DefiLlamaError,
     _DefiLlamaSource,

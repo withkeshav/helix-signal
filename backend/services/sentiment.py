@@ -8,10 +8,19 @@ from typing import Any
 
 import httpx
 
-OLLAMA_API_BASE = os.getenv("OLLAMA_CLOUD_BASE", "https://ollama.com/v1")
-OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
-OLLAMA_MODEL = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
 _SENTIMENT_CACHE: dict[str, dict[str, Any]] = {}
+
+
+def _ollama_api_base() -> str:
+    return os.getenv("OLLAMA_CLOUD_BASE", "https://ollama.com/v1")
+
+
+def _ollama_api_key() -> str:
+    return os.getenv("OLLAMA_API_KEY", "")
+
+
+def _ollama_model() -> str:
+    return os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
 
 def _sentiment_max_articles() -> int:
     from providers.settings import get_setting
@@ -37,7 +46,7 @@ def _parse_sentiment(item: dict) -> dict[str, Any]:
 
 
 def _make_request(titles: list[str]) -> list[dict[str, Any]]:
-    if not OLLAMA_API_KEY:
+    if not _ollama_api_key():
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
     titles = titles[:_sentiment_max_articles()]
@@ -61,13 +70,13 @@ def _make_request(titles: list[str]) -> list[dict[str, Any]]:
 
     try:
         resp = httpx.post(
-            f"{OLLAMA_API_BASE}/chat/completions",
+            f"{_ollama_api_base()}/chat/completions",
             headers={
-                "Authorization": f"Bearer {OLLAMA_API_KEY}",
+                "Authorization": f"Bearer {_ollama_api_key()}",
                 "Content-Type": "application/json",
             },
             json={
-                "model": OLLAMA_MODEL,
+                "model": _ollama_model(),
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.0,
                 "max_tokens": 500,

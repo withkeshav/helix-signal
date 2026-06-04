@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
-from sources.base import AbstractSource, SourceError, async_http_get_with_retry, http_get_with_retry
+from sources.base import AbstractSource, async_http_get_with_retry, http_get_with_retry
 
 USDT_STABLECOINS_URL = "https://stablecoins.llama.fi/stablecoins?includePrices=true"
 STABLECOIN_CHAINS_URL = "https://stablecoins.llama.fi/stablecoinchains"

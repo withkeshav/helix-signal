@@ -303,6 +303,27 @@ class User(Base):
     )
 
 
+class Playbook(Base):
+    """User-customizable configuration playbooks."""
+
+    __tablename__ = "playbooks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(128))
+    description: Mapped[str] = mapped_column(String(500))
+    settings: Mapped[dict] = mapped_column(JSON)
+    is_builtin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 class SettingsAuditLog(Base):
     """Audit log for settings changes."""
 
@@ -354,6 +375,44 @@ def init_db() -> None:
     else:
         Base.metadata.create_all(bind=engine)
     _migrate_legacy_chain_data()
+    _seed_builtin_playbooks()
+
+
+def _seed_builtin_playbooks() -> None:
+    """Seed built-in playbooks into the database on first init."""
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table' AND name='playbooks'")
+            )
+            if result.fetchone() is None:
+                return
+    except Exception:
+        return
+    from datetime import datetime, timezone
+    from providers.settings import PLAYBOOKS
+
+    with SessionLocal() as session:
+        existing = {
+            row[0]
+            for row in session.execute(
+                text("SELECT name FROM playbooks WHERE is_builtin = 1")
+            ).fetchall()
+        }
+        now = datetime.now(timezone.utc)
+        for name, data in PLAYBOOKS.items():
+            if name not in existing:
+                pb = Playbook(
+                    name=name,
+                    label=data["label"],
+                    description=data["description"],
+                    settings=dict(data["settings"]),
+                    is_builtin=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(pb)
+        session.commit()
 
 
 def _migrate_legacy_chain_data() -> None:

@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app/backend
 
 WORKDIR /app/backend
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/backend:/app
 
 RUN mkdir -p /data && chown helix:helix /data /tmp
 

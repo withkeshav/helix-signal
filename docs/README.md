@@ -8,6 +8,7 @@
 - [Adding a Stablecoin](guides/adding-asset.md)
 - [Adding a Chain](guides/adding-chain.md)
 - [Plugin Development](guides/plugins.md)
+- [AI Configuration](guides/ai-configuration.md)
 
 ## Concepts
 - [Data Methodology](concepts/data-methodology.md) — Scoring, supply velocity, regime detection, anomaly detection

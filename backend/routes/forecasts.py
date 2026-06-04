@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 from database import ForecastPoint, ForecastRun, AssetTrendSnapshot, get_db
 
 router = APIRouter()

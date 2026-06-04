@@ -15,7 +15,7 @@ from sources.defillama import DefiLlamaError, _DefiLlamaSource, async_fetch_chai
 from sources.coingecko import CoinGeckoSource
 from sources.dexscreener import DexScreenerSource
 from sources.base import AbstractSource
-from backend.core.registry import get_source
+from core.registry import get_source
 from services.source_usage import increment_source_usage
 from structlog import get_logger
 
@@ -37,8 +37,7 @@ class SourceRegistry:
     def all(self) -> list[AbstractSource]:
         return list(self._sources.values())
 
-    def names(self) -> list[str]:
-        return list(self._sources.keys())
+
 
 
 def build_default_registry(db: Session | None = None) -> SourceRegistry:
@@ -52,8 +51,12 @@ def build_default_registry(db: Session | None = None) -> SourceRegistry:
     r.register(DexScreenerSource())
     from providers.settings import get_setting
     if get_setting("enable_chainlink", db):
-        from sources.chainlink import ChainlinkSource
-        r.register(ChainlinkSource())
+        plugin_src = get_source("chainlink")
+        if plugin_src is not None:
+            r.register(plugin_src)
+        else:
+            from sources.chainlink import ChainlinkSource
+            r.register(ChainlinkSource())
     return r
 
 

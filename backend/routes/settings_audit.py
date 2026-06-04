@@ -14,7 +14,8 @@ from services.settings_audit import (
     get_user_settings_changes,
     get_recent_settings_changes,
 )
-from backend.core.admin_auth import require_admin_token
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
 
 router = APIRouter()
 
@@ -32,7 +33,9 @@ class SettingsAuditLogResponse(BaseModel):
 
 
 @router.get("/settings/audit", response_model=List[SettingsAuditLogResponse])
+@limiter.limit("30/minute")
 def get_audit_logs(
+    request: Request,
     setting_key: Optional[str] = None,
     user_id: Optional[int] = None,
     limit: int = 100,
@@ -66,7 +69,9 @@ def get_audit_logs(
 
 
 @router.get("/settings/audit/history/{setting_key}", response_model=List[SettingsAuditLogResponse])
+@limiter.limit("30/minute")
 def get_setting_history(
+    request: Request,
     setting_key: str,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -96,7 +101,9 @@ def get_setting_history(
 
 
 @router.get("/settings/audit/user/{user_id}", response_model=List[SettingsAuditLogResponse])
+@limiter.limit("30/minute")
 def get_user_changes(
+    request: Request,
     user_id: int,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -126,7 +133,9 @@ def get_user_changes(
 
 
 @router.get("/settings/audit/recent", response_model=List[SettingsAuditLogResponse])
+@limiter.limit("30/minute")
 def get_recent_changes(
+    request: Request,
     limit: int = 50,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),

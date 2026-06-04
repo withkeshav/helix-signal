@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.core.admin_auth import require_admin_token
-from backend.core.limiter import limiter
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
 from database import get_db
 from providers.settings import get_all_settings, set_setting
 

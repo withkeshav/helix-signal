@@ -277,10 +277,31 @@ async def digest_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_T
 async def alerts_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /alerts command - show recent alerts."""
     try:
-        # This would fetch recent alerts from the database
-        message = "📊 *Recent Alerts*\n\n"
-        message += "No recent alerts to display.\n\n"
-        message += "_This feature will show your recent alerts when implemented._"
+        from sqlalchemy import desc
+        from database import SessionLocal, SignalEvent
+
+        db = SessionLocal()
+        try:
+            recent = (
+                db.query(SignalEvent)
+                .order_by(desc(SignalEvent.timestamp))
+                .limit(5)
+                .all()
+            )
+        finally:
+            db.close()
+
+        if not recent:
+            message = "📊 *Recent Alerts*\n\nNo recent alerts to display."
+        else:
+            message = f"📊 *Recent Alerts* (last {len(recent)})\n\n"
+            for ev in recent:
+                emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(
+                    ev.severity, "ℹ️"
+                )
+                ts = ev.timestamp.strftime("%H:%M UTC") if ev.timestamp else ""
+                message += f"{emoji} *{ev.title}*\n`{ev.asset_symbol}` · {ts}\n{ev.summary[:200]}\n\n"
+
         await update.message.reply_text(message, parse_mode="Markdown")
     except Exception as e:
         logger.error(f"Error in alerts_command: {e}")
@@ -314,15 +335,15 @@ def create_bot_application() -> Optional[Application]:
         # Create the Application
         application = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
 
-        # Add command handlers
-        application.add_handler(CommandHandler("start", start_command))
-        application.add_handler(CommandHandler("help", help_command))
-        application.add_handler(CommandHandler("subscribe", subscribe_command))
-        application.add_handler(CommandHandler("unsubscribe", unsubscribe_command))
-        application.add_handler(CommandHandler("status", status_command))
-        application.add_handler(CommandHandler("settings", settings_command))
-        application.add_handler(CommandHandler("digest", digest_command))
-        application.add_handler(CommandHandler("alerts", alerts_command))
+        # Add command handlers (all rate-limited)
+        application.add_handler(CommandHandler("start", rate_limited_start_command))
+        application.add_handler(CommandHandler("help", rate_limited_help_command))
+        application.add_handler(CommandHandler("subscribe", rate_limited_subscribe_command))
+        application.add_handler(CommandHandler("unsubscribe", rate_limited_unsubscribe_command))
+        application.add_handler(CommandHandler("status", rate_limited_status_command))
+        application.add_handler(CommandHandler("settings", rate_limited_settings_command))
+        application.add_handler(CommandHandler("digest", rate_limited_digest_command))
+        application.add_handler(CommandHandler("alerts", rate_limited_alerts_command))
         application.add_handler(CommandHandler("signal", rate_limited_signal_command))
         application.add_handler(CommandHandler("brief", rate_limited_brief_command))
         application.add_handler(CommandHandler("price", rate_limited_price_command))
@@ -356,6 +377,38 @@ async def rate_limited_refer_command(update: TelegramUpdate, context: ContextTyp
     """Rate-limited wrapper for /refer command."""
     if await telegram_middleware.check_rate_limit(update, context):
         await refer_command(update, context)
+
+async def rate_limited_start_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await start_command(update, context)
+
+async def rate_limited_help_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await help_command(update, context)
+
+async def rate_limited_subscribe_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await subscribe_command(update, context)
+
+async def rate_limited_unsubscribe_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await unsubscribe_command(update, context)
+
+async def rate_limited_status_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await status_command(update, context)
+
+async def rate_limited_settings_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await settings_command(update, context)
+
+async def rate_limited_digest_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await digest_command(update, context)
+
+async def rate_limited_alerts_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if await telegram_middleware.check_rate_limit(update, context):
+        await alerts_command(update, context)
 
 async def send_alert_to_user(telegram_id: int, alert_message: str, alert_type: str = "info") -> bool:
     """Send an alert message to a specific user."""

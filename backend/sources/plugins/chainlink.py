@@ -11,9 +11,9 @@ from typing import Any
 
 import requests
 
-from backend.core.registry import register_source
-from backend.core.circuit_breaker import CircuitBreaker
-from backend.sources.base import AbstractSource
+from core.registry import register_source
+from core.circuit_breaker import CircuitBreaker
+from sources.base import AbstractSource
 
 
 @register_source("chainlink")

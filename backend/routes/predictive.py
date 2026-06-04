@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

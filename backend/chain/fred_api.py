@@ -12,15 +12,15 @@ from core.olap import get_duckdb
 
 log = get_logger(__name__)
 
-FRED_API_KEY = os.getenv("FRED_API_KEY", "")
 FRED_BASE = "https://api.stlouisfed.org/fred"
 
-SERIES_MAP: dict[str, str] = {
-    "DGS1MO": "1-Month Treasury Bill Yield",
-    "DGS3MO": "3-Month Treasury Bill Yield",
-}
 
-POLL_INTERVAL_SECONDS = int(os.getenv("FRED_POLL_INTERVAL_SECONDS", "3600"))
+def _fred_api_key() -> str:
+    return os.getenv("FRED_API_KEY", "")
+
+
+def _poll_interval_seconds() -> int:
+    return int(os.getenv("FRED_POLL_INTERVAL_SECONDS", "3600"))
 
 
 def _init_fred_schema() -> None:
@@ -41,14 +41,14 @@ def _init_fred_schema() -> None:
 
 
 async def fetch_series(series_id: str) -> list[dict[str, Any]]:
-    if not FRED_API_KEY:
+    if not _fred_api_key():
         log.warning("fred.api_key_missing")
         return []
 
     url = f"{FRED_BASE}/series/observations"
     params = {
         "series_id": series_id,
-        "api_key": FRED_API_KEY,
+        "api_key": _fred_api_key(),
         "file_type": "json",
         "sort_order": "desc",
         "limit": 100,
@@ -108,14 +108,14 @@ async def refresh_fred_yields() -> dict[str, int]:
 
 
 async def start_fred_poller() -> None:
-    if not FRED_API_KEY:
+    if not _fred_api_key():
         log.warning("fred.poller_disabled", reason="FRED_API_KEY not set")
         return
     _init_fred_schema()
-    log.info("fred.poller.start", interval_seconds=POLL_INTERVAL_SECONDS)
+    log.info("fred.poller.start", interval_seconds=_poll_interval_seconds())
     while True:
         try:
             await refresh_fred_yields()
         except Exception as exc:
             log.warning("fred.poller.error", error=str(exc))
-        await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        await asyncio.sleep(_poll_interval_seconds())

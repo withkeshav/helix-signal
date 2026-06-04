@@ -728,28 +728,119 @@
             <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
               <div>
                 <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600">AI Playbook Presets</h3>
-                <p style="margin:0;font-size:12px;color:var(--muted)">One-click presets to reconfigure all AI budget and provider settings</p>
+                <p style="margin:0;font-size:12px;color:var(--muted)">One-click presets to reconfigure AI budget, providers, and features</p>
               </div>
-              <div style="display:flex;gap:8px">
-                <button class="playbook-btn btn" :class="playbookLoading==='max_free'?'btn-muted':''"
-                        :style="playbookLoading==='max_free'?'opacity:0.6':'background:#065f46;color:#fff;border-color:#065f46'"
-                        @click="applyPlaybook('max_free')" :disabled="playbookLoading !== null">
-                  <span x-show="playbookLoading==='max_free'" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
-                  Max Free
-                </button>
-                <button class="playbook-btn btn" :class="playbookLoading==='balanced'?'btn-muted':''"
-                        :style="playbookLoading==='balanced'?'opacity:0.6':'background:#1e40af;color:#fff;border-color:#1e40af'"
-                        @click="applyPlaybook('balanced')" :disabled="playbookLoading !== null">
-                  <span x-show="playbookLoading==='balanced'" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
-                  Balanced
-                </button>
-                <button class="playbook-btn btn" :class="playbookLoading==='quality'?'btn-muted':''"
-                        :style="playbookLoading==='quality'?'opacity:0.6':'background:#7c3aed;color:#fff;border-color:#7c3aed'"
-                        @click="applyPlaybook('quality')" :disabled="playbookLoading !== null">
-                  <span x-show="playbookLoading==='quality'" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
-                  Quality
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <template x-for="pb in playbooks" :key="pb.name">
+                  <button class="playbook-btn btn"
+                          :style="playbookLoading===pb.name?'opacity:0.6':pb.is_builtin && pb.name==='max_free'?'background:#065f46;color:#fff;border-color:#065f46':pb.is_builtin && pb.name==='balanced'?'background:#1e40af;color:#fff;border-color:#1e40af':pb.is_builtin && pb.name==='quality'?'background:#7c3aed;color:#fff;border-color:#7c3aed':'background:var(--panel);color:var(--text);border-color:var(--line)'"
+                          @click="applyCustomPlaybook(pb)" :disabled="playbookLoading !== null">
+                    <span x-show="playbookLoading===pb.name" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
+                    <span x-text="pb.label"></span>
+                  </button>
+                </template>
+                <button class="btn btn-muted" style="padding:8px 14px;font-size:12px" @click="initPlaybookSettingsEdit(); showCreatePlaybookModal=true">
+                  + Custom
                 </button>
               </div>
+            </div>
+            <!-- Custom playbook management -->
+            <template x-if="playbooks.filter(p => !p.is_builtin).length">
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <template x-for="pb in playbooks.filter(p => !p.is_builtin)" :key="pb.id">
+                    <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-size:12px">
+                      <span style="font-weight:600" x-text="pb.label"></span>
+                      <span style="color:var(--muted);font-size:10px" x-text="`(${Object.keys(pb.settings).length} settings)`"></span>
+                      <button class="btn btn-muted" style="padding:2px 6px;font-size:10px" @click="openEditPlaybook(pb)">Edit</button>
+                      <button class="btn btn-muted" style="padding:2px 6px;font-size:10px;background:var(--alert-bg);color:var(--down);border-color:var(--down)" @click="openDeletePlaybook(pb)">Del</button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+          
+          <!-- A1: Create Playbook Modal -->
+          <div x-show="showCreatePlaybookModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showCreatePlaybookModal=false">
+            <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
+              <h3 style="margin:0 0 16px 0;font-size:16px">Create Custom Playbook</h3>
+              <form @submit.prevent="createPlaybook">
+                <div style="margin-bottom:12px">
+                  <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600">Name</label>
+                  <input type="text" x-model="newPlaybook.name" required placeholder="e.g. my_preset"
+                         style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;font-family:monospace">
+                  <p style="margin:4px 0 0;font-size:11px;color:var(--muted)">Spaces become underscores. Lowercase only.</p>
+                </div>
+                <div style="margin-bottom:12px">
+                  <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600">Label</label>
+                  <input type="text" x-model="newPlaybook.label" placeholder="Display name"
+                         style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+                </div>
+                <div style="margin-bottom:12px">
+                  <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600">Description</label>
+                  <input type="text" x-model="newPlaybook.description" placeholder="What does this playbook do?"
+                         style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+                </div>
+                <div style="margin-bottom:16px">
+                  <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:600">Settings to Include</label>
+                  <p style="margin:0 0 8px;font-size:11px;color:var(--muted)">Enter values for the settings you want this playbook to override. Leave blank to skip.</p>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:300px;overflow-y:auto;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)">
+                    <template x-for="s in settingsList.filter(sk => !sk.key.startsWith('secret_'))" :key="s.key">
+                      <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;font-size:11px">
+                        <span style="flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="s.key + ': ' + s.description" x-text="s.label || s.key"></span>
+                        <input type="text" :placeholder="'default: ' + (s.default ?? '')" 
+                               x-model="playbookSettingsEdit[s.key]"
+                               style="width:80px;padding:3px 6px;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--text);font-size:10px;font-family:monospace;text-align:right">
+                        <span style="font-size:9px;color:var(--muted)" x-text="s.type"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;justify-content:flex-end">
+                  <button class="btn btn-muted" style="padding:10px 20px" type="button" @click="showCreatePlaybookModal=false">Cancel</button>
+                  <button class="btn btn-primary" style="padding:10px 20px" type="submit">Create Playbook</button>
+                </div>
+              </form>
+            </div>
+          </div>
+          
+          <!-- A1: Edit Playbook Modal -->
+          <div x-show="showEditPlaybookModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showEditPlaybookModal=false">
+            <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
+              <h3 style="margin:0 0 16px 0;font-size:16px">Edit Playbook: <span x-text="editPlaybookData.name" style="font-family:monospace"></span></h3>
+              <form @submit.prevent="updatePlaybook">
+                <div style="margin-bottom:12px">
+                  <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600">Label</label>
+                  <input type="text" x-model="editPlaybookData.label"
+                         style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+                </div>
+                <div style="margin-bottom:12px">
+                  <label style="display:block;margin-bottom:4px;font-size:13px;font-weight:600">Description</label>
+                  <input type="text" x-model="editPlaybookData.description"
+                         style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+                </div>
+                <div style="margin-bottom:16px">
+                  <label style="display:block;margin-bottom:8px;font-size:13px;font-weight:600">Settings</label>
+                  <p style="margin:0 0 8px;font-size:11px;color:var(--muted)">Enter values for settings. Leave blank to exclude.</p>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:300px;overflow-y:auto;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)">
+                    <template x-for="s in settingsList.filter(sk => !sk.key.startsWith('secret_'))" :key="s.key">
+                      <div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;font-size:11px"
+                           :style="playbookSettingsEdit[s.key] !== '' ? 'background:var(--ok-bg)' : ''">
+                        <span style="flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="s.key" x-text="s.label || s.key"></span>
+                        <input type="text" :placeholder="'default: ' + (s.default ?? '')"
+                               x-model="playbookSettingsEdit[s.key]"
+                               style="width:80px;padding:3px 6px;border:1px solid var(--line);border-radius:3px;background:var(--panel);color:var(--text);font-size:10px;font-family:monospace;text-align:right">
+                        <span style="font-size:9px;color:var(--muted)" x-text="s.type"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+                <div style="display:flex;gap:12px;justify-content:flex-end">
+                  <button class="btn btn-muted" style="padding:10px 20px" type="button" @click="showEditPlaybookModal=false">Cancel</button>
+                  <button class="btn btn-primary" style="padding:10px 20px" type="submit">Save Changes</button>
+                </div>
+              </form>
             </div>
           </div>
           
@@ -956,23 +1047,35 @@
               </div>
             </div>
             
-            <!-- A3: Per-Feature Budget Sliders -->
+            <!-- A3: Per-Feature Budget Sliders + Stacked Visualization -->
             <div x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <h3 style="margin:0;font-size:14px;font-weight:600">Per-Feature Budget Allocation</h3>
                 <div style="display:flex;gap:8px;align-items:center">
-                  <span style="font-size:12px;color:var(--muted)">Total:</span>
-                  <input type="number" x-model="totalBudgetSlider" :min="1000" :max="500000" step="1000"
-                         style="width:100px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
+                  <span style="font-size:12px;color:var(--muted)">Total daily:</span>
+                  <input type="range" x-model="totalBudgetSlider" min="1000" max="500000" step="1000"
+                         style="width:120px;accent-color:var(--spark);cursor:pointer"
+                         @input="recalculateFeatureBudgets()">
+                  <input type="number" x-model="totalBudgetSlider" min="1000" max="500000" step="1000"
+                         style="width:90px;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace"
+                         @change="recalculateFeatureBudgets()">
                   <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" @click="saveTotalBudget()">Save</button>
                 </div>
               </div>
-              <template x-for="fb in featureBudgets" :key="fb.name">
+              <!-- Stacked budget visualization bar -->
+              <div style="height:24px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:16px">
+                <template x-for="(fb, fi) in featureBudgets" :key="fb.name">
+                  <div :style="`width:${fb.share}%;background:${['#065f46','#1e40af','#7c3aed','#b45309'][fi]};transition:width .3s;min-width:${fb.share > 0 ? '4px' : '0'}`"
+                       :title="`${fb.label}: ${fb.share}% (${fb.tokens.toLocaleString()} tokens)`"></div>
+                </template>
+              </div>
+              <template x-for="(fb, fi) in featureBudgets" :key="fb.name">
                 <div style="margin-bottom:10px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)">
                   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <div>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span :style="`display:inline-block;width:10px;height:10px;border-radius:3px;background:${['#065f46','#1e40af','#7c3aed','#b45309'][fi]}`"></span>
                       <span style="font-weight:600;font-size:13px" x-text="fb.label"></span>
-                      <span style="font-size:11px;color:var(--muted);margin-left:6px" x-text="`(${fb.share}%)`"></span>
+                      <span style="font-size:11px;color:var(--muted)" x-text="`(${fb.share}%)`"></span>
                     </div>
                     <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${fb.tokens.toLocaleString()} tokens/day`"></span>
                   </div>
@@ -990,23 +1093,26 @@
 
             <!-- A4: Provider Priority Drag-and-Drop -->
             <div style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
-              <h3 style="margin:0 0 12px 0;font-size:14px;font-weight:600">AI Provider Priority</h3>
-              <p style="margin:0 0 12px 0;font-size:12px;color:var(--muted)">Drag to reorder provider fallback priority</p>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <h3 style="margin:0;font-size:14px;font-weight:600">AI Provider Priority</h3>
+                <span style="font-size:11px;color:var(--muted)">Drag to reorder fallback chain</span>
+              </div>
               <div style="display:flex;flex-direction:column;gap:6px">
                 <template x-for="(p, i) in providers" :key="p.name">
                   <div draggable="true"
                        @dragstart="handleDragStart(i)"
                        @dragover.prevent="handleDragOver(i)"
                        @dragend="handleDragEnd"
-                       :style="`display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:${dragOverIndex === i ? 'var(--warn-bg)' : 'var(--panel)'};cursor:grab;transition:background .15s;user-select:none`">
-                    <span style="font-size:16px;color:var(--muted);cursor:grab">&#9776;</span>
+                       :style="`display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid ${dragOverIndex === i ? 'var(--spark)' : 'var(--line)'};border-radius:8px;background:${dragOverIndex === i ? 'var(--ok-bg)' : 'var(--panel)'};cursor:grab;transition:all .15s;user-select:none;box-shadow:${dragIndex === i ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'}`">
+                    <span style="font-size:14px;color:var(--muted);cursor:grab;min-width:20px;text-align:center">&#9776;</span>
                     <div style="flex:1">
                       <span style="font-weight:600;font-size:13px" x-text="p.label"></span>
-                      <span style="font-size:11px;color:var(--muted);margin-left:6px" x-text="`#${i+1}`"></span>
+                      <span style="font-size:10px;color:var(--muted);margin-left:6px;background:var(--bg-accent);padding:1px 6px;border-radius:8px" x-text="`#${i+1}`"></span>
                     </div>
                     <span style="font-size:11px;color:var(--muted)" x-text="p.cost"></span>
                     <span style="font-size:11px;color:var(--muted)" x-text="`${p.rpm} rpm`"></span>
-                    <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--ok-bg);color:var(--up)" x-text="'active'"></span>
+                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--ok-bg);color:var(--up)" x-show="i===0">Primary</span>
+                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-accent);color:var(--muted)" x-show="i>0">Fallback</span>
                   </div>
                 </template>
               </div>
@@ -1046,9 +1152,40 @@
                     <select :value="s.value" 
                             style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px"
                             @change="toggleSetting(s.key, $event.target.value)">
-                      <option value="ai_off">Off - Disable AI features</option>
-                      <option value="ai_lite">Lite - Basic AI features</option>
-                      <option value="ai_full">Full - All AI features enabled</option>
+                      <template x-if="s.key === 'ai_mode'">
+                        <optgroup label="AI Mode Options">
+                          <option value="ai_off">Off - Disable AI features</option>
+                          <option value="ai_lite">Lite - Basic AI features</option>
+                          <option value="ai_full">Full - All AI features enabled</option>
+                        </optgroup>
+                      </template>
+                      <template x-if="s.key.startsWith('ai_model_')">
+                        <optgroup label="Feature-Specific Models">
+                          <option value="">Auto - Use provider default</option>
+                          <template x-for="providerId in Object.keys(availableModels)" :key="providerId">
+                            <optgroup :label="providerId + ' Models'">
+                              <template x-for="model in availableModels[providerId] || []" :key="model.id">
+                                <option :value="model.id" :selected="s.value === model.id" x-text="model.name + (model.description ? ' - ' + model.description : '')"></option>
+                              </template>
+                            </optgroup>
+                          </template>
+                        </optgroup>
+                      </template>
+                      <template x-if="s.key.includes('model') && s.key !== 'ai_mode' && !s.key.startsWith('ai_model_')">
+                        <optgroup label="Provider Models">
+                          <option value="">Auto - Use provider default</option>
+                          <template x-for="providerId in Object.keys(availableModels)" :key="providerId">
+                            <optgroup :label="providerId + ' Models'">
+                              <template x-for="model in availableModels[providerId] || []" :key="model.id">
+                                <option :value="model.id" :selected="s.value === model.id" x-text="model.name + (model.description ? ' - ' + model.description : '')"></option>
+                              </template>
+                            </optgroup>
+                          </template>
+                        </optgroup>
+                      </template>
+                      <template x-if="s.key !== 'ai_mode' && !s.key.includes('model')">
+                        <option :value="s.value" x-text="s.value || 'Enter value'"></option>
+                      </template>
                     </select>
                   </div>
                   
@@ -1076,42 +1213,53 @@
               <button class="btn btn-muted" style="padding:6px 12px;font-size:12px" @click="loadAuditLog()">Refresh</button>
             </div>
           </div>
-          <p class="kpi-sub" style="margin:0 0 12px 0">Auto-refreshes every 30 seconds. Shows the last 100 changes.</p>
+          <p class="kpi-sub" style="margin:0 0 12px 0">Auto-refreshes every 30s. Shows the last <strong>100</strong> changes.</p>
           
           <div style="overflow-x:auto;font-size:12px">
             <table style="width:100%;border-collapse:collapse" x-show="auditLog.length">
               <thead>
-                <tr style="border-bottom:2px solid var(--line);font-size:11px;text-transform:uppercase;color:var(--muted)">
-                  <th style="padding:8px 6px;text-align:left;cursor:pointer" @click="toggleAuditSort('created_at')">
-                    Timestamp <span x-show="auditSortField==='created_at'" x-text="auditSortAsc?'&#9650;':'&#9660;'"></span>
+                <tr style="border-bottom:2px solid var(--line);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:0.5px">
+                  <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('created_at')">
+                    Timestamp <span x-show="auditSortField==='created_at'" x-text="auditSortAsc?'&#9650;':'&#9660;'" style="font-size:8px"></span>
                   </th>
-                  <th style="padding:8px 6px;text-align:left;cursor:pointer" @click="toggleAuditSort('user_username')">
-                    User <span x-show="auditSortField==='user_username'" x-text="auditSortAsc?'&#9650;':'&#9660;'"></span>
+                  <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('user_username')">
+                    User <span x-show="auditSortField==='user_username'" x-text="auditSortAsc?'&#9650;':'&#9660;'" style="font-size:8px"></span>
                   </th>
-                  <th style="padding:8px 6px;text-align:left;cursor:pointer" @click="toggleAuditSort('setting_key')">
-                    Setting <span x-show="auditSortField==='setting_key'" x-text="auditSortAsc?'&#9650;':'&#9660;'"></span>
+                  <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('setting_key')">
+                    Setting <span x-show="auditSortField==='setting_key'" x-text="auditSortAsc?'&#9650;':'&#9660;'" style="font-size:8px"></span>
                   </th>
-                  <th style="padding:8px 6px;text-align:left">Old Value</th>
-                  <th style="padding:8px 6px;text-align:left">New Value</th>
-                  <th style="padding:8px 6px;text-align:center">History</th>
+                  <th style="padding:8px 8px;text-align:left">Change</th>
+                  <th style="padding:8px 8px;text-align:center">History</th>
                 </tr>
               </thead>
               <tbody>
                 <template x-for="entry in auditLog" :key="entry.id">
                   <tr style="border-bottom:1px solid var(--line)">
-                    <td style="padding:6px;white-space:nowrap;font-size:11px;color:var(--muted)" x-text="new Date(entry.created_at).toLocaleString()"></td>
-                    <td style="padding:6px" x-text="entry.user_username || 'system'"></td>
-                    <td style="padding:6px;font-family:monospace;font-size:11px" x-text="entry.setting_key"></td>
-                    <td style="padding:6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)" x-text="entry.old_value || '-'"></td>
-                    <td style="padding:6px;max-width:160px;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:600" x-text="entry.new_value || '-'"></td>
-                    <td style="padding:6px;text-align:center">
-                      <button class="btn btn-muted" style="padding:4px 8px;font-size:10px" @click="openAuditHistory(entry.setting_key)">View</button>
+                    <td style="padding:6px 8px;white-space:nowrap;font-size:11px;color:var(--muted)" x-text="new Date(entry.created_at).toLocaleString()"></td>
+                    <td style="padding:6px 8px;font-size:11px" x-text="entry.user_username || 'system'"></td>
+                    <td style="padding:6px 8px;font-family:monospace;font-size:11px">
+                      <span x-text="entry.setting_key"></span>
+                    </td>
+                    <td style="padding:6px 8px;font-size:11px;max-width:240px">
+                      <div style="display:flex;flex-direction:column;gap:2px">
+                        <div style="display:flex;align-items:center;gap:4px">
+                          <span style="color:var(--down);background:var(--alert-bg);padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600">-</span>
+                          <span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="entry.old_value || '—'"></span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px">
+                          <span style="color:var(--up);background:var(--ok-bg);padding:1px 5px;border-radius:3px;font-size:10px;font-weight:600">+</span>
+                          <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="entry.new_value || '—'"></span>
+                        </div>
+                      </div>
+                    </td>
+                    <td style="padding:6px 8px;text-align:center">
+                      <button class="btn btn-muted" style="padding:3px 8px;font-size:10px" @click="openAuditHistory(entry.setting_key)">View All</button>
                     </td>
                   </tr>
                 </template>
               </tbody>
             </table>
-            <div x-show="!auditLog.length" class="kpi-sub" style="padding:16px;text-align:center">No audit entries. Make changes to settings to see them here.</div>
+            <div x-show="!auditLog.length" class="kpi-sub" style="padding:24px;text-align:center;font-size:13px">No audit entries yet. Make changes to settings to see them here.</div>
           </div>
         </div>
         
@@ -1125,23 +1273,23 @@
             <div x-show="auditHistoryLoading" class="kpi-sub" style="padding:16px;text-align:center">
               <span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span> Loading history...
             </div>
-            <div x-show="!auditHistoryLoading && !auditHistory.length" class="kpi-sub" style="padding:16px;text-align:center">No change history for this setting.</div>
+            <div x-show="!auditHistoryLoading && !auditHistory.length" class="kpi-sub" style="padding:24px;text-align:center">No change history for this setting.</div>
             <table x-show="!auditHistoryLoading && auditHistory.length" style="width:100%;border-collapse:collapse;font-size:12px">
               <thead>
-                <tr style="border-bottom:2px solid var(--line);font-size:11px;text-transform:uppercase;color:var(--muted)">
-                  <th style="padding:8px 6px;text-align:left">Timestamp</th>
-                  <th style="padding:8px 6px;text-align:left">User</th>
-                  <th style="padding:8px 6px;text-align:left">Old</th>
-                  <th style="padding:8px 6px;text-align:left">New</th>
+                <tr style="border-bottom:2px solid var(--line);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:0.5px">
+                  <th style="padding:8px 8px;text-align:left">Timestamp</th>
+                  <th style="padding:8px 8px;text-align:left">User</th>
+                  <th style="padding:8px 8px;text-align:left">Old Value</th>
+                  <th style="padding:8px 8px;text-align:left">New Value</th>
                 </tr>
               </thead>
               <tbody>
                 <template x-for="h in auditHistory" :key="h.id">
                   <tr style="border-bottom:1px solid var(--line)">
-                    <td style="padding:6px;font-size:11px;color:var(--muted);white-space:nowrap" x-text="new Date(h.created_at).toLocaleString()"></td>
-                    <td style="padding:6px" x-text="h.user_username || 'system'"></td>
-                    <td style="padding:6px;font-size:11px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis" x-text="h.old_value || '-'"></td>
-                    <td style="padding:6px;font-size:11px;font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis" x-text="h.new_value || '-'"></td>
+                    <td style="padding:6px 8px;font-size:11px;color:var(--muted);white-space:nowrap" x-text="new Date(h.created_at).toLocaleString()"></td>
+                    <td style="padding:6px 8px;font-size:11px" x-text="h.user_username || 'system'"></td>
+                    <td style="padding:6px 8px;font-size:11px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;background:var(--alert-bg);border-radius:3px" x-text="h.old_value || '—'"></td>
+                    <td style="padding:6px 8px;font-size:11px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;background:var(--ok-bg);border-radius:3px" x-text="h.new_value || '—'"></td>
                   </tr>
                 </template>
               </tbody>
@@ -1156,7 +1304,7 @@
               <h2 style="margin:0 0 4px 0;display:flex;align-items:center;gap:8px">
                 <span>🔁</span> Reset to Safe Defaults
               </h2>
-              <p class="kpi-sub" style="margin:0">Reset all settings (except API keys and budget) to their factory defaults.</p>
+              <p class="kpi-sub" style="margin:0">Reset all settings (except API keys, secrets, and AI daily budget) to their factory defaults.</p>
             </div>
             <button class="btn" style="padding:10px 20px;background:var(--down);color:#fff;border-color:var(--down)" @click="openConfirmDefaults()">Apply Safe Defaults</button>
           </div>
@@ -1164,15 +1312,196 @@
         
         <!-- A5: Safe Defaults Confirmation Modal -->
         <div x-show="showConfirmDefaults" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeConfirmDefaults()">
-          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:520px;width:100%">
             <h3 style="margin:0 0 12px 0;font-size:16px;color:var(--down)">Reset All Settings to Defaults?</h3>
-            <p style="margin:0 0 16px 0;font-size:13px;line-height:1.5;color:var(--muted)">
-              This will reset every setting (except API keys/credentials and AI daily budget) to its factory default value. 
-              This action cannot be undone.
+            <p style="margin:0 0 12px 0;font-size:13px;line-height:1.5;color:var(--muted)">
+              This will reset <strong>every setting</strong> (except API keys/credentials and AI daily budget) to its factory default value.
+              This action <strong>cannot be undone</strong>.
             </p>
+            <div style="margin-bottom:16px;padding:12px;background:var(--bg-accent);border-radius:8px;font-size:12px;line-height:1.6">
+              <div style="font-weight:600;margin-bottom:6px">Settings that will be reset:</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;color:var(--muted)">
+                <template x-for="s in settingsList.filter(sk => !sk.always_active && !sk.key.startsWith('secret_') && sk.key !== 'ai_daily_token_budget' && sk.default !== undefined).slice(0,20)" :key="s.key">
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <span style="color:var(--down)">•</span>
+                    <span x-text="s.label || s.key" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                    <span style="font-size:10px;color:var(--muted)" x-text="`→ ${s.default}`"></span>
+                  </div>
+                </template>
+                <template x-if="settingsList.filter(sk => !sk.always_active && !sk.key.startsWith('secret_') && sk.key !== 'ai_daily_token_budget' && sk.default !== undefined).length > 20">
+                  <div style="color:var(--muted);font-size:11px;grid-column:1/-1;padding-top:4px;border-top:1px solid var(--line)">
+                    ...and <span x-text="settingsList.filter(sk => !sk.always_active && !sk.key.startsWith('secret_') && sk.key !== 'ai_daily_token_budget' && sk.default !== undefined).length - 20"></span> more settings
+                  </div>
+                </template>
+              </div>
+            </div>
             <div style="display:flex;gap:12px;justify-content:flex-end">
               <button class="btn btn-muted" style="padding:10px 20px" @click="closeConfirmDefaults()">Cancel</button>
               <button class="btn" style="padding:10px 20px;background:var(--down);color:#fff;border-color:var(--down)" @click="applySafeDefaults()">Confirm Reset</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Multi-User Management Section -->
+        <div class="insight-card" x-show="settingsList.find(s => s.key === 'feature_multi_user')?.value" style="grid-column:1/-1">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <h2 style="margin:0 0 8px 0;display:flex;align-items:center;gap:8px">
+                <span>👥</span> User Management
+              </h2>
+              <p class="kpi-sub" style="margin:0">Manage users and their permissions when multi-user mode is enabled.</p>
+            </div>
+            <button class="btn btn-primary" @click="showAddUserModal=true" style="padding:10px 20px">Add User</button>
+          </div>
+          
+          <div>
+            <div x-show="usersLoading" class="kpi-sub" style="padding:20px;text-align:center">
+              <span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span> Loading users...
+            </div>
+            
+            <div x-show="usersError" class="kpi-sub" style="padding:20px;text-align:center;color:var(--down)">
+              Error loading users: <span x-text="usersError"></span>
+            </div>
+            
+            <table x-show="!usersLoading && !usersError && users.length" style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="border-bottom:2px solid var(--line);text-align:left">
+                  <th style="padding:12px 8px">Username</th>
+                  <th style="padding:12px 8px">Email</th>
+                  <th style="padding:12px 8px">Role</th>
+                  <th style="padding:12px 8px">Status</th>
+                  <th style="padding:12px 8px">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="user in users" :key="user.id">
+                  <tr style="border-bottom:1px solid var(--line)">
+                    <td style="padding:12px 8px;font-weight:600" x-text="user.username"></td>
+                    <td style="padding:12px 8px" x-text="user.email"></td>
+                    <td style="padding:12px 8px">
+                      <span x-text="user.role" :class="user.is_admin ? 'pill' : ''" 
+                            :style="user.is_admin ? 'background:var(--up);color:#fff;padding:2px 8px;border-radius:4px;font-size:11px' : ''"></span>
+                    </td>
+                    <td style="padding:12px 8px">
+                      <span :class="user.is_active ? 'text-green' : 'text-red'" x-text="user.is_active ? 'Active' : 'Inactive'"></span>
+                    </td>
+                    <td style="padding:12px 8px">
+                      <button class="btn btn-muted" style="padding:4px 8px;font-size:12px;margin-right:4px" 
+                              @click="editUser(user)">Edit</button>
+                      <button class="btn btn-muted" style="padding:4px 8px;font-size:12px;background:var(--alert-bg);color:var(--down);border-color:var(--down)" 
+                              @click="deleteUser(user.id)" :disabled="user.username === 'admin'">Delete</button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            
+            <div x-show="!usersLoading && !usersError && !users.length" class="kpi-sub" style="padding:40px;text-align:center">
+              No users found. Add your first user to get started.
+            </div>
+          </div>
+        </div>
+        
+        <!-- Add User Modal -->
+        <div x-show="showAddUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showAddUserModal=false">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
+            <h3 style="margin:0 0 16px 0;font-size:16px">Add New User</h3>
+            <form @submit.prevent="addUser">
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Username</label>
+                <input type="text" x-model="newUser.username" required
+                       style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+              </div>
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Email</label>
+                <input type="email" x-model="newUser.email" required
+                       style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+              </div>
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Password</label>
+                <input type="password" x-model="newUser.password" required
+                       style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+              </div>
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Role</label>
+                <select x-model="newUser.role"
+                        style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;margin-bottom:20px">
+                <label class="toggle">
+                  <input type="checkbox" x-model="newUser.is_admin">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="margin-left:10px;font-size:13px">Admin privileges</span>
+              </div>
+              <div style="display:flex;gap:12px;justify-content:flex-end">
+                <button class="btn btn-muted" style="padding:10px 20px" type="button" @click="showAddUserModal=false">Cancel</button>
+                <button class="btn btn-primary" style="padding:10px 20px" type="submit">Add User</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Edit User Modal -->
+        <div x-show="showEditUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showEditUserModal=false">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
+            <h3 style="margin:0 0 16px 0;font-size:16px">Edit User</h3>
+            <form @submit.prevent="updateUser">
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Username</label>
+                <input type="text" x-model="editUserForm.username" required
+                       style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+              </div>
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Email</label>
+                <input type="email" x-model="editUserForm.email" required
+                       style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+              </div>
+              <div style="margin-bottom:16px">
+                <label style="display:block;margin-bottom:6px;font-size:13px;font-weight:600">Role</label>
+                <select x-model="editUserForm.role"
+                        style="width:100%;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px">
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="viewer">Viewer</option>
+                </select>
+              </div>
+              <div style="display:flex;align-items:center;margin-bottom:20px">
+                <label class="toggle">
+                  <input type="checkbox" x-model="editUserForm.is_active">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="margin-left:10px;font-size:13px">Active</span>
+              </div>
+              <div style="display:flex;align-items:center;margin-bottom:20px">
+                <label class="toggle">
+                  <input type="checkbox" x-model="editUserForm.is_admin">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="margin-left:10px;font-size:13px">Admin privileges</span>
+              </div>
+              <div style="display:flex;gap:12px;justify-content:flex-end">
+                <button class="btn btn-muted" style="padding:10px 20px" type="button" @click="showEditUserModal=false">Cancel</button>
+                <button class="btn btn-primary" style="padding:10px 20px" type="submit">Update User</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Delete User Confirmation Modal -->
+        <div x-show="showDeleteUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showDeleteUserModal=false">
+          <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
+            <h3 style="margin:0 0 16px 0;font-size:16px;color:var(--down)">Delete User?</h3>
+            <p style="margin:0 0 16px 0;font-size:13px;line-height:1.5;color:var(--muted)">
+              Are you sure you want to delete this user? This action cannot be undone.
+            </p>
+            <div style="display:flex;gap:12px;justify-content:flex-end">
+              <button class="btn btn-muted" style="padding:10px 20px" @click="showDeleteUserModal=false">Cancel</button>
+              <button class="btn" style="padding:10px 20px;background:var(--down);color:#fff;border-color:var(--down)" @click="confirmDeleteUser">Delete User</button>
             </div>
           </div>
         </div>

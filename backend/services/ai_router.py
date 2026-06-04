@@ -53,7 +53,7 @@ return 1
 
 def _try_redis_cache() -> Any:
     try:
-        from backend.core.cache_manager import cache
+        from core.cache_manager import cache
         return cache
     except Exception:
         return None
@@ -138,9 +138,13 @@ def _trigram_similarity(a: str, b: str) -> float:
 
 
 
-def ai_mode() -> str:
+def ai_mode(db=None) -> str:
     """Get current AI mode from environment or settings."""
-    return os.getenv("AI_MODE", "ai_off").strip().lower()
+    mode = os.getenv("AI_MODE", "").strip()
+    if not mode and db is not None:
+        from providers.settings import get_setting
+        mode = get_setting("ai_mode", db)
+    return mode or "balanced"
 
 
 def get_cache_stats() -> dict[str, Any]:
@@ -173,7 +177,7 @@ from services.components.ai.providers import (
 _openrouter_lite = _openrouter_lite_impl  # alias for backward compat
 
 def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None, **kwargs) -> dict[str, Any] | None:
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("OLLAMA_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
@@ -195,7 +199,7 @@ def _ollama_cloud(prompt: str, max_tokens: int, system: str | None = None, model
 
 
 def _groq(prompt: str, max_tokens: int, model: str | None = None, **kwargs) -> dict[str, Any] | None:
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("GROQ_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
@@ -217,8 +221,8 @@ def _groq(prompt: str, max_tokens: int, model: str | None = None, **kwargs) -> d
 
 
 def _cloudflare_ai(prompt: str, max_tokens: int, system: str | None = None, model: str | None = None, **kwargs) -> dict[str, Any] | None:
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
-    account_id = kwargs.get("_resolved_account_id") or os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
+    account_id = kwargs.get("_resolved_account_id", "").strip()
     if not api_key or not account_id:
         return None
     model = model or os.getenv("CLOUDFLARE_AI_MODEL", "@cf/meta/llama-3.1-8b-instruct")
@@ -399,7 +403,7 @@ def _resolve_api_key(env_key: str, db: Any = None) -> str:
     return os.getenv(env_key, "").strip()
 
 
-def _build_provider_callable(name: str, db: Any = None) -> Callable[..., dict[str, Any] | None] | None:
+def _build_provider_callable(name: str, db: Any = None, feature: str | None = None) -> Callable[..., dict[str, Any] | None] | None:
     """Return the appropriate provider function for *name*, or None if the
     required API key is not configured."""
     meta = PROVIDER_METADATA.get(name)
@@ -413,27 +417,44 @@ def _build_provider_callable(name: str, db: Any = None) -> Callable[..., dict[st
 
     from providers.settings import get_setting
 
+    # Resolve model - first check for feature-specific override, then provider default
+    model = None
+    if feature and db is not None:
+        # Check for feature-specific model override
+        feature_model_setting = f"ai_model_{feature}"
+        model = get_setting(feature_model_setting, db)
+    
+    # If no feature-specific model or no override, use provider default
+    if not model:
+        if name == "groq":
+            model = get_setting("groq_model", db) or meta["default_model"]
+        elif name == "ollama_cloud":
+            model = get_setting("ollama_cloud_model", db) or meta["default_model"]
+        elif name == "openrouter_free":
+            model = get_setting("openrouter_free_model", db) or "openrouter/free"
+        elif name == "openrouter_paid":
+            model = get_setting("openrouter_model", db) or meta["default_model"]
+        elif name == "cloudflare":
+            model = get_setting("cloudflare_ai_model", db) or meta["default_model"]
+        else:
+            model = meta["default_model"]
+
     if name == "groq":
-        model = get_setting("groq_model", db) or meta["default_model"]
         return partial(_groq, model=model, _resolved_api_key=api_key)
     if name == "ollama_cloud":
-        model = get_setting("ollama_cloud_model", db) or meta["default_model"]
         return partial(_ollama_cloud, model=model, _resolved_api_key=api_key)
     if name == "openrouter_free":
-        model = get_setting("openrouter_free_model", db) or "openrouter/free"
         return partial(_openrouter_lite, model=model, _resolved_api_key=api_key)
     if name == "openrouter_paid":
-        model = get_setting("openrouter_model", db) or meta["default_model"]
         return partial(_openrouter_lite, model=model, _resolved_api_key=api_key)
     if name == "cloudflare":
-        model = get_setting("cloudflare_ai_model", db) or meta["default_model"]
         account_id = get_setting("cloudflare_account_id", db) or os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
         return partial(_cloudflare_ai, model=model, _resolved_api_key=api_key, _resolved_account_id=account_id)
 
     return None
 
 
-def get_ai_provider_chain(db: Any = None, mode: str | None = None) -> list[Callable[..., dict[str, Any] | None]]:
+def get_ai_provider_chain(db: Any = None, mode: str | None = None, feature: str | None = None) -> list[Callable[..., dict[str, Any] | None]]:
     """Build a dynamic provider chain from Settings metadata.
 
     Returns a list of callables ordered by priority.  Each callable accepts
@@ -442,6 +463,7 @@ def get_ai_provider_chain(db: Any = None, mode: str | None = None) -> list[Calla
 
     *db* — optional SQLAlchemy session for Settings lookups (falls back to env vars)
     *mode* — override AI mode (defaults to ``ai_mode()``)
+    *feature* — optional feature name for per-feature model overrides
     """
     mode = mode or ai_mode()
     if mode == "ai_off":
@@ -450,7 +472,7 @@ def get_ai_provider_chain(db: Any = None, mode: str | None = None) -> list[Calla
     priority = _get_provider_priority_list(db)
     chain: list[Callable[..., dict[str, Any] | None]] = []
     for name in priority:
-        fn = _build_provider_callable(name, db=db)
+        fn = _build_provider_callable(name, db=db, feature=feature)
         if fn is not None:
             fn._provider_name = name
             chain.append(fn)
@@ -461,7 +483,7 @@ def get_ai_provider_chain(db: Any = None, mode: str | None = None) -> list[Calla
 # Backward-compatible _providers_for_mode (delegates to new system)
 # ---------------------------------------------------------------------------
 
-def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
+def _providers_for_mode(mode: str, *, priority: bool = False, feature: str | None = None) -> list:
     """Legacy provider list — retained for backward compatibility.
 
     Delegates to the new Settings-driven chain when *db* is available, or
@@ -474,6 +496,13 @@ def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
         or_free = partial(_openrouter_lite, model="openrouter/free")
         primary = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
         fallback = os.getenv("OLLAMA_CLOUD_FALLBACK_MODEL", "qwen-2.5-7b-cloud")
+        
+        # Apply feature-specific model overrides if provided
+        if feature:
+            # In legacy mode, we can't read from settings, but we could add env var support
+            # For now, we just use the default models
+            pass
+            
         return [
             or_free,
             partial(_ollama_cloud, model=fallback),
@@ -481,7 +510,7 @@ def _providers_for_mode(mode: str, *, priority: bool = False) -> list:
             _groq,
         ]
 
-    return get_ai_provider_chain(mode=mode)
+    return get_ai_provider_chain(mode=mode, feature=feature)
 
 
 # ---------------------------------------------------------------------------
@@ -735,9 +764,9 @@ def enrich_with_ai(
     errors: list[str] = []
 
     if db is not None:
-        provider_chain = get_ai_provider_chain(db=db)
+        provider_chain = get_ai_provider_chain(db=db, feature=feature)
     else:
-        provider_chain = _providers_for_mode(mode, priority=priority)
+        provider_chain = _providers_for_mode(mode, priority=priority, feature=feature)
 
     preferred_provider: str | None = None
 

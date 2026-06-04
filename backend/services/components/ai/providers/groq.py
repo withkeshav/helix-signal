@@ -10,7 +10,7 @@ def groq(
     prompt: str, max_tokens: int, model: Optional[str] = None, **kwargs
 ) -> Optional[Dict[str, Any]]:
     """Call Groq API."""
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("GROQ_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")

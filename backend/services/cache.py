@@ -1,11 +1,11 @@
-"""Cache layer for read-heavy API responses — uses CacheManager from core."""
+"""Cache layer for read-heavy API responses — uses enhanced CacheService."""
 
 from __future__ import annotations
 
 import os
 from typing import Any, Callable
 
-from backend.core.cache_manager import cache
+from services.cache_service import cache_service
 
 _TTL_SECONDS = int(os.getenv("REDIS_CACHE_TTL_SECONDS", "45"))
 
@@ -29,20 +29,19 @@ def _cache_enabled() -> bool:
 def cache_get(key: str) -> dict[str, Any] | None:
     if not _cache_enabled():
         return None
-    return cache.get(key)
+    return cache_service.get(key)
 
 
 def cache_set(key: str, payload: dict[str, Any], ttl: int | None = None) -> None:
     if not _cache_enabled():
         return
-    cache.set(key, payload, ttl or _TTL_SECONDS)
+    cache_service.set(key, payload, ttl or _TTL_SECONDS)
 
 
 def invalidate_dashboard(asset: str | None) -> None:
     if not _cache_enabled():
         return
-    sym = (asset or "DEFAULT").upper()
-    cache.delete(f"helix:dashboard:{sym}")
+    cache_service.invalidate_dashboard(asset)
 
 
 def dashboard_cache_key(asset: str | None) -> str:
@@ -64,12 +63,19 @@ def get_or_build_dashboard(
     return payload
 
 
-def get_or_build_cache(key: str, builder_fn: Callable, data_type: str = "trends"):
-    """Get from cache or build and cache by data type TTL."""
-    ttl = CACHE_TTL.get(data_type, 300)
-    hit = cache_get(key)
-    if hit is not None:
-        return hit
-    result = builder_fn()
-    cache_set(key, result, ttl)
-    return result
+def get_cache_stats() -> dict[str, Any]:
+    """Get cache service statistics."""
+    return cache_service.get_stats()
+
+
+def clear_cache_stats() -> None:
+    """Clear cache service statistics."""
+    cache_service.clear_stats()
+
+
+def cache_health_check() -> dict[str, Any]:
+    """Perform cache health check."""
+    return cache_service.health_check()
+
+
+

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import AssetTrendSnapshot
-from backend.core.database_manager import dbm
+from core.database_manager import dbm
 
 log = get_logger(__name__)
 

@@ -79,6 +79,15 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
+| GET | `/api/settings` | Get all settings (supports `?search=`, `?group=`) | Admin token |
+| PUT | `/api/settings` | Update a setting (`key`, `value`) | Admin token |
+| GET | `/api/settings/groups` | Get all setting groups | Admin token |
+| GET | `/api/settings/defaults` | Get default values for all settings | Admin token |
+
+## Settings Audit
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
 | GET | `/api/settings/audit` | Settings change audit log (supports `?setting_key=`, `?user_id=`, `?limit=`, `?offset=`) | Admin token |
 | GET | `/api/settings/audit/history/{setting_key}` | Full change history for a single setting | Admin token |
 | GET | `/api/settings/audit/user/{user_id}` | All changes made by a specific user | Admin token |
@@ -115,6 +124,13 @@ Data Quality Dashboard provides comprehensive monitoring of:
 AI endpoints can optionally require `X-Admin-Token` — enable `ai_require_token` in Settings UI.
 When enabled, failed auth triggers a per-IP lockout after 20 failed attempts (15-minute window).
 Lockout uses Redis when available, falling back to in-memory tracking.
+
+## AI Model Discovery (Admin)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/admin/ai/providers` | List all available AI providers | Admin token |
+| GET | `/api/admin/ai/providers/{provider_id}/models` | List models available from a specific provider | Admin token |
 
 ## Common Parameters
 

@@ -10,7 +10,7 @@ def ollama_cloud(
     prompt: str, max_tokens: int, system: Optional[str] = None, model: Optional[str] = None, **kwargs
 ) -> Optional[Dict[str, Any]]:
     """Call Ollama Cloud API."""
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("OLLAMA_API_KEY", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
     if not api_key:
         return None
     model = model or os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")

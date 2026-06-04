@@ -33,7 +33,7 @@ def _nonce():
 
 class TestDatabaseManager:
     def test_singleton_exists(self):
-        from backend.core.database_manager import dbm
+        from core.database_manager import dbm
         assert dbm is not None
 
     def test_get_trend_history_falls_back_to_oltp(self):
@@ -41,7 +41,7 @@ class TestDatabaseManager:
         db = SessionLocal()
         try:
             sym = f"TEST_{_nonce()}"
-            from backend.core.database_manager import DatabaseManager
+            from core.database_manager import DatabaseManager
             dm = DatabaseManager()
             rows = dm.get_trend_history(db, asset_symbol=sym, window_days=30)
             assert rows == []
@@ -71,7 +71,7 @@ class TestDatabaseManager:
                 ))
             db.commit()
 
-            from backend.core.database_manager import DatabaseManager
+            from core.database_manager import DatabaseManager
             dm = DatabaseManager()
             rows = dm.get_trend_history(db, asset_symbol=sym, window_days=30)
             assert len(rows) == 10
@@ -83,7 +83,7 @@ class TestDatabaseManager:
         db = SessionLocal()
         try:
             sym = f"TEST_{_nonce()}"
-            from backend.core.database_manager import DatabaseManager
+            from core.database_manager import DatabaseManager
             dm = DatabaseManager()
             rows = dm.get_chain_trend_history(db, asset_symbol=sym, window_days=30)
             assert rows == []

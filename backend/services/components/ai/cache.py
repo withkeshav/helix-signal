@@ -76,7 +76,7 @@ def _try_redis_cache() -> Any:
     if not redis_url:
         return None
     try:
-        from backend.core.cache_manager import cache
+        from core.cache_manager import cache
         return cache._redis if cache._redis else None
     except Exception:
         return None

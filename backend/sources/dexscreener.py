@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from sources.base import AbstractSource, SourceError, http_get_with_retry, async_http_get_with_retry
+from sources.base import AbstractSource, http_get_with_retry, async_http_get_with_retry
 from services.source_usage import _check_source_rate_limit, _record_source_call
 
 DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"

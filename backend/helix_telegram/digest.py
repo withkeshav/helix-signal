@@ -1,7 +1,7 @@
 """Daily/weekly digest service for Telegram bot."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from sqlalchemy import desc
@@ -198,9 +198,19 @@ class DigestService:
     def _should_send_digest(user: TelegramUser, current_utc_time: str) -> bool:
         """Check if it's time to send digest to this user based on their timezone."""
         try:
-            # For now, simple implementation - we can improve timezone conversion later
-            # This is a simplified version that doesn't actually convert timezones
             digest_time = user.digest_time or "09:00"
+            tz_name = user.timezone or "UTC"
+
+            try:
+                from zoneinfo import ZoneInfo
+                user_tz = ZoneInfo(tz_name)
+                now_utc = datetime.now(timezone.utc)
+                now_user = now_utc.astimezone(user_tz)
+                user_time_str = now_user.strftime("%H:%M")
+                return user_time_str == digest_time
+            except Exception:
+                pass
+
             return current_utc_time == digest_time
         except Exception as e:
             logger.error(f"Error checking digest time for user {user.id}: {e}")
@@ -294,5 +304,61 @@ def add_digest_scheduler(scheduler) -> None:
 async def send_weekly_digests():
     """Scheduled job to send weekly summaries."""
     logger.info("Starting weekly summary job")
-    # Implementation would be similar to daily digests but with weekly data
-    logger.info("Weekly summary job completed")
+    try:
+        from collections import defaultdict
+
+        db = SessionLocal()
+        try:
+            users = get_subscribed_users(db)
+            users_with_digest = [u for u in users if u.receive_digest]
+            logger.info(f"Found {len(users_with_digest)} users for weekly summary")
+
+            from sqlalchemy import func as sa_func
+            week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+
+            recent_events = (
+                db.query(SignalEvent)
+                .filter(SignalEvent.timestamp >= week_ago)
+                .order_by(desc(SignalEvent.timestamp))
+                .all()
+            )
+
+            top_alerts = [
+                {"title": e.title, "severity": e.severity}
+                for e in recent_events[:5]
+            ]
+
+            perf_by_asset = defaultdict(lambda: {"change": 0.0, "trend": "stable"})
+            enabled_assets = [a for a in load_enabled_assets() if a.get("symbol")]
+            for asset_cfg in enabled_assets:
+                sym = str(asset_cfg["symbol"]).upper()
+                try:
+                    dash = build_dashboard_response(db, sym)
+                    perf_by_asset[sym]["change"] = getattr(dash.depeg_index, "current_price", 0) or 0
+                    perf_by_asset[sym]["trend"] = "stable"
+                except Exception:
+                    pass
+
+            summary_data = {
+                "week": f"{week_ago.strftime('%b %d')} – {datetime.now().strftime('%b %d')}",
+                "highlights": [
+                    f"{e.title} ({e.asset_symbol})" for e in recent_events[:3]
+                ],
+                "performance": dict(perf_by_asset),
+                "top_alerts": top_alerts,
+            }
+
+            sent = 0
+            for user in users_with_digest:
+                try:
+                    ok = await DigestService.send_weekly_summary(user, summary_data)
+                    if ok:
+                        sent += 1
+                except Exception as e:
+                    logger.error(f"Weekly summary failed for user {user.telegram_id}: {e}")
+
+            logger.info(f"Weekly summary job completed — sent to {sent}/{len(users_with_digest)} users")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error in weekly summary job: {e}")

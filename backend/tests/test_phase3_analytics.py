@@ -166,7 +166,7 @@ class TestAnomalyDetection:
         assert isolation_forest_detect(points) == []
 
     def test_anomaly_detector_plugin_trained(self):
-        from backend.ml_models.anomaly import AnomalyDetector
+        from ml_models.anomaly import AnomalyDetector
         import numpy as np
         detector = AnomalyDetector()
         train_data = list(np.random.normal(1.0, 0.01, 100))
@@ -181,7 +181,7 @@ class TestAnomalyDetection:
         assert result["anomaly_count"] > 0
 
     def test_anomaly_detector_predict_untrained(self):
-        from backend.ml_models.anomaly import AnomalyDetector
+        from ml_models.anomaly import AnomalyDetector
         detector = AnomalyDetector()
         detector.trained = False
         result = detector.predict({"values": [1.0, 1.0, 1.0, 5.0, 1.0]})
@@ -190,7 +190,7 @@ class TestAnomalyDetection:
         assert result["anomaly_count"] == 0
 
     def test_anomaly_detector_empty_values(self):
-        from backend.ml_models.anomaly import AnomalyDetector
+        from ml_models.anomaly import AnomalyDetector
         detector = AnomalyDetector()
         result = detector.predict({"values": []})
         assert result["anomalies"] == []

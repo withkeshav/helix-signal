@@ -9,9 +9,16 @@ export function useGovernance() {
     aiBudget: { daily_budget: 0, tokens_used_today: 0, tokens_remaining: 0, pct_used: 0 },
     aiBudgetLoaded: false,
     secretValues: {},
+    availableModels: {}, // Store available models for each provider
 
     // --- A1: Playbook state ---
     playbookLoading: null,
+    playbooks: [],
+    showCreatePlaybookModal: false,
+    showEditPlaybookModal: false,
+    newPlaybook: { name: '', label: '', description: '', settings: {} },
+    editPlaybookData: { id: null, name: '', label: '', description: '', settings: {} },
+    playbookSettingsEdit: {},
 
     // --- A2: Audit log state ---
     auditLog: [],
@@ -46,6 +53,17 @@ export function useGovernance() {
     toastType: '',
     toastVisible: false,
     toastTimer: null,
+    
+    // --- User management ---
+    users: [],
+    usersLoading: false,
+    usersError: null,
+    showAddUserModal: false,
+    showEditUserModal: false,
+    showDeleteUserModal: false,
+    selectedUserId: null,
+    newUser: { username: '', email: '', password: '', is_admin: false, role: 'user' },
+    editUserForm: { username: '', email: '', is_active: true, is_admin: false, role: 'user' },
 
     get adminToken() {
       return this.$store.ui.adminToken;
@@ -64,6 +82,14 @@ export function useGovernance() {
       this._bindKeyboard();
       this.startAuditPolling();
       this.initProviders();
+      // Load available models
+      this.loadAvailableModels();
+      // Load users if multi-user feature is enabled
+      if (this.settingsList.find(s => s.key === 'feature_multi_user')?.value) {
+        this.loadUsers();
+      }
+      // Load playbooks
+      this.loadPlaybooks();
     },
 
     destroy() {
@@ -134,6 +160,134 @@ export function useGovernance() {
       } finally {
         this.playbookLoading = null;
       }
+    },
+
+    async loadPlaybooks() {
+      try {
+        const r = await fetch('/api/playbooks', { headers: this._adminHeaders() });
+        if (r.ok) {
+          this.playbooks = await r.json();
+        }
+      } catch (e) {
+        this.playbooks = [];
+      }
+    },
+
+    async createPlaybook() {
+      const name = this.newPlaybook.name.trim().toLowerCase().replace(/\s+/g, '_');
+      if (!name) { this.showToast('Name is required', 'error'); return; }
+      const settings = {};
+      for (const [key, val] of Object.entries(this.playbookSettingsEdit)) {
+        if (val !== '' && val !== null && val !== undefined) {
+          settings[key] = val;
+        }
+      }
+      if (!Object.keys(settings).length) { this.showToast('Select at least one setting', 'error'); return; }
+      try {
+        const r = await fetch('/api/playbooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
+          body: JSON.stringify({
+            name,
+            label: this.newPlaybook.label || this.newPlaybook.name,
+            description: this.newPlaybook.description,
+            settings,
+          }),
+        });
+        if (r.ok) {
+          this.showCreatePlaybookModal = false;
+          this.newPlaybook = { name: '', label: '', description: '', settings: {} };
+          this.playbookSettingsEdit = {};
+          await this.loadPlaybooks();
+          this.showToast('Playbook created', 'success');
+        } else {
+          const err = await r.text();
+          this.showToast('Failed: ' + err, 'error');
+        }
+      } catch (e) {
+        this.showToast('Error: ' + e.message, 'error');
+      }
+    },
+
+    openEditPlaybook(pb) {
+      this.editPlaybookData = {
+        id: pb.id,
+        name: pb.name,
+        label: pb.label,
+        description: pb.description,
+        settings: { ...pb.settings },
+      };
+      this.playbookSettingsEdit = { ...pb.settings };
+      for (const s of this.settingsList) {
+        if (!(s.key in this.playbookSettingsEdit)) {
+          this.playbookSettingsEdit[s.key] = '';
+        }
+      }
+      this.showEditPlaybookModal = true;
+    },
+
+    async updatePlaybook() {
+      const settings = {};
+      for (const [key, val] of Object.entries(this.playbookSettingsEdit)) {
+        if (val !== '' && val !== null && val !== undefined) {
+          settings[key] = val;
+        }
+      }
+      if (!Object.keys(settings).length) { this.showToast('Select at least one setting', 'error'); return; }
+      try {
+        const r = await fetch(`/api/playbooks/${this.editPlaybookData.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
+          body: JSON.stringify({
+            label: this.editPlaybookData.label,
+            description: this.editPlaybookData.description,
+            settings,
+          }),
+        });
+        if (r.ok) {
+          this.showEditPlaybookModal = false;
+          await this.loadPlaybooks();
+          this.showToast('Playbook updated', 'success');
+        } else {
+          const err = await r.text();
+          this.showToast('Failed: ' + err, 'error');
+        }
+      } catch (e) {
+        this.showToast('Error: ' + e.message, 'error');
+      }
+    },
+
+    openDeletePlaybook(pb) {
+      if (!confirm(`Delete playbook "${pb.label}"? This cannot be undone.`)) return;
+      this.deletePlaybook(pb.id);
+    },
+
+    async deletePlaybook(id) {
+      try {
+        const r = await fetch(`/api/playbooks/${id}`, {
+          method: 'DELETE',
+          headers: this._adminHeaders(),
+        });
+        if (r.ok) {
+          await this.loadPlaybooks();
+          this.showToast('Playbook deleted', 'success');
+        } else {
+          this.showToast('Failed to delete', 'error');
+        }
+      } catch (e) {
+        this.showToast('Error: ' + e.message, 'error');
+      }
+    },
+
+    initPlaybookSettingsEdit() {
+      this.playbookSettingsEdit = {};
+      for (const s of this.settingsList) {
+        this.playbookSettingsEdit[s.key] = '';
+      }
+    },
+
+    async applyCustomPlaybook(pb) {
+      await this.applyPlaybook(pb.name);
     },
 
     // ===================================================================
@@ -373,6 +527,14 @@ export function useGovernance() {
           this.settingsGroups = [...new Set(data.map(s => s.group).filter(Boolean))].sort();
           this.loadFeatureBudgets();
           this.initProviders();
+          // Load available models for model settings
+          await this.loadAvailableModels();
+          // Load users if multi-user feature is enabled
+          if (this.settingsList.find(s => s.key === 'feature_multi_user')?.value) {
+            this.loadUsers();
+          }
+          // Load playbooks after settings are loaded
+          this.loadPlaybooks();
           return true;
         }
         this.settingsList = [];
@@ -382,6 +544,35 @@ export function useGovernance() {
         this.settingsList = [];
         this.filteredSettings = [];
         return false;
+      }
+    },
+
+    async loadAvailableModels() {
+      try {
+        // Initialize availableModels structure
+        this.availableModels = {};
+        
+        // Fetch available providers
+        const providersResponse = await fetch('/api/admin/ai/providers', { headers: this._adminHeaders() });
+        if (providersResponse.ok) {
+          const providers = await providersResponse.json();
+          
+          // Fetch models for each provider
+          for (const provider of providers) {
+            try {
+              const modelsResponse = await fetch(`/api/admin/ai/providers/${provider.id}/models`, { headers: this._adminHeaders() });
+              if (modelsResponse.ok) {
+                const models = await modelsResponse.json();
+                // Store models by provider ID
+                this.availableModels[provider.id] = models;
+              }
+            } catch (e) {
+              console.warn(`Failed to fetch models for provider ${provider.id}:`, e);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load available models:', e);
       }
     },
 
@@ -481,6 +672,102 @@ export function useGovernance() {
       if (!val) return;
       await this.toggleSetting(key, val);
       this.secretValues[key] = '';
+    },
+    
+    // ===================================================================
+    // User Management Functions
+    // ===================================================================
+    
+    async loadUsers() {
+      this.usersLoading = true;
+      this.usersError = null;
+      try {
+        const r = await fetch('/api/users', { headers: this._adminHeaders() });
+        if (r.ok) {
+          this.users = await r.json();
+        } else {
+          this.usersError = 'Failed to load users';
+        }
+      } catch (e) {
+        this.usersError = e.message;
+      } finally {
+        this.usersLoading = false;
+      }
+    },
+    
+    async addUser() {
+      try {
+        const r = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
+          body: JSON.stringify(this.newUser)
+        });
+        if (r.ok) {
+          this.showAddUserModal = false;
+          this.newUser = { username: '', email: '', password: '', is_admin: false, role: 'user' };
+          await this.loadUsers();
+          this.showToast('User added successfully', 'success');
+        } else {
+          const err = await r.text();
+          this.showToast('Error: ' + err, 'error');
+        }
+      } catch (e) {
+        this.showToast('Error: ' + e.message, 'error');
+      }
+    },
+    
+    async editUser(user) {
+      this.selectedUserId = user.id;
+      this.editUserForm = {
+        username: user.username,
+        email: user.email,
+        is_active: user.is_active,
+        is_admin: user.is_admin,
+        role: user.role
+      };
+      this.showEditUserModal = true;
+    },
+    
+    async updateUser() {
+      try {
+        const r = await fetch(`/api/users/${this.selectedUserId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
+          body: JSON.stringify(this.editUserForm)
+        });
+        if (r.ok) {
+          this.showEditUserModal = false;
+          await this.loadUsers();
+          this.showToast('User updated successfully', 'success');
+        } else {
+          const err = await r.text();
+          this.showToast('Error: ' + err, 'error');
+        }
+      } catch (e) {
+        this.showToast('Error: ' + e.message, 'error');
+      }
+    },
+    
+    async deleteUser(userId) {
+      if (!confirm('Are you sure you want to delete this user? This cannot be undone.')) {
+        return;
+      }
+      
+      try {
+        const r = await fetch(`/api/users/${userId}`, {
+          method: 'DELETE',
+          headers: this._adminHeaders()
+        });
+        if (r.ok) {
+          await this.loadUsers();
+          this.showToast('User deleted successfully', 'success');
+        } else {
+          const err = await r.text();
+          this.showToast('Error: ' + err, 'error');
+        }
+      } catch (e) {
+        this.showToast('Error: ' + e.message, 'error');
+      }
     },
   };
 }

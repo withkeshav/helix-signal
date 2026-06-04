@@ -9,8 +9,9 @@ from typing import List, Optional
 from helix_telegram.review import review_queue, ReviewItem
 
 from database import get_db
-from backend.core.admin_auth import require_admin_token
-from helix_telegram.models import TelegramUser, get_all_users, get_user_by_id, update_user
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
+from helix_telegram.models import TelegramUser, get_all_users, get_user_by_id, update_user, delete_user
 from helix_telegram.service import get_telegram_stats
 from helix_telegram.digest import DigestService
 
@@ -72,7 +73,9 @@ class ReviewActionRequest(BaseModel):
     action: str  # "approve" or "reject"
 
 @router.get("/telegram/stats", response_model=TelegramStatsResponse)
+@limiter.limit("30/minute")
 def get_telegram_stats_endpoint(
+    request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):
@@ -80,7 +83,9 @@ def get_telegram_stats_endpoint(
     return get_telegram_stats()
 
 @router.get("/telegram/users", response_model=List[TelegramUserResponse])
+@limiter.limit("30/minute")
 def list_telegram_users(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -91,7 +96,9 @@ def list_telegram_users(
     return [_user_to_response(user) for user in users]
 
 @router.get("/telegram/users/{user_id}", response_model=TelegramUserResponse)
+@limiter.limit("30/minute")
 def get_telegram_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
@@ -103,7 +110,9 @@ def get_telegram_user(
     return _user_to_response(user)
 
 @router.put("/telegram/users/{user_id}", response_model=TelegramUserResponse)
+@limiter.limit("30/minute")
 def update_telegram_user(
+    request: Request,
     user_id: int,
     user_data: TelegramUserUpdate,
     db: Session = Depends(get_db),
@@ -148,7 +157,9 @@ def update_telegram_user(
     return _user_to_response(user)
 
 @router.delete("/telegram/users/{user_id}")
+@limiter.limit("30/minute")
 def delete_telegram_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
@@ -165,13 +176,15 @@ def delete_telegram_user(
     return {"ok": True}
 
 @router.post("/telegram/test-digest")
+@limiter.limit("30/minute")
 async def send_test_digest(
-    request: SendTestDigestRequest,
+    request: Request,
+    body: SendTestDigestRequest,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):
     """Send a test digest to a user (admin only)."""
-    user = get_user_by_id(db, request.user_id)
+    user = get_user_by_id(db, body.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -210,7 +223,9 @@ def _user_to_response(user: TelegramUser) -> TelegramUserResponse:
 # ===================================================================
 
 @router.get("/telegram/review/pending", response_model=List[ReviewItemResponse])
+@limiter.limit("30/minute")
 def get_pending_reviews(
+    request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):
@@ -230,20 +245,22 @@ def get_pending_reviews(
     ]
 
 @router.post("/telegram/review/{review_id}/action")
+@limiter.limit("30/minute")
 def review_action(
+    request: Request,
     review_id: str,
-    request: ReviewActionRequest,
+    body: ReviewActionRequest,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):
     """Approve or reject a review item (admin only)."""
-    if request.action == "approve":
+    if body.action == "approve":
         success = review_queue.approve(review_id)
         if success:
             return {"ok": True, "message": "Review approved"}
         else:
             raise HTTPException(status_code=404, detail="Review not found or already processed")
-    elif request.action == "reject":
+    elif body.action == "reject":
         success = review_queue.reject(review_id)
         if success:
             return {"ok": True, "message": "Review rejected"}
@@ -253,7 +270,9 @@ def review_action(
         raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'reject'")
 
 @router.get("/telegram/review/stats", response_model=ReviewStatsResponse)
+@limiter.limit("30/minute")
 def get_review_stats(
+    request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):

@@ -9,7 +9,7 @@ from services.dashboard import build_dashboard_response
 from services.cache import get_or_build_dashboard
 from signal_engine.core import load_enabled_assets
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

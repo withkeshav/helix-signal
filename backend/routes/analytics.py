@@ -8,7 +8,7 @@ from services.anomaly import detect_anomalies
 from services.analytics import compute_correlations, detect_patterns, detect_regime, cross_asset_rotation
 from services.compare import build_compare_payload
 
-from backend.core.limiter import limiter
+from core.limiter import limiter
 
 router = APIRouter()
 

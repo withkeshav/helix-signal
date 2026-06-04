@@ -8,7 +8,7 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**328 regression tests pass.** Zero paid API dependencies for core operation.
+**328+ regression tests pass.** Zero paid API dependencies for core operation.
 
 ## V3 Highlights
 
@@ -189,6 +189,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - 📖 [Documentation index](docs/README.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
 - API reference: [`docs/api.md`](docs/api.md)
+- AI Configuration: [`docs/guides/ai-configuration.md`](docs/guides/ai-configuration.md)
 - Data methodology: [`docs/concepts/data-methodology.md`](docs/concepts/data-methodology.md)
 - Adding a stablecoin: [`docs/guides/adding-asset.md`](docs/guides/adding-asset.md)
 - Adding a chain: [`docs/guides/adding-chain.md`](docs/guides/adding-chain.md)

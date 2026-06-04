@@ -17,7 +17,8 @@ from services.user_service import (
     get_users,
     update_user,
 )
-from backend.core.admin_auth import require_admin_token
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
 
 
 def require_multi_user_enabled(db: Session = Depends(get_db)):
@@ -65,7 +66,9 @@ class UserResponse(BaseModel):
 
 
 @router.post("/users", response_model=UserResponse)
+@limiter.limit("30/minute")
 def create_new_user(
+    request: Request,
     user: UserCreate,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
@@ -99,7 +102,9 @@ def create_new_user(
 
 
 @router.get("/users", response_model=list[UserResponse])
+@limiter.limit("30/minute")
 def read_users(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -123,7 +128,9 @@ def read_users(
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
+@limiter.limit("30/minute")
 def read_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
@@ -147,7 +154,9 @@ def read_user(
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
+@limiter.limit("30/minute")
 def update_existing_user(
+    request: Request,
     user_id: int,
     user: UserUpdate,
     db: Session = Depends(get_db),
@@ -181,7 +190,9 @@ def update_existing_user(
 
 
 @router.delete("/users/{user_id}")
+@limiter.limit("30/minute")
 def delete_existing_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
@@ -195,6 +206,7 @@ def delete_existing_user(
 
 
 @router.post("/auth/login")
+@limiter.limit("10/minute")
 def login(
     request: Request,
     credentials: UserLogin,

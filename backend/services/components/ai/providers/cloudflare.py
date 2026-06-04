@@ -10,8 +10,8 @@ def cloudflare_ai(
     prompt: str, max_tokens: int, system: Optional[str] = None, model: Optional[str] = None, **kwargs
 ) -> Optional[Dict[str, Any]]:
     """Call Cloudflare AI API."""
-    api_key = kwargs.get("_resolved_api_key") or os.getenv("CLOUDFLARE_API_TOKEN", "").strip()
-    account_id = kwargs.get("_resolved_account_id") or os.getenv("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    api_key = kwargs.get("_resolved_api_key", "").strip()
+    account_id = kwargs.get("_resolved_account_id", "").strip()
     if not api_key or not account_id:
         return None
     model = model or os.getenv("CLOUDFLARE_AI_MODEL", "@cf/meta/llama-3.1-8b-instruct")

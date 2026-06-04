@@ -14,7 +14,8 @@ from services.settings_import_export import (
     export_settings_to_json,
     import_settings_from_json,
 )
-from backend.core.admin_auth import require_admin_token
+from core.admin_auth import require_admin_token
+from core.limiter import limiter
 
 router = APIRouter()
 
@@ -26,7 +27,9 @@ class ImportResponse(BaseModel):
 
 
 @router.get("/settings/export")
+@limiter.limit("30/minute")
 def export_settings_endpoint(
+    request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):
@@ -39,6 +42,7 @@ def export_settings_endpoint(
 
 
 @router.post("/settings/import", response_model=ImportResponse)
+@limiter.limit("5/minute")
 async def import_settings_endpoint(
     request: Request,
     settings_data: dict,
@@ -59,7 +63,9 @@ async def import_settings_endpoint(
 
 
 @router.get("/settings/export/json")
+@limiter.limit("30/minute")
 def export_settings_json_endpoint(
+    request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ):
@@ -75,6 +81,7 @@ def export_settings_json_endpoint(
 
 
 @router.post("/settings/import/json", response_model=ImportResponse)
+@limiter.limit("5/minute")
 async def import_settings_json_endpoint(
     request: Request,
     file: UploadFile = File(...),

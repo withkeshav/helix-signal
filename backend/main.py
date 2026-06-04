@@ -148,7 +148,8 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     app.state.scheduler = scheduler
 
-    _osint_job()
+    loop = asyncio.get_running_loop()
+    loop.create_task(asyncio.to_thread(_osint_job))
 
     if not skip_refresh:
         await _refresh_job()

@@ -503,7 +503,7 @@
     </div>
 
     <!-- Tab: Supply -->
-    <div class="tab-content" :class="tab === 'supply' && 'active'">
+    <div class="tab-content" :class="tab === 'supply' && 'active'" x-data="market">
       <div x-show="!totalSupply && _loadingDashboard" class="empty-state" style="margin-bottom:12px">
         <span class="loading-spinner" style="width:32px;height:32px;border-width:3px;margin-bottom:4px"></span>
         <span class="kpi-label">Loading supply data...</span>

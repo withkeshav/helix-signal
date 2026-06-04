@@ -20,6 +20,7 @@ export function useMarket() {
     
     // Additional data needed for dashboard cards
     errorOverview: '',
+    tickerItems: [],
     marketOverview: '',
     aiSummary: '',
     aiNarrative: '',
@@ -82,7 +83,9 @@ export function useMarket() {
     
     // Init — called automatically by Alpine when component mounts
     async init() {
+      await this.loadDashboard(this.asset);
       await this.loadAnomalies();
+      this.tickerItems = await this.loadTicker();
       await this.loadPredictive();
       await this.loadMarketOverview();
       await this.loadAiExplain();
@@ -90,6 +93,25 @@ export function useMarket() {
       await this.loadInsights();
       await this.loadStressLeaderboard();
       await this.loadRotation();
+    },
+
+    async loadDashboard(asset) {
+      try {
+        const r = await fetch(`/api/dashboard?asset=${asset}`, { cache: 'no-store' });
+        if (!r.ok) { this.errorOverview = `Dashboard HTTP ${r.status}`; return; }
+        const d = await r.json();
+        this.chains = d.chains || [];
+        this.signal = d.asset_signal || {};
+        this.crossSource = d.cross_source_signal || {};
+        this.supplyFeed = d.supply_feed || {};
+        this.attSignal = d.attestation || {};
+        this.depeg = d.depeg_index || {};
+        this.concentration = d.chain_concentration || {};
+        this.totalSupply = d.total_supply_current;
+        this.supplyChange = d.total_supply_change_24h_pct;
+      } catch (e) {
+        this.errorOverview = `Dashboard error: ${e.message}`;
+      }
     },
 
     // Core data loading methods (from original market.js)

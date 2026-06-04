@@ -80,6 +80,18 @@ export function useMarket() {
       this.$dispatch('chart-range-changed', { timeRange: this.timeRange });
     },
     
+    // Init — called automatically by Alpine when component mounts
+    async init() {
+      await this.loadAnomalies();
+      await this.loadPredictive();
+      await this.loadMarketOverview();
+      await this.loadAiExplain();
+      await this.loadNarrative();
+      await this.loadInsights();
+      await this.loadStressLeaderboard();
+      await this.loadRotation();
+    },
+
     // Core data loading methods (from original market.js)
     async loadAnomalies() {
       try { 

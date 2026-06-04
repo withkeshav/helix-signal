@@ -70,8 +70,6 @@ Alpine.data('helixApp', () => ({
     // Watch for tab changes
     this.$watch('tab', val => location.hash = val);
     
-    // Load source usage
-    await this._loadSourceUsage();
     // Load warnings
     await this._loadWarnings();
   },
@@ -127,6 +125,11 @@ Alpine.data('helixApp', () => ({
   switchAsset() {
     // Dispatch event for components to handle asset switching  
     this.$dispatch('asset-changed', { asset: this.asset });
+  },
+
+  loadTab() {
+    // Request focused data reload from current tab component
+    this.$dispatch('tab-changed', { tab: this.tab });
   }
 }));
 

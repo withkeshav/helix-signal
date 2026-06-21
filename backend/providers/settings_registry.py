@@ -201,7 +201,7 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
         "description": "Enable DexScreener API for DEX pool data",
         "requires_restart": False,
         "affects_rate_limits": True,
-        "rate_limit_rpm": 60,
+        "rate_limit_rpm": 120,  # Increased from 60 to 120
         "warning_threshold": 0.8,
     },
     "provider_coingecko": {
@@ -213,7 +213,7 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
         "description": "Enable CoinGecko API for price data",
         "requires_restart": False,
         "affects_rate_limits": True,
-        "rate_limit_rpm": 50,
+        "rate_limit_rpm": 100,  # Increased from 50 to 100
         "warning_threshold": 0.8,
     },
     "provider_coinmarketcap": {

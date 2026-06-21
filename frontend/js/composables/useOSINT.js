@@ -1,10 +1,14 @@
 import { renderSentimentChart, _disposeChart } from '../charts.js';
+import { formatWhen, statusBand, formatFeedAge } from '../utils.js';
 
 export function useOSINT() {
   return {
     _charts: new Map(),
     _echarts: new Map(),
     _disposeChart,
+    formatWhen,
+    statusBand,
+    formatFeedAge,
 
     get attestation() { return this.$store.osint.attestation; },
     get osintArticles() { return this.$store.osint.osintArticles; },
@@ -12,6 +16,7 @@ export function useOSINT() {
     get loadingEvents() { return this.$store.osint.loadingEvents; },
     get errorEvents() { return this.$store.osint.errorEvents; },
     get _sentimentSeries() { return this.$store.osint._sentimentSeries; },
+    get nlpAvailable() { return this.$store.dashboard.nlpAvailable; },
 
     async loadAttestation() {
       await this.$store.osint.loadAttestation();
@@ -35,40 +40,64 @@ export function useOSINT() {
 
     init() {
       this.$nextTick(() => {
+        // Load data if we're on events or intel tab
+        const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
+        if (currentTab === 'events' || currentTab === 'intel') {
+          const asset = this.$store.dashboard.asset || 'USDT';
+          this.loadEvents(asset);
+          this.loadAttestation();
+        }
+
+        // Initial render if data exists
+        if (this._sentimentSeries.length) {
+          requestAnimationFrame(() => this._renderSentiment());
+        }
+
         // Render charts when sentiment data changes
-        Alpine.effect(() => {
-          const series = this._sentimentSeries;
-          if (series.length) {
-            requestAnimationFrame(() => this._renderSentiment());
-          }
-        });
-        
-        // Re-render charts on theme change
-        Alpine.effect(() => {
-          Alpine.store('ui').theme;
+        this.$watch('$store.osint._sentimentSeries', () => {
           if (this._sentimentSeries.length) {
             requestAnimationFrame(() => this._renderSentiment());
           }
         });
-        
-        // Clean up charts when switching away from tab
-        this.$watch('$store.ui.tab', (newTab) => {
-          if (newTab !== 'events' && newTab !== 'intel') {
-            this._destroyCharts();
-          }
+
+        // Re-render charts on theme change
+        this.$watch('$store.ui.theme', () => {
+          this.$nextTick(() => {
+            if (this._sentimentSeries.length) {
+              requestAnimationFrame(() => this._renderSentiment());
+            }
+          });
         });
-        
-        // Handle window resize
+
+        // Handle window resize + tab-switch cleanup
         const resizeHandler = () => {
           if (this._sentimentSeries.length) {
             this._renderSentiment();
           }
         };
-        window.addEventListener('resize', resizeHandler);
-        // Clean up resize handler when component is destroyed
+
+        // Load data when tab changes to events or intel
         this.$watch('$store.ui.tab', (newTab) => {
+          if (newTab === 'events' || newTab === 'intel') {
+            const asset = this.$store.dashboard.asset || 'USDT';
+            this.loadEvents(asset);
+            this.loadAttestation();
+          }
+          
           if (newTab !== 'events' && newTab !== 'intel') {
+            this._destroyCharts();
             window.removeEventListener('resize', resizeHandler);
+          } else {
+            window.addEventListener('resize', resizeHandler);
+          }
+        });
+
+        // Reload data when asset changes
+        this.$watch('$store.dashboard.asset', (newAsset) => {
+          const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
+          if (currentTab === 'events' || currentTab === 'intel') {
+            this.loadEvents(newAsset);
+            this.loadAttestation();
           }
         });
       });

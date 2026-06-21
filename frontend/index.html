@@ -58,29 +58,29 @@
       </div>
     </nav>
 
-    <!-- KPI Row -->
+    <!-- KPI Row (reads from shared dashboard store) -->
     <div class="kpi-row">
-      <div class="kpi-card" @click="showEvidence('score')">
+      <div class="kpi-card">
         <div class="kpi-label">Signal Score</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" :class="`band-${signal.band?.toLowerCase()}`" x-text="`${signal.score ?? '--'}`"></div>
-            <div class="kpi-trend" x-text="signal.band || ''"></div>
+            <div class="kpi-value" :class="`band-${($store.dashboard.signal.band||'').toLowerCase()}`" x-text="`${$store.dashboard.signal.score ?? '--'}`"></div>
+            <div class="kpi-trend" x-text="$store.dashboard.signal.band || ''"></div>
           </div>
-          <svg class="kpi-spark" viewBox="0 0 60 20" :style="`stroke:${gaugeColor}`">
-            <polyline fill="none" stroke-width="2" stroke-linecap="round" :points="sparkline('signal')"/>
+          <svg class="kpi-spark" viewBox="0 0 60 20" :style="'stroke:'+($store.dashboard.signal.band==='risk'?'var(--down)':$store.dashboard.signal.band==='watch'?'var(--neutral)':'var(--up)')">
+            <polyline fill="none" stroke-width="2" stroke-linecap="round" points="0,10 60,10"/>
           </svg>
         </div>
       </div>
-      <div class="kpi-card" @click="showEvidence('peg')">
+      <div class="kpi-card">
         <div class="kpi-label">Peg</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" :class="depeg.current_price && Math.abs(depeg.current_price-1)>0.001 ? 'band-watch' : 'text-green'" x-text="depeg.current_price?.toFixed(4)??'--'"></div>
-            <div class="kpi-trend" x-text="depeg.peg_status||''"></div>
+            <div class="kpi-value" :class="$store.dashboard.depeg.current_price && Math.abs($store.dashboard.depeg.current_price-1)>0.001 ? 'band-watch' : 'text-green'" x-text="$store.dashboard.depeg.current_price?.toFixed(4)??'--'"></div>
+            <div class="kpi-trend" x-text="$store.dashboard.depeg.peg_status||''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--spark)">
-            <polyline fill="none" stroke-width="2" stroke-linecap="round" :points="sparkline('peg')"/>
+            <polyline fill="none" stroke-width="2" stroke-linecap="round" points="0,10 60,10"/>
           </svg>
         </div>
       </div>
@@ -88,11 +88,11 @@
         <div class="kpi-label">Supply</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" x-text="formatUsd(totalSupply)"></div>
-            <div class="kpi-trend" :class="supplyChange!=null?(supplyChange>=0?'text-green':'text-red'):''" x-text="supplyChange!=null?`${supplyChange>=0?'+':''}${supplyChange.toFixed(2)}% 24h`:''"></div>
+            <div class="kpi-value" x-text="$store.dashboard.totalSupply != null ? '$' + Number($store.dashboard.totalSupply).toLocaleString(undefined,{maximumFractionDigits:2}) : 'N/A'"></div>
+            <div class="kpi-trend" :class="$store.dashboard.supplyChange!=null?($store.dashboard.supplyChange>=0?'text-green':'text-red'):''" x-text="$store.dashboard.supplyChange!=null?`${$store.dashboard.supplyChange>=0?'+':''}${$store.dashboard.supplyChange.toFixed(2)}% 24h`:''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--up)">
-            <polyline fill="none" stroke-width="2" stroke-linecap="round" :points="sparkline('supply')"/>
+            <polyline fill="none" stroke-width="2" stroke-linecap="round" points="0,10 60,10"/>
           </svg>
         </div>
       </div>
@@ -100,8 +100,8 @@
         <div class="kpi-label">Chains</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" x-text="chains?.length||0"></div>
-            <div class="kpi-trend" x-text="`Top: ${concentration.top_chain||''}`"></div>
+            <div class="kpi-value" x-text="$store.dashboard.chains?.length||0"></div>
+            <div class="kpi-trend" x-text="`Top: ${$store.dashboard.concentration.top_chain||''}`"></div>
           </div>
         </div>
       </div>
@@ -109,8 +109,8 @@
         <div class="kpi-label">Fresh</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" :class="freshness.status==='Fresh'?'text-green':freshness.status==='Aging'?'band-watch':'text-red'" x-text="freshness.status||'--'"></div>
-            <div class="kpi-trend" x-text="freshness.age_minutes!=null?`${freshness.age_minutes.toFixed(0)}m ago`:''"></div>
+            <div class="kpi-value" :class="$store.dashboard.freshness.status==='Fresh'?'text-green':$store.dashboard.freshness.status==='Aging'?'band-watch':'text-red'" x-text="$store.dashboard.freshness.status||'--'"></div>
+            <div class="kpi-trend" x-text="$store.dashboard.freshness.age_minutes!=null?`${$store.dashboard.freshness.age_minutes.toFixed(0)}m ago`:''"></div>
           </div>
         </div>
       </div>
@@ -118,9 +118,9 @@
         <div class="kpi-label">Sources</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" x-text="`${(sources||[]).filter(s=>s.status==='ok').length}/${(sources||[]).length}`"></div>
-            <div class="kpi-trend" :class="(sources||[]).some(s=>s.status!=='ok')?'text-red':'text-green'" x-text="(sources||[]).some(s=>s.status!=='ok')?'Degraded':'All OK'"></div>
-            <div x-show="crossSource.discrepancy_flag" class="kpi-sub" style="color:var(--down);font-size:10px">Cross-source: &Delta; <span x-text="crossSource.max_discrepancy_pct?.toFixed(2)"></span>%</div>
+            <div class="kpi-value" x-text="`${($store.dashboard.sources||[]).filter(s=>s.status==='ok').length}/${($store.dashboard.sources||[]).length}`"></div>
+            <div class="kpi-trend" :class="($store.dashboard.sources||[]).some(s=>s.status!=='ok')?'text-red':'text-green'" x-text="($store.dashboard.sources||[]).some(s=>s.status!=='ok')?'Degraded':'All OK'"></div>
+            <div x-show="$store.dashboard.crossSource.discrepancy_flag" class="kpi-sub" style="color:var(--down);font-size:10px">Cross-source: &Delta; <span x-text="$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)"></span>%</div>
           </div>
         </div>
       </div>
@@ -600,22 +600,22 @@
         </div>
         <div class="insight-card">
           <h2>Cross-Source Price</h2>
-          <template x-for="c in chains" :key="c.chain_name">
+          <template x-for="c in ($store.dashboard.chains||[])" :key="c.chain_name">
             <div class="signal-item">
               <span x-text="c.chain_name"></span>
               <span x-text="c.price != null ? `$${c.price.toFixed(6)}` : 'N/A'" :class="c.price && Math.abs(c.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
             </div>
           </template>
-          <div x-show="!chains.length" class="kpi-sub" style="padding:8px 0">No chain data</div>
-          <div x-show="crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
-            Discrepancy: <strong x-text="`${crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
+          <div x-show="!($store.dashboard.chains||[]).length" class="kpi-sub" style="padding:8px 0">No chain data</div>
+          <div x-show="$store.dashboard.crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
+            Discrepancy: <strong x-text="`${$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
           </div>
         </div>
       </div>
     </div>
 
     <!-- Tab: Health -->
-    <div class="tab-content" :class="tab === 'health' && 'active'">
+    <div class="tab-content" :class="tab === 'health' && 'active'" x-data="healthDashboard" x-init="init()">
       <div class="insight-grid">
         <div class="insight-card">
           <h2>Source Health</h2>
@@ -1668,10 +1668,10 @@
 
     <!-- Footer -->
     <footer class="footer">
-      <span x-text="`Generated ${generatedAt}`"></span>
-      <span x-show="freshness.status === 'Stale'" class="pill source-down">stale</span>
-      <span x-show="freshness.status === 'Fresh'" class="pill source-ok">fresh</span>
-      <template x-for="s in sources" :key="s.source_name">
+      <span x-text="`Generated ${$store.dashboard.generatedAt}`"></span>
+      <span x-show="$store.dashboard.freshness.status === 'Stale'" class="pill source-down">stale</span>
+      <span x-show="$store.dashboard.freshness.status === 'Fresh'" class="pill source-ok">fresh</span>
+      <template x-for="s in ($store.dashboard.sources||[])" :key="s.source_name">
         <span class="pill" :class="`source-${s.status}`" x-text="`${s.source_name}: ${s.status}`"></span>
       </template>
       <span class="pill" x-text="'v' + version"></span>

@@ -1,4 +1,5 @@
 import { gaugeArc, gaugeColor, formatWhen, formatAiAge, formatUsd, pegLabel } from '../utils.js';
+import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, _setupResizeHandler, _disposeAllCharts, _disposeChart } from '../charts.js';
 
 export function useMarket() {
   return {
@@ -17,6 +18,9 @@ export function useMarket() {
     supplyChange: null,
     anomalyEvents: {},
     _trendCache: { signal: [], peg: [], supply: [] },
+    
+    // Chart-related properties
+    _charts: new Map(),
     
     // Additional data needed for dashboard cards
     errorOverview: '',
@@ -42,6 +46,7 @@ export function useMarket() {
     // Computed properties
     get gaugeArc() { return gaugeArc(this.signal.score); },
     get gaugeColor() { return gaugeColor(this.signal.band); },
+    get adminToken() { return this.$store.ui.adminToken; },
     
     sparkline(key) {
       const pts = this._trendCache[key || 'signal'];
@@ -81,6 +86,16 @@ export function useMarket() {
       this.$dispatch('chart-range-changed', { timeRange: this.timeRange });
     },
     
+    // Chart methods
+    renderCharts,
+    destroyCharts,
+    _makeBar,
+    loadTrendChart,
+    renderSupplyChart,
+    _setupResizeHandler,
+    _disposeAllCharts,
+    _disposeChart,
+    
     // Init — called automatically by Alpine when component mounts
     async init() {
       await this.loadDashboard(this.asset);
@@ -93,6 +108,41 @@ export function useMarket() {
       await this.loadInsights();
       await this.loadStressLeaderboard();
       await this.loadRotation();
+      
+      // Render charts after data is loaded
+      this.$nextTick(() => {
+        this.renderCharts({ chains: this.chains });
+        this.renderSupplyChart();
+      });
+      
+      // Set up resize handler
+      this._setupResizeHandler();
+      
+      // Clean up charts when switching away from tab
+      this.$watch('$store.ui.tab', (newTab) => {
+        if (newTab !== 'overview' && newTab !== 'supply') {
+          this._disposeAllCharts();
+        }
+      });
+      
+      // Reload data and charts when asset changes
+      this.$watch('$store.dashboard.asset', (newAsset) => {
+        this.loadDashboard(newAsset);
+        this.loadAnomalies();
+        this.loadPredictive();
+        this.loadMarketOverview();
+        this.loadAiExplain();
+        this.loadNarrative();
+        this.loadInsights();
+        this.loadStressLeaderboard();
+        this.loadRotation();
+        
+        // Re-render charts after data reload
+        this.$nextTick(() => {
+          this.renderCharts({ chains: this.chains });
+          this.renderSupplyChart();
+        });
+      });
     },
 
     async loadDashboard(asset) {
@@ -109,6 +159,19 @@ export function useMarket() {
         this.concentration = d.chain_concentration || {};
         this.totalSupply = d.total_supply_current;
         this.supplyChange = d.total_supply_change_24h_pct;
+        this.$store.dashboard.chains = d.chains || [];
+        this.$store.dashboard.signal = d.asset_signal || {};
+        this.$store.dashboard.crossSource = d.cross_source_signal || {};
+        this.$store.dashboard.supplyFeed = d.supply_feed || {};
+        this.$store.dashboard.attSignal = d.attestation || {};
+        this.$store.dashboard.depeg = d.depeg_index || {};
+        this.$store.dashboard.concentration = d.chain_concentration || {};
+        this.$store.dashboard.totalSupply = d.total_supply_current;
+        this.$store.dashboard.supplyChange = d.total_supply_change_24h_pct;
+        this.$store.dashboard.freshness = d.freshness || {};
+        this.$store.dashboard.sources = d.sources || [];
+        this.$store.dashboard.generatedAt = d.generated_at || '';
+        this.$store.dashboard.nlpAvailable = !!(d.data_quality?.nlp_available);
       } catch (e) {
         this.errorOverview = `Dashboard error: ${e.message}`;
       }

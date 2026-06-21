@@ -553,14 +553,14 @@ export function useGovernance() {
         this.availableModels = {};
         
         // Fetch available providers
-        const providersResponse = await fetch('/api/admin/ai/providers', { headers: this._adminHeaders() });
+        const providersResponse = await fetch('/api/ai/providers', { headers: this._adminHeaders() });
         if (providersResponse.ok) {
           const providers = await providersResponse.json();
           
           // Fetch models for each provider
           for (const provider of providers) {
             try {
-              const modelsResponse = await fetch(`/api/admin/ai/providers/${provider.id}/models`, { headers: this._adminHeaders() });
+              const modelsResponse = await fetch(`/api/ai/providers/${provider.id}/models`, { headers: this._adminHeaders() });
               if (modelsResponse.ok) {
                 const models = await modelsResponse.json();
                 // Store models by provider ID

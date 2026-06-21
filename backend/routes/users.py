@@ -203,30 +203,3 @@ def delete_existing_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     return {"ok": True}
-
-
-@router.post("/auth/login")
-@limiter.limit("10/minute")
-def login(
-    request: Request,
-    credentials: UserLogin,
-    db: Session = Depends(get_db),
-    _multi=Depends(require_multi_user_enabled),
-):
-    """Authenticate a user and return a token."""
-    user = authenticate_user(db, credentials.username, credentials.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    if not user.is_active:
-        raise HTTPException(status_code=401, detail="User is inactive")
-    
-    # In a real application, you would generate a JWT token here
-    # For now, we'll just return a success message
-    return {
-        "access_token": "mock_token",  # In a real app, this would be a JWT
-        "token_type": "bearer",
-        "user_id": user.id,
-        "username": user.username,
-        "is_admin": user.is_admin,
-    }

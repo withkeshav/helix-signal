@@ -41,27 +41,57 @@ export function useForecast() {
 
     init() {
       this.$nextTick(() => {
+        // Load data if we're on forecast tab
+        const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
+        if (currentTab === 'forecast') {
+          const asset = this.$store.dashboard.asset || 'USDT';
+          this.loadForecastData(asset);
+          this.loadForecastAccuracy(asset);
+        }
+
+        // Initial render if data exists
+        if (this._forecastData) {
+          requestAnimationFrame(() => this._renderForecastCharts());
+        }
+
         // Render charts when forecast data changes
-        Alpine.effect(() => {
+        this.$watch('$store.forecast._forecastData', () => {
           if (this._forecastData) {
             requestAnimationFrame(() => this._renderForecastCharts());
           }
         });
-        
+
         // Re-render charts on theme change
-        Alpine.effect(() => {
-          Alpine.store('ui').theme;
+        this.$watch('$store.ui.theme', () => {
           this.$nextTick(() => {
             if (this._forecastData) {
               requestAnimationFrame(() => this._renderForecastCharts());
             }
           });
         });
-        
+
         // Clean up charts when switching away from tab
         this.$watch('$store.ui.tab', (newTab) => {
           if (newTab !== 'forecast') {
             this._destroyCharts();
+          }
+        });
+
+        // Reload data when asset changes
+        this.$watch('$store.dashboard.asset', (newAsset) => {
+          const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
+          if (currentTab === 'forecast') {
+            this.loadForecastData(newAsset);
+            this.loadForecastAccuracy(newAsset);
+          }
+        });
+
+        // Load data when tab changes to forecast
+        this.$watch('$store.ui.tab', (newTab) => {
+          if (newTab === 'forecast') {
+            const asset = this.$store.dashboard.asset || 'USDT';
+            this.loadForecastData(asset);
+            this.loadForecastAccuracy(asset);
           }
         });
       });

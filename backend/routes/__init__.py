@@ -21,6 +21,10 @@ def register_routes(app):
     from routes.telegram import router as telegram_router
     from routes.trends import router as trends_router
     from routes.analytics import router as analytics_router
+    from routes.chain_detail import router as chain_detail_router
+    from routes.settings_audit import router as settings_audit_router
+    from routes.settings_import_export import router as settings_import_export_router
+    from routes.users import router as users_router
 
     app.include_router(admin_router, prefix="/api", tags=["admin"])
     app.include_router(ai_router, prefix="/api", tags=["ai"])
@@ -41,3 +45,7 @@ def register_routes(app):
     app.include_router(telegram_router, prefix="/api", tags=["telegram"])
     app.include_router(trends_router, prefix="/api", tags=["trends"])
     app.include_router(analytics_router, prefix="/api", tags=["analytics"])
+    app.include_router(chain_detail_router, prefix="/api", tags=["chains"])
+    app.include_router(settings_audit_router, prefix="/api", tags=["settings"])
+    app.include_router(settings_import_export_router, prefix="/api", tags=["settings"])
+    app.include_router(users_router, prefix="/api", tags=["users"])

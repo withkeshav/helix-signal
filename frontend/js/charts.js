@@ -1,3 +1,5 @@
+import { formatUsd } from './utils.js';
+
 export function _disposeChart(c) {
   if (!c) return;
   if (typeof c.dispose === 'function') {

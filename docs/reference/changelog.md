@@ -1,5 +1,31 @@
 # Changelog
 
+## 3.9.3 (2026-06-21)
+
+### Added
+
+- **Database optimizations** — Added indexes on frequently queried columns, implemented bulk operations, configured connection pooling, and added caching for frequently updated records
+- **Rate limiting improvements** — Reduced DexScreener API calls from 3 endpoints to 1, limited chains from 6 to 2 major chains, increased rate limits to 120 RPM for DexScreener and 100 RPM for CoinGecko
+- **Asset management pipeline** — Created `scripts/add_stablecoin.py` for automated asset addition with configuration validation
+- **Enhanced monitoring system** — Created `scripts/monitor_rate_limits.py` with comprehensive monitoring and alerting capabilities
+- **Health tab** — Added new health dashboard with source status, usage metrics, and freshness monitoring
+
+### Changed
+
+- **DexScreener implementation** — Optimized API calls and reduced chain coverage to stay within rate limits
+- **Asset addition process** — Enhanced with validation and automated documentation updates
+- **Documentation** — Updated guides and added comprehensive system improvements documentation
+
+### Fixed
+
+- **Rate limiting issues** — Resolved excessive API calls that were causing rate limit exceeded errors
+- **Database performance** — Optimized queries and operations for better performance
+- **Asset configuration validation** — Added comprehensive validation for new asset additions
+
+### Infrastructure
+
+- **Version bumped** — 3.9.2 → 3.9.3
+
 ## 3.9.2 (2026-06-04)
 
 ### Added

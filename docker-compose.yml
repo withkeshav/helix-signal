@@ -49,6 +49,7 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    profiles: ["data"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,8 +100,9 @@ services:
     build:
       context: ./frontend
     restart: unless-stopped
+    profiles: ["data"]
     ports:
-      - "80:80"
+      - "8080:80"
     security_opt:
       - no-new-privileges:true
     cap_drop:

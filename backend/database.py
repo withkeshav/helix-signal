@@ -21,6 +21,14 @@ if DATABASE_URL in ("sqlite:///:memory:", "sqlite://"):
 elif DATABASE_URL.startswith("postgresql"):
     _pool_kw["pool_pre_ping"] = True
     _pool_kw["pool_recycle"] = 3600
+    _pool_kw["pool_size"] = 10
+    _pool_kw["max_overflow"] = 20
+else:
+    # For SQLite, set pool settings for better performance
+    _pool_kw["pool_size"] = 5
+    _pool_kw["max_overflow"] = 10
+    _pool_kw["pool_pre_ping"] = True
+    _pool_kw["pool_recycle"] = 3600
 engine = create_engine(DATABASE_URL, connect_args=connect_args, **_pool_kw)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -31,7 +39,13 @@ class Base(DeclarativeBase):
 
 class AssetChainSnapshot(Base):
     __tablename__ = "asset_chain_snapshots"
-    __table_args__ = (UniqueConstraint("asset_symbol", "chain_name", name="uq_asset_chain_snapshot"),)
+    __table_args__ = (
+        UniqueConstraint("asset_symbol", "chain_name", name="uq_asset_chain_snapshot"),
+        Index("ix_asset_chain_asset_symbol", "asset_symbol"),
+        Index("ix_asset_chain_chain_name", "chain_name"),
+        Index("ix_asset_chain_fetched_at", "fetched_at"),
+        Index("ix_asset_chain_updated_at", "updated_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
@@ -64,6 +78,11 @@ class AssetChainSnapshot(Base):
 
 class SourceStatus(Base):
     __tablename__ = "source_status"
+    __table_args__ = (
+        Index("ix_source_status_name", "source_name"),
+        Index("ix_source_status_status", "status"),
+        Index("ix_source_status_updated_at", "updated_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     source_name: Mapped[str] = mapped_column(String(64), unique=True, index=True)
@@ -82,6 +101,11 @@ class AssetFreshness(Base):
     """Per-asset last-successful-fetch tracking."""
 
     __tablename__ = "asset_freshness"
+    __table_args__ = (
+        Index("ix_asset_freshness_asset_symbol", "asset_symbol"),
+        Index("ix_asset_freshness_last_fetch", "last_successful_fetch"),
+        Index("ix_asset_freshness_updated_at", "updated_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), unique=True, index=True)
@@ -99,6 +123,10 @@ class AssetTrendSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("asset_symbol", "bucket_id", name="uq_asset_trend_bucket"),
         Index("ix_asset_trend_asset_ts", "asset_symbol", "timestamp"),
+        Index("ix_asset_trend_asset_symbol", "asset_symbol"),
+        Index("ix_asset_trend_timestamp", "timestamp"),
+        Index("ix_asset_trend_bucket_id", "bucket_id"),
+        Index("ix_asset_trend_signal_band", "signal_band"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -109,7 +137,7 @@ class AssetTrendSnapshot(Base):
     price: Mapped[float | None] = mapped_column(Float, nullable=True)
     depeg_index: Mapped[int] = mapped_column(Integer, default=0)
     signal_score: Mapped[int] = mapped_column(Integer, default=0)
-    signal_band: Mapped[str] = mapped_column(String(16), default="Normal")
+    signal_band: Mapped[str] = mapped_column(String(16), default="Normal", index=True)
     concentration_score: Mapped[int] = mapped_column(Integer, default=0)
     data_confidence_label: Mapped[str] = mapped_column(String(16), default="Unknown")
     source_status: Mapped[str] = mapped_column(String(32), default="unknown")
@@ -127,6 +155,10 @@ class ChainTrendSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("asset_symbol", "chain_key", "bucket_id", name="uq_chain_trend_bucket"),
         Index("ix_chain_trend_asset_chain_ts", "asset_symbol", "chain_key", "timestamp"),
+        Index("ix_chain_trend_asset_symbol", "asset_symbol"),
+        Index("ix_chain_trend_chain_key", "chain_key"),
+        Index("ix_chain_trend_timestamp", "timestamp"),
+        Index("ix_chain_trend_bucket_id", "bucket_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -213,6 +245,14 @@ class SignalEvent(Base):
     """Local, explainable monitoring events (not external alerts)."""
 
     __tablename__ = "signal_events"
+    __table_args__ = (
+        Index("ix_signal_event_asset_symbol", "asset_symbol"),
+        Index("ix_signal_event_chain_key", "chain_key"),
+        Index("ix_signal_event_event_type", "event_type"),
+        Index("ix_signal_event_severity", "severity"),
+        Index("ix_signal_event_timestamp", "timestamp"),
+        Index("ix_signal_event_created_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     asset_symbol: Mapped[str] = mapped_column(String(16), index=True)

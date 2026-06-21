@@ -23,6 +23,10 @@ export function useQuality() {
     loading: false,
     error: null,
     
+    async init() {
+      await this.loadQualityData();
+    },
+
     get adminToken() {
       return this.$store.ui.adminToken;
     },

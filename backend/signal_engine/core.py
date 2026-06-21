@@ -223,6 +223,34 @@ async def refresh_chain_data(db: Session) -> None:
         dx_transformed, dx_error = dx_result
         dx_ok = dx_transformed is not None
 
+        # Prepare bulk operations
+        asset_chain_snapshots_to_update = []
+        asset_chain_snapshots_to_create = []
+        asset_freshness_updates = []
+
+        # Get existing snapshots for bulk update
+        asset_symbols = [str(enabled_assets[idx].get("symbol", "")).upper() 
+                        for idx, llm_snapshot, asset_exc in dl_results 
+                        if asset_exc is None and llm_snapshot is not None]
+        
+        chain_names = [str(chain["name"]) for chain in configured]
+        
+        # Query all existing snapshots for the assets and chains we're working with
+        existing_snapshots = db.query(AssetChainSnapshot).filter(
+            AssetChainSnapshot.asset_symbol.in_(asset_symbols),
+            AssetChainSnapshot.chain_name.in_(chain_names)
+        ).all()
+        
+        # Create a lookup dict for existing snapshots
+        snapshot_lookup = {(s.asset_symbol, s.chain_name): s for s in existing_snapshots}
+        
+        # Also get existing asset freshness records
+        existing_freshness = db.query(AssetFreshness).filter(
+            AssetFreshness.asset_symbol.in_(asset_symbols)
+        ).all()
+        
+        freshness_lookup = {f.asset_symbol: f for f in existing_freshness}
+
         for idx, llm_snapshot, asset_exc in dl_results:
             if asset_exc is not None or llm_snapshot is None:
                 symbol = str(enabled_assets[idx].get("symbol", "UNKNOWN")).upper() if idx < len(enabled_assets) else "UNKNOWN"
@@ -244,33 +272,88 @@ async def refresh_chain_data(db: Session) -> None:
                 chain_name = str(chain["name"])
                 key = str(chain["defillama_id"])
                 values = per_chain.get(key, {})
-                row = db.query(AssetChainSnapshot).filter(
-                    AssetChainSnapshot.asset_symbol == asset_symbol,
-                    AssetChainSnapshot.chain_name == chain_name
-                ).first()
-                if row is None:
-                    row = AssetChainSnapshot(asset_symbol=asset_symbol, chain_name=chain_name)
-                    db.add(row)
-                row.asset_name = asset_name
-                row.supply_current = values.get("supply_current")
-                row.supply_prev_day = values.get("supply_prev_day")
-                row.supply_prev_week = values.get("supply_prev_week")
-                row.supply_prev_month = values.get("supply_prev_month")
-                row.tvl = values.get("tvl")
-                row.price = values.get("price")
-                row.price_coingecko = cg_asset.get("price")
-                row.market_cap = cg_asset.get("market_cap")
-                row.volume_24h = cg_asset.get("volume_24h")
-                dex_price = dx_asset.get("price")
-                if dex_price is not None:
-                    row.price_dexscreener = dex_price
-                row.total_liquidity_usd = dx_asset.get("total_liquidity_usd")
-                row.top3_pool_share_pct = dx_asset.get("top3_pool_share_pct")
-                row.pool_count = dx_asset.get("pool_count")
-                row.peg_type = peg_type
-                row.source_name = "multi"
-                row.fetched_at = fetched_at
-                row.updated_at = datetime.now(timezone.utc)
+                
+                # Check if snapshot exists in our lookup
+                snapshot_key = (asset_symbol, chain_name)
+                if snapshot_key in snapshot_lookup:
+                    # Update existing snapshot
+                    row = snapshot_lookup[snapshot_key]
+                    row.asset_name = asset_name
+                    row.supply_current = values.get("supply_current")
+                    row.supply_prev_day = values.get("supply_prev_day")
+                    row.supply_prev_week = values.get("supply_prev_week")
+                    row.supply_prev_month = values.get("supply_prev_month")
+                    row.tvl = values.get("tvl")
+                    row.price = values.get("price")
+                    row.price_coingecko = cg_asset.get("price")
+                    row.market_cap = cg_asset.get("market_cap")
+                    row.volume_24h = cg_asset.get("volume_24h")
+                    dex_price = dx_asset.get("price")
+                    if dex_price is not None:
+                        row.price_dexscreener = dex_price
+                    row.total_liquidity_usd = dx_asset.get("total_liquidity_usd")
+                    row.top3_pool_share_pct = dx_asset.get("top3_pool_share_pct")
+                    row.pool_count = dx_asset.get("pool_count")
+                    row.peg_type = peg_type
+                    row.source_name = "multi"
+                    row.fetched_at = fetched_at
+                    row.updated_at = datetime.now(timezone.utc)
+                    asset_chain_snapshots_to_update.append(row)
+                else:
+                    # Create new snapshot
+                    new_snapshot = AssetChainSnapshot(
+                        asset_symbol=asset_symbol,
+                        chain_name=chain_name,
+                        asset_name=asset_name,
+                        supply_current=values.get("supply_current"),
+                        supply_prev_day=values.get("supply_prev_day"),
+                        supply_prev_week=values.get("supply_prev_week"),
+                        supply_prev_month=values.get("supply_prev_month"),
+                        tvl=values.get("tvl"),
+                        price=values.get("price"),
+                        price_coingecko=cg_asset.get("price"),
+                        market_cap=cg_asset.get("market_cap"),
+                        volume_24h=cg_asset.get("volume_24h"),
+                        price_dexscreener=dx_asset.get("price") if dx_asset.get("price") is not None else None,
+                        total_liquidity_usd=dx_asset.get("total_liquidity_usd"),
+                        top3_pool_share_pct=dx_asset.get("top3_pool_share_pct"),
+                        pool_count=dx_asset.get("pool_count"),
+                        peg_type=peg_type,
+                        source_name="multi",
+                        fetched_at=fetched_at,
+                        updated_at=datetime.now(timezone.utc)
+                    )
+                    asset_chain_snapshots_to_create.append(new_snapshot)
+
+            # Prepare asset freshness updates
+            completed_at = datetime.now(timezone.utc)
+            if asset_symbol in freshness_lookup:
+                # Update existing freshness record
+                freshness_row = freshness_lookup[asset_symbol]
+                freshness_row.last_successful_fetch = completed_at
+                freshness_row.updated_at = completed_at
+                asset_freshness_updates.append(freshness_row)
+            else:
+                # Create new freshness record
+                new_freshness = AssetFreshness(
+                    asset_symbol=asset_symbol,
+                    last_successful_fetch=completed_at,
+                    updated_at=completed_at
+                )
+                asset_freshness_updates.append(new_freshness)
+
+        # Perform bulk operations
+        if asset_chain_snapshots_to_create:
+            db.bulk_save_objects(asset_chain_snapshots_to_create)
+        
+        # For updates, we need to merge since they're already attached to the session
+        # The updates are already applied to the objects, so we just need to commit
+        
+        # Also commit the freshness updates
+        for freshness_obj in asset_freshness_updates:
+            if freshness_obj.id is None:  # New object
+                db.add(freshness_obj)
+            # Existing objects are already updated in place
 
         if success_count > 0:
             completed_at = datetime.now(timezone.utc)
@@ -292,20 +375,12 @@ async def refresh_chain_data(db: Session) -> None:
                 last_error=dx_error,
             )
 
-            for sym in successful_asset_symbols:
-                freshen = db.query(AssetFreshness).filter(AssetFreshness.asset_symbol == sym).first()
-                if freshen is None:
-                    freshen = AssetFreshness(asset_symbol=sym, last_successful_fetch=completed_at)
-                    db.add(freshen)
-                else:
-                    freshen.last_successful_fetch = completed_at
-                    freshen.updated_at = completed_at
-
-            from signal_engine.history import persist_trends_and_events
+            from signal_engine.history import persist_trends_and_events, flush_source_usage
             from services.cache import invalidate_dashboard
 
             symbols = list(dict.fromkeys(successful_asset_symbols))
             persist_trends_and_events(db, successful_asset_symbols=symbols, completed_at=completed_at, prior_source_status=prior_source_status)
+            flush_source_usage(db)  # Flush cached source usage
             for sym in symbols:
                 invalidate_dashboard(sym)
         else:

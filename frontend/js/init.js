@@ -8,6 +8,7 @@ import { useOSINT } from 'composables/useOSINT.js';
 import { useForecast } from 'composables/useForecast.js';
 import { useMarket } from 'composables/useMarket.js';
 import { useQuality } from 'composables/useQuality.js';
+import { useHealth } from 'composables/useHealth.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -19,6 +20,7 @@ Alpine.data('osint', useOSINT);
 Alpine.data('forecast', useForecast);
 Alpine.data('market', useMarket);
 Alpine.data('qualityDashboard', useQuality);
+Alpine.data('healthDashboard', useHealth);
 
 // Minimal root application component
 Alpine.data('helixApp', () => ({
@@ -34,9 +36,9 @@ Alpine.data('helixApp', () => ({
   rateLimitWarning: '',
   warnings: [],
   _timer: null,
+  enabledAssets: ['USDT', 'USDC', 'DAI', 'PYUSD'],
   _loadingDashboard: false,
   _refreshingStale: false,
-  refreshing: false,
   evidenceOpen: false,
   evidenceTitle: '',
   evidenceFormula: '',
@@ -69,6 +71,9 @@ Alpine.data('helixApp', () => ({
     
     // Watch for tab changes
     this.$watch('tab', val => location.hash = val);
+    
+    // Sync asset changes to dashboard store
+    this.$watch('asset', val => this.$store.dashboard.asset = val);
     
     // Load warnings
     await this._loadWarnings();
@@ -130,7 +135,40 @@ Alpine.data('helixApp', () => ({
   loadTab() {
     // Request focused data reload from current tab component
     this.$dispatch('tab-changed', { tab: this.tab });
-  }
+    // Update the UI store with the current tab
+    this.$store.ui.tab = this.tab;
+  },
+
+  selectSearchResult(r) {
+    this.searchQuery = '';
+    this.searchResults = [];
+    if (r && r.symbol) {
+      this.asset = r.symbol;
+      this.$dispatch('asset-changed', { asset: r.symbol });
+    }
+  },
+
+  showEvidence(type) {
+    this.evidenceOpen = true;
+    this.evidenceTitle = type === 'score' ? 'Signal Score' : 'Peg Status';
+    if (type === 'score') {
+      this.evidenceFormula = 'Weighted composite of all signal components';
+      this.evidenceComponents = this.$store.dashboard.signal?.components || {};
+    } else if (type === 'peg') {
+      this.evidenceFormula = 'Current price vs target peg';
+      this.evidenceComponents = { current_price: this.$store.dashboard.depeg?.current_price || 0, peg_status: this.$store.dashboard.depeg?.peg_status || '' };
+    }
+    this.evidenceSources = {};
+  },
+
+  copyEvidence() {
+    const text = [
+      this.evidenceTitle,
+      this.evidenceFormula,
+      ...Object.entries(this.evidenceComponents).map(([k, v]) => `${k}: ${typeof v === 'number' ? v.toFixed(4) : v}`),
+    ].join('\n');
+    navigator.clipboard?.writeText(text).catch(() => {});
+  },
 }));
 
 Alpine.start();

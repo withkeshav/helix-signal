@@ -93,6 +93,9 @@ def _duplicate_event(
     return last is not None and (new_value is None or last.new_value == new_value)
 
 
+# Keep track of events to bulk insert
+_events_to_insert = []
+
 def _emit(
     db: Session,
     *,
@@ -132,7 +135,14 @@ def _emit(
         timestamp=ts,
         metadata_json=json.dumps(metadata) if metadata else None,
     )
-    db.add(row)
+    _events_to_insert.append(row)
+
+def _flush_events(db: Session) -> None:
+    """Flush all pending events to the database using bulk insert."""
+    global _events_to_insert
+    if _events_to_insert:
+        db.bulk_save_objects(_events_to_insert)
+        _events_to_insert = []
 
 
 def _emit_band_change(db: Session, *, sym: str, prev_band: str | None, new_band: str, ts: datetime) -> None:
@@ -350,6 +360,7 @@ def persist_trends_and_events(
 
         prev_row = _previous_asset_snapshot(db, asset_symbol=u, bucket_id=bucket_id)
 
+        # Delete existing snapshots for this bucket using bulk operations
         db.query(AssetTrendSnapshot).filter(
             AssetTrendSnapshot.asset_symbol == u,
             AssetTrendSnapshot.bucket_id == bucket_id,
@@ -371,38 +382,43 @@ def persist_trends_and_events(
                 "discrepancy_pct": rk.get("cross_source_discrepancy_pct", 0.0),
             }
 
-        db.add(
-            AssetTrendSnapshot(
+        # Prepare objects for bulk insert
+        asset_trend = AssetTrendSnapshot(
+            asset_symbol=u,
+            timestamp=ts,
+            bucket_id=bucket_id,
+            total_supply=bundle.total_supply,
+            price=bundle.price,
+            depeg_index=bundle.depeg_index,
+            signal_score=bundle.signal_score,
+            signal_band=bundle.signal_band,
+            concentration_score=bundle.concentration_score,
+            data_confidence_label=bundle.data_confidence_label,
+            source_status=bundle.source_status,
+            cross_source_discrepancy=cross_source,
+        )
+        
+        chain_trends = []
+        for ch in bundle.chains:
+            chain_trend = ChainTrendSnapshot(
                 asset_symbol=u,
+                chain_key=ch.chain_key,
+                chain_name=ch.chain_name,
                 timestamp=ts,
                 bucket_id=bucket_id,
-                total_supply=bundle.total_supply,
-                price=bundle.price,
-                depeg_index=bundle.depeg_index,
-                signal_score=bundle.signal_score,
-                signal_band=bundle.signal_band,
-                concentration_score=bundle.concentration_score,
-                data_confidence_label=bundle.data_confidence_label,
-                source_status=bundle.source_status,
-                cross_source_discrepancy=cross_source,
+                supply=ch.supply_current,
+                supply_share_pct=ch.supply_share_pct,
+                chain_tvl=ch.chain_tvl,
+                chain_signal_score=ch.chain_signal_score,
+                chain_signal_band=ch.chain_signal_band,
+                data_confidence_score=ch.data_confidence_score,
             )
-        )
-        for ch in bundle.chains:
-            db.add(
-                ChainTrendSnapshot(
-                    asset_symbol=u,
-                    chain_key=ch.chain_key,
-                    chain_name=ch.chain_name,
-                    timestamp=ts,
-                    bucket_id=bucket_id,
-                    supply=ch.supply_current,
-                    supply_share_pct=ch.supply_share_pct,
-                    chain_tvl=ch.chain_tvl,
-                    chain_signal_score=ch.chain_signal_score,
-                    chain_signal_band=ch.chain_signal_band,
-                    data_confidence_score=ch.data_confidence_score,
-                )
-            )
+            chain_trends.append(chain_trend)
+        
+        # Bulk insert using bulk_save_objects for better performance
+        db.add(asset_trend)
+        if chain_trends:
+            db.bulk_save_objects(chain_trends)
 
         if prev_row is None:
             continue
@@ -470,4 +486,7 @@ def persist_trends_and_events(
         bundle_dict["slippage_7d_median"] = rk.get("slippage_7d_median")
         bundle_dict["supply_age_hours"] = rk.get("supply_age_hours")
         evaluate_alerts(db, bundle=bundle_dict, asset_symbol=u, now=ts)
+    
+    # Flush all pending events
+    _flush_events(db)
 

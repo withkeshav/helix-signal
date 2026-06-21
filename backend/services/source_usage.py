@@ -39,29 +39,59 @@ def _record_source_call(source_name: str) -> None:
     _SOURCE_RATE_LIMITS[source_name].append(time.time())
 
 
+# Keep track of source usage in memory for bulk update at the end of the session
+_source_usage_cache: dict[str, dict[str, int]] = {}
+
 def increment_source_usage(db: Session, source_name: str) -> None:
     """Increment the call count for a source for today."""
     today = date.today().isoformat()
+    
+    # Use in-memory cache to avoid repeated queries
+    if source_name not in _source_usage_cache:
+        _source_usage_cache[source_name] = {}
+    
+    if today not in _source_usage_cache[source_name]:
+        # Check if record exists in database
+        usage = db.query(SourceUsage).filter(
+            SourceUsage.source_name == source_name,
+            SourceUsage.usage_date == today,
+        ).first()
+        
+        if usage:
+            _source_usage_cache[source_name][today] = usage.call_count
+        else:
+            _source_usage_cache[source_name][today] = 0
+    
+    # Increment in cache
+    _source_usage_cache[source_name][today] += 1
+
+def flush_source_usage(db: Session) -> None:
+    """Flush all cached source usage to the database."""
+    today = date.today().isoformat()
     now = datetime.now(timezone.utc)
+    
+    for source_name, dates in _source_usage_cache.items():
+        if today in dates:
+            usage = db.query(SourceUsage).filter(
+                SourceUsage.source_name == source_name,
+                SourceUsage.usage_date == today,
+            ).first()
 
-    usage = db.query(SourceUsage).filter(
-        SourceUsage.source_name == source_name,
-        SourceUsage.usage_date == today,
-    ).first()
-
-    if usage:
-        usage.call_count += 1
-        usage.last_call_at = now
-        usage.updated_at = now
-    else:
-        usage = SourceUsage(
-            source_name=source_name,
-            usage_date=today,
-            call_count=1,
-            last_call_at=now,
-        )
-        db.add(usage)
-
+            if usage:
+                usage.call_count = dates[today]
+                usage.last_call_at = now
+                usage.updated_at = now
+            else:
+                usage = SourceUsage(
+                    source_name=source_name,
+                    usage_date=today,
+                    call_count=dates[today],
+                    last_call_at=now,
+                )
+                db.add(usage)
+    
+    # Clear the cache
+    _source_usage_cache.clear()
     db.commit()
 
 

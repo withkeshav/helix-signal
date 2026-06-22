@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# SECURITY: The SSH deploy key used by CI must be restricted on the server.
+# In ~/.ssh/authorized_keys on the deploy target, prefix the key entry with:
+#   command="cd /apps/helix-signal && git pull origin main && docker compose up -d",no-port-forwarding,no-X11-forwarding,no-agent-forwarding
+# This prevents the key from being used for arbitrary shell access.
+
 echo "=== Helix Signal Deploy ==="
 
 REMOTE="${HELIX_DEPLOY_REMOTE:-${1:-}}"

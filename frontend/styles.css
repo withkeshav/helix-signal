@@ -1,6 +1,6 @@
-:root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06)}
-:root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35)}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,"Segoe UI",Arial,sans-serif;background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh}
+:root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06);--cat-1:#3b82f6;--cat-2:#2dd4bf;--cat-3:#f59e0b;--cat-4:#ef4444;--cat-5:#8b5cf6;--fs-xs:11px;--fs-sm:13px;--fs-base:14px;--fs-lg:18px;--fs-xl:24px}
+:root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35);--cat-1:#60a5fa;--cat-2:#34d399;--cat-3:#fbbf24;--cat-4:#f87171;--cat-5:#a78bfa}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:var(--fs-base);background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh}
 .glass{background:color-mix(in srgb,var(--panel) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
 .container{width:min(1280px,98vw);margin:16px auto 40px}
 .btn{border:1px solid transparent;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer;font-size:13px;font-family:Inter,sans-serif}
@@ -49,7 +49,7 @@ code{background:var(--bg-accent);padding:4px 8px;border-radius:4px;font-size:12p
 .section-title{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em;margin:0 0 10px}
 .time-range{display:flex;align-items:center;gap:4px;margin-bottom:12px;flex-wrap:wrap}
 .time-range-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
-.time-pill{padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer;font-family:Inter,sans-serif}
+.time-pill{padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer;font-family:Inter,sans-serif}
 .time-pill:hover{border-color:var(--spark);color:var(--text)}
 .time-pill.active{background:var(--spark);color:var(--panel);border-color:var(--spark)}
 .time-badge{font-size:9px;color:var(--muted);margin-left:6px;font-weight:400}

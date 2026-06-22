@@ -98,16 +98,31 @@ export function useMarket() {
     
     // Init — called automatically by Alpine when component mounts
     async init() {
-      await this.loadDashboard(this.asset);
-      await this.loadAnomalies();
-      this.tickerItems = await this.loadTicker();
-      await this.loadPredictive();
-      await this.loadMarketOverview();
-      await this.loadAiExplain();
-      await this.loadNarrative();
-      await this.loadInsights();
-      await this.loadStressLeaderboard();
-      await this.loadRotation();
+      // Skip redundant API calls if dashboard already loaded (tabs share `$store.dashboard`)
+      if (!this.$store.dashboard.chains?.length) {
+        await this.loadDashboard(this.asset);
+        await this.loadAnomalies();
+        this.tickerItems = await this.loadTicker();
+        await this.loadPredictive();
+        await this.loadMarketOverview();
+        await this.loadAiExplain();
+        await this.loadNarrative();
+        await this.loadInsights();
+        await this.loadStressLeaderboard();
+        await this.loadRotation();
+      } else {
+        // Sync shared store data to this component's local state
+        const s = this.$store.dashboard;
+        this.chains = s.chains || [];
+        this.signal = s.signal || {};
+        this.crossSource = s.crossSource || {};
+        this.supplyFeed = s.supplyFeed || {};
+        this.attSignal = s.attSignal || {};
+        this.depeg = s.depeg || {};
+        this.concentration = s.concentration || {};
+        this.totalSupply = s.totalSupply;
+        this.supplyChange = s.supplyChange;
+      }
       
       // Render charts after data is loaded
       this.$nextTick(() => {

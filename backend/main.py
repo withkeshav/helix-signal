@@ -110,6 +110,12 @@ async def lifespan(app: FastAPI):
     from providers.settings import get_setting
 
     scheduler = AsyncIOScheduler()
+    disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
+    listener_task = None
+    fred_task = None
+    telegram_app = None
+    telegram_task = None
+
     with SessionLocal() as setup_db:
         skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
         if not skip_refresh:
@@ -122,6 +128,20 @@ async def lifespan(app: FastAPI):
                 replace_existing=True,
             )
         osint_minutes = max(15, get_setting("refresh_osint_minutes", setup_db) or 60)
+
+        # Wire up Telegram bot if enabled
+        if not disable_bg and get_setting("feature_telegram_bot", setup_db):
+            try:
+                from helix_telegram.bot import create_bot_application
+                telegram_app = create_bot_application()
+                if telegram_app:
+                    from helix_telegram.digest import add_digest_scheduler
+                    add_digest_scheduler(scheduler)
+                    loop = asyncio.get_running_loop()
+                    telegram_task = loop.create_task(telegram_app.run_polling())
+                    log.info("telegram_bot.started")
+            except Exception as exc:
+                log.warning("telegram_bot.start_failed", error=str(exc))
 
     scheduler.add_job(
         _retention_job,
@@ -173,12 +193,6 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
 
-    disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
-    listener_task = None
-    fred_task = None
-    telegram_app = None
-    telegram_task = None
-
     if not disable_bg:
         try:
             from chain.web3_listener import start_block_listener
@@ -192,20 +206,6 @@ async def lifespan(app: FastAPI):
             fred_task = loop.create_task(start_fred_poller())
         except Exception as exc:
             log.warning("fred_poller.start_failed", error=str(exc))
-
-        # Wire up Telegram bot if enabled
-        if get_setting("feature_telegram_bot", setup_db):
-            try:
-                from helix_telegram.bot import create_bot_application
-                telegram_app = create_bot_application()
-                if telegram_app:
-                    from helix_telegram.digest import add_digest_scheduler
-                    add_digest_scheduler(scheduler)
-                    loop = asyncio.get_running_loop()
-                    telegram_task = loop.create_task(telegram_app.run_polling())
-                    log.info("telegram_bot.started")
-            except Exception as exc:
-                log.warning("telegram_bot.start_failed", error=str(exc))
 
     try:
         yield

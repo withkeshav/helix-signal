@@ -578,7 +578,7 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
     "ai_require_token": {
         "label": "Require Admin Token for AI",
         "type": "bool",
-        "default": False,
+        "default": True,
         "group": "AI & Intelligence",
         "description": "Require X-Admin-Token header for AI features",
         "requires_restart": False,

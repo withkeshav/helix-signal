@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime, timezone
 from typing import Optional
 
+import bcrypt
 from sqlalchemy.orm import Session
 
 from database import User
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password using SHA-256."""
-    return hashlib.sha256(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    return get_password_hash(plain_password) == hashed_password
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 
 def get_user(db: Session, user_id: int) -> Optional[User]:

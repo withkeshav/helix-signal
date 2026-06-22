@@ -117,7 +117,7 @@ def latest_zscore(values: list[float], threshold: float = 3.0, min_bps: float = 
     import numpy as np
     arr = np.array(values)
     mean = np.mean(arr)
-    std = max(np.std(arr), STD_FLOOR)
+    std = max(np.std(arr), _std_floor())
     latest = float(arr[-1])
     z = (latest - mean) / std if std > 0 else 0
     bps = abs((latest - mean) / mean) * 10000 if mean != 0 else 0

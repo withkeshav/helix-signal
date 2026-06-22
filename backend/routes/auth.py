@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPBearer
+from fastapi.security import HTTPBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
+from database import get_db
+from services.user_service import authenticate_user
 
 router = APIRouter()
 security = HTTPBearer()
@@ -18,10 +22,17 @@ security = HTTPBearer()
 @limiter.limit("10/minute")
 async def login(
     request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """User login endpoint."""
-    # Placeholder implementation
-    return {"access_token": "placeholder_token", "token_type": "bearer"}
+    user = authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = os.getenv("HELIX_ADMIN_TOKEN", "")
+    if not token:
+        raise HTTPException(status_code=503, detail="Admin token not configured")
+    return {"access_token": token, "token_type": "bearer", "username": user.username, "role": user.role}
 
 
 @router.post("/auth/logout")
@@ -31,7 +42,6 @@ async def logout(
     _auth=Depends(require_admin_token),
 ) -> Dict[str, Any]:
     """User logout endpoint."""
-    # Placeholder implementation
     return {"status": "logged_out"}
 
 
@@ -42,5 +52,4 @@ async def get_current_user(
     _auth=Depends(require_admin_token),
 ) -> Dict[str, Any]:
     """Get current user information."""
-    # Placeholder implementation
     return {"username": "admin", "role": "administrator"}

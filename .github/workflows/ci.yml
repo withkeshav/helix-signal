@@ -32,6 +32,9 @@ jobs:
       - name: Import smoke check
         run: .venv/bin/python -c "import main"
 
+      - name: Alembic migration smoke test
+        run: .venv/bin/python -m pytest tests/test_alembic.py -v -m "not slow"
+
       - name: Pytest with coverage
         run: .venv/bin/pytest -v --cov=.. --cov-report=term --cov-fail-under=60 -m "not network" --timeout=120
 
@@ -39,10 +42,10 @@ jobs:
         run: .venv/bin/ruff check --output-format=github .
 
       - name: Bandit security scan
-        run: .venv/bin/bandit -r . -x ".venv,tests,__pycache__" --skip B101 -ll --exit-zero
+        run: .venv/bin/bandit -r . -x ".venv,tests,__pycache__" --skip B101 -ll
 
       - name: pip-audit
-        run: .venv/bin/pip-audit --requirement requirements.txt || true
+        run: .venv/bin/pip-audit --requirement requirements.txt
 
       - name: hadolint Dockerfiles
         run: |

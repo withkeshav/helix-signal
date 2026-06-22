@@ -18,3 +18,4 @@ pandas>=2.2.0
 web3>=7.0.0
 python-multipart>=0.0.9
 python-telegram-bot>=21.0
+bcrypt>=4.0.0

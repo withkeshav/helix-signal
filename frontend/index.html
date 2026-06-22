@@ -27,7 +27,7 @@
     <nav class="top-nav">
       <span class="nav-brand">&#128305; Helix Signal</span>
       <div class="nav-search">
-        <input type="text" class="search-input" placeholder="Search assets..." x-model="searchQuery" @input.debounce.300ms="search">
+        <input type="text" class="search-input" placeholder="Search assets..." x-model="searchQuery" @input.debounce.300ms="search" x-show="false">
         <div class="search-results" x-show="searchResults.length > 0" @click.outside="searchResults=[]">
           <template x-for="r in searchResults" :key="r.id">
             <div class="search-item" @click="selectSearchResult(r)">
@@ -38,14 +38,14 @@
         </div>
       </div>
       <div class="nav-links" role="tablist">
-        <button class="nav-link" role="tab" :class="tab==='overview'&&'active'" :aria-selected="tab==='overview'" @click="tab='overview';loadTab()">Overview</button>
-        <button class="nav-link" role="tab" :class="tab==='supply'&&'active'" :aria-selected="tab==='supply'" @click="tab='supply';loadTab()">Supply</button>
-        <button class="nav-link" role="tab" :class="tab==='events'&&'active'" :aria-selected="tab==='events'" @click="tab='events';loadTab()">OSINT</button>
-        <button class="nav-link" role="tab" :class="tab==='forecast'&&'active'" :aria-selected="tab==='forecast'" @click="tab='forecast';loadTab()">Forecast</button>
-        <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()">Intel</button>
-        <button class="nav-link" role="tab" :class="tab==='health'&&'active'" :aria-selected="tab==='health'" @click="tab='health';loadTab()">Health</button>
-        <button class="nav-link" role="tab" :class="tab==='quality'&&'active'" :aria-selected="tab==='quality'" @click="tab='quality';loadTab()">Quality</button>
-        <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()">&#9881;</button>
+        <button class="nav-link" role="tab" :class="tab==='overview'&&'active'" :aria-selected="tab==='overview'" @click="tab='overview';loadTab()" aria-controls="tab-overview">Overview</button>
+        <button class="nav-link" role="tab" :class="tab==='supply'&&'active'" :aria-selected="tab==='supply'" @click="tab='supply';loadTab()" aria-controls="tab-supply">Supply</button>
+        <button class="nav-link" role="tab" :class="tab==='events'&&'active'" :aria-selected="tab==='events'" @click="tab='events';loadTab()" aria-controls="tab-events">OSINT</button>
+        <button class="nav-link" role="tab" :class="tab==='forecast'&&'active'" :aria-selected="tab==='forecast'" @click="tab='forecast';loadTab()" aria-controls="tab-forecast">Forecast</button>
+        <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()" aria-controls="tab-intel">Intel</button>
+        <button class="nav-link" role="tab" :class="tab==='health'&&'active'" :aria-selected="tab==='health'" @click="tab='health';loadTab()" aria-controls="tab-health">Health</button>
+        <button class="nav-link" role="tab" :class="tab==='quality'&&'active'" :aria-selected="tab==='quality'" @click="tab='quality';loadTab()" aria-controls="tab-quality">Quality</button>
+        <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings">&#9881;</button>
       </div>
       <div class="nav-controls">
         <select class="asset-select" x-model="asset" @change="switchAsset">
@@ -53,7 +53,7 @@
             <option x-text="a" :value="a"></option>
           </template>
         </select>
-        <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" x-text="refreshing?'...':'⟳'"></button>
+        <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" aria-label="Refresh now" x-text="refreshing?'...':'⟳'" x-show="false"></button>
         <button class="btn btn-muted" @click="cycleTheme" x-text="theme==='light'?'☀':'🌙'" aria-label="Toggle dark/light theme" title="Toggle theme"></button>
       </div>
     </nav>
@@ -68,7 +68,6 @@
             <div class="kpi-trend" x-text="$store.dashboard.signal.band || ''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" :style="'stroke:'+($store.dashboard.signal.band==='risk'?'var(--down)':$store.dashboard.signal.band==='watch'?'var(--neutral)':'var(--up)')">
-            <polyline fill="none" stroke-width="2" stroke-linecap="round" points="0,10 60,10"/>
           </svg>
         </div>
       </div>
@@ -80,7 +79,6 @@
             <div class="kpi-trend" x-text="$store.dashboard.depeg.peg_status||''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--spark)">
-            <polyline fill="none" stroke-width="2" stroke-linecap="round" points="0,10 60,10"/>
           </svg>
         </div>
       </div>
@@ -92,7 +90,6 @@
             <div class="kpi-trend" :class="$store.dashboard.supplyChange!=null?($store.dashboard.supplyChange>=0?'text-green':'text-red'):''" x-text="$store.dashboard.supplyChange!=null?`${$store.dashboard.supplyChange>=0?'+':''}${$store.dashboard.supplyChange.toFixed(2)}% 24h`:''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--up)">
-            <polyline fill="none" stroke-width="2" stroke-linecap="round" points="0,10 60,10"/>
           </svg>
         </div>
       </div>
@@ -165,7 +162,7 @@
     <div class="warning-banner" :class="rateLimitWarning ? 'visible' : ''" x-text="rateLimitWarning"></div>
 
     <!-- Event Ticker -->
-    <div class="event-ticker glass" x-show="tickerItems.length">
+    <div class="event-ticker glass" x-show="false">
       <div class="event-ticker-inner">
         <template x-for="(t, i) in tickerItems" :key="`t-${i}`">
           <span x-text="t"></span>
@@ -174,20 +171,39 @@
     </div>
 
     <!-- Tab: Overview -->
-    <div class="tab-content" :class="tab === 'overview' && 'active'" x-data="market">
+    <div class="tab-content" :class="tab === 'overview' && 'active'" x-data="market" role="tabpanel" id="tab-overview">
       <!-- Error Banner -->
       <div x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
-      <!-- Market Overview -->
+      <!-- Consolidated AI Intelligence -->
       <div class="insight-card glass" style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:13px;text-transform:uppercase;color:var(--muted)">Market Overview <span class="model-badge">AI</span></h2>
-          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(marketOverviewGeneratedAt, marketOverviewExpiresAt)"></span>
+        <div style="margin:0 0 8px">
+          <h2 style="margin:0;font-size:13px;text-transform:uppercase;color:var(--muted)">AI Intelligence <span class="model-badge">AI</span></h2>
         </div>
-        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="marketOverview" x-text="marketOverview"></p>
-        <div x-show="!marketOverview" class="empty-state">
-          <span class="empty-state-icon">&#128200;</span>
+        <div x-show="marketOverview">
+          <div class="kpi-label" style="margin-bottom:4px">Overview</div>
+          <p style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
+        </div>
+        <div x-show="!marketOverview" class="empty-state" style="padding:8px">
           <span class="kpi-label">No market overview yet</span>
           <span class="kpi-sub">AI will generate a market summary after enough data is collected</span>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:8px 0">
+        <div x-show="aiNarrative">
+          <div class="kpi-label" style="margin-bottom:4px">Narrative</div>
+          <p style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
+        </div>
+        <div x-show="!aiNarrative" class="empty-state" style="padding:8px">
+          <span class="kpi-label">No narrative yet</span>
+          <span class="kpi-sub">Requires AI_MODE enabled in server settings</span>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:8px 0">
+        <div x-show="aiInsights">
+          <div class="kpi-label" style="margin-bottom:4px">Insight</div>
+          <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
+        </div>
+        <div x-show="!aiInsights" class="empty-state" style="padding:8px">
+          <span class="kpi-label">No insights yet</span>
+          <span class="kpi-sub">Requires AI_MODE enabled + at least 24h of snapshot history</span>
         </div>
       </div>
       <!-- Risk Terminal -->
@@ -219,7 +235,7 @@
         </div>
         <div x-show="stressLeaderboard?.length" style="font-size:12px">
           <template x-for="(row, i) in stressLeaderboard" :key="i">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
               <span>
                 <span style="font-weight:600" x-text="row.chain_name"></span>
                 <span :class="row.direction==='inflow'?'text-green':'text-red'" x-text="row.direction==='inflow'?'&#9650;':row.direction==='outflow'?'&#9660;':''"></span>
@@ -236,32 +252,6 @@
           <span class="kpi-sub">Needs multiple 5-min snapshots to compute chain-level velocity</span>
         </div>
       </div>
-      <!-- AI Market Narrative -->
-      <div class="insight-card glass" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Market Narrative <span class="model-badge">AI</span></h2>
-          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiNarrativeGeneratedAt, aiNarrativeExpiresAt)"></span>
-        </div>
-        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="aiNarrative" x-text="aiNarrative"></p>
-        <div x-show="!aiNarrative" class="empty-state">
-          <span class="empty-state-icon">&#128240;</span>
-          <span class="kpi-label">No narrative yet</span>
-          <span class="kpi-sub">Requires AI_MODE enabled in server settings. Data refreshes every 5 min.</span>
-        </div>
-      </div>
-      <!-- AI Insights -->
-      <div class="insight-card glass" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Analytics Insight <span class="model-badge">AI</span></h2>
-          <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiInsightsGeneratedAt, aiInsightsExpiresAt)"></span>
-        </div>
-        <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-show="aiInsights" x-text="aiInsights"></p>
-        <div x-show="!aiInsights" class="empty-state">
-          <span class="empty-state-icon">&#128269;</span>
-          <span class="kpi-label">No insights yet</span>
-          <span class="kpi-sub">Requires AI_MODE enabled + at least 24h of snapshot history</span>
-        </div>
-      </div>
       <!-- Cross-Asset Rotation -->
       <div class="insight-card glass" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
@@ -270,7 +260,7 @@
         </div>
         <div x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
           <template x-for="(p, i) in rotation.pairs" :key="i">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
               <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
               <span>
                 <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
@@ -319,18 +309,18 @@
             <div class="token-bar" x-show="a===asset&&chains?.length">
               <div class="token-bar-inner">
                 <template x-for="(c,i) in (chains||[]).slice(0,5)" :key="i">
-                  <div :style="`flex:${c.chain_share_pct||0};background:${['#3b82f6','#2dd4bf','#f59e0b','#ef4444','#8b5cf6'][i%5]};min-width:4px`" :title="`${c.chain_name}: ${(c.chain_share_pct||0).toFixed(1)}%`"></div>
-          </template>
-        </div>
+                  <div :style="`flex:${c.chain_share_pct||0};background:var(--cat-${(i%5)+1});min-width:4px`" :title="`${c.chain_name}: ${(c.chain_share_pct||0).toFixed(1)}%`"></div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
       <div class="insight-card" style="grid-column:1/-1">
         <h2>Diagnostics</h2>
         <p class="kpi-sub" style="margin-bottom:8px">Download a JSON snapshot of system state for debugging.</p>
         <button class="btn btn-muted" x-show="adminToken" @click="downloadDiagnostics()">Export Diagnostics</button>
         <span x-show="!adminToken" class="kpi-sub">Set Admin Token above to export diagnostics</span>
-      </div>
-    </div>
-        </template>
       </div>
       <!-- Charts row -->
       <div class="insight-grid">
@@ -441,7 +431,7 @@
     </div>
 
     <!-- Tab: Forecast -->
-    <div class="tab-content" :class="tab === 'forecast' && 'active'" x-data="forecast">
+    <div class="tab-content" :class="tab === 'forecast' && 'active'" x-data="forecast" role="tabpanel" id="tab-forecast">
       <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
       <div class="chart-card">
         <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
@@ -503,7 +493,7 @@
     </div>
 
     <!-- Tab: Supply -->
-    <div class="tab-content" :class="tab === 'supply' && 'active'" x-data="market">
+    <div class="tab-content" :class="tab === 'supply' && 'active'" x-data="market" role="tabpanel" id="tab-supply">
       <div x-show="!totalSupply && _loadingDashboard" class="empty-state" style="margin-bottom:12px">
         <span class="loading-spinner" style="width:32px;height:32px;border-width:3px;margin-bottom:4px"></span>
         <span class="kpi-label">Loading supply data...</span>
@@ -532,7 +522,7 @@
     </div>
 
     <!-- Tab: Events -->
-    <div class="tab-content" :class="tab === 'events' && 'active'" x-data="osint">
+    <div class="tab-content" :class="tab === 'events' && 'active'" x-data="osint" role="tabpanel" id="tab-events">
       <div x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
       <div class="insight-grid">
         <div class="insight-card">
@@ -577,7 +567,7 @@
     </div>
 
     <!-- Tab: Intel -->
-    <div class="tab-content" :class="tab === 'intel' && 'active'" x-data="osint">
+    <div class="tab-content" :class="tab === 'intel' && 'active'" x-data="osint" role="tabpanel" id="tab-intel">
       <div class="insight-grid">
         <div class="insight-card">
           <h2>Attestation Reports</h2>
@@ -615,7 +605,7 @@
     </div>
 
     <!-- Tab: Health -->
-    <div class="tab-content" :class="tab === 'health' && 'active'" x-data="healthDashboard" x-init="init()">
+    <div class="tab-content" :class="tab === 'health' && 'active'" x-data="healthDashboard" x-init="init()" role="tabpanel" id="tab-health">
       <div class="insight-grid">
         <div class="insight-card">
           <h2>Source Health</h2>
@@ -697,7 +687,7 @@
 
     <!-- Tab: Settings -->
     <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
-         x-init="filterSettings(); loadAiBudget();">
+         x-init="filterSettings(); loadAiBudget();" role="tabpanel" id="tab-settings">
       <div class="insight-grid">
         <!-- Settings Header with Search and Filters -->
         <div class="insight-card" style="grid-column:1/-1">
@@ -1545,7 +1535,7 @@
     </div>
 
     <!-- Tab: Data Quality -->
-    <div class="tab-content" :class="tab === 'quality' && 'active'" x-data="qualityDashboard" x-init="loadQualityData()" style="display:none" x-show="tab === 'quality'">
+    <div class="tab-content" :class="tab === 'quality' && 'active'" x-data="qualityDashboard" x-init="loadQualityData()" style="display:none" x-show="tab === 'quality'" role="tabpanel" id="tab-quality">
       <div class="insight-grid">
         <!-- Quality Dashboard Header -->
         <div class="insight-card" style="grid-column:1/-1">

@@ -1,4 +1,4 @@
-"""Auto-discover and register all route modules."""
+"""Register all route modules (manual list — no auto-discovery)."""
 
 
 def register_routes(app):

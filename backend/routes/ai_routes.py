@@ -119,14 +119,7 @@ def ai_narrative(
     ctx.setdefault("sentiment_label", "?")
     ctx.setdefault("sentiment_score", "?")
 
-    try:
-        from routes.events import get_recent_events
-        evts = get_recent_events(db, asset=asset, limit=5)
-        ctx["recent_events"] = "; ".join(
-            f"{e.get('title','')} ({e.get('severity','')})" for e in evts if e.get("title")
-        ) if evts else "none"
-    except Exception:
-        ctx["recent_events"] = "?"
+    ctx["recent_events"] = "?"  # TODO: implement get_recent_events
 
     try:
         from services.predictive import run_predictive_bundle

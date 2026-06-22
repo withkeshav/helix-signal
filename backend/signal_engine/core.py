@@ -375,7 +375,8 @@ async def refresh_chain_data(db: Session) -> None:
                 last_error=dx_error,
             )
 
-            from signal_engine.history import persist_trends_and_events, flush_source_usage
+            from signal_engine.history import persist_trends_and_events
+            from services.source_usage import flush_source_usage
             from services.cache import invalidate_dashboard
 
             symbols = list(dict.fromkeys(successful_asset_symbols))

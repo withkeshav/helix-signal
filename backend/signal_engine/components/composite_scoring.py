@@ -74,14 +74,10 @@ def compute_risk_score(**kwargs) -> Dict[str, Any]:
 
 def _score_to_band(score: float) -> str:
     if score <= 20:
-        return "Very Low"
-    if score <= 40:
-        return "Low"
+        return "Normal"
     if score <= 60:
-        return "Medium"
-    if score <= 80:
-        return "High"
-    return "Very High"
+        return "Watch"
+    return "Alert"
 
 def compute_freshness(
     source_status: str,

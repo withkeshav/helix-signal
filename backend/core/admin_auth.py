@@ -28,7 +28,7 @@ def _ip_key(request: Request) -> str:
 
 def _redis_client():
     try:
-        from cache_manager import cache
+        from core.cache_manager import cache
         return cache._redis if cache._redis else None
     except Exception:
         return None

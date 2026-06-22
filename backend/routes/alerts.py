@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
+from services.alerts import load_alert_rules
 
 router = APIRouter()
 
@@ -21,6 +22,15 @@ async def list_alerts(
     """List all alerts."""
     # Placeholder implementation
     return []
+
+
+@router.get("/alerts/config")
+@limiter.limit("10/minute")
+def get_alert_config(
+    request: Request,
+    _auth=Depends(require_admin_token),
+) -> list[dict[str, Any]]:
+    return load_alert_rules()
 
 
 @router.post("/alerts")

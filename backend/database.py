@@ -108,7 +108,7 @@ class AssetFreshness(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    asset_symbol: Mapped[str] = mapped_column(String(16), unique=True, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), unique=True)
     last_successful_fetch: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

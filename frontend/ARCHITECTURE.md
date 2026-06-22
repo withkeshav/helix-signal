@@ -38,11 +38,12 @@ $store.dashboard.asset
 Composable functions encapsulate component-specific logic and state. Each tab/feature area has its own composable.
 
 **Available Composables:**
-- `composables/useCharts.js` - Chart lifecycle management
 - `composables/useGovernance.js` - Settings tab logic
-- `composables/useOSINT.js` - OSINT/Events tab logic  
-- `composables/useForecast.js` - Forecast tab logic
+- `composables/useHealth.js` - Health/status tab logic
 - `composables/useMarket.js` - Market/Overview tab logic
+- `composables/useOSINT.js` - OSINT/Events tab logic
+- `composables/useForecast.js` - Forecast tab logic
+- `composables/useQuality.js` - Data quality tab logic
 
 **Usage:**
 ```js
@@ -264,11 +265,11 @@ Alpine.data('mytab', useMyTab);
 
 ## Migration Status
 
-- ✅ **Phase 1 Complete**: All frontend architecture overhaul finished
-- ✅ **Sprint 1**: Foundation (Import map, stores, useCharts, Governance)
-- ✅ **Sprint 2**: Core Migrations (OSINT, Forecast, chart lifecycle, tests)  
-- ✅ **Sprint 3**: Market/Overview tab migration
-- ✅ **Sprint 4**: Settings completion and hardening
+- ✅ All frontend architecture overhaul complete
+- ✅ Foundation (Import map, stores, composables)
+- ✅ Core migrations (OSINT, Forecast, chart lifecycle, tests)
+- ✅ Market/Overview tab migration
+- ✅ Settings completion and hardening
 
 ## Best Practices
 

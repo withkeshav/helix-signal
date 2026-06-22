@@ -14,6 +14,11 @@ log = get_logger(__name__)
 
 FRED_BASE = "https://api.stlouisfed.org/fred"
 
+SERIES_MAP: dict[str, str] = {
+    "DGS1MO": "1-Month Treasury Bill Yield",
+    "DGS3MO": "3-Month Treasury Bill Yield",
+}
+
 
 def _fred_api_key() -> str:
     return os.getenv("FRED_API_KEY", "")

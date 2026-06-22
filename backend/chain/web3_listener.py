@@ -49,40 +49,49 @@ def _make_jsonrpc_payload(method: str, params: list[Any]) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "method": method, "params": params, "id": 1}
 
 
-async def _jsonrpc_call(method: str, params: list[Any]) -> dict[str, Any]:
+async def _jsonrpc_call(method: str, params: list[Any]) -> Any | None:
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             ANKR_PUBLIC_RPC,
             json=_make_jsonrpc_payload(method, params),
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+    if "error" in data:
+        log.warning("rpc_listener.rpc_error", method=method, error=data["error"])
+        return None
+    if "result" not in data:
+        log.warning("rpc_listener.no_result", method=method, payload=data)
+        return None
+    return data["result"]
 
 
-async def _get_block_number() -> int:
-    data = await _jsonrpc_call("eth_blockNumber", [])
-    return int(data["result"], 16)
+async def _get_block_number() -> int | None:
+    result = await _jsonrpc_call("eth_blockNumber", [])
+    if result is None:
+        return None
+    return int(result, 16)
 
 
 async def _get_block_logs(block_number: int) -> list[dict[str, Any]]:
     hex_block = hex(block_number)
     addresses = [info["address"] for info in STABLECOIN_CONTRACTS.values()]
-    data = await _jsonrpc_call("eth_getLogs", [{
+    result = await _jsonrpc_call("eth_getLogs", [{
         "fromBlock": hex_block,
         "toBlock": hex_block,
         "address": addresses,
     }])
-    return data.get("result", [])
+    return result if isinstance(result, list) else []
 
 
 async def _fetch_blocks_in_range(from_block: int, to_block: int) -> list[dict[str, Any]]:
     addresses = [info["address"] for info in STABLECOIN_CONTRACTS.values()]
-    data = await _jsonrpc_call("eth_getLogs", [{
+    result = await _jsonrpc_call("eth_getLogs", [{
         "fromBlock": hex(from_block),
         "toBlock": hex(to_block),
         "address": addresses,
     }])
-    return data.get("result", [])
+    return result if isinstance(result, list) else []
 
 
 async def poll_stablecoin_logs() -> None:
@@ -92,6 +101,9 @@ async def poll_stablecoin_logs() -> None:
     while True:
         try:
             current_block = await _get_block_number()
+            if current_block is None:
+                await asyncio.sleep(POLL_INTERVAL)
+                continue
 
             if last_block is None:
                 last_block = current_block - 1

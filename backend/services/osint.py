@@ -22,7 +22,7 @@ from signal_engine.core import get_asset_by_symbol, load_enabled_assets
 log = get_logger(__name__)
 
 RSS_FEEDS = {
-    "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss",
     "cointelegraph": "https://cointelegraph.com/rss",
     "theblock": "https://www.theblock.co/rss.xml",
     "cryptoslate": "https://cryptoslate.com/feed/",

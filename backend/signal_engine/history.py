@@ -242,7 +242,7 @@ def _emit_concentration_change(
     if prev_top is not None and new_top is not None and abs(new_top - prev_top) >= CONC_SHARE_DELTA_WARN:
         fired = True
         _emit(
-            db,
+            pending_events, db,
             asset_symbol=sym,
             chain_key=None,
             event_type="concentration_change",
@@ -261,7 +261,7 @@ def _emit_concentration_change(
         and abs(new_score - prev_score) >= CONC_SCORE_DELTA_WARN
     ):
         _emit(
-            db,
+            pending_events, db,
             asset_symbol=sym,
             chain_key=None,
             event_type="concentration_change",

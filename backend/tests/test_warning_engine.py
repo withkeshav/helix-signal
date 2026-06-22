@@ -168,8 +168,8 @@ def test_increment_ai_usage_multiple_providers(db_session) -> None:
     assert summary["providers"]["ollama_cloud"]["calls"] == 1
 
 
-def test_ai_usage_endpoint(client) -> None:
-    resp = client.get("/api/ai/usage")
+def test_ai_usage_endpoint(admin_headers, client) -> None:
+    resp = client.get("/api/ai/usage", headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert "date" in data
@@ -180,16 +180,16 @@ def test_ai_usage_endpoint(client) -> None:
     assert "providers" in data
 
 
-def test_ai_warnings_endpoint(client) -> None:
-    resp = client.get("/api/ai/warnings")
+def test_ai_warnings_endpoint(admin_headers, client) -> None:
+    resp = client.get("/api/ai/warnings", headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
 
 
-def test_ai_usage_endpoint_with_data(db_session, client) -> None:
+def test_ai_usage_endpoint_with_data(admin_headers, db_session, client) -> None:
     increment_ai_usage(db_session, provider="groq", model="llama-3.1-8b-instant", tokens=150, cost=0.0075)
-    resp = client.get("/api/ai/usage")
+    resp = client.get("/api/ai/usage", headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_calls"] == 1

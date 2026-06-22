@@ -67,8 +67,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-sqlite:////data/helix.db}
-      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-false}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-helix}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-helix}}
+      HELIX_USE_ALEMBIC: ${HELIX_USE_ALEMBIC:-true}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       REFRESH_INTERVAL_SECONDS: ${REFRESH_INTERVAL_SECONDS:-300}
       TREND_RETENTION_DAYS: ${TREND_RETENTION_DAYS:-90}

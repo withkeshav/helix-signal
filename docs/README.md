@@ -3,6 +3,7 @@
 ## Core Reference
 - [Architecture](architecture.md) — System design, data flow, deployment
 - [API Reference](api.md) — All endpoints, parameters, response formats
+- [Scoring Design](scoring-design.md) — Asset-level and chain-level risk score formulas
 
 ## Guides
 - [Adding a Stablecoin](guides/adding-asset.md)

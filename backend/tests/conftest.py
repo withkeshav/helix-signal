@@ -85,6 +85,13 @@ def _reset_shared_globals() -> None:
     _r._PROVIDER_FALLBACK_COUNTS.clear()
     _SOURCE_RATE_LIMITS.clear()
 
+    # -- Admin auth brute-force lockout state --
+    from core.admin_auth import _FAILED_ATTEMPTS as _AUTH_FAILURES
+    _AUTH_FAILURES.clear()
+
+    # -- SlowAPI HTTP rate limiter (in-memory MemoryStorage) --
+    main.app.state.limiter.reset()
+
 
 @pytest.fixture()
 def client():

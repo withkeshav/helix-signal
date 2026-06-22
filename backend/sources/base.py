@@ -22,6 +22,7 @@ class AbstractSource(ABC):
             self._session = httpx.Client(
                 transport=transport,
                 timeout=httpx.Timeout(20),
+                follow_redirects=False,
             )
         return self._session
 
@@ -29,6 +30,7 @@ class AbstractSource(ABC):
         if self._async_session is None:
             self._async_session = httpx.AsyncClient(
                 timeout=httpx.Timeout(20),
+                follow_redirects=False,
             )
         return self._async_session
 
@@ -64,7 +66,7 @@ def http_get_with_retry(
     last_exc: Exception | None = None
     for attempt in range(max_retries):
         try:
-            with httpx.Client(timeout=timeout) as session:
+            with httpx.Client(timeout=timeout, follow_redirects=False) as session:
                 resp = session.get(url)
                 if resp.status_code in (429, 502, 503, 504):
                     delay = base_delay * (2 ** attempt) + random.uniform(0, 2)
@@ -90,7 +92,7 @@ async def async_http_get_with_retry(
     last_exc: Exception | None = None
     for attempt in range(max_retries):
         try:
-            async with httpx.AsyncClient(timeout=timeout) as session:
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as session:
                 resp = await session.get(url)
                 if resp.status_code in (429, 502, 503, 504):
                     delay = base_delay * (2 ** attempt) + random.uniform(0, 2)

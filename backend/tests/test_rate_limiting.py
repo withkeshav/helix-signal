@@ -93,12 +93,12 @@ class TestSourceRateLimit:
         assert _check_source_rate_limit("coingecko")
 
     def test_at_limit(self):
-        for _ in range(50):
+        for _ in range(100):
             _record_source_call("coingecko")
         assert not _check_source_rate_limit("coingecko")
 
     def test_over_limit(self):
-        for _ in range(55):
+        for _ in range(105):
             _record_source_call("coingecko")
         assert not _check_source_rate_limit("coingecko")
 
@@ -106,7 +106,7 @@ class TestSourceRateLimit:
         assert _check_source_rate_limit("nonexistent_source")
 
     def test_dexscreener_limit(self):
-        for _ in range(59):
+        for _ in range(119):
             _record_source_call("dexscreener")
         assert _check_source_rate_limit("dexscreener")
         _record_source_call("dexscreener")

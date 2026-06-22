@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
@@ -183,7 +183,6 @@ class OsintArticle(Base):
     __tablename__ = "osint_articles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    asset_symbols: Mapped[str | None] = mapped_column(String(128), nullable=True)
     source: Mapped[str] = mapped_column(String(64), index=True)
     title: Mapped[str] = mapped_column(String(500))
     url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
@@ -197,6 +196,27 @@ class OsintArticle(Base):
     sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
     entities: Mapped[str | None] = mapped_column(Text, nullable=True)
     topics: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    asset_links: Mapped[list["OsintArticleAsset"]] = relationship("OsintArticleAsset", back_populates="article", cascade="all, delete-orphan")
+
+
+class OsintArticleAsset(Base):
+    __tablename__ = "osint_article_assets"
+    __table_args__ = (
+        UniqueConstraint("article_id", "asset_symbol", name="uq_article_asset"),
+        Index("ix_article_asset_article_id", "article_id"),
+        Index("ix_article_asset_asset_symbol", "asset_symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    article_id: Mapped[int] = mapped_column(Integer, ForeignKey("osint_articles.id", ondelete="CASCADE"), nullable=False)
+    asset_symbol: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    article: Mapped["OsintArticle"] = relationship("OsintArticle", back_populates="asset_links")
 
 
 class ForecastRun(Base):

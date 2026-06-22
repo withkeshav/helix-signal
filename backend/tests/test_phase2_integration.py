@@ -281,9 +281,9 @@ class TestEnrichmentFlow:
 
 
 class TestApiEndpoints:
-    def test_api_ai_budget(self, client):
+    def test_api_ai_budget(self, client, admin_headers):
         """GET /api/ai/budget returns budget shape."""
-        resp = client.get("/api/ai/budget")
+        resp = client.get("/api/ai/budget", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert "daily_budget" in data
@@ -291,10 +291,10 @@ class TestApiEndpoints:
         assert "tokens_remaining" in data
         assert "pct_used" in data
 
-    def test_api_ai_stats(self, client):
+    def test_api_ai_stats(self, client, admin_headers):
         """GET /api/ai/stats — note: stats endpoint redirects or not available;
         test provider_stats through /api/ai/usage."""
-        resp = client.get("/api/ai/usage")
+        resp = client.get("/api/ai/usage", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert "provider_stats" in data
@@ -302,9 +302,9 @@ class TestApiEndpoints:
         assert "total_calls" in data
         assert "total_tokens" in data
 
-    def test_api_ai_usage(self, client):
+    def test_api_ai_usage(self, client, admin_headers):
         """GET /api/ai/usage returns usage summary."""
-        resp = client.get("/api/ai/usage")
+        resp = client.get("/api/ai/usage", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert "date" in data
@@ -314,20 +314,20 @@ class TestApiEndpoints:
         assert "provider_stats" in data
         assert "providers" in data
 
-    def test_api_ai_warnings(self, client):
+    def test_api_ai_warnings(self, client, admin_headers):
         """GET /api/ai/warnings returns a list."""
-        resp = client.get("/api/ai/warnings")
+        resp = client.get("/api/ai/warnings", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
 
-    def test_api_ai_warnings_with_high_usage(self, monkeypatch, client):
+    def test_api_ai_warnings_with_high_usage(self, monkeypatch, client, admin_headers):
         """Increment AI usage past threshold, verify warning appears."""
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
         budget_mod._LOCAL_DAILY_TOKENS = 900
         budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        resp = client.get("/api/ai/warnings")
+        resp = client.get("/api/ai/warnings", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         ai_warnings = [w for w in data if w["type"] == "ai_budget"]
@@ -366,9 +366,9 @@ class TestApiEndpoints:
         assert resp.status_code == 403
 
     def test_api_ai_warnings_requires_auth(self, client):
-        """GET /api/ai/warnings does NOT require auth (public endpoint)."""
+        """GET /api/ai/warnings now requires admin token."""
         resp = client.get("/api/ai/warnings")
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
 
 # ===================================================================
@@ -430,10 +430,10 @@ class TestWarningEngineIntegration:
         assert summary_today["total_tokens"] == 100
 
     def test_source_usage_rate_limit(self):
-        """_check_source_rate_limit respects rpm setting for coingecko (50 RPM)."""
+        """_check_source_rate_limit respects rpm setting for coingecko (100 RPM)."""
         assert _check_source_rate_limit("coingecko") is True
 
-        for _ in range(50):
+        for _ in range(100):
             _record_source_call("coingecko")
 
         assert _check_source_rate_limit("coingecko") is False

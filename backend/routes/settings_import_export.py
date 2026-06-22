@@ -92,8 +92,11 @@ async def import_settings_json_endpoint(
 ):
     """Import settings from uploaded JSON file (admin only)."""
     try:
-        # Read the uploaded file
-        content = await file.read()
+        # Read the uploaded file (limit 1 MB)
+        MAX_IMPORT_SIZE = 1 * 1024 * 1024
+        content = await file.read(MAX_IMPORT_SIZE + 1)
+        if len(content) > MAX_IMPORT_SIZE:
+            raise HTTPException(status_code=413, detail="Import file too large (max 1 MB)")
         json_data = content.decode("utf-8")
         
         # Get user information for audit logging

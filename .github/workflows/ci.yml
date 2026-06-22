@@ -47,13 +47,17 @@ jobs:
       - name: pip-audit
         run: .venv/bin/pip-audit --requirement requirements.txt
 
+      - name: gitleaks detect
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: hadolint Dockerfiles
         run: |
           docker run --rm -i ghcr.io/hadolint/hadolint:v2.12.0 < ../frontend/Dockerfile
           docker run --rm -i ghcr.io/hadolint/hadolint:v2.12.0 < ../backend/Dockerfile
 
   smoke:
-    if: github.event_name != 'pull_request'
     needs: [test]
     runs-on: ubuntu-latest
     steps:
@@ -83,6 +87,38 @@ jobs:
           ./scripts/smoke-check.sh "${BASE_URL}"
         env:
           BASE_URL: "http://localhost"
+
+      - name: Set up Node.js for Playwright
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium
+
+      - name: Check frontend renders
+        run: |
+          node -e "
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+            await page.goto('http://localhost', { waitUntil: 'networkidle' });
+            const title = await page.title();
+            console.log('Page title:', title);
+            const content = await page.content();
+            if (content.includes('Helix') || content.includes('Signal')) {
+              console.log('SUCCESS: Frontend renders with expected content');
+            } else {
+              console.error('FAIL: Frontend missing expected content');
+              process.exit(1);
+            }
+            await browser.close();
+          })();
+          "
 
       - name: Clean up
         run: docker compose down -v

@@ -17,6 +17,7 @@ from database import (
     AssetTrendSnapshot,
     SignalEvent,
     OsintArticle,
+    OsintArticleAsset,
     Base,
     engine,
 )
@@ -177,19 +178,21 @@ class TestRetentionPolicy:
         db = SessionLocal()
         try:
             old = datetime(2020, 1, 1, tzinfo=timezone.utc)
-            db.add(OsintArticle(
-                asset_symbols="TEST_DEL", source="test", title="old article",
+            article = OsintArticle(
+                source="test", title="old article",
                 url="http://example.com", published_at=old,
                 fetched_at=old,
-            ))
+            )
+            db.add(article)
+            db.flush()
+            db.add(OsintArticleAsset(article_id=article.id, asset_symbol="TEST_DEL"))
             db.commit()
 
             from services.retention import prune_all
             result = prune_all(db)
             assert result["osint_article_rows"] >= 1
-            assert db.query(OsintArticle).filter(
-                OsintArticle.asset_symbols == "TEST_DEL"
-            ).count() == 0
+            db.expire_all()
+            assert db.query(OsintArticle).count() == 0
         finally:
             db.close()
 

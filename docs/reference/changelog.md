@@ -1,5 +1,34 @@
 # Changelog
 
+## 3.9.4 (2026-06-22)
+
+### Added
+
+- **OsintArticle join table** — New `OsintArticleAsset` model with FK to `osint_articles`, unique constraint on `(article_id, asset_symbol)`, cascade delete. Replaces `asset_symbols` comma-separated string column. Includes Alembic migration with data migration (splits strings into join rows) and column drop.
+
+### Changed
+
+- **Test suite passes 355/355** — Fixed admin auth brute-force lockout (`_FAILED_ATTEMPTS` dict never cleared between tests) causing false 429 responses. Added `_FAILED_ATTEMPTS.clear()` + `limiter.reset()` to the autouse `_reset_shared_globals` fixture. Updated stale rate-limit test values (coingecko 50→100 RPM, dexscreener 59→119 RPM) to match current settings registry.
+- **AI endpoints require admin token** — `/api/ai/budget`, `/api/ai/usage`, `/api/ai/warnings` now gated by `_require_admin_token` (was public before).
+- **Signal engine history refactored** — `_events_to_insert` module-global list replaced with local `pending_events: list[SignalEvent]` parameter threaded through all `_emit*` call sites, improving test isolation and predictability.
+- **Postgres default** — `docker-compose.yml` defaults to Postgres + Alembic enabled; SQLite-only mode requires explicit `DATABASE_URL` override.
+- **HTTP client hardening** — `follow_redirects=False` on all `httpx.Client` / `AsyncClient` instances in `sources/base.py` and `http_get_with_retry` helpers.
+
+### Fixed
+
+- **Admin auth lockout per-IP** — Fixed `_ip_key()` proxy CIDR logic: properly extracts real client IP from `X-Forwarded-For` when behind a trusted proxy, avoiding false lockout on shared proxy IPs.
+- **Settings import file size** — Rejects uploads >1 MB with 413 status (was no limit).
+- **`composite_scoring.py`** — Removed stale `source_ok` penalty that halved risk scores when source had errors.
+
+### Infrastructure
+
+- **CI hardening** — Added gitleaks secrets scan, Playwright frontend render check, always-on smoke job (not only on PR). Removed stale `docs/system_improvements.md` and `docs/system_improvements_summary.md`.
+
+### Documentation
+
+- **Scoring design** — New `docs/scoring-design.md` with asset-level and chain-level risk score formulas.
+- **Version bumped** — 3.9.3.1 → 3.9.4
+
 ## 3.9.3 (2026-06-21)
 
 ### Added

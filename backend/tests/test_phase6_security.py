@@ -144,14 +144,39 @@ class TestBruteforceLockout:
         assert resp.status_code == 429
         assert "Too many failed auth attempts" in resp.text
 
-    def test_different_ip_not_blocked_by_lockout(self, client, admin_headers):
-        self._reset_lockout()
-        attacker_headers = {"X-Admin-Token": "wrong-token", "X-Forwarded-For": "10.0.0.99"}
-        for _ in range(20):
-            client.get("/api/settings", headers=attacker_headers)
-        legit_headers = {**admin_headers, "X-Forwarded-For": "10.0.0.1"}
-        resp = client.get("/api/settings", headers=legit_headers)
-        assert resp.status_code == 200
+    def test_ip_key_trusts_xff_only_with_cidr(self, monkeypatch):
+        from unittest.mock import Mock
+        from core.admin_auth import _ip_key
+        monkeypatch.setenv("TRUSTED_PROXY_CIDR", "127.0.0.0/8")
+        from starlette.datastructures import Headers
+
+        req = Mock()
+        req.client.host = "127.0.0.1"
+
+        req.headers = Headers({"X-Forwarded-For": "10.0.0.99"})
+        key_attacker = _ip_key(req)
+
+        req.headers = Headers({"X-Forwarded-For": "10.0.0.1"})
+        key_legit = _ip_key(req)
+
+        assert key_attacker != key_legit
+
+    def test_ip_key_ignores_xff_without_cidr(self, monkeypatch):
+        from unittest.mock import Mock
+        from core.admin_auth import _ip_key
+        monkeypatch.delenv("TRUSTED_PROXY_CIDR", raising=False)
+        from starlette.datastructures import Headers
+
+        req = Mock()
+        req.client.host = "127.0.0.1"
+
+        req.headers = Headers({"X-Forwarded-For": "10.0.0.99"})
+        key_a = _ip_key(req)
+
+        req.headers = Headers({"X-Forwarded-For": "10.0.0.1"})
+        key_b = _ip_key(req)
+
+        assert key_a == key_b
 
     def test_lockout_window_expiry(self, client, monkeypatch):
         self._reset_lockout()
@@ -167,19 +192,6 @@ class TestBruteforceLockout:
         time.sleep(0.01)
         resp = client.get("/api/settings", headers=wrong_headers)
         assert resp.status_code in (403, 429), f"Expected 403/429 got {resp.status_code}"
-
-    def test_different_ip_not_locked_out(self, client):
-        self._reset_lockout()
-        wrong_headers = {"X-Admin-Token": "wrong-token", "X-Forwarded-For": "10.0.0.1"}
-        for _ in range(20):
-            client.get("/api/settings", headers=wrong_headers)
-        resp = client.get("/api/settings", headers=wrong_headers)
-        assert resp.status_code == 429
-
-        other_headers = {"X-Admin-Token": "wrong-token", "X-Forwarded-For": "10.0.0.2"}
-        resp = client.get("/api/settings", headers=other_headers)
-        assert resp.status_code == 403
-
 
 class TestRateLimiting:
     """PR3: Stricter rate limits on admin routes."""

@@ -3,7 +3,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import SignalEvent, get_db
+from sqlalchemy import desc
 from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
 from providers.settings import get_playbooks as get_builtin_playbooks
 from routes.playbooks import apply_playbook_by_name, get_all_playbooks, seed_builtin_playbooks
@@ -20,8 +21,15 @@ router = APIRouter()
 
 def _require_ai_auth(request: Request, db: Session | None = None) -> None:
     from providers.settings import get_setting
-    if not get_setting("ai_require_token", db):
-        return
+    require = get_setting("ai_require_token", db)
+    if require is None:
+        require = True
+    if require:
+        token = request.headers.get("X-Admin-Token")
+        require_admin_token(request, token=token)
+
+
+def _require_admin_token(request: Request) -> None:
     token = request.headers.get("X-Admin-Token")
     require_admin_token(request, token=token)
 
@@ -45,6 +53,7 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
 @router.get("/ai/budget")
 @limiter.limit("30/minute")
 def ai_budget_endpoint(request: Request) -> dict[str, Any]:
+    _require_admin_token(request)
     return get_budget_status()
 
 
@@ -54,6 +63,7 @@ def ai_usage_endpoint(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    _require_admin_token(request)
     per_provider = get_ai_usage_summary(db)
     provider_stats = get_provider_stats()
     budget = get_budget_status()
@@ -70,6 +80,7 @@ def ai_warnings_endpoint(
     request: Request,
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
+    _require_admin_token(request)
     return check_warnings(db=db)
 
 
@@ -119,7 +130,17 @@ def ai_narrative(
     ctx.setdefault("sentiment_label", "?")
     ctx.setdefault("sentiment_score", "?")
 
-    ctx["recent_events"] = "?"  # TODO: implement get_recent_events
+    try:
+        events = (
+            db.query(SignalEvent)
+            .filter(SignalEvent.asset_symbol == asset.upper())
+            .order_by(desc(SignalEvent.timestamp))
+            .limit(5)
+            .all()
+        )
+        ctx["recent_events"] = "; ".join(f"{e.title} ({e.severity})" for e in events) if events else "No recent events."
+    except Exception:
+        ctx["recent_events"] = "?"
 
     try:
         from services.predictive import run_predictive_bundle

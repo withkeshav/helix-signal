@@ -16,14 +16,26 @@ _LOCKOUT_REDIS_PREFIX = "helix:auth:lockout:"
 
 
 def _ip_key(request: Request) -> str:
+    import ipaddress as _ipa
     cidr = os.getenv("TRUSTED_PROXY_CIDR", "").strip()
-    if cidr and request.client:
-        from ipaddress import ip_address, ip_network
-        if ip_address(request.client.host) not in ip_network(cidr, strict=False):
-            return hashlib.sha256(request.client.host.encode()).hexdigest()[:16]
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
-    return hashlib.sha256(ip.encode()).hexdigest()[:16]
+    raw = request.client.host if request.client else "unknown"
+
+    if cidr and raw != "unknown":
+        try:
+            client_ip = _ipa.ip_address(raw)
+            if client_ip in _ipa.ip_network(cidr, strict=False):
+                forwarded = request.headers.get("X-Forwarded-For", "")
+                if forwarded:
+                    raw = forwarded.split(",")[0].strip()
+        except ValueError:
+            pass
+
+    try:
+        raw = str(_ipa.ip_address(raw))
+    except ValueError:
+        pass
+
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _redis_client():

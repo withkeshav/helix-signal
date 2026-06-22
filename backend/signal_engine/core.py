@@ -218,10 +218,6 @@ async def refresh_chain_data(db: Session) -> None:
         dl_results = await asyncio.gather(
             *[_fetch_asset(i, asset, tvl_map) for i, asset in enumerate(enabled_assets)]
         )
-        cg_transformed, cg_error = cg_result
-        cg_ok = cg_transformed is not None
-        dx_transformed, dx_error = dx_result
-        dx_ok = dx_transformed is not None
 
         # Prepare bulk operations
         asset_chain_snapshots_to_update = []

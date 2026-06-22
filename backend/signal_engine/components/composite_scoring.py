@@ -47,9 +47,6 @@ def compute_risk_score(**kwargs) -> Dict[str, Any]:
                   velocity_component * 0.20 +
                   age_penalty * 0.20)
 
-    if not source_ok:
-        base_score *= 0.5
-
     final_score = max(0, min(100, base_score))
     band = _score_to_band(final_score)
 

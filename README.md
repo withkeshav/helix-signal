@@ -195,6 +195,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - Adding a chain: [`docs/guides/adding-chain.md`](docs/guides/adding-chain.md)
 - Plugin development: [`docs/guides/plugins.md`](docs/guides/plugins.md)
 - Code quality improvements: [`docs/reference/phase6_code_quality.md`](docs/reference/phase6_code_quality.md)
+- Scoring design: [`docs/scoring-design.md`](docs/scoring-design.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 - Changelog: [`docs/reference/changelog.md`](docs/reference/changelog.md)

@@ -93,10 +93,8 @@ def _duplicate_event(
     return last is not None and (new_value is None or last.new_value == new_value)
 
 
-# Keep track of events to bulk insert
-_events_to_insert = []
-
 def _emit(
+    pending_events: list[SignalEvent],
     db: Session,
     *,
     asset_symbol: str,
@@ -135,17 +133,16 @@ def _emit(
         timestamp=ts,
         metadata_json=json.dumps(metadata) if metadata else None,
     )
-    _events_to_insert.append(row)
+    pending_events.append(row)
 
-def _flush_events(db: Session) -> None:
+def _flush_events(db: Session, pending_events: list[SignalEvent]) -> None:
     """Flush all pending events to the database using bulk insert."""
-    global _events_to_insert
-    if _events_to_insert:
-        db.bulk_save_objects(_events_to_insert)
-        _events_to_insert = []
+    if pending_events:
+        db.bulk_save_objects(pending_events)
+        pending_events.clear()
 
 
-def _emit_band_change(db: Session, *, sym: str, prev_band: str | None, new_band: str, ts: datetime) -> None:
+def _emit_band_change(pending_events: list[SignalEvent], db: Session, *, sym: str, prev_band: str | None, new_band: str, ts: datetime) -> None:
     if prev_band is None or prev_band == new_band:
         return
     order = {"Normal": 0, "Watch": 1, "Risk": 2}
@@ -156,7 +153,7 @@ def _emit_band_change(db: Session, *, sym: str, prev_band: str | None, new_band:
     else:
         severity = "info"
     _emit(
-        db,
+        pending_events, db,
         asset_symbol=sym,
         chain_key=None,
         event_type="signal_band_change",
@@ -171,7 +168,7 @@ def _emit_band_change(db: Session, *, sym: str, prev_band: str | None, new_band:
     )
 
 
-def _emit_depeg_change(db: Session, *, sym: str, prev_score: int | None, new_score: int, ts: datetime) -> None:
+def _emit_depeg_change(pending_events: list[SignalEvent], db: Session, *, sym: str, prev_score: int | None, new_score: int, ts: datetime) -> None:
     if prev_score is None:
         return
     pz, nz = _depeg_zone(prev_score), _depeg_zone(new_score)
@@ -184,7 +181,7 @@ def _emit_depeg_change(db: Session, *, sym: str, prev_score: int | None, new_sco
     else:
         severity = "info"
     _emit(
-        db,
+        pending_events, db,
         asset_symbol=sym,
         chain_key=None,
         event_type="depeg_pressure_change",
@@ -200,6 +197,7 @@ def _emit_depeg_change(db: Session, *, sym: str, prev_score: int | None, new_sco
 
 
 def _emit_supply_change(
+    pending_events: list[SignalEvent],
     db: Session,
     *,
     sym: str,
@@ -214,7 +212,7 @@ def _emit_supply_change(
         return
     severity = "warning" if abs(pct) >= SUPPLY_WARN_PCT else "info"
     _emit(
-        db,
+        pending_events, db,
         asset_symbol=sym,
         chain_key=None,
         event_type="large_supply_change",
@@ -230,6 +228,7 @@ def _emit_supply_change(
 
 
 def _emit_concentration_change(
+    pending_events: list[SignalEvent],
     db: Session,
     *,
     sym: str,
@@ -278,6 +277,7 @@ def _emit_concentration_change(
 
 
 def _emit_confidence_drop(
+    pending_events: list[SignalEvent],
     db: Session,
     *, sym: str, prev_label: str | None, new_label: str, ts: datetime
 ) -> None:
@@ -286,7 +286,7 @@ def _emit_confidence_drop(
     if new_label not in ("Medium", "Low"):
         return
     _emit(
-        db,
+        pending_events, db,
         asset_symbol=sym,
         chain_key=None,
         event_type="data_confidence_drop",
@@ -301,7 +301,7 @@ def _emit_confidence_drop(
     )
 
 
-def _emit_source_recovered(db: Session, *, prior: str | None, ts: datetime) -> None:
+def _emit_source_recovered(pending_events: list[SignalEvent], db: Session, *, prior: str | None, ts: datetime) -> None:
     global _last_source_recovery_emitted
     if prior != "error":
         return
@@ -312,7 +312,7 @@ def _emit_source_recovered(db: Session, *, prior: str | None, ts: datetime) -> N
                 return
         _last_source_recovery_emitted = ts
     _emit(
-        db,
+        pending_events, db,
         asset_symbol="ALL",
         chain_key=None,
         event_type="source_recovered",
@@ -345,11 +345,12 @@ def persist_trends_and_events(
     if defillama is None or defillama.status != "ok":
         return
 
+    pending_events: list[SignalEvent] = []
     interval = _refresh_interval()
     bucket_id = int(completed_at.timestamp() // BUCKET_SECONDS)
     ts = completed_at if completed_at.tzinfo else completed_at.replace(tzinfo=timezone.utc)
 
-    _emit_source_recovered(db, prior=prior_source_status, ts=ts)
+    _emit_source_recovered(pending_events, db, prior=prior_source_status, ts=ts)
 
     seen: set[str] = set()
     for sym in successful_asset_symbols:
@@ -423,9 +424,10 @@ def persist_trends_and_events(
         if prev_row is None:
             continue
 
-        _emit_band_change(db, sym=u, prev_band=prev_row.signal_band, new_band=bundle.signal_band, ts=ts)
-        _emit_depeg_change(db, sym=u, prev_score=prev_row.depeg_index, new_score=bundle.depeg_index, ts=ts)
+        _emit_band_change(pending_events, db, sym=u, prev_band=prev_row.signal_band, new_band=bundle.signal_band, ts=ts)
+        _emit_depeg_change(pending_events, db, sym=u, prev_score=prev_row.depeg_index, new_score=bundle.depeg_index, ts=ts)
         _emit_supply_change(
+            pending_events,
             db,
             sym=u,
             prev_supply=prev_row.total_supply,
@@ -447,6 +449,7 @@ def persist_trends_and_events(
             prev_top = float(prev_q.supply_share_pct)
         new_top = bundle.top_chain_share_pct
         _emit_concentration_change(
+            pending_events,
             db,
             sym=u,
             prev_top=prev_top,
@@ -456,6 +459,7 @@ def persist_trends_and_events(
             ts=ts,
         )
         _emit_confidence_drop(
+            pending_events,
             db,
             sym=u,
             prev_label=prev_row.data_confidence_label,
@@ -488,5 +492,5 @@ def persist_trends_and_events(
         evaluate_alerts(db, bundle=bundle_dict, asset_symbol=u, now=ts)
     
     # Flush all pending events
-    _flush_events(db)
+    _flush_events(db, pending_events)
 

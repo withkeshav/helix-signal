@@ -13,10 +13,10 @@ from html.parser import HTMLParser
 from typing import Any
 
 import httpx
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from structlog import get_logger
 
-from database import OsintArticle, SignalEvent, SourceStatus
+from database import OsintArticle, OsintArticleAsset, SignalEvent, SourceStatus
 from signal_engine.core import get_asset_by_symbol, load_enabled_assets
 
 log = get_logger(__name__)
@@ -168,8 +168,7 @@ def ingest_osint_feed(db: Session) -> int:
     sentiments = _batch_sentiment(titles, nlp_active)
 
     for art, sentiment in zip(all_articles, sentiments):
-        db.add(OsintArticle(
-            asset_symbols=",".join(art["assets"]) if art["assets"] else None,
+        article = OsintArticle(
             source=art["source"],
             title=art["title"],
             url=art["url"],
@@ -178,7 +177,11 @@ def ingest_osint_feed(db: Session) -> int:
             sentiment_score=sentiment["score"],
             sentiment_label=sentiment["label"],
             entities=json.dumps(art["assets"]) if art["assets"] else None,
-        ))
+        )
+        db.add(article)
+        db.flush()
+        for sym in (art["assets"] or []):
+            db.add(OsintArticleAsset(article_id=article.id, asset_symbol=sym.upper()))
 
     db.commit()
     return len(all_articles)
@@ -189,10 +192,10 @@ def _article_exists(db: Session, title: str, source: str) -> bool:
 
 
 def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
-    q = db.query(OsintArticle).order_by(OsintArticle.published_at.desc().nullslast())
+    q = db.query(OsintArticle).options(joinedload(OsintArticle.asset_links)).order_by(OsintArticle.published_at.desc().nullslast())
     if asset:
         sym = asset.strip().upper()
-        q = q.filter(OsintArticle.asset_symbols.like(f"%{sym}%"))
+        q = q.join(OsintArticle.asset_links).filter(OsintArticleAsset.asset_symbol == sym)
     articles = q.limit(limit).all()
     return [
         {
@@ -204,7 +207,7 @@ def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) ->
             "published_at": a.published_at.isoformat().replace("+00:00", "Z") if a.published_at else None,
             "sentiment_score": a.sentiment_score,
             "sentiment_label": a.sentiment_label,
-            "assets": a.asset_symbols.split(",") if a.asset_symbols else [],
+            "assets": [ln.asset_symbol for ln in a.asset_links],
         }
         for a in articles
     ]
@@ -216,7 +219,7 @@ def get_sentiment_timeseries(db: Session, *, asset: str | None = None, window_da
     q = db.query(OsintArticle).filter(OsintArticle.published_at >= cutoff).order_by(OsintArticle.published_at.asc())
     if asset:
         sym = asset.strip().upper()
-        q = q.filter(OsintArticle.asset_symbols.like(f"%{sym}%"))
+        q = q.join(OsintArticle.asset_links).filter(OsintArticleAsset.asset_symbol == sym)
     articles = q.all()
     if not articles:
         return []
@@ -605,7 +608,8 @@ def correlate_sentiment_depeg(db: Session, *, asset: str, window_hours: int = 24
     articles = db.query(OsintArticle).filter(
         OsintArticle.published_at >= cutoff,
         OsintArticle.sentiment_score < -0.3,
-        OsintArticle.asset_symbols.contains(sym),
+    ).join(OsintArticle.asset_links).filter(
+        OsintArticleAsset.asset_symbol == sym,
     ).order_by(OsintArticle.published_at.desc()).all()
     depeg_events = db.query(SignalEvent).filter(
         SignalEvent.event_type.like("%depeg%"),

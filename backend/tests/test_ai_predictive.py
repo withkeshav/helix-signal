@@ -37,50 +37,50 @@ def test_predictive_api(client, monkeypatch: pytest.MonkeyPatch) -> None:
     assert "available" in body
 
 
-def test_ai_narrative_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ai_narrative_returns_200_when_ai_off(admin_headers, client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_off")
-    r = client.get("/api/ai/narrative?asset=USDT")
+    r = client.get("/api/ai/narrative?asset=USDT", headers=admin_headers)
     assert r.status_code == 200
     body = r.json()
     assert body.get("available") is False
 
 
-def test_ai_insights_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ai_insights_returns_200_when_ai_off(admin_headers, client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_off")
-    r = client.get("/api/ai/insights?asset=USDT")
+    r = client.get("/api/ai/insights?asset=USDT", headers=admin_headers)
     assert r.status_code == 200
     body = r.json()
     assert body.get("available") is False
 
 
-def test_ai_explain_returns_200_when_ai_off(client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ai_explain_returns_200_when_ai_off(admin_headers, client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_off")
-    r = client.get("/api/ai/explain?asset=USDT")
+    r = client.get("/api/ai/explain?asset=USDT", headers=admin_headers)
     assert r.status_code == 200
     body = r.json()
     assert body.get("available") is False
 
 
 @network
-def test_ai_narrative_returns_200_when_asset_not_found(client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ai_narrative_returns_200_when_asset_not_found(admin_headers, client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_lite")
-    r = client.get("/api/ai/narrative?asset=NONEXISTENT")
+    r = client.get("/api/ai/narrative?asset=NONEXISTENT", headers=admin_headers)
     assert r.status_code == 200
     body = r.json()
     assert body.get("available") is False
 
 
 @network
-def test_ai_insights_returns_200_when_asset_not_found(client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ai_insights_returns_200_when_asset_not_found(admin_headers, client, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_lite")
-    r = client.get("/api/ai/insights?asset=NONEXISTENT")
+    r = client.get("/api/ai/insights?asset=NONEXISTENT", headers=admin_headers)
     assert r.status_code == 200
     body = r.json()
     assert body.get("available") is False
 
 
-def test_ai_budget_endpoint(client) -> None:
-    r = client.get("/api/ai/budget")
+def test_ai_budget_endpoint(admin_headers, client) -> None:
+    r = client.get("/api/ai/budget", headers=admin_headers)
     assert r.status_code == 200
     body = r.json()
     assert "daily_budget" in body
@@ -89,8 +89,8 @@ def test_ai_budget_endpoint(client) -> None:
     assert "pct_used" in body
 
 
-def test_ai_budget_shape(client) -> None:
-    r = client.get("/api/ai/budget")
+def test_ai_budget_shape(admin_headers, client) -> None:
+    r = client.get("/api/ai/budget", headers=admin_headers)
     body = r.json()
     assert body["daily_budget"] > 0
     assert body["tokens_remaining"] >= 0

@@ -18,7 +18,7 @@ from database import (
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "3.9.3.1"
+HELIX_VERSION = "3.9.4"
 
 RETENTION_DEFAULTS: dict[str, int] = {
     "asset_trend_snapshots": 90,

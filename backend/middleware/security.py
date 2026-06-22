@@ -16,7 +16,7 @@ VALID_WINDOWS = frozenset({"24h", "7d", "30d", "90d"})
 _CSP = os.getenv(
     "CONTENT_SECURITY_POLICY",
     "default-src 'self'; "
-    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval'; "
+    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-eval' 'sha256-9RZrN3RExF+0bvaRfEqFGDB1AuQYP7U9C++sm12qeCQ='; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com; "
     "img-src 'self' data:; "
@@ -59,6 +59,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         if path.startswith(("/api/", "/metrics")):
+            sanitize_query_params(dict(request.query_params))
             for key, val in request.query_params.items():
                 if key in ("asset",):
                     try:

@@ -59,7 +59,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         path = request.url.path
 
         if path.startswith(("/api/", "/metrics")):
-            sanitize_query_params(dict(request.query_params))
+            safe_params = sanitize_query_params(dict(request.query_params))
             for key, val in request.query_params.items():
                 if key in ("asset",):
                     try:

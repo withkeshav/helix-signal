@@ -84,6 +84,8 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - `js/init.js` — Alpine component (`helixApp`), chart wiring, tab loaders
 - `js/market.js`, `js/osint.js`, `js/governance.js`, `js/forecast.js` — feature modules spread into `helixApp`
 - nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
+- Frontend container binds to host port 80 (mapped from container port 80)
+- Content-Security-Policy uses SHA-256 hashes to allow specific inline scripts (like importmap) without using 'unsafe-inline'
 
 ## Local development
 

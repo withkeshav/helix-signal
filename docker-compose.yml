@@ -102,7 +102,7 @@ services:
     restart: unless-stopped
     profiles: ["data"]
     ports:
-      - "8080:80"
+      - "80:80"
     security_opt:
       - no-new-privileges:true
     cap_drop:

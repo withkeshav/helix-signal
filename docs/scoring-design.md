@@ -32,3 +32,8 @@ Used in `chain_row_signal()` (`signal_engine/scoring.py`). Applied per chain wit
 ## Health Flag
 
 `source_health` is returned as a string (`"OK"` or `"DEGRADED"`) in the `components` dict. It is **not** a score modifier — it surfaces as a UI flag so operators can see when a data source is unhealthy without it silently biasing the numeric score.
+
+## Data Sources
+
+- **FRED SERIES_MAP** — Authoritative source for economic indicator definitions in the FRED API integration
+- **Web3 RPC guard** — RPC responses are checked for missing result/error keys to prevent crashes on malformed responses

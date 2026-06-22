@@ -15,6 +15,12 @@
 - **HTTP client hardening** — `follow_redirects=False` on all `httpx.Client` / `AsyncClient` instances in `sources/base.py` and `http_get_with_retry` helpers.
 
 ### Fixed
+- **FRED SERIES_MAP** — Restore SERIES_MAP definition broken in recent refactor (2ec6017)
+- **CoinDesk RSS URL** — Update to canonical URL without trailing slash (ce62b94)
+- **RSS User-Agent** — Add browser User-Agent to RSS fetch to bypass 403 on TheBlock (c4b542a)
+- **Web3 RPC response** — Guard RPC response for missing result/error keys (9f7ab58)
+- **CSP importmap hash** — Allow importmap SHA-256 hash in script-src; unsafe-inline NOT re-added (f5673ee)
+- **Frontend port mapping** — Reconcile docker-compose.yml frontend port 8080:80 → 80:80
 
 - **Admin auth lockout per-IP** — Fixed `_ip_key()` proxy CIDR logic: properly extracts real client IP from `X-Forwarded-For` when behind a trusted proxy, avoiding false lockout on shared proxy IPs.
 - **Settings import file size** — Rejects uploads >1 MB with 413 status (was no limit).

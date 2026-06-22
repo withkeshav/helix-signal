@@ -48,3 +48,4 @@ are identified by their direct connection IP and their XFF header is ignored.
 ### Content Security Policy
 
 A `Content-Security-Policy` header is applied to all backend responses and nginx static assets. Configure via `CONTENT_SECURITY_POLICY` env var. The default policy restricts scripts to `'self'` + CDN, blocks `frame-ancestors`, and restricts `form-action` and `base-uri`.
+For inline scripts, the policy uses SHA-256 hashes to allow specific scripts while maintaining security. This approach avoids using 'unsafe-inline' which would weaken the policy. The importmap script in the frontend is specifically allowed through its SHA-256 hash.

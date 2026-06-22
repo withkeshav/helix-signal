@@ -21,10 +21,15 @@ from signal_engine.core import get_asset_by_symbol, load_enabled_assets
 
 log = get_logger(__name__)
 
+RSS_USER_AGENT = (
+    "Mozilla/5.0 (compatible; HelixSignal/1.0; +https://github.com/withkeshav/helix-signal)"
+)
+
 RSS_FEEDS = {
     "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss",
     "cointelegraph": "https://cointelegraph.com/rss",
-    "theblock": "https://www.theblock.co/rss.xml",
+    # Disabled: Cloudflare returns 403 on server IPs even with a browser User-Agent.
+    # "theblock": "https://www.theblock.co/rss.xml",
     "cryptoslate": "https://cryptoslate.com/feed/",
     "decrypt": "https://decrypt.co/feed",
     "bitcoincom": "https://news.bitcoin.com/feed/",
@@ -57,7 +62,11 @@ def _strip_html(raw: str) -> str:
 
 def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
     try:
-        resp = httpx.get(url, timeout=15)
+        resp = httpx.get(
+            url,
+            timeout=15,
+            headers={"User-Agent": RSS_USER_AGENT},
+        )
         resp.raise_for_status()
         root = ET.fromstring(resp.text)
         articles: list[dict[str, Any]] = []

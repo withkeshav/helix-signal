@@ -7,6 +7,13 @@ from signal_engine.components.peg_analysis import depeg_index_score, peg_deviati
 from signal_engine.components.concentration import concentration_component
 from signal_engine.components.supply_momentum import supply_momentum_component
 
+# ASSET-LEVEL SIGNAL SCORE WEIGHTS
+# depeg_index    0.35  (peg deviation pressure)
+# concentration  0.25  (chain supply concentration)
+# velocity       0.20  (supply momentum)
+# age_penalty    0.20  (data staleness)
+# Note: chain-level scores use different weights (depeg 0.40, share 0.40, momentum 0.20)
+# See docs/scoring-design.md for rationale.
 def compute_risk_score(**kwargs) -> Dict[str, Any]:
     depeg_score = kwargs.get("depeg_index")
     if depeg_score is None:

@@ -28,3 +28,7 @@ Used in `chain_row_signal()` (`signal_engine/scoring.py`). Applied per chain wit
 **Why different weights?** At the chain level, concentration is expressed directly as `chain_share_pct` (if a single chain holds 50%+ of supply, it contributes maximum risk). The asset-level concentration component aggregates across all chains using the Herfindahl-style `concentration_component()`. Asset-level age penalty is omitted at the chain level because chain snapshots are fresher by nature.
 
 **Band thresholds:** same as asset-level — ≤20 Normal, ≤60 Watch, >60 Alert (via `composite_band()`).
+
+## Health Flag
+
+`source_health` is returned as a string (`"OK"` or `"DEGRADED"`) in the `components` dict. It is **not** a score modifier — it surfaces as a UI flag so operators can see when a data source is unhealthy without it silently biasing the numeric score.

@@ -15,6 +15,7 @@
 - **HTTP client hardening** — `follow_redirects=False` on all `httpx.Client` / `AsyncClient` instances in `sources/base.py` and `http_get_with_retry` helpers.
 
 ### Fixed
+- **Admin token input always visible** — Move authentication block to top of settings tab outside settings-dependant gating, so token can be entered before settings load (chicken-and-egg fix).
 - **FRED SERIES_MAP** — Restore SERIES_MAP definition broken in recent refactor (2ec6017)
 - **CoinDesk RSS URL** — Update to canonical URL without trailing slash (ce62b94)
 - **RSS User-Agent** — Add browser User-Agent to RSS fetch to bypass 403 on TheBlock (c4b542a)

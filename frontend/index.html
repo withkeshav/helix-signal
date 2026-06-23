@@ -690,6 +690,25 @@
     <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
          x-init="filterSettings(); loadAiBudget();" role="tabpanel" id="tab-settings">
       <div class="insight-grid">
+        <!-- Admin Token Section (always visible — enter token first) -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <div style="display:flex;align-items:flex-start;gap:16px">
+            <div style="flex:1">
+              <h2 style="margin:0 0 8px 0">🔒 Admin Authentication</h2>
+              <p class="kpi-sub" style="margin:0 0 16px 0">Required for refresh operations and settings changes when HELIX_ADMIN_TOKEN is configured on the server.</p>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                <input type="password" x-model="adminToken" placeholder="Enter admin token"
+                       style="flex:1;min-width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:monospace">
+                <button class="btn btn-primary" @click="saveAdminToken()" style="padding:10px 20px">Save Token</button>
+              </div>
+            </div>
+            <div style="background:var(--warn-bg);padding:16px;border-radius:8px;min-width:200px">
+              <h3 style="margin:0 0 8px 0;color:var(--neutral)">Security Note</h3>
+              <p style="margin:0;font-size:12px;color:var(--neutral)">Tokens are stored in browser session storage and never sent to the server unless required for API requests.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Settings Header with Search and Filters -->
         <div class="insight-card" style="grid-column:1/-1">
           <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -840,25 +859,6 @@
             <span x-show="settingsSearch && settingsGroupFilter"> • </span>
             <span x-show="settingsGroupFilter">Category: <strong x-text="settingsGroupFilter"></strong></span>
             <span> • Showing <strong x-text="filteredSettings.length"></strong> of <strong x-text="settingsList.length"></strong> settings</span>
-          </div>
-        </div>
-        
-        <!-- Admin Token Section -->
-        <div class="insight-card" style="grid-column:1/-1">
-          <div style="display:flex;align-items:flex-start;gap:16px">
-            <div style="flex:1">
-              <h2 style="margin:0 0 8px 0">🔒 Admin Authentication</h2>
-              <p class="kpi-sub" style="margin:0 0 16px 0">Required for refresh operations and settings changes when HELIX_ADMIN_TOKEN is configured on the server.</p>
-              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                <input type="password" x-model="adminToken" placeholder="Enter admin token" 
-                       style="flex:1;min-width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:monospace">
-                <button class="btn btn-primary" @click="saveAdminToken()" style="padding:10px 20px">Save Token</button>
-              </div>
-            </div>
-            <div style="background:var(--warn-bg);padding:16px;border-radius:8px;min-width:200px">
-              <h3 style="margin:0 0 8px 0;color:var(--neutral)">Security Note</h3>
-              <p style="margin:0;font-size:12px;color:var(--neutral)">Tokens are stored in browser session storage and never sent to the server unless required for API requests.</p>
-            </div>
           </div>
         </div>
         

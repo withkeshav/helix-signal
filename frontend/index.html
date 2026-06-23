@@ -163,7 +163,7 @@
     <div class="warning-banner" :class="rateLimitWarning ? 'visible' : ''" x-text="rateLimitWarning"></div>
 
     <!-- Event Ticker -->
-    <div class="event-ticker glass" x-show="false">
+    <div class="event-ticker glass" x-if="false">
       <div class="event-ticker-inner">
         <template x-for="(t, i) in tickerItems" :key="`t-${i}`">
           <span x-text="t"></span>
@@ -342,22 +342,22 @@
                 <div>
                   <span class="kpi-label">Attestation:</span>
                   <span :class="`band-${attSignal.status === 'fresh' ? 'normal' : attSignal.status === 'aging' ? 'watch' : 'risk'}`" x-text="attSignal.label || 'Unknown'"></span>
-                  <span class="kpi-sub" x-show="attSignal.age_days != null" x-text="` · ${attSignal.age_days.toFixed(0)}d`"></span>
+                  <span class="kpi-sub" x-show="attSignal?.age_days != null" x-text="` · ${(attSignal?.age_days??0).toFixed(0)}d`"></span>
                 </div>
                 <div style="margin-top:4px">
                   <span class="kpi-label">Supply Feed:</span>
                   <span :class="`band-${supplyFeed.status === 'fresh' ? 'normal' : supplyFeed.status === 'aging' ? 'watch' : 'risk'}`" x-text="supplyFeed.label || 'Unknown'"></span>
-                  <span class="kpi-sub" x-show="supplyFeed.age_minutes != null" x-text="` · ${supplyFeed.age_minutes.toFixed(0)}m`"></span>
+                  <span class="kpi-sub" x-show="supplyFeed?.age_minutes != null" x-text="` · ${(supplyFeed?.age_minutes??0).toFixed(0)}m`"></span>
                 </div>
                 <div x-show="crossSource.discrepancy_flag" style="margin-top:4px">
                   <span class="kpi-label">Cross-Source:</span>
-                  <span class="band-risk">&Delta; <span x-text="crossSource.max_discrepancy_pct?.toFixed(3)"></span>%</span>
-                  <span class="kpi-sub" x-text="`avg: $${(crossSource.avg_price||0).toFixed(6)}`"></span>
+                  <span class="band-risk">&Delta; <span x-text="crossSource?.max_discrepancy_pct?.toFixed(3)"></span>%</span>
+                  <span class="kpi-sub" x-text="crossSource ? `avg: $${(crossSource.avg_price??0).toFixed(6)}` : ''"></span>
                 </div>
                 <div x-show="!crossSource.discrepancy_flag" style="margin-top:4px">
                   <span class="kpi-label">Cross-Source:</span>
                   <span class="text-green">Agreed</span>
-                  <span class="kpi-sub" x-show="crossSource.avg_price != null" x-text="` · avg: $${crossSource.avg_price.toFixed(6)}`"></span>
+                  <span class="kpi-sub" x-show="crossSource?.avg_price != null" x-text="` · avg: $${(crossSource?.avg_price??0).toFixed(6)}`"></span>
                 </div>
               </div>
         </div>

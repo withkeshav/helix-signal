@@ -7,6 +7,7 @@
 - **ruff lint errors (14)** — Fixed F823 (undefined loop variable), F541 (f-string without placeholders), and E712 (boolean comparison with `== True`/`== False`) across 7 files. Added missing `_day_start()` helper in backfill.py, removed stale import in bot.py, added missing `timedelta` import in brief.py.
 - **Bandit security warnings (4)** — Defused XML parsing in osint.py (`defusedxml.ElementTree`); `# nosec` on dev-only 0.0.0.0 binding in main.py; `# nosec` on hardcoded table name SQL in admin.py; `usedforsecurity=False` on MD5 cache key hashes in cache.py.
 - **Settings auto-reload** — `adminToken` `$watch` in `useGovernance.js init()` now triggers `loadSettings()` automatically when the admin token is saved, eliminating the need to manually reload the page.
+- **Frontend runtime errors** — Fixed 8 production JS errors in Alpine + Chart.js + ECharts. `tickerItems` undefined: replaced `x-show="false"` with `x-if="false"` on event ticker to prevent Alpine expression evaluation. `toFixed` on undefined/null: added optional chaining (`?.`) and nullish coalescing (`??`) guards on `attSignal.age_days`, `supplyFeed.age_minutes`, `crossSource.avg_price`. Chart canvas reuse: added `Chart.getChart(id)?.destroy()` before `new Chart()` in all chart renderers. `_disposeAllCharts`/resize handler: guarded `this._echarts` and `destroyForecastCharts` with existence checks.
 
 ### Changed
 

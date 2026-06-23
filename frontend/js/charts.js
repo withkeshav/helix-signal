@@ -10,18 +10,20 @@ export function _disposeChart(c) {
 }
 
 export function destroyCharts() {
+  if (!this._charts) return;
   for (const [, c] of this._charts) this._disposeChart(c);
   this._charts.clear();
 }
 
 export function destroyForecastCharts() {
+  if (!this._echarts) return;
   for (const [, c] of this._echarts) this._disposeChart(c);
   this._echarts.clear();
 }
 
 export function _disposeAllCharts() {
   this.destroyCharts();
-  this.destroyForecastCharts();
+  if (typeof this.destroyForecastCharts === 'function') this.destroyForecastCharts();
   if (window._helixResizeHandler) {
     window.removeEventListener('resize', window._helixResizeHandler);
     window._helixResizeHandler = null;
@@ -31,17 +33,22 @@ export function _disposeAllCharts() {
 export function _setupResizeHandler() {
   if (window._helixResizeHandler) return;
   window._helixResizeHandler = () => {
-    for (const [, c] of this._charts) {
-      if (typeof c.resize === 'function') c.resize();
+    if (this._charts) {
+      for (const [, c] of this._charts) {
+        if (typeof c.resize === 'function') c.resize();
+      }
     }
-    for (const [, c] of this._echarts) {
-      if (typeof c.isDisposed === 'function' && !c.isDisposed()) c.resize();
+    if (this._echarts) {
+      for (const [, c] of this._echarts) {
+        if (typeof c.isDisposed === 'function' && !c.isDisposed()) c.resize();
+      }
     }
   };
   window.addEventListener('resize', window._helixResizeHandler);
 }
 
 export function renderCharts(data) {
+  if (!this._charts) this._charts = new Map();
   this.destroyCharts();
   if (typeof Chart === 'undefined') return;
   const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
@@ -71,6 +78,7 @@ export function loadTrendChart() {
         const el = document.getElementById('chart-trend-signal');
         if (!el) return;
         if (this._charts.has('chart-trend-signal')) this._disposeChart(this._charts.get('chart-trend-signal'));
+        if (typeof Chart.getChart === 'function') Chart.getChart('chart-trend-signal')?.destroy();
         const pts = t.points.map(p => ({ x: new Date(p.timestamp).getTime(), y: p.signal_score != null ? Number(p.signal_score) : null }));
         this._charts.set('chart-trend-signal', new Chart(el.getContext('2d'), {
           type: 'line',
@@ -86,10 +94,11 @@ export function loadTrendChart() {
 }
 
 export function _makeBar(canvasId, labels, values, color) {
+  if (!this._charts) this._charts = new Map();
   if (this._charts.has(canvasId)) this._disposeChart(this._charts.get(canvasId));
   const el = document.getElementById(canvasId);
   if (!el || typeof Chart === 'undefined') return;
-  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#9aa8c4';
+  if (typeof Chart.getChart === 'function') Chart.getChart(canvasId)?.destroy();
   this._charts.set(canvasId, new Chart(el.getContext('2d'), {
     type: 'bar', data: { labels, datasets: [{ label: '', data: values, backgroundColor: color, borderRadius: 4 }] },
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } } } },
@@ -99,6 +108,7 @@ export function _makeBar(canvasId, labels, values, color) {
 export function renderSentimentChart(series) {
   if (!series || !series.length || typeof Chart === 'undefined') return;
   if (this._charts.has('chart-sentiment')) this._disposeChart(this._charts.get('chart-sentiment'));
+  if (typeof Chart.getChart === 'function') Chart.getChart('chart-sentiment')?.destroy();
   const el = document.getElementById('chart-sentiment');
   if (!el) return;
   const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
@@ -143,9 +153,9 @@ export function _renderForecastChartsImpl() {
 }
 
 export function _renderForecastCanvas(el, title, historical, forecast, baseConfig, textColor, lineColor) {
-  if (this._echarts.has(el.id)) { this._disposeChart(this._echarts.get(el.id)); this._echarts.delete(el.id); }
+  if (this._echarts?.has(el.id)) { this._disposeChart(this._echarts.get(el.id)); this._echarts?.delete(el.id); }
   const chart = echarts.init(el);
-  this._echarts.set(el.id, chart);
+  if (this._echarts) this._echarts.set(el.id, chart);
   const series = forecast && forecast.length
     ? [
         { name: 'q10 base', type: 'line', data: forecast.map(p => [p.timestamp, p.q10 ?? p.q50 * 0.997]), lineStyle: { opacity: 0 }, itemStyle: { opacity: 0 }, stack: 'confidence', areaStyle: { color: 'rgba(59,130,246,0.06)' }, symbol: 'none' },
@@ -167,6 +177,7 @@ export async function renderSupplyChart() {
   const el = document.getElementById('chart-supply-trend');
   if (!el) return;
   if (this._charts.has('chart-supply-trend')) this._disposeChart(this._charts.get('chart-supply-trend'));
+  if (typeof Chart.getChart === 'function') Chart.getChart('chart-supply-trend')?.destroy();
   const pts = d.points.filter(p => p.total_supply != null).map(p => ({ x: new Date(p.timestamp).getTime(), y: Number(p.total_supply) }));
   const primary = getComputedStyle(document.documentElement).getPropertyValue('--spark').trim() || '#60a5fa';
   this._charts.set('chart-supply-trend', new Chart(el.getContext('2d'), {

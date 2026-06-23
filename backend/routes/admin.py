@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 # Safe env vars — allowlist only, never expose secrets
 _DIAGNOSTICS_ALLOWLIST = frozenset({
     "HELIX_VERSION", "HELIX_ENV", "AI_MODE", "PYTHON_VERSION",
-    "FEATURE_TELEGRAM_BOT", "ENABLE_CHAINLINK", "ENABLE_REDIS_CACHE",
+    "ENABLE_CHAINLINK", "ENABLE_REDIS_CACHE",
     "HELIX_DISABLE_BACKGROUND_TASKS",
 })
 

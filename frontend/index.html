@@ -87,7 +87,7 @@
         <div class="kpi-label">Supply</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" x-text="$store.dashboard.totalSupply != null ? '$' + Number($store.dashboard.totalSupply).toLocaleString(undefined,{maximumFractionDigits:2}) : 'N/A'"></div>
+            <div class="kpi-value" x-text="$store.dashboard.totalSupply != null ? formatUsd($store.dashboard.totalSupply) : 'N/A'"></div>
             <div class="kpi-trend" :class="$store.dashboard.supplyChange!=null?($store.dashboard.supplyChange>=0?'text-green':'text-red'):''" x-text="$store.dashboard.supplyChange!=null?`${$store.dashboard.supplyChange>=0?'+':''}${$store.dashboard.supplyChange.toFixed(2)}% 24h`:''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--up)">
@@ -107,7 +107,7 @@
         <div class="kpi-label">Fresh</div>
         <div class="kpi-row-inner">
           <div>
-            <div class="kpi-value" :class="$store.dashboard.freshness.status==='Fresh'?'text-green':$store.dashboard.freshness.status==='Aging'?'band-watch':'text-red'" x-text="$store.dashboard.freshness.status||'--'"></div>
+            <div class="kpi-value" :class="freshnessBandClass($store.dashboard.freshness.status)" x-text="formatFreshnessLabel($store.dashboard.freshness.status)"></div>
             <div class="kpi-trend" x-text="$store.dashboard.freshness.age_minutes!=null?`${$store.dashboard.freshness.age_minutes.toFixed(0)}m ago`:''"></div>
           </div>
         </div>
@@ -265,7 +265,7 @@
               <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
               <span>
                 <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
-                <span x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="p.dominance_shift"></span>
+                <span x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="formatDisplayName(p.dominance_shift)"></span>
               </span>
             </div>
           </template>
@@ -291,20 +291,20 @@
           <div class="token-card glass" :class="a===asset?'token-active':''" @click="switchTo(a)">
             <div class="token-header">
               <span class="token-symbol" x-text="a"></span>
-              <span class="token-score" :class="a===asset?'band-'+((signal.band||'normal').toLowerCase()):''" x-text="a===asset?`${signal.score??'--'}/100`:''"></span>
+              <span class="token-score" :class="asset===a?'band-'+((assetScore(a).band||'normal').toLowerCase()):''" x-text="assetScore(a).score!=null?`${assetScore(a).score}/100`:''"></span>
             </div>
             <div class="token-stats">
               <div class="token-stat">
                 <span class="kpi-label">Supply</span>
-                <span class="token-stat-value" x-text="a===asset?formatUsd(totalSupply):'--'"></span>
+                <span class="token-stat-value" x-text="assetSupply(a)!=null?formatUsd(assetSupply(a)):'--'"></span>
               </div>
               <div class="token-stat">
                 <span class="kpi-label">Peg</span>
-                <span class="token-stat-value" x-text="a===asset?(depeg.current_price?.toFixed(4)??'--'):'--'"></span>
+                <span class="token-stat-value" x-text="assetDepeg(a).current_price!=null?assetDepeg(a).current_price.toFixed(4):'--'"></span>
               </div>
               <div class="token-stat">
                 <span class="kpi-label">Chains</span>
-                <span class="token-stat-value" x-text="a===asset?(chains?.length||'--'):'--'"></span>
+                <span class="token-stat-value" x-text="assetChains(a).length||'--'"></span>
               </div>
             </div>
             <div class="token-bar" x-show="a===asset&&chains?.length">
@@ -327,11 +327,19 @@
       <div class="insight-grid">
         <div class="insight-card">
           <h2>Risk Components</h2>
-          <ul style="margin:0;padding-left:16px;font-size:13px;line-height:1.6">
+          <div style="display:flex;flex-direction:column;gap:10px">
             <template x-for="(c, name) in signal.components || {}" :key="name">
-              <li><span x-text="name.replace(/_/g,' ')"></span>: <code x-text="`${c.score ?? '--'} (${Math.round((c.weight || 0) * 100)}%)`"></code></li>
+              <div x-show="c.score != null && c.weight != null">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+                  <span x-text="name.replace(/_/g,' ')"></span>
+                  <span><strong x-text="c.score"></strong> <span class="kpi-sub" x-text="`(${Math.round((c.weight||0)*100)}%)`"></span></span>
+                </div>
+                <div style="height:8px;background:var(--line);border-radius:4px;overflow:hidden">
+                  <div :style="`width:${Math.min(100,c.score||0)}%;height:100%;background:var(--spark);border-radius:4px`"></div>
+                </div>
+              </div>
             </template>
-          </ul>
+          </div>
         </div>
         <div class="insight-card">
           <h2>Attestation &amp; Supply Feed</h2>
@@ -438,14 +446,16 @@
         <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
         <div class="chart-wrap xl" id="chart-peg-forecast" style="position:relative">
           <div x-show="loadingForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
-          <div x-show="!loadingForecast && !errorForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data</div>
+          <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress. Enable in Settings or check back soon.</div>
+          <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data available yet</div>
         </div>
       </div>
       <div class="chart-card">
         <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
         <div class="chart-wrap xl" id="chart-supply-forecast" style="position:relative">
           <div x-show="loadingForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
-          <div x-show="!loadingForecast && !errorForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data</div>
+          <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress.</div>
+          <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data available yet</div>
         </div>
       </div>
       <div class="insight-grid">
@@ -568,8 +578,26 @@
     </div>
 
     <!-- Tab: Intel -->
-    <div class="tab-content" :class="tab === 'intel' && 'active'" x-data="osint" role="tabpanel" id="tab-intel">
+    <div class="tab-content" :class="tab === 'intel' && 'active'" x-data="smidgePanel" x-init="init()" role="tabpanel" id="tab-intel">
       <div class="insight-grid">
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>SMIDGE Score Card</h2>
+          <div x-show="loadingSmidge" class="kpi-sub"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading SMIDGE...</div>
+          <div x-show="errorSmidge" class="warning-banner visible" x-text="errorSmidge" style="margin-bottom:8px"></div>
+          <div x-show="!loadingSmidge && smidge?.available" style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:center">
+            <div id="chart-smidge-radar" class="chart-wrap" style="height:320px"></div>
+            <div style="font-size:13px;line-height:1.8">
+              <template x-for="(label, key) in (smidge?.labels || {})" :key="key">
+                <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0">
+                  <span x-text="`${key} — ${label}`"></span>
+                  <strong x-text="smidge?.dimensions?.[key] ?? '--'"></strong>
+                </div>
+              </template>
+              <div style="margin-top:8px;font-weight:600">Composite: <span x-text="smidge?.composite_score ?? '--'"></span>/100</div>
+            </div>
+          </div>
+          <div x-show="!loadingSmidge && !errorSmidge && !smidge?.available" class="kpi-sub">SMIDGE data unavailable for this asset</div>
+        </div>
         <div class="insight-card">
           <h2>Attestation Reports</h2>
           <template x-for="(a, sym) in attestation" :key="sym">
@@ -591,13 +619,13 @@
         </div>
         <div class="insight-card">
           <h2>Cross-Source Price</h2>
-          <template x-for="c in ($store.dashboard.chains||[])" :key="c.chain_name">
+          <template x-for="row in ($store.dashboard.crossSource.sources || [])" :key="row.source">
             <div class="signal-item">
-              <span x-text="c.chain_name"></span>
-              <span x-text="c.price != null ? `$${c.price.toFixed(6)}` : 'N/A'" :class="c.price && Math.abs(c.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
+              <span x-text="row.source"></span>
+              <span x-text="row.price != null ? `$${Number(row.price).toFixed(6)}` : 'N/A'" :class="row.price && Math.abs(row.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
             </div>
           </template>
-          <div x-show="!($store.dashboard.chains||[]).length" class="kpi-sub" style="padding:8px 0">No chain data</div>
+          <div x-show="!($store.dashboard.crossSource.sources||[]).length" class="kpi-sub" style="padding:8px 0">No cross-source prices</div>
           <div x-show="$store.dashboard.crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
             Discrepancy: <strong x-text="`${$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
           </div>
@@ -649,7 +677,7 @@
           <h2>Data Freshness</h2>
           <div class="kpi-card" style="text-align:center;margin-bottom:8px">
             <div class="kpi-label">Overall Status</div>
-            <div class="kpi-value" :class="freshness.status === 'Fresh' ? 'text-green' : freshness.status === 'Aging' ? 'band-watch' : 'text-red'" x-text="freshness.status || 'Unknown'"></div>
+            <div class="kpi-value" :class="freshnessBandClass(freshness.status)" x-text="formatFreshnessLabel(freshness.status)"></div>
           </div>
           <div style="font-size:13px;line-height:1.7">
             <div><span class="kpi-label">Age:</span> <span x-text="freshness.age_minutes != null ? `${freshness.age_minutes.toFixed(1)} min` : 'N/A'"></span></div>
@@ -1660,8 +1688,9 @@
     <!-- Footer -->
     <footer class="footer">
       <span x-text="`Generated ${$store.dashboard.generatedAt}`"></span>
-      <span x-show="$store.dashboard.freshness.status === 'Stale'" class="pill source-down">stale</span>
-      <span x-show="$store.dashboard.freshness.status === 'Fresh'" class="pill source-ok">fresh</span>
+      <span x-show="freshnessBandClass($store.dashboard.freshness.status)==='text-red'" class="pill source-down" x-text="formatFreshnessLabel($store.dashboard.freshness.status).toLowerCase()"></span>
+      <span x-show="freshnessBandClass($store.dashboard.freshness.status)==='text-green'" class="pill source-ok">fresh</span>
+      <span x-show="freshnessBandClass($store.dashboard.freshness.status)==='band-watch'" class="pill source-watch">aging</span>
       <template x-for="s in ($store.dashboard.sources||[])" :key="s.source_name">
         <span class="pill" :class="`source-${s.status}`" x-text="`${s.source_name}: ${s.status}`"></span>
       </template>

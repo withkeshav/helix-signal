@@ -12,7 +12,7 @@ from database import AssetChainSnapshot, AssetTrendSnapshot, SignalEvent
 
 log = get_logger(__name__)
 
-ENABLED = os.getenv("ENABLE_ANOMALY_DETECTION", "").strip().lower() in ("1", "true", "yes")
+ENABLED = os.getenv("ENABLE_ANOMALY_DETECTION", "true").strip().lower() in ("1", "true", "yes")
 
 
 def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 30) -> dict[str, Any]:
@@ -44,6 +44,44 @@ def _std_floor() -> float:
     except Exception:
         pass
     return float(os.getenv("ANOMALY_STD_FLOOR", "0.001"))
+
+
+def _adaptive_zscore_threshold(values: list[float], base: float = 3.0) -> float:
+    """Widen threshold in high-vol regimes, tighten in calm regimes."""
+    if len(values) < 10:
+        return base
+    import numpy as np
+    arr = np.array(values)
+    vol = float(np.std(arr))
+    mean = float(np.mean(np.abs(arr))) or 1.0
+    ratio = vol / mean
+    if ratio > 0.15:
+        return base + 0.5
+    if ratio < 0.03:
+        return max(2.0, base - 0.5)
+    return base
+
+
+def _contamination_for_asset(db: Session, asset_symbol: str) -> float:
+    from providers.settings import get_setting
+    override = get_setting("anomaly_contamination_override", db)
+    if override and float(override) > 0:
+        return float(override)
+    from database import AssetTrendSnapshot
+    first = (
+        db.query(AssetTrendSnapshot)
+        .filter(AssetTrendSnapshot.asset_symbol == asset_symbol.upper())
+        .order_by(AssetTrendSnapshot.timestamp.asc())
+        .first()
+    )
+    if first is None:
+        return 0.01
+    age_days = (datetime.now(timezone.utc) - first.timestamp).days
+    if age_days < 90:
+        return 0.01
+    if age_days > 365:
+        return 0.03
+    return 0.02
 
 
 def zscore_detect(values: list[float], threshold: float = 3.0, min_bps: float = 0.0) -> list[dict[str, Any]]:
@@ -136,9 +174,9 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     bridge = _check_bridge_flow(db, asset_symbol=asset_symbol)
     results["bridge_flow"] = bridge
 
-    supply_anomalies = zscore_detect(history["supplies"], threshold=3.5, min_bps=15.0)
-    price_anomalies = zscore_detect(history["prices"], threshold=2.5, min_bps=5.0)
-    depeg_anomalies = zscore_detect(history["depeg_indices"], threshold=2.5, min_bps=5.0)
+    supply_anomalies = zscore_detect(history["supplies"], threshold=_adaptive_zscore_threshold(history["supplies"], 3.5), min_bps=15.0)
+    price_anomalies = zscore_detect(history["prices"], threshold=_adaptive_zscore_threshold(history["prices"], 2.5), min_bps=5.0)
+    depeg_anomalies = zscore_detect(history["depeg_indices"], threshold=_adaptive_zscore_threshold(history["depeg_indices"], 2.5), min_bps=5.0)
     results["z_score"] = {
         "supply": supply_anomalies,
         "price": price_anomalies,
@@ -159,7 +197,7 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
             float(history["concentration_scores"][i]) if i < len(history["concentration_scores"]) else 0.0,
         ]
         features.append(row)
-    if_anomalies = isolation_forest_detect(features)
+    if_anomalies = isolation_forest_detect(features, contamination=_contamination_for_asset(db, asset_symbol))
     results["isolation_forest"] = {"anomaly_indices": if_anomalies, "point_count": len(features)}
 
     normalized: list[dict[str, Any]] = []
@@ -282,6 +320,44 @@ def detect_change_points(
         "total_change_points": total_changes,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
+
+
+def emit_cusum_regime_events(db: Session, *, asset_symbol: str) -> int:
+    """Emit regime_shift events when CUSUM detects >3 change points in 24h window."""
+    cp = detect_change_points(db, asset_symbol=asset_symbol, window_days=1)
+    if not cp.get("available"):
+        return 0
+    total = int(cp.get("total_change_points") or 0)
+    if total < 3:
+        return 0
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    existing = (
+        db.query(SignalEvent)
+        .filter(
+            SignalEvent.asset_symbol == asset_symbol.upper(),
+            SignalEvent.event_type == "regime_shift",
+            SignalEvent.timestamp >= cutoff,
+        )
+        .count()
+    )
+    if existing:
+        return 0
+    row = SignalEvent(
+        asset_symbol=asset_symbol.upper(),
+        chain_key=None,
+        event_type="regime_shift",
+        severity="warning",
+        title=f"{asset_symbol.upper()} regime shift detected",
+        summary=f"CUSUM detected {total} change points in the last 24h across supply/depeg/concentration.",
+        old_value=None,
+        new_value=str(total),
+        delta=None,
+        threshold="3",
+        timestamp=datetime.now(timezone.utc),
+    )
+    db.add(row)
+    db.commit()
+    return 1
 
 
 def get_recent_anomaly_count(db: Session, *, asset_symbol: str, days: int = 7) -> int:

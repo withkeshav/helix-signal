@@ -7,13 +7,44 @@ from signal_engine.components.peg_analysis import depeg_index_score, peg_deviati
 from signal_engine.components.concentration import concentration_component
 from signal_engine.components.supply_momentum import supply_momentum_component
 
-# ASSET-LEVEL SIGNAL SCORE WEIGHTS
+# ASSET-LEVEL SIGNAL SCORE WEIGHTS (5-component architecture)
 # depeg_index    0.35  (peg deviation pressure)
-# concentration  0.25  (chain supply concentration)
-# velocity       0.20  (supply momentum)
+# concentration  0.20  (chain supply concentration)
+# velocity       0.15  (supply momentum)
+# liquidity      0.10  (DEX depth / slippage)
 # age_penalty    0.20  (data staleness)
-# Note: chain-level scores use different weights (depeg 0.40, share 0.40, momentum 0.20)
-# See docs/scoring-design.md for rationale.
+def liquidity_depth_score(slippage_100k_bps: float = 0.0) -> int:
+    """Score liquidity depth from estimated 100k USD trade slippage (bps). Lower slippage = lower risk."""
+    bps = abs(float(slippage_100k_bps or 0))
+    if bps <= 5:
+        return 0
+    if bps <= 15:
+        return 25
+    if bps <= 40:
+        return 50
+    if bps <= 100:
+        return 75
+    return 100
+
+
+def _age_penalty_score(age_seconds: float) -> tuple[int, dict[str, Any]]:
+    """4-tier freshness penalty model."""
+    age = float(age_seconds or 0)
+    if age < 3600:
+        score = 0
+        tier = "fresh"
+    elif age < 7200:
+        score = 10
+        tier = "aging"
+    elif age < 86400:
+        score = 15
+        tier = "stale"
+    else:
+        score = 20
+        tier = "very_stale"
+    return score, {"age_seconds": age, "tier": tier}
+
+
 def compute_risk_score(**kwargs) -> Dict[str, Any]:
     depeg_score = kwargs.get("depeg_index")
     if depeg_score is None:
@@ -24,7 +55,10 @@ def compute_risk_score(**kwargs) -> Dict[str, Any]:
     conc_detail = {}
     if concentration_score is None:
         chain_shares = kwargs.get("chain_shares", [])
-        concentration_score, conc_detail = concentration_component(chain_shares)
+        concentration_score, conc_detail = concentration_component(
+            chain_shares,
+            top3_dex_pool_share=kwargs.get("top3_dex_pool_share"),
+        )
     elif "top_chain_share_pct" in kwargs:
         conc_detail = {"top_chain_share_pct": kwargs["top_chain_share_pct"]}
 
@@ -35,38 +69,49 @@ def compute_risk_score(**kwargs) -> Dict[str, Any]:
 
     velocity_component = 0
     vel_detail = {}
-    if supply_velocity_1h > 0:
-        velocity_component += min(25, abs(supply_velocity_1h) * 5)
-    if supply_velocity_4h > 0:
-        velocity_component += min(15, abs(supply_velocity_4h) * 3)
+    # Contracting supply (negative velocity) contributes equally via abs()
+    if supply_velocity_1h != 0:
+        velocity_component += min(25, abs(float(supply_velocity_1h)) * 5)
+    if supply_velocity_4h != 0:
+        velocity_component += min(15, abs(float(supply_velocity_4h)) * 3)
     vel_detail["supply_velocity_1h"] = supply_velocity_1h
     vel_detail["supply_velocity_4h"] = supply_velocity_4h
     vel_detail["supply_accel_1h"] = kwargs.get("supply_accel_1h", 0) or 0
 
-    age_penalty = 0
-    age_detail = {}
-    if age_seconds > 3600:
-        age_penalty = min(20, (age_seconds / 3600) * 2)
-    age_detail["age_seconds"] = age_seconds
+    liq_score = kwargs.get("liquidity_depth_score")
+    if liq_score is None:
+        liq_score = liquidity_depth_score(kwargs.get("slippage_100k_bps", 0) or 0)
 
-    base_score = (depeg_score * 0.35 +
-                  concentration_score * 0.25 +
-                  velocity_component * 0.20 +
-                  age_penalty * 0.20)
+    age_penalty, age_detail = _age_penalty_score(age_seconds)
+
+    base_score = (
+        depeg_score * 0.35
+        + concentration_score * 0.20
+        + velocity_component * 0.15
+        + liq_score * 0.10
+        + age_penalty * 0.20
+    )
 
     final_score = max(0, min(100, base_score))
     band = _score_to_band(final_score)
 
     components = {
-        "depeg_index": {"score": int(depeg_score), "weight": 0.35,
-                        "detail": {"price": kwargs.get("price"),
-                                   "deviation_pct": kwargs.get("price") and round(abs(kwargs["price"] - 1.0) * 100, 4)}},
-        "concentration": {"score": int(concentration_score), "weight": 0.25,
-                          "detail": conc_detail},
-        "velocity": {"score": int(velocity_component), "weight": 0.20,
-                     "detail": vel_detail},
-        "age_penalty": {"score": int(age_penalty), "weight": 0.20,
-                        "detail": age_detail},
+        "depeg_index": {
+            "score": int(depeg_score),
+            "weight": 0.35,
+            "detail": {
+                "price": kwargs.get("price"),
+                "deviation_pct": kwargs.get("price") and round(abs(kwargs["price"] - 1.0) * 100, 4),
+            },
+        },
+        "concentration": {"score": int(concentration_score), "weight": 0.20, "detail": conc_detail},
+        "velocity": {"score": int(velocity_component), "weight": 0.15, "detail": vel_detail},
+        "liquidity_depth": {
+            "score": int(liq_score),
+            "weight": 0.10,
+            "detail": {"slippage_100k_bps": kwargs.get("slippage_100k_bps", 0)},
+        },
+        "age_penalty": {"score": int(age_penalty), "weight": 0.20, "detail": age_detail},
         "source_health": "OK" if source_ok else "DEGRADED",
     }
 
@@ -76,6 +121,7 @@ def compute_risk_score(**kwargs) -> Dict[str, Any]:
         "components": components,
     }
 
+
 def _score_to_band(score: float) -> str:
     if score <= 20:
         return "Normal"
@@ -83,11 +129,12 @@ def _score_to_band(score: float) -> str:
         return "Watch"
     return "Alert"
 
+
 def compute_freshness(
     source_status: str,
     last_successful_fetch: datetime | None,
     newest_chain_snapshot: datetime | None,
-    refresh_interval_seconds: int
+    refresh_interval_seconds: int,
 ) -> Dict[str, Any]:
     basis_timestamp = newest_chain_snapshot or last_successful_fetch
     basis = "chain_snapshot" if newest_chain_snapshot else "source_fetch"

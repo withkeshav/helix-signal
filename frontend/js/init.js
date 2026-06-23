@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { formatUsd, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from './utils.js';
 import { registerDashboardStore } from 'stores/dashboard.js';
 import { registerUiStore } from 'stores/ui.js';
 import { registerOsintStore } from 'stores/osint.js';
@@ -9,6 +10,7 @@ import { useForecast } from 'composables/useForecast.js';
 import { useMarket } from 'composables/useMarket.js';
 import { useQuality } from 'composables/useQuality.js';
 import { useHealth } from 'composables/useHealth.js';
+import { useSMIDGE } from 'composables/useSMIDGE.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -21,6 +23,7 @@ Alpine.data('forecast', useForecast);
 Alpine.data('market', useMarket);
 Alpine.data('qualityDashboard', useQuality);
 Alpine.data('healthDashboard', useHealth);
+Alpine.data('smidgePanel', useSMIDGE);
 
 // Minimal root application component
 Alpine.data('helixApp', () => ({
@@ -44,7 +47,12 @@ Alpine.data('helixApp', () => ({
   evidenceFormula: '',
   evidenceComponents: {},
   evidenceSources: {},
-  
+  formatUsd,
+  formatFreshnessLabel,
+  freshnessBandClass,
+  formatDisplayName,
+  depegVelocityMeta,
+
   async init() {
     const root = document.documentElement;
     this.theme = root.getAttribute('data-theme') || 'light';

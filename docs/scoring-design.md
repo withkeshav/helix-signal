@@ -8,12 +8,19 @@ Used in `compute_risk_score()` (`signal_engine/components/composite_scoring.py`)
 
 | Component       | Weight | Source |
 |-----------------|--------|--------|
-| Depeg index     | 0.35   | `peg_analysis.py` |
-| Concentration   | 0.25   | `concentration.py` |
-| Supply velocity | 0.20   | `supply_momentum.py` |
-| Age penalty     | 0.20   | inline in `composite_scoring.py` |
+| Depeg index     | 0.35   | `peg_analysis.py` (continuous interpolation) |
+| Concentration   | 0.20   | `concentration.py` (crypto HHI + DEX pool share) |
+| Supply velocity | 0.15   | `risk_inputs.inject_velocity()` → `composite_scoring.py` |
+| Liquidity depth | 0.10   | `liquidity_depth_score()` from `slippage_100k_bps` |
+| Age penalty     | 0.20   | 4-tier freshness model in `composite_scoring.py` |
 
-**Band thresholds:** ≤20 Normal, ≤60 Watch, >60 Alert.
+**Velocity:** Contracting supply (negative %) contributes via `abs(velocity)` — no directional guard.
+
+**Depeg index:** Linear interpolation between breakpoints `[(0,0), (0.1,0), (0.5,25), (1.0,50), (2.0,75), (4.0,100)]`.
+
+**Age penalty tiers:** fresh (<1h)=0, aging (<2h)=10, stale (<24h)=15, very stale (≥24h)=20.
+
+**Band thresholds:** ≤20 Normal, ≤60 Watch, >60 Alert (from `_score_to_band` in composite_scoring.py).
 
 ## Chain-Level Score
 
@@ -23,17 +30,18 @@ Used in `chain_row_signal()` (`signal_engine/scoring.py`). Applied per chain wit
 |-----------------|--------|--------|
 | Chain share     | 0.40   | supply share % binned into tiers |
 | Depeg index     | 0.40   | `peg_analysis.py` |
-| Momentum        | 0.20   | `supply_momentum.py` |
-
-**Why different weights?** At the chain level, concentration is expressed directly as `chain_share_pct` (if a single chain holds 50%+ of supply, it contributes maximum risk). The asset-level concentration component aggregates across all chains using the Herfindahl-style `concentration_component()`. Asset-level age penalty is omitted at the chain level because chain snapshots are fresher by nature.
+| Momentum        | 0.20   | `supply_momentum_component()` via `momentum_score_hint` |
 
 **Band thresholds:** same as asset-level — ≤20 Normal, ≤60 Watch, >60 Alert (via `composite_band()`).
 
 ## Health Flag
 
-`source_health` is returned as a string (`"OK"` or `"DEGRADED"`) in the `components` dict. It is **not** a score modifier — it surfaces as a UI flag so operators can see when a data source is unhealthy without it silently biasing the numeric score.
+`source_health` is returned as a string (`"OK"` or `"DEGRADED"`) in the `components` dict. It is **not** a weighted score component.
 
-## Data Sources
+## Regime Classification (Predictive)
 
-- **FRED SERIES_MAP** — Authoritative source for economic indicator definitions in the FRED API integration
-- **Web3 RPC guard** — RPC responses are checked for missing result/error keys to prevent crashes on malformed responses
+`services/predictive.py` `_regime_state`: stable / volatile (≥40) / alert (≥61) / crisis (≥80).
+
+## Webhook Alerts
+
+Signal events emitted during `persist_trends_and_events` can be forwarded to external webhooks. See [webhook-alerts.md](guides/webhook-alerts.md).

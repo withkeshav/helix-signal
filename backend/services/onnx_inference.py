@@ -6,7 +6,23 @@ import os
 from pathlib import Path
 from typing import Any
 
+from structlog import get_logger
+
+log = get_logger(__name__)
+
 _SESSION = None
+_FALLBACK_WARNED = False
+
+
+def _warn_heuristic_fallback(*, path: str, detail: str) -> None:
+    global _FALLBACK_WARNED
+    if _FALLBACK_WARNED:
+        return
+    _FALLBACK_WARNED = True
+    if path:
+        log.warning(f"ONNX depeg model not found at {path} ({detail}); using heuristic fallback")
+    else:
+        log.warning(f"ONNX depeg model not configured ({detail}); using heuristic fallback")
 
 
 def _get_session():
@@ -15,14 +31,17 @@ def _get_session():
         return _SESSION
     path = os.getenv("ONNX_DEPEG_MODEL_PATH", "").strip()
     if not path:
+        _warn_heuristic_fallback(path="", detail="ONNX_DEPEG_MODEL_PATH not set")
         return None
     if not Path(path).is_file():
+        _warn_heuristic_fallback(path=path, detail="file not found")
         return None
     try:
         import onnxruntime as ort
         _SESSION = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
         return _SESSION
-    except Exception:
+    except Exception as exc:
+        _warn_heuristic_fallback(path=path, detail=f"unloadable: {exc}")
         return None
 
 
@@ -33,14 +52,16 @@ def build_feature_vector(
     concentration_score: int = 0,
     depeg_index: int,
     cross_source_discrepancy_pct: float = 0.0,
+    supply_velocity_1h: float | None = None,
 ) -> list[float]:
     price_dev = abs((price or 1.0) - 1.0) * 10000.0
+    vel = abs(float(supply_velocity_1h or 0.0))
     return [
         float(price_dev),
         float(signal_score),
         float(concentration_score),
         float(depeg_index),
-        0.0,
+        vel,
     ]
 
 

@@ -40,8 +40,7 @@ from schemas import (
 from schemas import TrendPointOut, TrendSummaryOut
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol
-from signal_engine.risk_inputs import build_risk_score_kwargs
-from services.velocity import compute_supply_velocity
+from signal_engine.risk_inputs import build_risk_score_kwargs, inject_velocity
 from utils import utc_normalize, window_delta
 
 
@@ -196,13 +195,7 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         age_seconds=freshness_dict.get("age_seconds"),
         refresh_interval_seconds=refresh_interval,
     )
-    supply_velocity = compute_supply_velocity(db, asset_symbol=selected_symbol, window_hours=24)
-    if supply_velocity.get("available"):
-        vel = supply_velocity.get("velocity", {})
-        acc = supply_velocity.get("acceleration", {})
-        risk_kwargs["supply_velocity_1h"] = vel.get("1h")
-        risk_kwargs["supply_velocity_4h"] = vel.get("4h")
-        risk_kwargs["supply_accel_1h"] = acc.get("1h")
+    risk_kwargs = inject_velocity(db, risk_kwargs, asset_symbol=selected_symbol)
 
     conc_s, conc_detail = scoring.concentration_component(
         chain_shares,
@@ -313,15 +306,27 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
     prices_ds = [c.price_dexscreener for c in chains_orm if c.price_dexscreener is not None]
     all_prices = prices_all + prices_cg + prices_ds
     cross_source = CrossSourceSignalOut()
+    source_rows: list[dict] = []
+    ref_chain = next((c for c in chains_orm if c.price is not None or c.price_coingecko or c.price_dexscreener), None)
+    if ref_chain:
+        if ref_chain.price is not None:
+            source_rows.append({"source": "DeFiLlama", "price": ref_chain.price})
+        if ref_chain.price_coingecko is not None:
+            source_rows.append({"source": "CoinGecko", "price": ref_chain.price_coingecko})
+        if ref_chain.price_dexscreener is not None:
+            source_rows.append({"source": "DexScreener", "price": ref_chain.price_dexscreener})
     if len(all_prices) >= 2:
         avg_p = sum(all_prices) / len(all_prices)
         max_disc = max(abs(p - avg_p) / avg_p * 100 if avg_p else 0 for p in all_prices)
         cross_source = CrossSourceSignalOut(
-            sources_agreeing=len(all_prices),
+            sources_agreeing=len(source_rows) or len(all_prices),
             max_discrepancy_pct=round(max_disc, 4),
             discrepancy_flag=max_disc > 0.5,
             avg_price=round(avg_p, 6),
+            sources=source_rows,
         )
+    elif source_rows:
+        cross_source = CrossSourceSignalOut(sources=source_rows, sources_agreeing=len(source_rows))
 
     supply_feed = SupplyFeedOut()
     defillama_source = next((s for s in sources_orm if s.source_name == "defillama"), None)

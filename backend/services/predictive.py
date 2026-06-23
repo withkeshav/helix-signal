@@ -23,7 +23,7 @@ def _expected_shortfall(returns: list[float], alpha: float = 0.95) -> float | No
     return round(sum(tail) / len(tail), 4)
 
 
-def _historical_price_returns(db: Session, asset_symbol: str, limit: int = 30) -> list[float]:
+def _historical_price_returns(db: Session, asset_symbol: str, limit: int = 288) -> list[float]:
     history = (
         db.query(AssetTrendSnapshot)
         .filter(AssetTrendSnapshot.asset_symbol == asset_symbol.upper())
@@ -66,11 +66,21 @@ def _depeg_probability_heuristic(
 
 
 def _regime_state(*, signal_score: int, depeg_index: int) -> str:
-    if signal_score >= 70 or depeg_index >= 85:
+    if signal_score >= 80 or depeg_index >= 85:
         return "crisis"
-    if signal_score >= 40 or depeg_index >= 60:
+    if signal_score >= 61 or depeg_index >= 60:
+        return "alert"
+    if signal_score >= 40 or depeg_index >= 40:
         return "volatile"
     return "stable"
+
+
+def _coerce_bool_setting(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
 
 
 def run_predictive_bundle(
@@ -92,6 +102,8 @@ def run_predictive_bundle(
         source_error=bundle.source_error,
         age_seconds=bundle.freshness_age_seconds,
         refresh_interval_seconds=_refresh_interval,
+        db=db,
+        asset_symbol=sym,
     )
     liq_component = int((risk.get("components") or {}).get("liquidity_depth", {}).get("score") or 0)
     returns = _historical_price_returns(db, sym)
@@ -103,12 +115,15 @@ def run_predictive_bundle(
         age_seconds=bundle.freshness_age_seconds,
         refresh_interval_seconds=_refresh_interval,
     )
+    from signal_engine.risk_inputs import inject_velocity
+    risk_kwargs = inject_velocity(db, risk_kwargs, asset_symbol=sym)
     features = build_feature_vector(
         price=bundle.price,
         signal_score=bundle.signal_score,
         concentration_score=liq_component,
         depeg_index=bundle.depeg_index,
         cross_source_discrepancy_pct=float(risk_kwargs.get("cross_source_discrepancy_pct") or 0.0),
+        supply_velocity_1h=risk_kwargs.get("supply_velocity_1h"),
     )
     depeg = predict_depeg_probability(features) or _depeg_probability_heuristic(
         price=bundle.price,
@@ -117,8 +132,7 @@ def run_predictive_bundle(
     )
     regime = _regime_state(signal_score=bundle.signal_score, depeg_index=bundle.depeg_index)
 
-    from providers.settings import get_setting
-    enabled = get_setting("enable_predictive", db)
+    enabled = _coerce_bool_setting(get_setting("enable_predictive", db))
 
     return {
         "asset_symbol": bundle.asset_symbol,

@@ -111,6 +111,8 @@ def compute_asset_metric_bundle(
         source_error=source_error,
         age_seconds=age_seconds,
         refresh_interval_seconds=refresh_interval_seconds,
+        db=db,
+        asset_symbol=sym,
     )
     conc_s, conc_detail = scoring.concentration_component(
         chain_shares,

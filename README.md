@@ -8,18 +8,18 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**355+ regression tests pass.** Zero paid API dependencies for core operation.
+**354 regression tests pass (0 failed).** Zero paid API dependencies for core operation. (ONNX model training + direct notification adapters are future work; current dispatch is webhook-based.)
 
 ## V3 Highlights
 
-- **V3 Risk Score**: Composite (depeg 35%, concentration 25%, velocity 20%, age penalty 20%) with source health modifier
+- **V3 Risk Score**: 5-component composite (depeg 35%, concentration 20%, velocity 15%, liquidity depth 10%, age penalty 20%) with source health modifier. Weights sum to 1.0. Contracting supply contributes via abs().
 - **Multi-source engine**: DefiLlama (supply, TVL, peg) + CoinGecko (price, market cap, volume) + DEX Screener (liquidity depth, pool concentration, slippage)
 - **Cross-source price validator**: flags discrepancies >0.5% between sources
-- **Alerting system**: 9 rule types with persistence tracking, dedup, 4 dispatch channels (dashboard, webhook, Discord, Telegram)
+- **Alerting system**: 9 rule types (peg deviation, slippage, supply contraction, concentration, staleness, source failure/recovery, etc.) with persistence, dedup, and dispatch to dashboard + signed webhooks (primary for external automation: Zapier/Pabbly/Make/Slack/Discord/Telegram/email via webhook bridge). Configured in Settings UI (`webhook_*` keys). Legacy direct channels (native Telegram, Resend email) deferred.
 - **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + LLM-powered sentiment scoring (Ollama Cloud)
 - **Attestation & supply feed**: issuer report age (when parseable) plus DefiLlama on-chain supply feed freshness — no synthetic dates
 - **Governance monitoring**: contract upgrade tracking via Etherscan API
-- **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enable via Settings UI
+- **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enable via Settings UI. ONNX depeg model support present (velocity feature) but training not performed in this build (future).
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
 - **Alpine.js + Chart.js + ECharts frontend**: 6-tab layout (Market, Forecast, Supply, Events, Intel, Health), no build step, CDN-loaded

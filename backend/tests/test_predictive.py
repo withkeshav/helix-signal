@@ -32,11 +32,12 @@ def test_regime_stable():
 
 def test_regime_volatile():
     assert _regime_state(signal_score=50, depeg_index=30) == "volatile"
-    assert _regime_state(signal_score=20, depeg_index=70) == "volatile"
+    assert _regime_state(signal_score=20, depeg_index=50) == "volatile"
+    assert _regime_state(signal_score=20, depeg_index=70) == "alert"
 
 
 def test_regime_crisis():
-    assert _regime_state(signal_score=75, depeg_index=50) == "crisis"
+    assert _regime_state(signal_score=85, depeg_index=50) == "crisis"
     assert _regime_state(signal_score=30, depeg_index=90) == "crisis"
 
 

@@ -1,4 +1,4 @@
-import { gaugeArc, gaugeColor, formatWhen, formatAiAge, formatUsd, pegLabel } from '../utils.js';
+import { gaugeArc, gaugeColor, formatWhen, formatAiAge, formatUsd, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from '../utils.js';
 import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, _setupResizeHandler, _disposeAllCharts, _disposeChart } from '../charts.js';
 
 export function useMarket() {
@@ -7,6 +7,7 @@ export function useMarket() {
     asset: 'USDT',
     timeRange: '7d',
     enabledAssets: ['USDT', 'USDC', 'DAI', 'PYUSD'],
+    assetSnapshots: {},
     chains: [],
     signal: {},
     depeg: {},
@@ -62,8 +63,30 @@ export function useMarket() {
     formatWhen,
     formatAiAge,
     pegLabel,
-    
-    // UI interaction methods that dispatch events
+    formatFreshnessLabel,
+    freshnessBandClass,
+    formatDisplayName,
+    depegVelocityMeta,
+
+    assetSupply(asset) {
+      const snap = this.assetSnapshots[asset];
+      return snap?.totalSupply ?? (asset === this.asset ? this.totalSupply : null);
+    },
+
+    assetScore(asset) {
+      const snap = this.assetSnapshots[asset];
+      return snap?.signal ?? (asset === this.asset ? this.signal : {});
+    },
+
+    assetDepeg(asset) {
+      const snap = this.assetSnapshots[asset];
+      return snap?.depeg ?? (asset === this.asset ? this.depeg : {});
+    },
+
+    assetChains(asset) {
+      const snap = this.assetSnapshots[asset];
+      return snap?.chains ?? (asset === this.asset ? this.chains : []);
+    },
     switchTo(symbol) {
       if (this.enabledAssets.includes(symbol)) {
         this.asset = symbol;
@@ -101,6 +124,7 @@ export function useMarket() {
       // Skip redundant API calls if dashboard already loaded (tabs share `$store.dashboard`)
       if (!this.$store.dashboard.chains?.length) {
         await this.loadDashboard(this.asset);
+        await this.loadAllAssetSnapshots();
         await this.loadAnomalies();
         this.tickerItems = await this.loadTicker();
         await this.loadPredictive();
@@ -143,6 +167,7 @@ export function useMarket() {
       // Reload data and charts when asset changes
       this.$watch('$store.dashboard.asset', (newAsset) => {
         this.loadDashboard(newAsset);
+        this.loadAllAssetSnapshots();
         this.loadAnomalies();
         this.loadPredictive();
         this.loadMarketOverview();
@@ -158,6 +183,32 @@ export function useMarket() {
           this.renderSupplyChart();
         });
       });
+    },
+
+    async loadAllAssetSnapshots() {
+      const assets = this.enabledAssets || [];
+      const results = await Promise.all(
+        assets.map(async (sym) => {
+          try {
+            const r = await fetch(`/api/dashboard?asset=${sym}`, { cache: 'no-store' });
+            if (!r.ok) return [sym, null];
+            const d = await r.json();
+            return [sym, {
+              totalSupply: d.total_supply_current,
+              signal: d.asset_signal || {},
+              depeg: d.depeg_index || {},
+              chains: d.chains || [],
+            }];
+          } catch {
+            return [sym, null];
+          }
+        }),
+      );
+      const snaps = {};
+      for (const [sym, data] of results) {
+        if (data) snaps[sym] = data;
+      }
+      this.assetSnapshots = snaps;
     },
 
     async loadDashboard(asset) {
@@ -187,6 +238,12 @@ export function useMarket() {
         this.$store.dashboard.sources = d.sources || [];
         this.$store.dashboard.generatedAt = d.generated_at || '';
         this.$store.dashboard.nlpAvailable = !!(d.data_quality?.nlp_available);
+        this.assetSnapshots[asset] = {
+          totalSupply: d.total_supply_current,
+          signal: d.asset_signal || {},
+          depeg: d.depeg_index || {},
+          chains: d.chains || [],
+        };
       } catch (e) {
         this.errorOverview = `Dashboard error: ${e.message}`;
       }
@@ -208,6 +265,7 @@ export function useMarket() {
         if (r.ok) { 
           const j = await r.json(); 
           this.predictive = j;
+          this.$store.dashboard.predictive = j;
           return j; 
         } 
       } catch (e) {}

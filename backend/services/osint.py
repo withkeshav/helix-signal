@@ -37,7 +37,7 @@ RSS_FEEDS = {
 }
 
 CRYPTOCURRENCY_CV_URL = "https://api.cryptocurrency.cv/v1/news/latest"
-ENABLE_NLP = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
+ENABLE_NLP = os.getenv("ENABLE_NLP", "true").strip().lower() in ("1", "true", "yes")
 
 
 class _HTMLStripper(HTMLParser):

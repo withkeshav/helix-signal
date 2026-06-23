@@ -41,7 +41,7 @@ def _recent_ai_investigation(db: Session, *, asset_symbol: str) -> bool:
 
 def _circuit_breaker_triggered(anomalies: dict[str, Any]) -> bool:
     """Check if any z-score exceeds 3.0 in the anomaly results."""
-    for metric_key in ("supply", "price"):
+    for metric_key in ("supply", "price", "depeg_index"):
         items = anomalies.get("z_score", {}).get(metric_key, [])
         if isinstance(items, list):
             for item in items:
@@ -72,7 +72,7 @@ def investigate_anomaly(
     anomalies = anomaly_results.get("anomalies", [])
 
     highest_z = 0.0
-    for metric_key in ("supply", "price"):
+    for metric_key in ("supply", "price", "depeg_index"):
         items = z_items.get(metric_key, [])
         if isinstance(items, list):
             for item in items:

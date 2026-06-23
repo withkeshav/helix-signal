@@ -1,9 +1,45 @@
 export function formatUsd(v) {
+  return formatSI(v, { prefix: '$' });
+}
+
+/** Abbreviate large numbers with SI suffixes (K/M/B/T). */
+export function formatSI(v, opts = {}) {
+  const { prefix = '', suffix = '', decimals = 2 } = opts;
   if (v == null || Number.isNaN(Number(v))) return 'N/A';
   const n = Number(v);
-  if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e12) return `${sign}${prefix}${(abs / 1e12).toFixed(decimals)}T${suffix}`;
+  if (abs >= 1e9) return `${sign}${prefix}${(abs / 1e9).toFixed(decimals)}B${suffix}`;
+  if (abs >= 1e6) return `${sign}${prefix}${(abs / 1e6).toFixed(decimals)}M${suffix}`;
+  if (abs >= 1e3) return `${sign}${prefix}${(abs / 1e3).toFixed(decimals)}K${suffix}`;
+  return `${sign}${prefix}${n.toLocaleString(undefined, { maximumFractionDigits: decimals })}${suffix}`;
+}
+
+/** Normalize freshness status strings to lowercase canonical form. */
+export function normalizeFreshnessStatus(status) {
+  if (status == null || status === '') return 'unknown';
+  return String(status).toLowerCase().replace(/\s+/g, '_');
+}
+
+/** Human-readable freshness label (Title Case). */
+export function formatFreshnessLabel(status) {
+  const s = normalizeFreshnessStatus(status);
+  if (s === 'fresh') return 'Fresh';
+  if (s === 'aging') return 'Aging';
+  if (s === 'stale') return 'Stale';
+  if (s === 'very_stale') return 'Very Stale';
+  if (s === 'unknown') return 'Unknown';
+  return String(status);
+}
+
+/** CSS class for freshness KPI coloring. */
+export function freshnessBandClass(status) {
+  const s = normalizeFreshnessStatus(status);
+  if (s === 'fresh') return 'text-green';
+  if (s === 'aging') return 'band-watch';
+  if (s === 'stale' || s === 'very_stale') return 'text-red';
+  return '';
 }
 
 export function formatWhen(iso) {
@@ -16,6 +52,20 @@ export function formatWhen(iso) {
   return `${d.toLocaleString()} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
 }
 
+/** Format timestamp for chart axes and tooltips. */
+export function formatDate(ts, style = 'short') {
+  if (ts == null || ts === '') return '';
+  const d = ts instanceof Date ? ts : new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
+  if (style === 'axis') {
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  if (style === 'date') {
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  return d.toLocaleString();
+}
+
 export function formatFeedAge(minutes) {
   if (minutes == null || Number.isNaN(Number(minutes))) return 'No data';
   const m = Number(minutes);
@@ -26,9 +76,10 @@ export function formatFeedAge(minutes) {
 }
 
 export function statusBand(status) {
-  if (status === 'fresh' || status === 'normal') return 'normal';
-  if (status === 'aging' || status === 'watch') return 'watch';
-  if (status === 'n/a') return 'normal';
+  const s = normalizeFreshnessStatus(status);
+  if (s === 'fresh' || s === 'normal' || s === 'healthy') return 'normal';
+  if (s === 'aging' || s === 'watch') return 'watch';
+  if (s === 'n/a' || s === 'unknown') return 'normal';
   return 'risk';
 }
 
@@ -47,7 +98,7 @@ export function gaugeArc(score) {
 
 export function gaugeColor(band) {
   const b = (band || '').toLowerCase();
-  if (b === 'risk') return 'var(--down)';
+  if (b === 'risk' || b === 'alert') return 'var(--down)';
   if (b === 'watch') return 'var(--neutral)';
   return 'var(--up)';
 }
@@ -60,4 +111,27 @@ export function formatAiAge(generatedAt, expiresAt) {
   const exp = new Date(expiresAt);
   const expLocal = exp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return `Updated ${genLocal} · Next ${expLocal}`;
+}
+
+/** Display name for rotation / analytics labels (snake_case → readable). */
+export function formatDisplayName(key) {
+  if (!key) return '';
+  const known = {
+    DAI_gaining_on_USDC: 'DAI gaining on USDC',
+    USDC_gaining_on_DAI: 'USDC gaining on DAI',
+    USDT_gaining_on_USDC: 'USDT gaining on USDC',
+    PYUSD_gaining_on_USDT: 'PYUSD gaining on USDT',
+  };
+  if (known[key]) return known[key];
+  return String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Label + unit for depeg velocity fields. */
+export function depegVelocityMeta(field) {
+  const map = {
+    '1h': { label: '1h Δ', unit: 'index pts', tooltip: 'Change in depeg index over the last hour' },
+    '4h': { label: '4h Δ', unit: 'index pts', tooltip: 'Change in depeg index over the last 4 hours' },
+    '12h': { label: '12h Δ', unit: 'index pts', tooltip: 'Change in depeg index over the last 12 hours' },
+  };
+  return map[field] || { label: field, unit: '', tooltip: '' };
 }

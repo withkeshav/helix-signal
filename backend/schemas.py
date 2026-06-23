@@ -110,6 +110,7 @@ class CrossSourceSignalOut(BaseModel):
     max_discrepancy_pct: float = 0.0
     discrepancy_flag: bool = False
     avg_price: float | None = None
+    sources: list[dict] = []
 
 
 class SupplyFeedOut(BaseModel):

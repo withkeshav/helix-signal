@@ -18,7 +18,6 @@ def register_routes(app):
     from routes.reports import router as reports_router
     from routes.settings import router as settings_router
     from routes.sources import router as sources_router
-    from routes.telegram import router as telegram_router
     from routes.trends import router as trends_router
     from routes.analytics import router as analytics_router
     from routes.chain_detail import router as chain_detail_router
@@ -42,7 +41,6 @@ def register_routes(app):
     app.include_router(reports_router, prefix="/api", tags=["reports"])
     app.include_router(settings_router, prefix="/api", tags=["settings"])
     app.include_router(sources_router, prefix="/api", tags=["sources"])
-    app.include_router(telegram_router, prefix="/api", tags=["telegram"])
     app.include_router(trends_router, prefix="/api", tags=["trends"])
     app.include_router(analytics_router, prefix="/api", tags=["analytics"])
     app.include_router(chain_detail_router, prefix="/api", tags=["chains"])

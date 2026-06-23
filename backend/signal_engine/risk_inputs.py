@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from database import AssetChainSnapshot
 from signal_engine import scoring
 from signal_engine.core import cross_source_price_check
 from signal_engine.metrics_v3 import estimate_slippage
+from services.velocity import compute_supply_velocity
 
 
 def _aggregate_supply_totals(chains_orm: list[AssetChainSnapshot]) -> tuple[float | None, float, float, float]:
@@ -124,6 +127,28 @@ def build_risk_score_kwargs(
     )
 
 
+def inject_velocity(
+    db: Session | None,
+    kwargs: dict[str, Any],
+    *,
+    asset_symbol: str | None,
+) -> dict[str, Any]:
+    """Attach supply velocity fields when history is available."""
+    if db is None or not asset_symbol:
+        return kwargs
+    supply_velocity = compute_supply_velocity(db, asset_symbol=asset_symbol.upper(), window_hours=24)
+    if supply_velocity.get("available"):
+        vel = supply_velocity.get("velocity", {})
+        acc = supply_velocity.get("acceleration", {})
+        kwargs["supply_velocity_1h"] = vel.get("1h")
+        kwargs["supply_velocity_4h"] = vel.get("4h")
+        kwargs["supply_velocity_12h"] = vel.get("12h")
+        kwargs["supply_velocity_24h"] = vel.get("24h")
+        kwargs["supply_accel_1h"] = acc.get("1h")
+        kwargs["supply_accel_4h"] = acc.get("4h")
+    return kwargs
+
+
 def compute_unified_risk_score(
     chains_orm: list[AssetChainSnapshot],
     *,
@@ -132,6 +157,8 @@ def compute_unified_risk_score(
     age_seconds: float | None,
     refresh_interval_seconds: int,
     attestation_age_days: float | None = None,
+    db: Session | None = None,
+    asset_symbol: str | None = None,
 ) -> dict[str, Any]:
     kwargs = build_risk_score_kwargs(
         chains_orm,
@@ -141,4 +168,6 @@ def compute_unified_risk_score(
         refresh_interval_seconds=refresh_interval_seconds,
         attestation_age_days=attestation_age_days,
     )
+    sym = asset_symbol or (chains_orm[0].asset_symbol if chains_orm else None)
+    kwargs = inject_velocity(db, kwargs, asset_symbol=sym)
     return scoring.compute_risk_score(**kwargs)

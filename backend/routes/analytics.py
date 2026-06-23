@@ -92,10 +92,27 @@ def api_rotation(
     return cross_asset_rotation(db, asset_symbols=symbols, window_days=window_days)
 
 
+@router.get("/analytics/cross-asset-matrix")
+@limiter.limit("30/minute")
+def api_cross_asset_matrix(
+    request: Request,
+    window_days: int = Query(7, ge=3, le=30),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from services.correlation import compute_cross_asset_matrix
+    return compute_cross_asset_matrix(db, window_days=window_days)
+
+
+@router.get("/smidge")
+@limiter.limit("30/minute")
+def api_smidge(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
+    from services.smidge import compute_smidge
+    return compute_smidge(db, asset_symbol=asset.upper())
+
+
 @router.get("/anomaly/detect")
 @limiter.limit("30/minute")
 def api_anomaly_detect(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
-    from services.anomaly import detect_anomalies
     return detect_anomalies(db, asset_symbol=asset)
 
 

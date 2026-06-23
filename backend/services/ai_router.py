@@ -77,11 +77,8 @@ from services.components.ai.budget import _deduct_tokens, _within_budget, get_bu
 # Cache helpers — exact-match (SHA-256), LRU, per-feature TTL
 # ---------------------------------------------------------------------------
 
-def _cache_get(key: str) -> dict[str, Any] | None:
+def _cache_get(key: str, feature: str | None = None) -> dict[str, Any] | None:
     """Exact-match lookup with per-feature TTL and LRU promotion."""
-    # Extract feature from cache key if possible (for backward compatibility)
-    # In practice, we'd need to pass the feature through the call chain
-    feature = None  # This would need to be extracted or passed
     return cache_get_enhanced(key, feature)
 
 def _cache_set(key: str, feature: str, prompt: str, payload: dict[str, Any]) -> None:
@@ -743,7 +740,7 @@ def enrich_with_ai(
     cache_key = _prompt_hash(feature, context)
 
     # 1. Exact-match cache
-    cached = _cache_get(cache_key)
+    cached = _cache_get(cache_key, feature)
     if cached:
         _CACHE_HITS += 1
         _CACHE_TOKENS_SAVED += cached.get("tokens", 0)

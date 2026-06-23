@@ -135,11 +135,19 @@ def _emit(
     )
     pending_events.append(row)
 
-def _flush_events(db: Session, pending_events: list[SignalEvent]) -> None:
-    """Flush all pending events to the database using bulk insert."""
-    if pending_events:
-        db.bulk_save_objects(pending_events)
-        pending_events.clear()
+def _flush_events(db: Session, pending_events: list[SignalEvent], *, metrics_by_asset: dict[str, dict] | None = None) -> None:
+    """Flush all pending events to the database using bulk insert, then dispatch webhooks."""
+    if not pending_events:
+        return
+    to_dispatch = list(pending_events)
+    db.bulk_save_objects(pending_events)
+    pending_events.clear()
+    try:
+        from services.webhook_dispatcher import dispatch_events
+        dispatch_events(db, to_dispatch, metrics_by_asset=metrics_by_asset)
+    except Exception as exc:
+        log = __import__("structlog").get_logger(__name__)
+        log.warning("webhook.dispatch_error", error=str(exc))
 
 
 def _emit_band_change(pending_events: list[SignalEvent], db: Session, *, sym: str, prev_band: str | None, new_band: str, ts: datetime) -> None:
@@ -491,6 +499,14 @@ def persist_trends_and_events(
         bundle_dict["supply_age_hours"] = rk.get("supply_age_hours")
         evaluate_alerts(db, bundle=bundle_dict, asset_symbol=u, now=ts)
     
-    # Flush all pending events
-    _flush_events(db, pending_events)
+    # Flush all pending events (with per-asset metrics for webhook payloads)
+    metrics_by_asset: dict[str, dict] = {}
+    for sym in seen:
+        bundle = compute_asset_metric_bundle(db, asset_symbol=sym, refresh_interval_seconds=interval)
+        if bundle:
+            metrics_by_asset[sym] = {
+                "signal_score": bundle.signal_score,
+                "depeg_index": bundle.depeg_index,
+            }
+    _flush_events(db, pending_events, metrics_by_asset=metrics_by_asset)
 

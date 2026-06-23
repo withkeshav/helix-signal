@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.9.5 (2026-06-23)
+
+### Added
+- **Webhook Alert System (Sprint 5)** — `backend/services/webhook_dispatcher.py` with `build_alert_payload` (stable v1.0 schema), HMAC-SHA256 `X-Webhook-Signature-256` header, severity filtering (`webhook_min_severity`), simple 3-attempt backoff, timeout. Hooked into `signal_engine/history.py:_flush_events` (post-persist, best-effort non-crashing). Settings: `webhook_enabled`, `webhook_url`, `webhook_signing_secret`, `webhook_min_severity`, `webhook_timeout_seconds` (admin-gated via routes/settings + registry).
+- **5-component scoring (Sprint 4)** — liquidity_depth 10%, velocity 15%, concentration 20%, depeg 35%, age 20% (sum=1.0). Continuous depeg interpolation. Crypto HHI 2000/4000/7000 + top3_dex_pool_share. 4-tier age. abs() for velocity (contracting contributes). Updated `docs/scoring-design.md`.
+- **SMIDGE Score Card (Sprint 7)** — `backend/sources/bluechip.py`, `services/smidge.py` (S/D/E local + M/I/G via Bluechip), `frontend/js/composables/useSMIDGE.js` + ECharts radar. `GET /api/smidge`, Intel tab panel.
+- **Frontend data fixes (Sprint 3 + 0)** — parallel 4-asset fetch, per-source cross-price rows, risk component progress bars, attestation startup refresh, freshness normalization (case-insensitive green/yellow/red), `formatSI`/`formatDate` on KPIs and charts, forecast empty states.
+
+### Changed / Removed
+- **Direct Telegram removed** — entire `helix_telegram/` package, `routes/telegram.py`, `tests/test_telegram.py` deleted. Removed telegram branches from `alerts.py`, `main.py` lifespan, routes includes, settings_registry keys (`alert_telegram_*`, `feature_telegram_bot`), admin allowlist, `config/alerts.json` (peg critical now dashboard+webhook+discord), `.env.example`, `requirements.txt`. `config/alerts.json` peg rules retain valid channels.
+- **Sprint 6 deferred** — no Email/Resend subscribers or direct push channels. Webhook is the integration point for Zapier/Pabbly/etc. Future adapters will reuse payload.
+- **Sprint 1 flags** — `ENABLE_NLP`, `ENABLE_ANOMALY_DETECTION` default true; `enable_predictive` bool coercion; CVaR window 288; per-feature cache TTL; depeg in circuit breaker.
+- **Sprint 0 cosmetic** — freshness colors fixed (no more inverted red), supply abbr, chart dates, empty states verified.
+- **Dependencies** — added `xgboost>=2.0`, `skl2onnx>=1.16`; removed `python-telegram-bot`.
+
+### Partial / Future
+- **Sprint 8 ONNX** — export script + feature vector (supply_velocity_1h) + deps present; training not executed (needs data); model fallback to heuristic if absent.
+- **Sprint 9 ML** — anomaly CUSUM, adaptive z-score, per-asset contamination, correlation matrix + endpoint; 8D features / Redis rate limits / LLM web search deferred.
+- **Direct notification channels** — Telegram/Email/Slack/Discord native deferred (use webhook + external automation for now).
+
+### Tests
+- Full suite: 354 passed, 0 failed (telegram-related pre-existing failures eliminated by removal; import main passes).
+- Webhook tests, scoring, predictive pass.
+
 ## 3.9.4.1 (2026-06-23)
 
 ### Fixed

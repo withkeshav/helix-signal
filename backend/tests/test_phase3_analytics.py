@@ -428,8 +428,9 @@ class TestScoringWeights:
         )
         comps = result["components"]
         assert comps["depeg_index"]["weight"] == 0.35
-        assert comps["concentration"]["weight"] == 0.25
-        assert comps["velocity"]["weight"] == 0.20
+        assert comps["concentration"]["weight"] == 0.20
+        assert comps["velocity"]["weight"] == 0.15
+        assert comps["liquidity_depth"]["weight"] == 0.10
         assert comps["age_penalty"]["weight"] == 0.20
 
     def test_velocity_integration_in_scoring(self):

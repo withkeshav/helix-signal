@@ -95,12 +95,17 @@ Higher scores mean more suggested monitoring attention (stress across dimensions
 
 **Weights** (see `signal_engine/components/composite_scoring.py` and API `components`):
 
-- Depeg index: 35% — peg deviation from $1 anchor
-- Concentration: 25% — HHI + top-chain share (elevated per 2025/2026 LEGO & ASRI research on downstream concentration as a primary failure mode)
-- Supply velocity: 20% — 1h/4h supply change acceleration as a leading indicator
-- Data age penalty: 20% — older data increases risk score, capped at 20 points
+- Depeg index: 35% — peg deviation from $1 anchor (continuous linear interpolation)
+- Concentration: 20% — HHI (crypto-calibrated 2000/4000/7000) + top-3 DEX pool share
+- Supply velocity: 15% — 1h/4h supply change (abs() so contracting contributes)
+- Liquidity depth: 10% — from 100k USD slippage bps via `liquidity_depth_score()`
+- Age penalty: 20% — 4-tier freshness: fresh(<1h)=0, aging(<2h)=10, stale(<24h)=15, very stale(>=24h)=20
 
 A source health modifier applies a 50% penalty when data sources are degraded (factor of 0.5).
+
+**Band thresholds:** ≤20 Normal, ≤60 Watch, >60 Alert.
+
+**Depeg index:** continuous interpolation over breakpoints [(0,0), (0.1,0), (0.5,25), (1.0,50), (2.0,75), (4.0,100)].
 
 Dashboard and trend pipelines share inputs via `signal_engine/risk_inputs.py`.
 
@@ -271,5 +276,5 @@ This reflects how recently on-chain supply data was ingested, not audit report r
 
 - Single-source baseline (DefiLlama)
 - Live dashboard still only exposes current and prev day, week, and month fields from DefiLlama; **trend charts** add forward-point storage but do not import long external history
-- No trading execution, outbound alerting, or predictive modeling
+- No trading execution, no direct push channels (Telegram/Email/Slack/Discord adapters deferred; use webhook + external automation bridge)
 - Chain TVL is chain aggregate context only, as labeled

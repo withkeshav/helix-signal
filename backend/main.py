@@ -113,8 +113,6 @@ async def lifespan(app: FastAPI):
     disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
     listener_task = None
     fred_task = None
-    telegram_app = None
-    telegram_task = None
 
     with SessionLocal() as setup_db:
         skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
@@ -128,20 +126,6 @@ async def lifespan(app: FastAPI):
                 replace_existing=True,
             )
         osint_minutes = max(15, get_setting("refresh_osint_minutes", setup_db) or 60)
-
-        # Wire up Telegram bot if enabled
-        if not disable_bg and get_setting("feature_telegram_bot", setup_db):
-            try:
-                from helix_telegram.bot import create_bot_application
-                telegram_app = create_bot_application()
-                if telegram_app:
-                    from helix_telegram.digest import add_digest_scheduler
-                    add_digest_scheduler(scheduler)
-                    loop = asyncio.get_running_loop()
-                    telegram_task = loop.create_task(telegram_app.run_polling())
-                    log.info("telegram_bot.started")
-            except Exception as exc:
-                log.warning("telegram_bot.start_failed", error=str(exc))
 
     scheduler.add_job(
         _retention_job,
@@ -170,6 +154,7 @@ async def lifespan(app: FastAPI):
 
     loop = asyncio.get_running_loop()
     loop.create_task(asyncio.to_thread(_osint_job))
+    loop.create_task(_osint_attestation_refresh())
 
     if not skip_refresh:
         await _refresh_job()
@@ -211,13 +196,6 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         scheduler.shutdown(wait=False)
-        if telegram_app and telegram_task and not telegram_task.done():
-            telegram_task.cancel()
-            try:
-                await asyncio.wait_for(telegram_task, timeout=5.0)
-            except (asyncio.TimeoutError, asyncio.CancelledError):
-                pass
-            log.info("telegram_bot.stopped")
         for task in (listener_task, fred_task):
             if task and not task.done():
                 task.cancel()

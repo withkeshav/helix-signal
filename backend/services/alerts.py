@@ -224,16 +224,21 @@ def _dispatch_alert(rule: dict, *, asset_symbol: str, meta: dict, db: Session | 
     channels = rule.get("channels", ["dashboard"])
     for channel in channels:
         if channel == "webhook":
+            # Legacy rule-engine webhook (alert_webhook_url): simple JSON POST when a rule lists
+            # channel "webhook". The canonical signed event pipeline is webhook_dispatcher
+            # (webhook_enabled / webhook_url / HMAC) on signal_engine.history event flush.
             _dispatch_webhook(asset_symbol, rule, meta, db)
         elif channel == "discord":
             _dispatch_discord(asset_symbol, rule, meta, db)
-        elif channel == "telegram":
-            _dispatch_telegram(asset_symbol, rule, meta, db)
         elif channel == "email":
             _dispatch_email(asset_symbol, rule, meta, db)
 
 
 def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
+    """Legacy rule-engine webhook: POST to alert_webhook_url (no HMAC).
+
+    Primary outbound alerts use services.webhook_dispatcher (Sprint 5 signed webhooks).
+    """
     from providers.settings import get_setting
     url = get_setting("alert_webhook_url", db) or ""
     if not url:
@@ -255,20 +260,6 @@ def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict, db: Session | N
         resp.raise_for_status()
     except Exception as exc:
         log.warning("discord_failed", error=str(exc))
-
-
-def _dispatch_telegram(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
-    from providers.settings import get_setting
-    token = get_setting("alert_telegram_bot_token", db) or ""
-    chat_id = get_setting("alert_telegram_chat_id", db) or ""
-    if not token or not chat_id:
-        return
-    try:
-        text = f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']}\n{rule['condition']}"
-        resp = httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": text}, timeout=10)
-        resp.raise_for_status()
-    except Exception as exc:
-        log.warning("telegram_failed", error=str(exc))
 
 
 def _dispatch_email(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:

@@ -377,6 +377,15 @@ async def refresh_chain_data(db: Session) -> None:
 
             symbols = list(dict.fromkeys(successful_asset_symbols))
             persist_trends_and_events(db, successful_asset_symbols=symbols, completed_at=completed_at, prior_source_status=prior_source_status)
+            from services import anomaly as anomaly_svc
+            if anomaly_svc.ENABLED:
+                from services.anomaly import detect_anomalies, emit_cusum_regime_events
+                for sym in symbols:
+                    try:
+                        detect_anomalies(db, asset_symbol=sym)
+                        emit_cusum_regime_events(db, asset_symbol=sym)
+                    except Exception:
+                        pass
             flush_source_usage(db)  # Flush cached source usage
             for sym in symbols:
                 invalidate_dashboard(sym)

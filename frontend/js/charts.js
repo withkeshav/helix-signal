@@ -1,4 +1,4 @@
-import { formatUsd } from './utils.js';
+import { formatUsd, formatDate } from './utils.js';
 
 export function _disposeChart(c) {
   if (!c) return;
@@ -85,7 +85,18 @@ export function loadTrendChart() {
           data: { datasets: [{ data: pts, borderColor: primary, backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 }] },
           options: {
             responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } },
-            scales: { x: { type: 'linear', ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { min: 0, max: 100, ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } } },
+            scales: {
+              x: {
+                type: 'linear',
+                ticks: {
+                  color: muted,
+                  maxTicksLimit: 8,
+                  callback: (v) => formatDate(v, 'axis'),
+                },
+                grid: { color: 'rgba(128,128,128,0.1)' },
+              },
+              y: { min: 0, max: 100, ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } },
+            },
           },
         }));
       })
@@ -172,7 +183,8 @@ export function _renderForecastCanvas(el, title, historical, forecast, baseConfi
 }
 
 export async function renderSupplyChart() {
-  const d = await this.loadSupplyTrend();
+  const tr = this.timeRange || '30d';
+  const d = await fetch(`/api/trends?asset=${this.asset}&window=${tr}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
   if (!d || !d.points || !d.points.length || typeof Chart === 'undefined') return;
   const el = document.getElementById('chart-supply-trend');
   if (!el) return;
@@ -183,6 +195,38 @@ export async function renderSupplyChart() {
   this._charts.set('chart-supply-trend', new Chart(el.getContext('2d'), {
     type: 'line',
     data: { datasets: [{ data: pts, borderColor: primary, backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 }] },
-    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { type: 'linear', ticks: { display: false }, grid: { display: false } }, y: { ticks: { callback: v => formatUsd(v) } } } },
+    options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { type: 'linear', ticks: { maxTicksLimit: 8, callback: v => formatDate(v, 'axis') }, grid: { display: false } }, y: { ticks: { callback: v => formatUsd(v) } } } },
   }));
+}
+
+export function destroySmidgeChart() {
+  if (!this._smidgeChart) return;
+  _disposeChart(this._smidgeChart);
+  this._smidgeChart = null;
+}
+
+export function renderSmidgeRadar(smidge) {
+  if (!smidge?.available || typeof echarts === 'undefined') return;
+  const el = document.getElementById('chart-smidge-radar');
+  if (!el) return;
+  destroySmidgeChart.call(this);
+  const dims = smidge.dimensions || {};
+  const order = ['S', 'M', 'I', 'D', 'G', 'E'];
+  const indicators = order.map(k => ({ name: k, max: 100 }));
+  const values = order.map(k => dims[k] ?? 0);
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e8edf7';
+  const chart = echarts.init(el);
+  this._smidgeChart = chart;
+  chart.setOption({
+    animation: false,
+    radar: {
+      indicator: indicators,
+      axisName: { color: textColor, fontSize: 12 },
+      splitLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } },
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: values, name: smidge.asset_symbol, areaStyle: { color: 'rgba(59,130,246,0.15)' }, lineStyle: { color: '#3b82f6' } }],
+    }],
+  });
 }

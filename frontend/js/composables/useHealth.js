@@ -1,4 +1,4 @@
-import { formatWhen } from '../utils.js';
+import { formatWhen, formatFreshnessLabel, freshnessBandClass } from '../utils.js';
 
 export function useHealth() {
   return {
@@ -10,6 +10,8 @@ export function useHealth() {
     loading: false,
     error: '',
     formatWhen,
+    formatFreshnessLabel,
+    freshnessBandClass,
 
     async init() {
       await this._loadAll();

@@ -134,7 +134,7 @@ def cache_set_enhanced(key: str, feature: str, prompt: str, payload: Dict[str, A
     
     # Add to semantic cache if enabled
     if _SEMANTIC_CACHE_ENABLED and prompt:
-        semantic_key = f"{feature}_{hashlib.md5(prompt.encode()).hexdigest()}"
+        semantic_key = f"{feature}_{hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()}"
         expiry = now + _FEATURE_CACHE_TTL.get(feature, _CACHE_TTL_SECONDS)
         if semantic_key in _AI_SEMANTIC_CACHE:
             _AI_SEMANTIC_CACHE.move_to_end(semantic_key)
@@ -168,7 +168,7 @@ def cache_set(key: str, feature: str, prompt: str, payload: Dict[str, Any]) -> N
     
     # Add to semantic cache if enabled
     if _SEMANTIC_CACHE_ENABLED:
-        semantic_key = f"{feature}_{hashlib.md5(prompt.encode()).hexdigest()}"
+        semantic_key = f"{feature}_{hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()}"
         _AI_SEMANTIC_CACHE[semantic_key] = (expiry, feature, prompt, payload, key)
         while len(_AI_SEMANTIC_CACHE) > _MAX_SEMANTIC_CACHE_ENTRIES:
             _AI_SEMANTIC_CACHE.popitem(last=False)

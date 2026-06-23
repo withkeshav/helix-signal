@@ -5,7 +5,7 @@ import html as html_mod
 import json
 import os
 import re
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import calendar
 import time
 from datetime import datetime, timedelta, timezone

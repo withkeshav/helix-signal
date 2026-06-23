@@ -1,7 +1,7 @@
 """Telegram bot command: /brief - Returns a market brief (top signals, recent alerts, sentiment summary)."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any
 
 from telegram import Update
@@ -81,7 +81,7 @@ async def brief_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
             # Format response
             message = "🌅 *Helix Signal Market Brief*\n"
-            message += f"──────────────────\n"
+            message += "──────────────────\n"
             message += f"📅 {now.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
 
             # Top assets section

@@ -44,7 +44,7 @@ def _serialize(pb: Playbook) -> dict[str, Any]:
 
 
 def seed_builtin_playbooks(db: Session) -> None:
-    existing = {p.name for p in db.query(Playbook).filter(Playbook.is_builtin == True).all()}
+    existing = {p.name for p in db.query(Playbook).filter(Playbook.is_builtin).all()}
     now = datetime.now(timezone.utc)
     for name, data in BUILTIN_PLAYBOOKS.items():
         if name not in existing:
@@ -159,7 +159,7 @@ async def update_playbook(
         pb_id = int(playbook_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Playbook ID must be an integer")
-    pb = db.query(Playbook).filter(Playbook.id == pb_id, Playbook.is_builtin == False).first()
+    pb = db.query(Playbook).filter(Playbook.id == pb_id, Playbook.is_builtin.is_(False)).first()
     if pb is None:
         raise HTTPException(status_code=404, detail="Custom playbook not found")
     if body.label is not None:
@@ -189,7 +189,7 @@ async def delete_playbook(
         pb_id = int(playbook_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Playbook ID must be an integer")
-    pb = db.query(Playbook).filter(Playbook.id == pb_id, Playbook.is_builtin == False).first()
+    pb = db.query(Playbook).filter(Playbook.id == pb_id, Playbook.is_builtin.is_(False)).first()
     if pb is None:
         raise HTTPException(status_code=404, detail="Custom playbook not found")
     db.delete(pb)

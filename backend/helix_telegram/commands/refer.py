@@ -29,7 +29,7 @@ async def refer_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             # Format response
             now = datetime.now(timezone.utc)
             message = "🔗 *Helix Signal System Reference*\n"
-            message += f"──────────────────\n"
+            message += "──────────────────\n"
             message += f"🕒 Time: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
 
             # System health section

@@ -44,12 +44,12 @@ def test_telegram_user_model():
         assert user.username == "testuser"
         assert user.first_name == "Test"
         assert user.last_name == "User"
-        assert user.is_subscribed == True
+        assert user.is_subscribed
         assert user.preferred_assets == "USDT,USDC"
         assert user.alert_types == "signal,anomaly"
         assert user.min_severity == "medium"
         assert user.timezone == "America/New_York"
-        assert user.receive_digest == True
+        assert user.receive_digest
         assert user.digest_time == "09:00"
         
         # Test string representation
@@ -177,7 +177,7 @@ async def test_send_alert_to_user(mock_application):
     )
     
     # Should return True (success)
-    assert success == True
+    assert success
 
 @pytest.mark.asyncio
 @patch('helix_telegram.bot.BOT_TOKEN', 'test_token')
@@ -202,7 +202,7 @@ async def test_send_alert_to_channel(mock_application):
     )
     
     # Should return True (success)
-    assert success == True
+    assert success
 
 def test_templates_constants():
     """Test template constants."""

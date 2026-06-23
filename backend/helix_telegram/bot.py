@@ -238,7 +238,6 @@ async def digest_command(update: TelegramUpdate, context: ContextTypes.DEFAULT_T
                         message = "🔕 Daily digest disabled."
                     elif action == "test":
                         # Send test digest with real data
-                        from database import SessionLocal
                         from helix_telegram.digest import DigestService
                         test_db = SessionLocal()
                         try:

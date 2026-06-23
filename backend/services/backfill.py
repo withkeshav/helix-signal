@@ -18,6 +18,11 @@ MAX_BACKFILL_DAYS = 30
 MIN_BACKFILL_DAYS = 7
 
 
+def _day_start(dt: datetime) -> datetime:
+    """Return the start of the day (midnight UTC) for the given datetime."""
+    return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 def run_backfill(db: Session, *, asset: str, days: int, _internal: bool = False) -> dict[str, Any]:
     if not _internal:
         from providers.settings import get_setting

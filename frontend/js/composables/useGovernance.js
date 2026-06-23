@@ -90,6 +90,11 @@ export function useGovernance() {
       }
       // Load playbooks
       this.loadPlaybooks();
+      // Auto-reload settings when admin token is saved
+      this.$watch('$store.ui.adminToken', val => { if (val) this.loadSettings(); });
+      if (this.adminToken) {
+        this.loadSettings();
+      }
     },
 
     destroy() {

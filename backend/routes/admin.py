@@ -108,7 +108,7 @@ def _get_table_counts(db: Session) -> dict[str, int]:
     counts = {}
     for table in _TABLE_NAMES:
         try:
-            result = db.execute(text(f"SELECT COUNT(*) FROM {table}"))
+            result = db.execute(text(f"SELECT COUNT(*) FROM {table}"))  # nosec: _TABLE_NAMES is a hardcoded constant (line 33)
             counts[table] = result.scalar() or 0
         except Exception:
             counts[table] = -1

@@ -51,7 +51,7 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
             # Format response
             message = f"💰 *Price Data for {asset_symbol}*\n"
-            message += f"──────────────────\n"
+            message += "──────────────────\n"
             message += f"📍 Chain: {chain_with_price.chain_name}\n\n"
 
             # Show all available prices
@@ -69,7 +69,7 @@ async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             if dashboard.depeg_index.deviation_pct is not None:
                 dev_pct = dashboard.depeg_index.deviation_pct
                 dev_abs = dashboard.depeg_index.deviation_abs or 0
-                message += f"🔗 *Peg Deviation*\n"
+                message += "🔗 *Peg Deviation*\n"
                 message += f"   Absolute: {'+' if dev_abs >= 0 else ''}${dev_abs:.6f}\n"
                 message += f"   Percent: {'+' if dev_pct >= 0 else ''}{dev_pct:.4f}%\n\n"
             

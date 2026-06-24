@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
@@ -39,8 +40,9 @@ def export_settings_endpoint(
     try:
         export_data = export_settings(db)
         return export_data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    except Exception:
+        logging.getLogger(__name__).error("Export failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="Export failed. Check server logs.")
 
 
 @router.post("/settings/import", response_model=ImportResponse)
@@ -62,8 +64,9 @@ async def import_settings_endpoint(
         
         results = import_settings(db, settings_data, user, ip_address, user_agent)
         return results
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    except Exception:
+        logging.getLogger(__name__).error("Import failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="Import failed. Check server logs.")
 
 
 @router.get("/settings/export/json")
@@ -80,8 +83,9 @@ def export_settings_json_endpoint(
             "content": json_data,
             "filename": f"helix-settings-export-{int(datetime.now().timestamp())}.json"
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+    except Exception:
+        logging.getLogger(__name__).error("Export JSON failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="Export failed. Check server logs.")
 
 
 @router.post("/settings/import/json", response_model=ImportResponse)
@@ -110,5 +114,6 @@ async def import_settings_json_endpoint(
         
         results = import_settings_from_json(db, json_data, user, ip_address, user_agent)
         return results
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    except Exception:
+        logging.getLogger(__name__).error("Import JSON failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="Import failed. Check server logs.")

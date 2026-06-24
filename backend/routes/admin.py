@@ -55,7 +55,6 @@ def _build_diagnostics(db: Session) -> dict[str, Any]:
         "system": {
             "python_version": sys.version,
             "platform": platform.platform(),
-            "hostname": platform.node(),
         },
         "environment": {
             key: os.getenv(key, "")

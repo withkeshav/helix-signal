@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from core.admin_auth import require_admin_token
+from core.admin_auth import _sign_session_token, require_admin_token
 from core.limiter import limiter
 from database import get_db
 from services.user_service import authenticate_user
@@ -29,10 +28,8 @@ async def login(
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = os.getenv("HELIX_ADMIN_TOKEN", "")
-    if not token:
-        raise HTTPException(status_code=503, detail="Admin token not configured")
-    return {"access_token": token, "token_type": "bearer", "username": user.username, "role": user.role}
+    session_token = _sign_session_token({"sub": user.id, "role": user.role})
+    return {"access_token": session_token, "token_type": "bearer", "username": user.username, "role": user.role}
 
 
 @router.post("/auth/logout")

@@ -120,6 +120,7 @@ def read_users(
             email=user.email,
             is_active=user.is_active,
             is_admin=user.is_admin,
+            role=user.role,
             created_at=user.created_at.isoformat() if user.created_at else None,
             updated_at=user.updated_at.isoformat() if user.updated_at else None,
         )

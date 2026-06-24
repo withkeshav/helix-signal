@@ -54,7 +54,7 @@ def get_setting(key: str, db: Session | None = None) -> Any:
     return meta.get("default")
 
 
-def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address: str = None, user_agent: str = None) -> None:
+def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address: str = None, user_agent: str = None, flush: bool = False) -> None:
     meta = _DEFAULT_SETTINGS.get(key)
     if not meta:
         raise ValueError(f"Unknown setting: {key}")
@@ -83,7 +83,8 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
     else:
         db.add(Setting(key=key, value=str(value)))
     
-    db.commit()
+    if not flush:
+        db.commit()
     
     # Log the change to the audit log
     try:

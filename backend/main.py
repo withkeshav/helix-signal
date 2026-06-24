@@ -153,8 +153,9 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = scheduler
 
     loop = asyncio.get_running_loop()
-    loop.create_task(asyncio.to_thread(_osint_job))
-    loop.create_task(_osint_attestation_refresh())
+    if not skip_refresh and not disable_bg:
+        loop.create_task(asyncio.to_thread(_osint_job))
+        loop.create_task(_osint_attestation_refresh())
 
     if not skip_refresh:
         await _refresh_job()

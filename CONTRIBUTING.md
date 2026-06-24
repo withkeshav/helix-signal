@@ -15,6 +15,7 @@ cd helix-signal
 
 Create your local env file (or export equivalent vars):
 
+- `SESSION_SIGNING_KEY` (**required** — generate via `openssl rand -hex 32`)
 - `DEFILLAMA_API_KEY` (optional)
 - `DATABASE_URL` (default works for local)
 - `REFRESH_INTERVAL_SECONDS` (default `300`)

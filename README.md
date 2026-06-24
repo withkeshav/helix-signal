@@ -121,7 +121,10 @@ Copy `.env.example` to `.env` and adjust:
 - `CONTENT_SECURITY_POLICY` — Content-Security-Policy header (set on backend + nginx)
 - `LOG_LEVEL` (default `INFO`) — set to `DEBUG` for verbose logging
 - `LOG_FORMAT` (default `dev`) — set to `json` for structured JSON logs in production
-- `HELIX_ADMIN_TOKEN` — required for admin routes (settings, refresh, backfill, metrics, governance)
+- `SESSION_SIGNING_KEY` — **required**; HMAC-SHA256 key for signed session tokens
+  (generate via `openssl rand -hex 32`). Backend fails closed with 503 if missing.
+- `HELIX_ADMIN_TOKEN` — legacy admin token (retained for `X-Admin-Token` rollout safety;
+  will be retired in a future release)
 - `RATE_LIMITER_STORAGE_URI` — Redis URL for multi-worker rate limiting (optional)
 
 All user-facing configuration (API keys, models, feature toggles, alert dispatch, refresh intervals, CORS origins) is managed from the Settings UI at `/settings` — no `.env` edits needed.

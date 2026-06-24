@@ -1,6 +1,36 @@
 # Changelog
 
-## [Unreleased] — 2026-06-24
+## [Unreleased]
+
+## 3.10.0 (2026-06-24)
+
+### Security
+- **Signed session tokens** — Auth now uses HMAC-SHA256 signed tokens (`sub`, `role`,
+  `exp:+30m`) with a dedicated `SESSION_SIGNING_KEY` env var. `_verify_session_token`
+  returns `None` (fail closed) when key is missing; `_sign_session_token` raises 503.
+  Legacy `X-Admin-Token` header still accepted for rollout safety.
+
+### Fixed
+- **500 crash hardening** — Per-source try/except in source health-check loops
+  (`routes/sources.py`) and alert eval functions (`services/alerts.py`). Null-guard
+  on `asset_symbol` in SMIDGE compute. Null-guard `created_at`/`updated_at` in user
+  and settings-audit response models.
+- **SMIDGE E-dimension query** — Join now routes through `OsintArticleAsset.asset_links`
+  relationship (previously referenced nonexistent `OsintArticle.asset_symbol`).
+- **Frontend `_makeBar` ReferenceError** — Muted property guard in chart renderer (N-1).
+- **Frontend resize handler** — `ownerDocument` guard + try/catch to prevent crashes
+  when chart container already destroyed (N-2).
+- **Audit-poll 429 flooding** — Polling gated on `adminToken` presence; stops on
+  401/403; pauses when `document.hidden` (R-1).
+- **`/auth/me` resolution** — Endpoint now resolves real user from signed token
+  payload; falls back to stub for legacy tokens.
+
+### Database
+- **Playbook seeding (Postgres-compatible)** — Uses `sa.inspect().has_table()` instead
+  of SQLite-specific `sqlite_master` query (F-1).
+- **New osint_articles indexes** — Migration `a1b2c3d4e5f8` adds
+  `ix_osint_articles_published_at` and `ix_osint_articles_source_title`.
+  New migration head — deploy must run `alembic upgrade head`.
 
 ### CI & Maintenance
 - **Fixed:** Chronic smoke job failure (3–4 weeks) — `POSTGRES_PASSWORD` is now
@@ -16,8 +46,15 @@
 - **Removed:** Dead `.event-ticker` CSS and `@keyframes ticker` animation
   (HTML consumer removed in previous tickerItems cleanup session)
 - **Fixed:** `train_depeg_model.py` docstring incorrectly referenced xgboost and GradientBoostingClassifier
-- **Docs:** Added CI secrets table and fork contributor guidance to CONTRIBUTING.md
-- **Docs:** Added CI setup note to README.md pointing to CONTRIBUTING.md
+
+### Docker
+- **Tightened dockerignores** — Backend: `*.db`, `*.log`, `tests/`, `requirements-ml.txt`,
+  `ruff.toml`, `pytest.ini`. Frontend: `Dockerfile`, `e2e/`, `playwright.config.ts`,
+  `package*.json`, `*.md`.
+
+### Docs
+- Added CI secrets table and fork contributor guidance to CONTRIBUTING.md
+- Added CI setup note to README.md pointing to CONTRIBUTING.md
 
 ## 3.9.5 (2026-06-23)
 

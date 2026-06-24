@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from services.source_usage import get_source_usage, get_source_usage_summary
+from core.admin_auth import require_admin_token
 from core.limiter import limiter
 from core.registry import SOURCES_REGISTRY, get_source
 
@@ -15,7 +16,7 @@ router = APIRouter()
 
 @router.get("/sources/status")
 @limiter.limit("60/minute")
-def get_source_status(request: Request):
+def get_source_status(request: Request, _auth=Depends(require_admin_token)):
     statuses = {}
     for name in SOURCES_REGISTRY:
         try:
@@ -37,14 +38,14 @@ def get_source_status(request: Request):
 
 @router.get("/sources/usage")
 @limiter.limit("60/minute")
-def get_sources_usage(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+def get_sources_usage(request: Request, db: Session = Depends(get_db), _auth=Depends(require_admin_token)) -> dict[str, Any]:
     """Get usage stats for all data sources."""
     return get_source_usage_summary(db)
 
 
 @router.get("/sources/{name}/config")
 @limiter.limit("60/minute")
-def get_source_config(request: Request, name: str):
+def get_source_config(request: Request, name: str, _auth=Depends(require_admin_token)):
     if name not in SOURCES_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
     return {"name": name}

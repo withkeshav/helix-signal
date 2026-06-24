@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Train a depeg probability classifier and export to ONNX.
+Train a depeg probability regressor and export to ONNX.
 
 Reads historical AssetTrendSnapshot data, engineers features (price deviation,
 signal score, liquidity score, depeg index, cross-source discrepancy), trains
-a GradientBoostingClassifier with 3 output classes (1h/6h/24h horizon), and
-exports to ONNX via skl2onnx.
+a RandomForestRegressor with MultiOutputRegressor for 3 horizons (1h/6h/24h),
+and exports to ONNX via skl2onnx (optional, falls back to pickle).
 
 Usage:
   cd backend

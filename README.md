@@ -96,6 +96,10 @@ Post-deploy smoke test (checks frontend shell, API health, `/metrics` not public
 ./scripts/smoke-check.sh https://your-host.example
 ```
 
+> **CI Setup:** The smoke job requires a `POSTGRES_PASSWORD` repository secret.
+> See [CONTRIBUTING.md](./CONTRIBUTING.md#ci--github-actions-requirements) for
+> the full list of required secrets and fork contributor notes.
+
 ### Database migrations
 
 ```bash

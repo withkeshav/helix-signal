@@ -25,7 +25,7 @@ export function useMarket() {
     
     // Additional data needed for dashboard cards
     errorOverview: '',
-    tickerItems: [],
+
     marketOverview: '',
     aiSummary: '',
     aiNarrative: '',
@@ -126,7 +126,6 @@ export function useMarket() {
         await this.loadDashboard(this.asset);
         await this.loadAllAssetSnapshots();
         await this.loadAnomalies();
-        this.tickerItems = await this.loadTicker();
         await this.loadPredictive();
         await this.loadMarketOverview();
         await this.loadAiExplain();
@@ -270,16 +269,6 @@ export function useMarket() {
         } 
       } catch (e) {}
       return null;
-    },
-    
-    async loadTicker() {
-      try {
-        const r = await fetch(`/api/events?asset=${this.asset}&limit=12`, { cache: 'no-store' });
-        if (!r.ok) return [];
-        const j = await r.json();
-        const evs = (j.events || []).filter(e => e.severity !== 'debug');
-        return evs.length ? evs.concat(evs).map(e => `${(e.severity || 'info').toUpperCase()} · ${formatWhen(e.timestamp)}`) : [];
-      } catch (e) { return []; }
     },
     
     async loadSupplyTrend() {

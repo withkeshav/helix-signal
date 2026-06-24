@@ -1,0 +1,5 @@
+# onnxruntime: accepted runtime dependency.
+# Unfixed CVEs in this package are acknowledged — no fix available upstream at time of writing.
+# Review quarterly or when a new onnxruntime release is available.
+# Training-only deps (xgboost, skl2onnx, pandas) have been moved to requirements-ml.txt
+# and are no longer present in the production Docker image.

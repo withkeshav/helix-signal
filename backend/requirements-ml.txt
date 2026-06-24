@@ -1,0 +1,12 @@
+# Training and experimental ML dependencies.
+# NOT installed in the production Docker image.
+# Install separately when training models: pip install -r requirements-ml.txt
+#
+# scikit-learn is already in requirements.txt (runtime anomaly detection)
+skl2onnx>=1.16.0
+
+# xgboost: listed but currently unused even in train script — reserved for future upgrade
+# xgboost>=2.0.0
+
+# pandas: removed from requirements.txt — zero imports in current runtime source
+# pandas>=2.2.0

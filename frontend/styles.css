@@ -81,9 +81,6 @@ code{background:var(--bg-accent);padding:4px 8px;border-radius:4px;font-size:12p
 .risk-gauge-track{fill:none;stroke:var(--line);stroke-width:10}
 .risk-gauge-value{fill:none;stroke:var(--spark);stroke-width:10;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50px 50px;transition:stroke-dashoffset .4s ease}
 .model-badge{font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:5px;background:var(--ok-bg);color:var(--up);display:inline-block;margin-left:6px;vertical-align:middle}
-.event-ticker{overflow:hidden;border-radius:10px;border:1px solid var(--line);background:var(--bg-accent);margin-bottom:12px}
-.event-ticker-inner{display:flex;gap:24px;white-space:nowrap;padding:7px 12px;font-size:12px;animation:ticker 40s linear infinite}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .event-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .event-meta{font-size:11px;color:var(--muted)}
 .event-title{font-weight:600;font-size:13px}.event-summary{font-size:12px;line-height:1.4;margin:4px 0 0}

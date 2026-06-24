@@ -157,3 +157,26 @@ Guidelines:
 - Confirm no secrets were added (`.env`, `secrets/`, internal briefs)
 - Keep docs in sync when behavior or thresholds change
 - Do not commit internal or local docs (`.progress/`, briefs, phase logs — see `.gitignore`)
+
+## CI / GitHub Actions Requirements
+
+The `smoke` job spins up the full Docker Compose stack (`--profile data`),
+which requires certain environment variables. These must be set as
+**repository secrets** in GitHub Settings → Secrets and Variables → Actions.
+
+### Required Repository Secrets
+
+| Secret | Purpose | Example CI value |
+|---|---|---|
+| `POSTGRES_PASSWORD` | Required by docker-compose.yml (`:?` strict) | Any non-empty string e.g. `smoketest-ci` |
+| `DEPLOY_HOST` | SSH deploy target hostname | Your server IP or domain |
+| `DEPLOY_USER` | SSH deploy username | `deploy` or `ubuntu` |
+| `DEPLOY_SSH_KEY` | Private key for SSH deploy step | PEM-format private key |
+
+> **Note for fork contributors:** The `smoke` job will show as red on fork PRs
+> because secrets are not passed to forks by default. This is expected GitHub
+> behaviour. The `test` job (unit tests, lint, security scan) will still run
+> and is the relevant signal for code review.
+
+`AI_MODE=ai_off` and `HELIX_SKIP_STARTUP_REFRESH=1` are injected automatically
+by the CI workflow — you do not need to set these as secrets.

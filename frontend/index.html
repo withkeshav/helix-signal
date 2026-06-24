@@ -162,14 +162,6 @@
     <!-- Rate Limit Warning -->
     <div class="warning-banner" :class="rateLimitWarning ? 'visible' : ''" x-text="rateLimitWarning"></div>
 
-    <!-- Event Ticker -->
-    <div class="event-ticker glass" x-if="false">
-      <div class="event-ticker-inner">
-        <template x-for="(t, i) in tickerItems" :key="`t-${i}`">
-          <span x-text="t"></span>
-        </template>
-      </div>
-    </div>
 
     <!-- Tab: Overview -->
     <div class="tab-content" :class="tab === 'overview' && 'active'" x-data="market" role="tabpanel" id="tab-overview">

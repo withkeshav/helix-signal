@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased] — 2026-06-24
+
+### CI & Maintenance
+- **Fixed:** Chronic smoke job failure (3–4 weeks) — `POSTGRES_PASSWORD` is now
+  injected in the CI environment before `docker compose up`; previous `touch .env`
+  band-aid never satisfied the `:?` hard-required compose variable
+- **Fixed:** Removed `xgboost`, `skl2onnx`, and `pandas` from `requirements.txt`
+  (zero runtime imports); created `backend/requirements-ml.txt` for training-only deps
+- **Fixed:** Trivy and pip-audit no longer fail on training ML deps in the production image
+- **Fixed:** Relaxed `requests==2.34.2` exact pin to `requests>=2.32.0,<3`
+- **Fixed:** Removed `master` branch from CI trigger (repo uses `main` only)
+- **Added:** `backend/.trivyignore` for onnxruntime accepted-risk annotation
+- **Added:** Playwright npm caching in smoke job (removes ~60–90s per run)
+- **Removed:** Dead `.event-ticker` CSS and `@keyframes ticker` animation
+  (HTML consumer removed in previous tickerItems cleanup session)
+- **Fixed:** `train_depeg_model.py` docstring incorrectly referenced xgboost and GradientBoostingClassifier
+- **Docs:** Added CI secrets table and fork contributor guidance to CONTRIBUTING.md
+- **Docs:** Added CI setup note to README.md pointing to CONTRIBUTING.md
+
 ## 3.9.5 (2026-06-23)
 
 ### Added

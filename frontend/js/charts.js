@@ -33,16 +33,23 @@ export function _disposeAllCharts() {
 export function _setupResizeHandler() {
   if (window._helixResizeHandler) return;
   window._helixResizeHandler = () => {
-    if (this._charts) {
-      for (const [, c] of this._charts) {
-        if (typeof c.resize === 'function') c.resize();
+    try {
+      if (this._charts) {
+        for (const [id, c] of this._charts) {
+          try {
+            const el = document.getElementById(id);
+            if (el && el.ownerDocument && typeof c.resize === 'function') c.resize();
+          } catch (e) { /* chart resize guard */ }
+        }
       }
-    }
-    if (this._echarts) {
-      for (const [, c] of this._echarts) {
-        if (typeof c.isDisposed === 'function' && !c.isDisposed()) c.resize();
+      if (this._echarts) {
+        for (const [, c] of this._echarts) {
+          try {
+            if (typeof c.isDisposed === 'function' && !c.isDisposed()) c.resize();
+          } catch (e) { /* echarts resize guard */ }
+        }
       }
-    }
+    } catch (e) { /* resize handler guard */ }
   };
   window.addEventListener('resize', window._helixResizeHandler);
 }
@@ -110,6 +117,7 @@ export function _makeBar(canvasId, labels, values, color) {
   const el = document.getElementById(canvasId);
   if (!el || typeof Chart === 'undefined') return;
   if (typeof Chart.getChart === 'function') Chart.getChart(canvasId)?.destroy();
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#9aa8c4';
   this._charts.set(canvasId, new Chart(el.getContext('2d'), {
     type: 'bar', data: { labels, datasets: [{ label: '', data: values, backgroundColor: color, borderRadius: 4 }] },
     options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } }, y: { ticks: { color: muted }, grid: { color: 'rgba(128,128,128,0.1)' } } } },

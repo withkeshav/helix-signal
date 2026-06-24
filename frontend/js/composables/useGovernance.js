@@ -80,7 +80,7 @@ export function useGovernance() {
     // --- Init: keyboard shortcuts + polling ---
     init() {
       this._bindKeyboard();
-      this.startAuditPolling();
+      if (this.adminToken) this.startAuditPolling();
       this.initProviders();
       // Load available models
       this.loadAvailableModels();
@@ -300,7 +300,10 @@ export function useGovernance() {
     // ===================================================================
     startAuditPolling() {
       this.stopAuditPolling();
-      this.auditPollTimer = setInterval(() => { this.loadAuditLog(); }, 30000);
+      this.auditPollTimer = setInterval(() => {
+        if (document.hidden) return;
+        this.loadAuditLog();
+      }, 30000);
     },
 
     stopAuditPolling() {
@@ -318,6 +321,8 @@ export function useGovernance() {
         if (r.ok) {
           this.auditLog = await r.json();
           this.sortAuditLog();
+        } else if (r.status === 401 || r.status === 403) {
+          this.stopAuditPolling();
         }
       } catch (e) {}
     },

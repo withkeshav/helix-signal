@@ -1,0 +1,5 @@
+Dockerfile
+e2e/
+playwright.config.ts
+package*.json
+*.md

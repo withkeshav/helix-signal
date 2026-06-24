@@ -9,14 +9,14 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import json
 
-from database import get_db
+from database import User, get_db
 from services.settings_import_export import (
     export_settings,
     import_settings,
     export_settings_to_json,
     import_settings_from_json,
 )
-from core.admin_auth import require_admin_token
+from core.admin_auth import _verify_session_token, require_admin_token
 from core.limiter import limiter
 
 router = APIRouter()
@@ -54,7 +54,9 @@ async def import_settings_endpoint(
     """Import settings from JSON data (admin only)."""
     try:
         # Get user information for audit logging
-        user = None  # In a real implementation, you would get the current user
+        token = request.headers.get("X-Admin-Token", "")
+        payload = _verify_session_token(token)
+        user = db.query(User).filter(User.id == payload["sub"]).first() if payload else None
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
         
@@ -100,7 +102,9 @@ async def import_settings_json_endpoint(
         json_data = content.decode("utf-8")
         
         # Get user information for audit logging
-        user = None  # In a real implementation, you would get the current user
+        token = request.headers.get("X-Admin-Token", "")
+        payload = _verify_session_token(token)
+        user = db.query(User).filter(User.id == payload["sub"]).first() if payload else None
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
         

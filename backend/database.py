@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, text, inspect
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -181,6 +181,10 @@ class ChainTrendSnapshot(Base):
 
 class OsintArticle(Base):
     __tablename__ = "osint_articles"
+    __table_args__ = (
+        Index("ix_osint_articles_published_at", "published_at"),
+        Index("ix_osint_articles_source_title", "source", "title"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     source: Mapped[str] = mapped_column(String(64), index=True)
@@ -442,10 +446,7 @@ def _seed_builtin_playbooks() -> None:
     """Seed built-in playbooks into the database on first init."""
     try:
         with engine.connect() as conn:
-            result = conn.execute(
-                text("SELECT name FROM sqlite_master WHERE type='table' AND name='playbooks'")
-            )
-            if result.fetchone() is None:
+            if not inspect(conn).has_table("playbooks"):
                 return
     except Exception:
         return

@@ -61,8 +61,8 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     role: str
-    created_at: str
-    updated_at: str
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 @router.post("/users", response_model=UserResponse)
@@ -96,8 +96,8 @@ def create_new_user(
         is_active=db_user.is_active,
         is_admin=db_user.is_admin,
         role=db_user.role,
-        created_at=db_user.created_at.isoformat(),
-        updated_at=db_user.updated_at.isoformat(),
+        created_at=db_user.created_at.isoformat() if db_user.created_at else None,
+        updated_at=db_user.updated_at.isoformat() if db_user.updated_at else None,
     )
 
 
@@ -120,8 +120,8 @@ def read_users(
             email=user.email,
             is_active=user.is_active,
             is_admin=user.is_admin,
-            created_at=user.created_at.isoformat(),
-            updated_at=user.updated_at.isoformat(),
+            created_at=user.created_at.isoformat() if user.created_at else None,
+            updated_at=user.updated_at.isoformat() if user.updated_at else None,
         )
         for user in users
     ]
@@ -148,8 +148,8 @@ def read_user(
         is_active=db_user.is_active,
         is_admin=db_user.is_admin,
         role=db_user.role,
-        created_at=db_user.created_at.isoformat(),
-        updated_at=db_user.updated_at.isoformat(),
+        created_at=db_user.created_at.isoformat() if db_user.created_at else None,
+        updated_at=db_user.updated_at.isoformat() if db_user.updated_at else None,
     )
 
 
@@ -184,8 +184,8 @@ def update_existing_user(
         is_active=db_user.is_active,
         is_admin=db_user.is_admin,
         role=db_user.role,
-        created_at=db_user.created_at.isoformat(),
-        updated_at=db_user.updated_at.isoformat(),
+        created_at=db_user.created_at.isoformat() if db_user.created_at else None,
+        updated_at=db_user.updated_at.isoformat() if db_user.updated_at else None,
     )
 
 

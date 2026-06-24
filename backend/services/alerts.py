@@ -73,9 +73,12 @@ def _eval_freshness(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
 def _eval_source_error(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
     sources = bundle.get("_sources", [])
     for s in sources:
-        if s.status == "error":
-            bundle["_meta"]["source"] = s.source_name
-            return True
+        try:
+            if s.status == "error":
+                bundle["_meta"]["source"] = s.source_name
+                return True
+        except Exception:
+            continue
     return False
 
 
@@ -92,12 +95,15 @@ def _eval_slippage(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
 def _eval_source_error_persistent(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
     sources = bundle.get("_sources", [])
     for s in sources:
-        if s.status == "error" and hasattr(s, "last_attempted_fetch") and s.last_attempted_fetch:
-            mins = (datetime.now(timezone.utc) - s.last_attempted_fetch).total_seconds() / 60
-            if mins > 5:
-                bundle["_meta"]["source"] = s.source_name
-                bundle["_meta"]["error_minutes"] = round(mins, 1)
-                return True
+        try:
+            if s.status == "error" and hasattr(s, "last_attempted_fetch") and s.last_attempted_fetch:
+                mins = (datetime.now(timezone.utc) - s.last_attempted_fetch).total_seconds() / 60
+                if mins > 5:
+                    bundle["_meta"]["source"] = s.source_name
+                    bundle["_meta"]["error_minutes"] = round(mins, 1)
+                    return True
+        except Exception:
+            continue
     return False
 
 
@@ -105,9 +111,12 @@ def _eval_source_error_persistent(bundle: dict[str, Any], rule: dict[str, Any]) 
 def _eval_source_recovered(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
     sources = bundle.get("_sources", [])
     for s in sources:
-        if s.status == "ok" and getattr(s, "previous_status", None) == "error":
-            bundle["_meta"]["source"] = s.source_name
-            return True
+        try:
+            if s.status == "ok" and getattr(s, "previous_status", None) == "error":
+                bundle["_meta"]["source"] = s.source_name
+                return True
+        except Exception:
+            continue
     return False
 
 

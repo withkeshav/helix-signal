@@ -18,11 +18,14 @@ router = APIRouter()
 def get_source_status(request: Request):
     statuses = {}
     for name in SOURCES_REGISTRY:
-        source = get_source(name)
-        if source and hasattr(source, "health_check"):
-            statuses[name] = source.health_check()
-        else:
-            statuses[name] = {"source": name, "state": "unknown"}
+        try:
+            source = get_source(name)
+            if source and hasattr(source, "health_check"):
+                statuses[name] = source.health_check()
+            else:
+                statuses[name] = {"source": name, "state": "unknown"}
+        except Exception:
+            statuses[name] = {"source": name, "state": "error", "error": "health check failed"}
     return {
         "sources": statuses,
         "healthy_count": sum(

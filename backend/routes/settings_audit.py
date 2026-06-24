@@ -29,7 +29,7 @@ class SettingsAuditLogResponse(BaseModel):
     user_username: Optional[str]
     ip_address: Optional[str]
     user_agent: Optional[str]
-    created_at: str
+    created_at: str | None = None
 
 
 @router.get("/settings/audit", response_model=List[SettingsAuditLogResponse])
@@ -62,7 +62,7 @@ def get_audit_logs(
             user_username=log.user_username,
             ip_address=log.ip_address,
             user_agent=log.user_agent,
-            created_at=log.created_at.isoformat(),
+            created_at=log.created_at.isoformat() if log.created_at else None,
         )
         for log in logs
     ]
@@ -94,7 +94,7 @@ def get_setting_history(
             user_username=log.user_username,
             ip_address=log.ip_address,
             user_agent=log.user_agent,
-            created_at=log.created_at.isoformat(),
+            created_at=log.created_at.isoformat() if log.created_at else None,
         )
         for log in logs
     ]
@@ -126,7 +126,7 @@ def get_user_changes(
             user_username=log.user_username,
             ip_address=log.ip_address,
             user_agent=log.user_agent,
-            created_at=log.created_at.isoformat(),
+            created_at=log.created_at.isoformat() if log.created_at else None,
         )
         for log in logs
     ]
@@ -156,7 +156,7 @@ def get_recent_changes(
             user_username=log.user_username,
             ip_address=log.ip_address,
             user_agent=log.user_agent,
-            created_at=log.created_at.isoformat(),
+            created_at=log.created_at.isoformat() if log.created_at else None,
         )
         for log in logs
     ]

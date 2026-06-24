@@ -8,9 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from core.admin_auth import _sign_session_token, require_admin_token
+from core.admin_auth import _sign_session_token, _verify_session_token, require_admin_token
 from core.limiter import limiter
-from database import get_db
+from database import User, get_db
 from services.user_service import authenticate_user
 
 router = APIRouter()
@@ -47,6 +47,13 @@ async def logout(
 async def get_current_user(
     request: Request,
     _auth=Depends(require_admin_token),
+    db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get current user information."""
+    token = request.headers.get("X-Admin-Token", "")
+    payload = _verify_session_token(token)
+    if payload is not None:
+        user = db.query(User).filter(User.id == payload["sub"]).first()
+        if user:
+            return {"username": user.username, "role": user.role}
     return {"username": "admin", "role": "administrator"}

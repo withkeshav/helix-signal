@@ -43,7 +43,9 @@ def _externals_score(sentiment: float | None, *, nlp_enabled: bool) -> int:
 
 
 def compute_smidge(db: Session, *, asset_symbol: str) -> dict[str, Any]:
-    sym = asset_symbol.upper()
+    if not asset_symbol:
+        return {"asset_symbol": "", "available": False}
+    sym = asset_symbol.strip().upper()
     bundle = compute_asset_metric_bundle(db, asset_symbol=sym)
     if bundle is None:
         return {"asset_symbol": sym, "available": False}
@@ -63,12 +65,13 @@ def compute_smidge(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     sentiment = None
     if nlp_enabled:
         try:
-            from database import OsintArticle
+            from database import OsintArticle, OsintArticleAsset
             from sqlalchemy import desc
 
             row = (
                 db.query(OsintArticle)
-                .filter(OsintArticle.asset_symbol == sym, OsintArticle.sentiment_score.isnot(None))
+                .join(OsintArticle.asset_links)
+                .filter(OsintArticleAsset.asset_symbol == sym, OsintArticle.sentiment_score.isnot(None))
                 .order_by(desc(OsintArticle.published_at))
                 .first()
             )

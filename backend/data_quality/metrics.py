@@ -96,12 +96,17 @@ class DataQualityMetrics:
                 asset_snapshots[key].append(snapshot)
             
             # Calculate completeness for each asset
+            asset_keys = list(asset_snapshots.keys())
+            freshness_map = {
+                f.asset_symbol: f
+                for f in db.query(AssetFreshness).filter(
+                    AssetFreshness.asset_symbol.in_(asset_keys)
+                ).all()
+            }
             for asset, snapshots_list in asset_snapshots.items():
                 if snapshots_list:
                     # Calculate data completeness based on expected refresh intervals
-                    freshness = db.query(AssetFreshness).filter(
-                        AssetFreshness.asset_symbol == asset
-                    ).first()
+                    freshness = freshness_map.get(asset)
                     
                     if freshness and freshness.last_successful_fetch:
                         age_hours = (datetime.now(timezone.utc) - freshness.last_successful_fetch).total_seconds() / 3600

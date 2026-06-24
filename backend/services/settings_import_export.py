@@ -18,16 +18,7 @@ def export_settings(db: Session) -> Dict[str, Any]:
     settings = get_all_settings(db)
     
     # Create a dictionary with setting keys and values
-    exported_settings = {}
-    for setting in settings:
-        key = setting["key"]
-        # Get the actual value from the database
-        db_setting = db.query(Setting).filter(Setting.key == key).first()
-        if db_setting:
-            exported_settings[key] = db_setting.value
-        else:
-            # Use the default value if not in database
-            exported_settings[key] = setting["default"]
+    exported_settings = {s["key"]: s["value"] for s in settings}
     
     # Add metadata
     export_data = {

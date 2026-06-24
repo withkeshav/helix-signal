@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import sys
@@ -26,6 +27,8 @@ from services.backfill import run_backfill
 from services.governance import build_governance_payload
 from services.source_usage import get_source_usage_summary
 from core.registry import SOURCES_REGISTRY, get_source
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,13 +80,13 @@ def _get_health(db: Session) -> dict[str, Any]:
         db.execute(text("SELECT 1"))
         db_ok = True
     except Exception:
-        pass
+        logger.debug("DB health check failed", exc_info=True)
     try:
         from core.cache_manager import cache
         if cache._redis:
             redis_connected = True
     except Exception:
-        pass
+        logger.debug("Redis health check failed", exc_info=True)
     pass  # scheduler status unavailable — no standalone scheduler module
     return {
         "db": db_ok,

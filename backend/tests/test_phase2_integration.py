@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 import services.ai_router as r
@@ -22,18 +21,11 @@ import services.components.ai.budget as budget_mod
 import services.components.ai.cache as cache_mod
 from core.circuit_breaker import CircuitBreaker, CircuitState
 from providers.rate_limiter import TokenBucket
-from providers.settings import PLAYBOOKS, apply_playbook, get_playbooks, set_setting
+from providers.settings import PLAYBOOKS, apply_playbook, get_playbooks
 from services.ai_router import (
-    _cache_get,
-    _cache_set,
-    _check_rate_limit,
-    _prompt_hash,
-    _FEATURE_CACHE_TTL,
     _PROVIDER_RATE_LIMITS,
-    _PROVIDER_FALLBACK_COUNTS,
     enrich_with_ai,
     get_cache_stats,
-    get_provider_stats,
 )
 from services.ai_usage import get_ai_usage_summary, increment_ai_usage
 from services.source_usage import _check_source_rate_limit, _record_source_call, _SOURCE_RATE_LIMITS

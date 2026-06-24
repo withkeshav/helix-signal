@@ -2,14 +2,13 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from database import (
     SourceStatus, AssetChainSnapshot, AssetFreshness, 
     SourceUsage, AiUsage, SettingsAuditLog
 )
-from providers.settings import get_setting
 
 # Configure logging
 logger = logging.getLogger(__name__)

@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from database import SignalEvent, get_db
 from sqlalchemy import desc
 from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
-from providers.settings import get_playbooks as get_builtin_playbooks
 from routes.playbooks import apply_playbook_by_name, get_all_playbooks, seed_builtin_playbooks
 from services.ai_usage import get_ai_usage_summary
 from services.dashboard import build_dashboard_response

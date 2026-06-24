@@ -4,7 +4,7 @@ CircuitBreaker, and HTTP retry logic."""
 from __future__ import annotations
 
 import time
-from unittest.mock import patch, Mock, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 import httpx
 import pytest

@@ -6,10 +6,8 @@ signal_engine/components/ for better maintainability and testability.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
-from utils import utc_normalize, utc_now
 
 # Import component modules
 from signal_engine.components.peg_analysis import (

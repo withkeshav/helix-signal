@@ -18,7 +18,7 @@ os.environ["HELIX_ADMIN_TOKEN"] = "test-admin-token"
 os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 
 import providers.settings  # noqa: E402,F401 — registers Setting model with Base.metadata
-from database import Base, engine, init_db  # noqa: E402
+from database import engine, init_db  # noqa: E402
 import main  # noqa: E402
 
 # Module references for global state reset (avoid "reset pollution" across test files)

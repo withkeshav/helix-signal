@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
 
@@ -29,7 +30,7 @@ def _sentiment_max_articles() -> int:
         if val is not None:
             return int(val)
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("Sentiment max articles lookup failed", exc_info=True)
     return int(os.getenv("SENTIMENT_MAX_ARTICLES_PER_BATCH", "15"))
 
 
@@ -90,6 +91,7 @@ def _make_request(titles: list[str]) -> list[dict[str, Any]]:
             raise ValueError("Expected array")
         return [_parse_sentiment(r) for r in results]
     except Exception:
+        logging.getLogger(__name__).warning("Sentiment analysis request failed", exc_info=True)
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
 

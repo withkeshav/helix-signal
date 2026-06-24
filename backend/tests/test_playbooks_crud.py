@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 
 def test_list_playbooks_includes_builtin(client, admin_headers) -> None:

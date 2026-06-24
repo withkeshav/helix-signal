@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database import Base, get_db
 from main import app
-from providers.settings import Setting, get_all_settings
+from providers.settings import Setting
 
 _tmpdb_path = None
 _orig_token = None

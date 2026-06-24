@@ -1,6 +1,6 @@
 """Peg analysis components for stablecoin monitoring."""
 
-from typing import Tuple, Optional
+from typing import Tuple
 
 
 def peg_deviation(price: float | None) -> Tuple[float, float]:

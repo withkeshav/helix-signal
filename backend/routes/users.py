@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from providers.settings import get_setting
 from services.user_service import (
-    authenticate_user,
     create_user,
     delete_user,
     get_user,

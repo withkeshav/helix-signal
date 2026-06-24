@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services.source_usage import get_source_usage, get_source_usage_summary
+from services.source_usage import get_source_usage_summary
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
 from core.registry import SOURCES_REGISTRY, get_source

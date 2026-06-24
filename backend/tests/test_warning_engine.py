@@ -6,7 +6,7 @@ Covers: threshold checking, warning generation, AI usage tracking.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,7 +18,7 @@ os.environ["HELIX_ADMIN_TOKEN"] = "test-admin-token"
 os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 
 
-from database import Base, engine, init_db, AiUsage  # noqa: E402
+from database import engine, init_db  # noqa: E402
 from services.ai_usage import increment_ai_usage, get_ai_usage_summary  # noqa: E402
 from services.warning_engine import check_warnings, _get_warning_threshold  # noqa: E402
 import services.components.ai.budget as budget_mod  # noqa: E402

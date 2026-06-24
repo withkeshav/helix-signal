@@ -1,9 +1,8 @@
 """Tests for predictive analytics bundle."""
 
-import os
 
 import pytest
-from database import AssetChainSnapshot, init_db, SessionLocal
+from database import init_db, SessionLocal
 from services.predictive import run_predictive_bundle, _depeg_probability_heuristic, _regime_state
 
 

@@ -13,7 +13,7 @@ network = pytest.mark.network
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from database import Base, engine, init_db
+from database import engine, init_db
 import main
 
 _TABLES = [

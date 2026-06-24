@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from sqlalchemy.orm import Session
 
-from providers.settings import Setting
 from providers.settings import get_all_settings, set_setting
-from services.settings_audit import log_settings_change
 
 
 def export_settings(db: Session) -> Dict[str, Any]:

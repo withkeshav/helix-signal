@@ -8,7 +8,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-import json
 
 from database import User, get_db
 from services.settings_import_export import (

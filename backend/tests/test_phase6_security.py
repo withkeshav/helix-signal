@@ -217,7 +217,6 @@ class TestXForwardedFor:
     def test_get_remote_address_uses_forwarded(self):
         from core.limiter import _get_remote_address
         from fastapi import Request
-        from starlette.datastructures import Headers
 
         scope = {
             "type": "http",

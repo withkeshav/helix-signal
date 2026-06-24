@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from database import AssetChainSnapshot, ChainTrendSnapshot
+from database import AssetChainSnapshot
 
 
 def build_stress_leaderboard(

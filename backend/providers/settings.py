@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, Session
 
-from database import Base, engine, SessionLocal
+from database import Base
 
 # Import settings registry
 from .settings_registry import _DEFAULT_SETTINGS

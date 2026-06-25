@@ -1,0 +1,9 @@
+{
+  "name": "helix-signal-frontend",
+  "private": true,
+  "description": "CDN dependency tracking only — not a build artifact",
+  "dependencies": {
+    "alpinejs": "3.14.9",
+    "echarts": "5.5.0"
+  }
+}

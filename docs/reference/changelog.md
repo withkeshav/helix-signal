@@ -22,6 +22,11 @@
 - **Postgres playbook seed crash** — `is_builtin = 1` fails on Postgres BOOLEAN. Replaced with ORM `Playbook.is_builtin.is_(True)`.
 - **Fail-loud lifespan** — Wrapped `lifespan()` startup in try/except that logs traceback to stderr.
 - **Re-export `_within_budget`** — Added to `ai_router.py` imports for `osint.py`/`sentiment.py` consumers.
+- **CSP + nginx perf** — Re-added `unsafe-eval` to nginx CSP, enabled gzip, added static asset caching.
+- **Redis persistence** — RDB snapshots + AOF.
+- **Chart.js removal** — Dropped Chart.js CDN, rewrote charts.js to ECharts-only.
+- **OSINT timeouts** — Per-source 15s RSS timeouts, 20s Twitter timeout.
+- **Audit follow-up** — Fixed `_makeBar`/`_renderForecastCanvas` exports, moved ECharts to `_echarts` map, replaced `immutable` cache with `no-cache`, added HSTS to static assets, removed redundant `--save 3600 1`, added dependabot npm tracking.
 
 ## 3.10.2 (2026-06-24)
 

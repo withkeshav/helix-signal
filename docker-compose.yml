@@ -34,7 +34,7 @@ services:
     container_name: helix-redis
     restart: unless-stopped
     profiles: ["data"]
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save 3600 1 --save 300 100 --appendonly yes
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save 300 100 --appendonly yes
     networks:
       - internal
     volumes:

@@ -86,10 +86,11 @@ export function loadTrendChart() {
       }
       const el = document.getElementById('chart-trend-signal');
       if (!el) return;
-      if (this._charts.has('chart-trend-signal')) this._disposeChart(this._charts.get('chart-trend-signal'));
+      if (this._echarts?.has('chart-trend-signal')) this._disposeChart(this._echarts.get('chart-trend-signal'));
       const pts = t.points.map(p => [new Date(p.timestamp).getTime(), p.signal_score != null ? Number(p.signal_score) : null]);
       const chart = echarts.init(el);
-      this._charts.set('chart-trend-signal', chart);
+      if (!this._echarts) this._echarts = new Map();
+      this._echarts.set('chart-trend-signal', chart);
       chart.setOption({
         grid: { left: 50, right: 16, top: 8, bottom: 28 },
         xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 10 }, axisLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } }, splitLine: { show: false } },
@@ -104,7 +105,7 @@ export function loadTrendChart() {
     .catch(() => {});
 }
 
-function _makeBar(elId, labels, values, color, prefix) {
+export function _makeBar(elId, labels, values, color, prefix) {
   if (!this._charts) this._charts = new Map();
   if (this._charts.has(elId)) this._disposeChart(this._charts.get(elId));
   const el = document.getElementById(elId);
@@ -125,11 +126,12 @@ export function renderSentimentChart(series) {
   if (!series || !series.length) return;
   const el = document.getElementById('chart-sentiment');
   if (!el) return;
-  if (this._charts.has('chart-sentiment')) this._disposeChart(this._charts.get('chart-sentiment'));
+  if (this._echarts?.has('chart-sentiment')) this._disposeChart(this._echarts.get('chart-sentiment'));
   const primary = _cssVar('--spark', '#60a5fa');
   const muted = _cssVar('--muted', '#9aa8c4');
   const chart = echarts.init(el);
-  this._charts.set('chart-sentiment', chart);
+  if (!this._echarts) this._echarts = new Map();
+  this._echarts.set('chart-sentiment', chart);
   chart.setOption({
     grid: { left: 50, right: 16, top: 8, bottom: 28 },
     xAxis: { type: 'category', data: series.map(s => s.date), axisLabel: { color: muted, fontSize: 10 }, axisLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } } },
@@ -170,7 +172,7 @@ export function _renderForecastChartsImpl() {
   _renderForecastCanvas.call(this, elSupply, 'Supply Forecast', supplyHistorical, supplyForecast, baseConfig, textColor, lineColor);
 }
 
-function _renderForecastCanvas(el, title, historical, forecast, baseConfig, textColor, lineColor) {
+export function _renderForecastCanvas(el, title, historical, forecast, baseConfig, textColor, lineColor) {
   if (this._echarts?.has(el.id)) { this._disposeChart(this._echarts.get(el.id)); this._echarts?.delete(el.id); }
   const chart = echarts.init(el);
   if (this._echarts) this._echarts.set(el.id, chart);
@@ -195,12 +197,13 @@ export async function renderSupplyChart() {
   if (!d || !d.points || !d.points.length) return;
   const el = document.getElementById('chart-supply-trend');
   if (!el) return;
-  if (this._charts.has('chart-supply-trend')) this._disposeChart(this._charts.get('chart-supply-trend'));
+  if (this._echarts?.has('chart-supply-trend')) this._disposeChart(this._echarts.get('chart-supply-trend'));
   const pts = d.points.filter(p => p.total_supply != null).map(p => [new Date(p.timestamp).getTime(), Number(p.total_supply)]);
   const primary = _cssVar('--spark', '#60a5fa');
   const muted = _cssVar('--muted', '#9aa8c4');
   const chart = echarts.init(el);
-  this._charts.set('chart-supply-trend', chart);
+  if (!this._echarts) this._echarts = new Map();
+  this._echarts.set('chart-supply-trend', chart);
   chart.setOption({
     grid: { left: 60, right: 16, top: 8, bottom: 28 },
     xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 10, formatter: v => formatDate(v, 'axis') }, axisLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } }, splitLine: { show: false } },

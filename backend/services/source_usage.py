@@ -5,7 +5,6 @@ from datetime import datetime, timezone, date
 from typing import Any
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from database import SourceUsage
 

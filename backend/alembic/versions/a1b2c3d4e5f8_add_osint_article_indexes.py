@@ -12,7 +12,6 @@ Adds indexes for common query patterns on osint_articles:
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 revision: str = "a1b2c3d4e5f8"

@@ -2,7 +2,6 @@
 
 import os
 
-import pytest
 
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
@@ -18,8 +17,6 @@ from database import (
     SignalEvent,
     OsintArticle,
     OsintArticleAsset,
-    Base,
-    engine,
 )
 
 _RUN_NONCE = None

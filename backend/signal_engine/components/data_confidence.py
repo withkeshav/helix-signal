@@ -1,7 +1,6 @@
 """Data confidence analysis components."""
 
 from typing import Dict, Any
-import math
 
 def chain_data_confidence(
     source_ok: bool,

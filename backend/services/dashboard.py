@@ -13,6 +13,7 @@ Key responsibilities:
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -356,7 +357,7 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
                     note=f"{att_age:.0f}d since last attestation report",
                 )
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("Attestation lookup failed", exc_info=True)
 
     from providers.settings import get_setting
     nlp_from_settings = get_setting("feature_nlp_sentiment", db)

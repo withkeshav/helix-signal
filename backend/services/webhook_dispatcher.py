@@ -12,6 +12,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+import ipaddress
+import socket
+
 from structlog import get_logger
 
 from database import SignalEvent
@@ -89,10 +92,20 @@ def compute_signature(body: bytes, secret: str) -> str:
     return f"sha256={digest}"
 
 
+def _is_private_ip(hostname: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(socket.gethostbyname(hostname))
+        return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+    except Exception:
+        return True
+
+
 def _validate_url(url: str) -> bool:
     try:
         parsed = urlparse(url.strip())
-        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return False
+        return not _is_private_ip(parsed.hostname or "")
     except Exception:
         return False
 

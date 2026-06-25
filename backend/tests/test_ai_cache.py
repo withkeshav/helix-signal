@@ -14,12 +14,10 @@ import services.ai_router as r
 from services.ai_router import (
     _AI_CACHE,
     _FEATURE_CACHE_TTL,
-    _SEMANTIC_CACHE,
     _cache_get,
     _cache_set,
     _prompt_hash,
     _semantic_cache_lookup,
-    _text_trigrams,
     _trigram_similarity,
     enrich_with_ai,
     get_cache_stats,

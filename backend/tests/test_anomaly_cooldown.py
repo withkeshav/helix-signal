@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from agents.anomaly_agent import _recent_ai_investigation, INVESTIGATION_COOLDOWN_MINUTES
 from database import SignalEvent

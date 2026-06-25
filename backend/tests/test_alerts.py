@@ -1,14 +1,11 @@
 """Tests for alert rule evaluation engine."""
 
-from datetime import datetime, timezone
 
 from services.alerts import (
     _eval_depeg_bps,
     _eval_supply_contraction,
     _eval_freshness,
-    _eval_source_error,
     _eval_concentration,
-    _eval_slippage,
     _match_condition,
     _extract_threshold,
     load_alert_rules,

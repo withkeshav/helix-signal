@@ -9,7 +9,6 @@ from sources.defillama import (
     _discover_chain_ids,
     fetch_chain_tvl_by_defillama_name,
     fetch_stablecoin_chart_points,
-    DefiLlamaError,
 )
 
 

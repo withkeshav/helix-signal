@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from database import AssetTrendSnapshot, SourceStatus, get_db
+from database import get_db
 from services.health import build_health_payload
 from services.retention import HELIX_VERSION
 

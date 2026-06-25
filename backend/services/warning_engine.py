@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from providers.settings import get_setting, _DEFAULT_SETTINGS
+from providers.settings import _DEFAULT_SETTINGS
 
 
 def check_warnings(db: Session | None = None) -> list[dict[str, Any]]:

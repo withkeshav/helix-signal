@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html as html_mod
 import json
+import logging
 import os
 import re
 import defusedxml.ElementTree as ET
@@ -17,7 +18,6 @@ from sqlalchemy.orm import Session, joinedload
 from structlog import get_logger
 
 from database import OsintArticle, OsintArticleAsset, SignalEvent, SourceStatus
-from signal_engine.core import get_asset_by_symbol, load_enabled_assets
 
 log = get_logger(__name__)
 
@@ -108,7 +108,7 @@ def _fetch_cryptocurrency_cv() -> list[dict[str, Any]]:
                 try:
                     dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).debug("Failed to parse OSINT article date", exc_info=True)
             articles.append({
                 "title": title,
                 "url": url,
@@ -263,7 +263,7 @@ def _llm_extract_cache_ttl() -> int:
         if val is not None:
             return int(val)
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("LLM extract cache TTL lookup failed", exc_info=True)
     return int(os.getenv("LLM_EXTRACT_CACHE_TTL", "86400"))
 _ATTESTATION_HINT_WORDS = ("attestation", "reserve", "transparency", "report", "proof")
 _MONTH_NAMES = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December"

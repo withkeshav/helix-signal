@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import statistics
 from datetime import datetime, timezone
 from pathlib import Path
@@ -385,7 +384,7 @@ async def refresh_chain_data(db: Session) -> None:
                         detect_anomalies(db, asset_symbol=sym)
                         emit_cusum_regime_events(db, asset_symbol=sym)
                     except Exception:
-                        pass
+                        log.warning("Anomaly detection failed for symbol", symbol=sym, exc_info=True)
             flush_source_usage(db)  # Flush cached source usage
             for sym in symbols:
                 invalidate_dashboard(sym)

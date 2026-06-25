@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 from database import SignalEvent, get_db
-from schemas import SignalEventOut, SignalEventsResponseOut
+from schemas import SignalEventsResponseOut
 from services.exports import events_export
 from signal_engine.core import get_asset_by_symbol
 from utils import signal_event_rows_to_out

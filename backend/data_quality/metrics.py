@@ -1,15 +1,14 @@
 """Data quality metrics collection and analysis."""
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
 from database import (
     SourceStatus, AssetChainSnapshot, AssetFreshness, 
     SourceUsage, AiUsage, SettingsAuditLog
 )
-from providers.settings import get_setting
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -54,7 +53,7 @@ class DataQualityMetrics:
                 
                 # Calculate freshness
                 if source.last_successful_fetch:
-                    freshness_hours = (datetime.utcnow() - source.last_successful_fetch).total_seconds() / 3600
+                    freshness_hours = (datetime.now(timezone.utc) - source.last_successful_fetch).total_seconds() / 3600
                     metrics["freshness_by_source"][source.source_name] = round(freshness_hours, 2)
                 
                 # Error rates from last error field
@@ -96,15 +95,20 @@ class DataQualityMetrics:
                 asset_snapshots[key].append(snapshot)
             
             # Calculate completeness for each asset
+            asset_keys = list(asset_snapshots.keys())
+            freshness_map = {
+                f.asset_symbol: f
+                for f in db.query(AssetFreshness).filter(
+                    AssetFreshness.asset_symbol.in_(asset_keys)
+                ).all()
+            }
             for asset, snapshots_list in asset_snapshots.items():
                 if snapshots_list:
                     # Calculate data completeness based on expected refresh intervals
-                    freshness = db.query(AssetFreshness).filter(
-                        AssetFreshness.asset_symbol == asset
-                    ).first()
+                    freshness = freshness_map.get(asset)
                     
                     if freshness and freshness.last_successful_fetch:
-                        age_hours = (datetime.utcnow() - freshness.last_successful_fetch).total_seconds() / 3600
+                        age_hours = (datetime.now(timezone.utc) - freshness.last_successful_fetch).total_seconds() / 3600
                         # Simple completeness score (newer = better)
                         completeness = max(0, 100 - (age_hours * 5))  # 5% penalty per hour of staleness
                         metrics["completeness_by_asset"][asset] = round(completeness, 2)
@@ -133,7 +137,7 @@ class DataQualityMetrics:
         """Get API usage and performance metrics."""
         try:
             # Get source usage for the last day
-            yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+            yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
             source_usage = db.query(SourceUsage).filter(
                 SourceUsage.usage_date == yesterday
             ).all()
@@ -239,7 +243,7 @@ class DataQualityMetrics:
             metrics["audit_trail"] = {
                 "total_changes": len(recent_audits),
                 "recent_changes": len([a for a in recent_audits 
-                                     if a.created_at > datetime.utcnow() - timedelta(hours=24)])
+                                     if a.created_at > datetime.now(timezone.utc) - timedelta(hours=24)])
             }
             
             return metrics
@@ -313,7 +317,7 @@ def get_data_quality_report(db: Session) -> Dict[str, Any]:
     """Generate a complete data quality report."""
     try:
         report = {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "overall_quality": DataQualityMetrics.get_overall_data_quality_score(db),
             "source_quality": DataQualityMetrics.get_source_quality_metrics(db),
             "asset_quality": DataQualityMetrics.get_asset_data_quality(db),
@@ -323,4 +327,4 @@ def get_data_quality_report(db: Session) -> Dict[str, Any]:
         return report
     except Exception as e:
         logger.error(f"Error generating data quality report: {e}")
-        return {"error": str(e), "generated_at": datetime.utcnow().isoformat()}
+        return {"error": str(e), "generated_at": datetime.now(timezone.utc).isoformat()}

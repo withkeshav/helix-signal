@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import os
 import time
 from functools import wraps
@@ -117,7 +118,7 @@ class CacheManager:
                     val = self._redis.get(key)
                     return json.loads(val) if val else None
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).debug("Cache get retry failed after reconnect", exc_info=True)
             return None
 
     def set(self, key: str, value: Any, ttl: int = 300):
@@ -132,7 +133,7 @@ class CacheManager:
                 try:
                     self._redis.setex(key, ttl, json.dumps(value))
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).debug("Cache set retry failed after reconnect", exc_info=True)
 
     def delete(self, key: str):
         """Delete key from cache with error handling."""
@@ -146,7 +147,7 @@ class CacheManager:
                 try:
                     self._redis.delete(key)
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).debug("Cache delete retry failed after reconnect", exc_info=True)
 
     def delete_pattern(self, pattern: str):
         """Delete keys matching pattern with error handling."""
@@ -172,7 +173,7 @@ class CacheManager:
                         if cursor == 0:
                             break
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).debug("Cache delete_pattern retry failed after reconnect", exc_info=True)
 
     def cached(self, ttl: int = 300):
         """Decorator: cache function results in Redis with automatic fallback."""

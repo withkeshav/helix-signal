@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from database import get_db
 from providers.settings import get_setting
 from services.user_service import (
-    authenticate_user,
     create_user,
     delete_user,
     get_user,
@@ -120,6 +119,7 @@ def read_users(
             email=user.email,
             is_active=user.is_active,
             is_admin=user.is_admin,
+            role=user.role,
             created_at=user.created_at.isoformat() if user.created_at else None,
             updated_at=user.updated_at.isoformat() if user.updated_at else None,
         )

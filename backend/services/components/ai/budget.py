@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import logging
 import os
-import time
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -67,7 +67,7 @@ def _deduct_tokens(count: int) -> bool:
             ok = client.eval(_BUDGET_LUA_SCRIPT, 1, key, limit, count, 86400)
             return bool(ok)
         except Exception:
-            pass
+            logging.getLogger(__name__).debug("Redis token deduction failed", exc_info=True)
     if _LOCAL_DAILY_TOKENS + count > limit:
         return False
     _LOCAL_DAILY_TOKENS += count
@@ -91,7 +91,7 @@ def _within_budget(count: int) -> bool:
             current = client.get(key) or "0"
             return int(current) + count <= limit
         except Exception:
-            pass
+            logging.getLogger(__name__).debug("Redis budget check failed", exc_info=True)
     return _LOCAL_DAILY_TOKENS + count <= limit
 
 def get_budget_status() -> Dict[str, Any]:
@@ -113,7 +113,7 @@ def get_budget_status() -> Dict[str, Any]:
                 current = client.get(key) or "0"
                 used = int(current)
         except Exception:
-            pass
+            logging.getLogger(__name__).debug("Redis budget status fetch failed", exc_info=True)
     
     remaining = max(0, limit - used)
     pct = (used / limit * 100) if limit > 0 else 0

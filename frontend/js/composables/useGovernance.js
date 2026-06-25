@@ -779,5 +779,25 @@ export function useGovernance() {
         this.showToast('Error: ' + e.message, 'error');
       }
     },
+
+    downloadDiagnostics() {
+      const snapshot = {
+        timestamp: new Date().toISOString(),
+        store: {
+          dashboard: Alpine.store('dashboard'),
+          ui: Alpine.store('ui')
+        }
+      };
+      const blob = new Blob(
+        [JSON.stringify(snapshot, null, 2)],
+        { type: 'application/json' }
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `helix-diagnostics-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
   };
 }

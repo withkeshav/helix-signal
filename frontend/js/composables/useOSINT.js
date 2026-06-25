@@ -40,9 +40,9 @@ export function useOSINT() {
 
     init() {
       this.$nextTick(() => {
-        // Load data if we're on events or intel tab
-        const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
-        if (currentTab === 'events' || currentTab === 'intel') {
+        // Load data if we're on intel tab
+        const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'signal';
+        if (currentTab === 'intel') {
           const asset = this.$store.dashboard.asset || 'USDT';
           this.loadEvents(asset);
           this.loadAttestation();
@@ -76,15 +76,15 @@ export function useOSINT() {
           }
         };
 
-        // Load data when tab changes to events or intel
+        // Load data when tab changes to intel
         this.$watch('$store.ui.tab', (newTab) => {
-          if (newTab === 'events' || newTab === 'intel') {
+          if (newTab === 'intel') {
             const asset = this.$store.dashboard.asset || 'USDT';
             this.loadEvents(asset);
             this.loadAttestation();
           }
           
-          if (newTab !== 'events' && newTab !== 'intel') {
+          if (newTab !== 'intel') {
             this._destroyCharts();
             window.removeEventListener('resize', resizeHandler);
           } else {
@@ -94,8 +94,8 @@ export function useOSINT() {
 
         // Reload data when asset changes
         this.$watch('$store.dashboard.asset', (newAsset) => {
-          const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
-          if (currentTab === 'events' || currentTab === 'intel') {
+          const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'signal';
+          if (currentTab === 'intel') {
             this.loadEvents(newAsset);
             this.loadAttestation();
           }

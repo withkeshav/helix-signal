@@ -28,7 +28,7 @@ Alpine.data('smidgePanel', useSMIDGE);
 // Minimal root application component
 Alpine.data('helixApp', () => ({
   // Essential global state needed by template
-  tab: location.hash.slice(1) || 'overview',
+  tab: location.hash.slice(1) || 'signal',
   theme: 'light',
   asset: 'USDT', // Needed by asset select dropdown
   searchQuery: '',
@@ -40,13 +40,8 @@ Alpine.data('helixApp', () => ({
   warnings: [],
   _timer: null,
   enabledAssets: ['USDT', 'USDC', 'DAI', 'PYUSD'],
-  _loadingDashboard: false,
+
   _refreshingStale: false,
-  evidenceOpen: false,
-  evidenceTitle: '',
-  evidenceFormula: '',
-  evidenceComponents: {},
-  evidenceSources: {},
   formatUsd,
   formatFreshnessLabel,
   freshnessBandClass,
@@ -147,6 +142,26 @@ Alpine.data('helixApp', () => ({
     this.$store.ui.tab = this.tab;
   },
 
+  downloadDiagnostics() {
+    const snapshot = {
+      timestamp: new Date().toISOString(),
+      store: {
+        dashboard: Alpine.store('dashboard'),
+        ui: Alpine.store('ui')
+      }
+    };
+    const blob = new Blob(
+      [JSON.stringify(snapshot, null, 2)],
+      { type: 'application/json' }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `helix-diagnostics-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   selectSearchResult(r) {
     this.searchQuery = '';
     this.searchResults = [];
@@ -156,27 +171,6 @@ Alpine.data('helixApp', () => ({
     }
   },
 
-  showEvidence(type) {
-    this.evidenceOpen = true;
-    this.evidenceTitle = type === 'score' ? 'Signal Score' : 'Peg Status';
-    if (type === 'score') {
-      this.evidenceFormula = 'Weighted composite of all signal components';
-      this.evidenceComponents = this.$store.dashboard.signal?.components || {};
-    } else if (type === 'peg') {
-      this.evidenceFormula = 'Current price vs target peg';
-      this.evidenceComponents = { current_price: this.$store.dashboard.depeg?.current_price || 0, peg_status: this.$store.dashboard.depeg?.peg_status || '' };
-    }
-    this.evidenceSources = {};
-  },
-
-  copyEvidence() {
-    const text = [
-      this.evidenceTitle,
-      this.evidenceFormula,
-      ...Object.entries(this.evidenceComponents).map(([k, v]) => `${k}: ${typeof v === 'number' ? v.toFixed(4) : v}`),
-    ].join('\n');
-    navigator.clipboard?.writeText(text).catch(() => {});
-  },
 }));
 
 Alpine.start();

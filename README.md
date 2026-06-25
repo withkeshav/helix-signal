@@ -22,7 +22,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enable via Settings UI. ONNX depeg model support present (velocity feature) but training not performed in this build (future).
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
-- **Alpine.js + Chart.js + ECharts frontend**: 6-tab layout (Market, Forecast, Supply, Events, Intel, Health), no build step, CDN-loaded
+- **Alpine.js + Chart.js + ECharts frontend**: 5-tab layout (Signal, Market, Intel, System, Settings), no build step, CDN-loaded
 
 ## Quick Start
 
@@ -183,7 +183,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, etc.)
 - `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener) with circuit breakers
 - `backend/signal_engine/` — V3 risk scoring (scoring, metrics, history, risk inputs)
-- `frontend/` — pure static HTML, Alpine.js 6-tab dashboard, Chart.js + ECharts, nginx API proxy
+- `frontend/` — pure static HTML, Alpine.js 5-tab dashboard, Chart.js + ECharts, nginx API proxy
 - `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast) + 3 Web Components
 - `config/` — chain, asset, and alert configuration
 - `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories

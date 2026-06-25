@@ -23,10 +23,159 @@
   <script type="module" src="/js/init.js"></script>
   </head>
 <body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+
+    <!-- Navigation / UI -->
+    <symbol id="icon-settings" viewBox="0 0 24 24">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </symbol>
+
+    <symbol id="icon-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+    </symbol>
+
+    <symbol id="icon-moon" viewBox="0 0 24 24">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </symbol>
+
+    <!-- Direction indicators -->
+    <symbol id="icon-arrow-up" viewBox="0 0 24 24">
+      <path d="M12 19V5M5 12l7-7 7 7"/>
+    </symbol>
+
+    <symbol id="icon-arrow-down" viewBox="0 0 24 24">
+      <path d="M12 5v14M19 12l-7 7-7-7"/>
+    </symbol>
+
+    <symbol id="icon-chevron-up" viewBox="0 0 24 24">
+      <path d="M18 15l-6-6-6 6"/>
+    </symbol>
+
+    <symbol id="icon-chevron-down" viewBox="0 0 24 24">
+      <path d="M6 9l6 6 6-6"/>
+    </symbol>
+
+    <!-- Section heading icons -->
+    <symbol id="icon-bar-chart" viewBox="0 0 24 24">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </symbol>
+
+    <symbol id="icon-trophy" viewBox="0 0 24 24">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+      <path d="M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>
+    </symbol>
+
+    <symbol id="icon-satellite" viewBox="0 0 24 24">
+      <path d="M13 7 9 3 3 9l4 4"/>
+      <path d="m13 7 3 3"/>
+      <path d="M14 14l4 4-6 6-4-4"/>
+      <path d="m14 14-3-3"/>
+      <circle cx="18.5" cy="5.5" r="2.5"/>
+      <path d="M22 2 20 4"/>
+    </symbol>
+
+    <symbol id="icon-clipboard" viewBox="0 0 24 24">
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+    </symbol>
+
+    <symbol id="icon-lock" viewBox="0 0 24 24">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </symbol>
+
+    <symbol id="icon-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.35-4.35"/>
+    </symbol>
+
+    <symbol id="icon-key" viewBox="0 0 24 24">
+      <circle cx="7.5" cy="15.5" r="5.5"/>
+      <path d="m21 2-9.6 9.6"/>
+      <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+    </symbol>
+
+    <symbol id="icon-globe" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+      <path d="M2 12h20"/>
+    </symbol>
+
+    <symbol id="icon-sliders" viewBox="0 0 24 24">
+      <line x1="4" y1="21" x2="4" y2="14"/>
+      <line x1="4" y1="10" x2="4" y2="3"/>
+      <line x1="12" y1="21" x2="12" y2="12"/>
+      <line x1="12" y1="8" x2="12" y2="3"/>
+      <line x1="20" y1="21" x2="20" y2="16"/>
+      <line x1="20" y1="10" x2="20" y2="3"/>
+      <line x1="1" y1="14" x2="7" y2="14"/>
+      <line x1="9" y1="8" x2="15" y2="8"/>
+      <line x1="17" y1="16" x2="23" y2="16"/>
+    </symbol>
+
+    <symbol id="icon-bot" viewBox="0 0 24 24">
+      <path d="M12 8V4H8"/>
+      <rect width="16" height="12" x="4" y="8" rx="2"/>
+      <path d="M2 14h2M20 14h2M9 18v2M15 18v2"/>
+    </symbol>
+
+    <symbol id="icon-menu" viewBox="0 0 24 24">
+      <line x1="4" y1="6" x2="20" y2="6"/>
+      <line x1="4" y1="12" x2="20" y2="12"/>
+      <line x1="4" y1="18" x2="20" y2="18"/>
+    </symbol>
+
+    <symbol id="icon-refresh-cw" viewBox="0 0 24 24">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+      <path d="M21 3v5h-5"/>
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+      <path d="M8 16H3v5"/>
+    </symbol>
+
+    <symbol id="icon-repeat" viewBox="0 0 24 24">
+      <path d="m17 2 4 4-4 4"/>
+      <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+      <path d="m7 22-4-4 4-4"/>
+      <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+    </symbol>
+
+    <symbol id="icon-users" viewBox="0 0 24 24">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </symbol>
+
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </symbol>
+
+    <symbol id="icon-upload" viewBox="0 0 24 24">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </symbol>
+
+    <symbol id="icon-warning" viewBox="0 0 24 24">
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </symbol>
+
+  </svg>
   <main class="container">
     <!-- Top Nav -->
     <nav class="top-nav">
-      <span class="nav-brand">&#128305; Helix Signal</span>
+      <span class="nav-brand"><svg class="icon"><use href="#icon-refresh-cw"/></svg> Helix Signal</span>
       <div class="nav-search">
         <input type="text" class="search-input" placeholder="Search assets..." x-model="searchQuery" @input.debounce.300ms="search" x-show="false">
         <div class="search-results" x-show="searchResults.length > 0" @click.outside="searchResults=[]">
@@ -39,14 +188,11 @@
         </div>
       </div>
       <div class="nav-links" role="tablist">
-        <button class="nav-link" role="tab" :class="tab==='overview'&&'active'" :aria-selected="tab==='overview'" @click="tab='overview';loadTab()" aria-controls="tab-overview">Overview</button>
-        <button class="nav-link" role="tab" :class="tab==='supply'&&'active'" :aria-selected="tab==='supply'" @click="tab='supply';loadTab()" aria-controls="tab-supply">Supply</button>
-        <button class="nav-link" role="tab" :class="tab==='events'&&'active'" :aria-selected="tab==='events'" @click="tab='events';loadTab()" aria-controls="tab-events">OSINT</button>
-        <button class="nav-link" role="tab" :class="tab==='forecast'&&'active'" :aria-selected="tab==='forecast'" @click="tab='forecast';loadTab()" aria-controls="tab-forecast">Forecast</button>
+        <button class="nav-link" role="tab" :class="tab==='signal'&&'active'" :aria-selected="tab==='signal'" @click="tab='signal';loadTab()" aria-controls="tab-signal">Signal</button>
+        <button class="nav-link" role="tab" :class="tab==='market'&&'active'" :aria-selected="tab==='market'" @click="tab='market';loadTab()" aria-controls="tab-market">Market</button>
         <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()" aria-controls="tab-intel">Intel</button>
-        <button class="nav-link" role="tab" :class="tab==='health'&&'active'" :aria-selected="tab==='health'" @click="tab='health';loadTab()" aria-controls="tab-health">Health</button>
-        <button class="nav-link" role="tab" :class="tab==='quality'&&'active'" :aria-selected="tab==='quality'" @click="tab='quality';loadTab()" aria-controls="tab-quality">Quality</button>
-        <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings">&#9881;</button>
+        <button class="nav-link" role="tab" :class="tab==='system'&&'active'" :aria-selected="tab==='system'" @click="tab='system';loadTab()" aria-controls="tab-system">System</button>
+        <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings"><svg class="icon"><use href="#icon-settings"/></svg></button>
       </div>
       <div class="nav-controls">
         <select class="asset-select" x-model="asset" @change="switchAsset">
@@ -55,23 +201,15 @@
           </template>
         </select>
         <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" aria-label="Refresh now" x-text="refreshing?'...':'⟳'" x-show="false"></button>
-        <button class="btn btn-muted" @click="cycleTheme" x-text="theme==='light'?'☀':'🌙'" aria-label="Toggle dark/light theme" title="Toggle theme"></button>
+        <button class="btn btn-muted" @click="cycleTheme" aria-label="Toggle dark/light theme" title="Toggle theme">
+          <svg class="icon" x-show="theme==='light'"><use href="#icon-sun"/></svg>
+          <svg class="icon" x-show="theme!=='light'"><use href="#icon-moon"/></svg>
+        </button>
       </div>
     </nav>
 
     <!-- KPI Row (reads from shared dashboard store) -->
     <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-label">Signal Score</div>
-        <div class="kpi-row-inner">
-          <div>
-            <div class="kpi-value" :class="`band-${($store.dashboard.signal.band||'').toLowerCase()}`" x-text="`${$store.dashboard.signal.score ?? '--'}`"></div>
-            <div class="kpi-trend" x-text="$store.dashboard.signal.band || ''"></div>
-          </div>
-          <svg class="kpi-spark" viewBox="0 0 60 20" :style="'stroke:'+($store.dashboard.signal.band==='risk'?'var(--down)':$store.dashboard.signal.band==='watch'?'var(--neutral)':'var(--up)')">
-          </svg>
-        </div>
-      </div>
       <div class="kpi-card">
         <div class="kpi-label">Peg</div>
         <div class="kpi-row-inner">
@@ -80,6 +218,7 @@
             <div class="kpi-trend" x-text="$store.dashboard.depeg.peg_status||''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--spark)">
+            <polyline fill="none" stroke-width="1.5" :points="$store.dashboard.pegSpark || '0,10 60,10'"></polyline>
           </svg>
         </div>
       </div>
@@ -91,6 +230,7 @@
             <div class="kpi-trend" :class="$store.dashboard.supplyChange!=null?($store.dashboard.supplyChange>=0?'text-green':'text-red'):''" x-text="$store.dashboard.supplyChange!=null?`${$store.dashboard.supplyChange>=0?'+':''}${$store.dashboard.supplyChange.toFixed(2)}% 24h`:''"></div>
           </div>
           <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--up)">
+            <polyline fill="none" stroke-width="1.5" :points="$store.dashboard.supplySpark || '0,10 60,10'"></polyline>
           </svg>
         </div>
       </div>
@@ -124,38 +264,6 @@
       </div>
     </div>
 
-    <!-- Evidence Drawer -->
-    <div class="evidence-drawer" x-show="evidenceOpen" @click.outside="evidenceOpen=false">
-      <div class="evidence-content">
-        <h3 x-text="evidenceTitle"></h3>
-        <div class="evidence-body">
-          <div class="evidence-section" x-show="evidenceFormula">
-            <h4>Formula</h4>
-            <code x-text="evidenceFormula"></code>
-          </div>
-          <div class="evidence-section" x-show="Object.keys(evidenceComponents).length">
-            <h4>Components</h4>
-            <template x-for="(v, k) in evidenceComponents" :key="k">
-              <div class="evidence-row">
-                <span x-text="k.replace(/_/g,' ')"></span>
-                <span x-text="typeof v === 'number' ? v.toFixed(4) : v"></span>
-              </div>
-            </template>
-          </div>
-          <div class="evidence-section" x-show="Object.keys(evidenceSources).length">
-            <h4>Data Sources</h4>
-            <template x-for="(s, name) in evidenceSources" :key="name">
-              <div class="evidence-row">
-                <span x-text="name"></span>
-                <span :class="s.status === 'ok' ? 'text-green' : 'text-red'" x-text="s.status"></span>
-              </div>
-            </template>
-          </div>
-          <button class="btn btn-muted" @click="copyEvidence" style="margin-top:12px">Copy Evidence</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Stale Warning -->
     <div class="warning-banner" :class="staleWarning ? 'visible' : ''" x-text="staleWarning"></div>
 
@@ -163,120 +271,166 @@
     <div class="warning-banner" :class="rateLimitWarning ? 'visible' : ''" x-text="rateLimitWarning"></div>
 
 
-    <!-- Tab: Overview -->
-    <div class="tab-content" :class="tab === 'overview' && 'active'" x-data="market" role="tabpanel" id="tab-overview">
+    <!-- Tab: Signal -->
+    <div class="tab-content" x-show="$store.ui.tab === 'signal'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="market" role="tabpanel" id="tab-signal">
       <!-- Error Banner -->
       <div x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
-      <!-- Consolidated AI Intelligence -->
-      <div class="insight-card glass" style="margin-bottom:12px">
-        <div style="margin:0 0 8px">
-          <h2 style="margin:0;font-size:13px;text-transform:uppercase;color:var(--muted)">AI Intelligence <span class="model-badge">AI</span></h2>
+
+      <!-- Skeleton loader shown during dashboard loading -->
+      <div x-show="$store.dashboard.loading">
+        <!-- Hero skeleton -->
+        <div style="display:flex;gap:1.5rem;margin-bottom:1.5rem">
+          <div class="skeleton skeleton-circle" style="width:180px;height:180px;flex-shrink:0"></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:.75rem;padding-top:.5rem">
+            <div class="skeleton skeleton-title"></div>
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-text" style="width:60%"></div>
+          </div>
         </div>
-        <div x-show="marketOverview">
-          <div class="kpi-label" style="margin-bottom:4px">Overview</div>
-          <p style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
+        <!-- KPI strip skeleton -->
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.5rem">
+          <template x-for="n in 5">
+            <div class="skeleton skeleton-card" style="height:90px"></div>
+          </template>
         </div>
-        <div x-show="!marketOverview" class="empty-state" style="padding:8px">
-          <span class="kpi-label">No market overview yet</span>
-          <span class="kpi-sub">AI will generate a market summary after enough data is collected</span>
-        </div>
-        <hr style="border:none;border-top:1px solid var(--line);margin:8px 0">
-        <div x-show="aiNarrative">
-          <div class="kpi-label" style="margin-bottom:4px">Narrative</div>
-          <p style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
-        </div>
-        <div x-show="!aiNarrative" class="empty-state" style="padding:8px">
-          <span class="kpi-label">No narrative yet</span>
-          <span class="kpi-sub">Requires AI_MODE enabled in server settings</span>
-        </div>
-        <hr style="border:none;border-top:1px solid var(--line);margin:8px 0">
-        <div x-show="aiInsights">
-          <div class="kpi-label" style="margin-bottom:4px">Insight</div>
-          <p style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
-        </div>
-        <div x-show="!aiInsights" class="empty-state" style="padding:8px">
-          <span class="kpi-label">No insights yet</span>
-          <span class="kpi-sub">Requires AI_MODE enabled + at least 24h of snapshot history</span>
+        <!-- Context skeleton -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
+          <template x-for="n in 3">
+            <div class="skeleton skeleton-card" style="height:140px"></div>
+          </template>
         </div>
       </div>
-      <!-- Risk Terminal -->
-      <div class="insight-card glass" style="margin-bottom:12px">
-        <div class="risk-gauge-wrap">
-          <svg class="risk-gauge" viewBox="0 0 100 100" aria-label="Risk gauge">
+
+      <!-- Main dashboard content (hidden while loading) -->
+      <div x-show="!$store.dashboard.loading">
+      <!-- HERO ZONE: 2-col -- Gauge (left 1/3) + AI Summary with Time Range (right 2/3) -->
+      <div class="insight-grid" style="margin-bottom:12px">
+        <div class="insight-card glass" style="text-align:center">
+          <svg class="risk-gauge" viewBox="0 0 100 100" aria-label="Signal gauge">
             <circle class="risk-gauge-track" cx="50" cy="50" r="40"></circle>
             <circle class="risk-gauge-value" cx="50" cy="50" r="40"
               :style="`stroke-dasharray:${gaugeArc} 251;stroke-dashoffset:0;stroke:${gaugeColor}`"></circle>
             <text x="50" y="48" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor" x-text="signal.score ?? '--'"></text>
             <text x="50" y="64" text-anchor="middle" font-size="9" fill="var(--muted)" x-text="signal.band || ''"></text>
           </svg>
-          <div>
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
-              <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiGeneratedAt, aiExpiresAt)"></span>
+          <!-- B4: signalSpark sparkline -->
+          <svg class="kpi-spark" viewBox="0 0 60 20" preserveAspectRatio="none" aria-hidden="true">
+            <polyline fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" :points="$store.dashboard.signalSpark || '0,10 60,10'"></polyline>
+          </svg>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+            <div>
+              <div class="kpi-label">Peg</div>
+              <div style="font-size:14px;font-weight:600" x-text="$store.dashboard.depeg.current_price?.toFixed(4) ?? '--'"></div>
             </div>
-            <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
-            <p class="kpi-sub" style="margin-top:8px;white-space:pre-wrap" x-show="aiSummary" x-text="aiSummary"></p>
-            <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} · v${predictive.model_version ?? predictive.version ?? '1.0'}`"></span>
+            <div>
+              <div class="kpi-label">Supply</div>
+              <div style="font-size:14px;font-weight:600" x-text="$store.dashboard.totalSupply != null ? formatUsd($store.dashboard.totalSupply) : 'N/A'"></div>
+            </div>
+            <div>
+              <div class="kpi-label">Chains</div>
+              <div style="font-size:14px;font-weight:600" x-text="$store.dashboard.chains?.length || 0"></div>
+            </div>
+          </div>
+        </div>
+        <div class="insight-card glass">
+          <div style="display:flex;gap:4px;margin-bottom:8px">
+            <button class="time-pill" :class="aiSubTab==='overview'&&'active'" @click="aiSubTab='overview'">Overview</button>
+            <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
+            <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
+          </div>
+          <div x-show="aiSubTab==='overview'">
+            <p x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
+            <p x-show="!marketOverview" class="kpi-sub" style="margin:0">No market overview yet</p>
+          </div>
+          <div x-show="aiSubTab==='narrative'">
+            <p x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
+            <p x-show="!aiNarrative" class="kpi-sub" style="margin:0">No narrative yet</p>
+          </div>
+          <div x-show="aiSubTab==='insights'">
+            <p x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
+            <p x-show="!aiInsights" class="kpi-sub" style="margin:0">No insights yet</p>
+          </div>
+          <div class="time-range" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+            <span class="time-range-label">Range:</span>
+            <button class="time-pill" :class="timeRange==='6h'&&'active'" @click="timeRange='6h';loadChartRange()">6H</button>
+            <button class="time-pill" :class="timeRange==='24h'&&'active'" @click="timeRange='24h';loadChartRange()">24H</button>
+            <button class="time-pill" :class="timeRange==='7d'&&'active'" @click="timeRange='7d';loadChartRange()">7D</button>
+            <button class="time-pill" :class="timeRange==='30d'&&'active'" @click="timeRange='30d';loadChartRange()">30D</button>
+            <button class="time-pill" :class="timeRange==='90d'&&'active'" @click="timeRange='90d';loadChartRange()">90D</button>
           </div>
         </div>
       </div>
-      <!-- Stress Leaderboard — moved up for 5-second glance -->
-      <div class="insight-card glass" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Stress Leaderboard <span class="model-badge">&#916;</span></h2>
-          <span class="kpi-sub" style="font-size:10px">Chains ranked by supply velocity</span>
-        </div>
-        <div x-show="stressLeaderboard?.length" style="font-size:12px">
-          <template x-for="(row, i) in stressLeaderboard" :key="i">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
-              <span>
-                <span style="font-weight:600" x-text="row.chain_name"></span>
-                <span :class="row.direction==='inflow'?'text-green':'text-red'" x-text="row.direction==='inflow'?'&#9650;':row.direction==='outflow'?'&#9660;':''"></span>
-              </span>
-              <span>
-                <span x-show="row.velocity_24h_pct != null" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="`${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}% 24h`"></span>
-              </span>
+
+      <!-- CONTEXT ZONE: 2-col -- Risk Terminal (left) + Stress/Rotation (right) -->
+      <div class="insight-grid" style="margin-bottom:12px">
+        <div class="insight-card glass">
+          <div class="risk-gauge-wrap">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
+                <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiGeneratedAt, aiExpiresAt)"></span>
+              </div>
+              <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} \u00B7 Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
+              <p class="kpi-sub" style="margin-top:8px;white-space:pre-wrap" x-show="aiSummary" x-text="aiSummary"></p>
+              <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} \u00B7 v${predictive.model_version ?? predictive.version ?? '1.0'}`"></span>
             </div>
-          </template>
+          </div>
         </div>
-        <div x-show="!stressLeaderboard?.length" class="empty-state">
-          <span class="empty-state-icon">&#128202;</span>
-          <span class="kpi-label">No chain velocity data yet</span>
-          <span class="kpi-sub">Needs multiple 5-min snapshots to compute chain-level velocity</span>
-        </div>
-      </div>
-      <!-- Cross-Asset Rotation -->
-      <div class="insight-card glass" style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-          <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Rotation <span class="model-badge">&#8644;</span></h2>
-          <span class="kpi-sub" style="font-size:10px">Cross-asset supply rotation</span>
-        </div>
-        <div x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
-          <template x-for="(p, i) in rotation.pairs" :key="i">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
-              <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
-              <span>
-                <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
-                <span x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="formatDisplayName(p.dominance_shift)"></span>
-              </span>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="insight-card glass" style="margin:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+              <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Stress Leaderboard <span class="model-badge">&#916;</span></h2>
+              <span class="kpi-sub" style="font-size:10px">Chains ranked by supply velocity</span>
             </div>
-          </template>
-        </div>
-        <div x-show="!rotation?.available || !rotation?.pairs?.length" class="empty-state">
-          <span class="empty-state-icon">&#128260;</span>
-          <span class="kpi-label">No rotation data</span>
-          <span class="kpi-sub">Needs 7 days of history on multiple assets. Enable more assets in Settings.</span>
+            <div x-show="stressLeaderboard?.length" style="font-size:12px">
+              <template x-for="(row, i) in stressLeaderboard" :key="i">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
+                  <span>
+                    <span style="font-weight:600" x-text="row.chain_name"></span>
+                    <span :class="row.direction==='inflow'?'text-green':'text-red'">
+                      <svg class="icon" x-show="row.direction==='inflow'"><use href="#icon-arrow-up"/></svg>
+                      <svg class="icon" x-show="row.direction==='outflow'"><use href="#icon-arrow-down"/></svg>
+                    </span>
+                  </span>
+                  <span>
+                    <span x-show="row.velocity_24h_pct != null" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="`${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}% 24h`"></span>
+                  </span>
+                </div>
+              </template>
+            </div>
+            <div x-show="!stressLeaderboard?.length" class="empty-state">
+              <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
+              <span class="kpi-label">No chain velocity data yet</span>
+              <span class="kpi-sub">Needs multiple 5-min snapshots to compute chain-level velocity</span>
+            </div>
+          </div>
+          <div class="insight-card glass" style="margin:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
+              <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Rotation <span class="model-badge"><svg class="icon"><use href="#icon-refresh-cw"/></svg></span></h2>
+              <span class="kpi-sub" style="font-size:10px">Cross-asset supply rotation</span>
+            </div>
+            <div x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
+              <template x-for="(p, i) in rotation.pairs" :key="i">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
+                  <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
+                  <span>
+                    <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
+                    <span x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="formatDisplayName(p.dominance_shift)"></span>
+                  </span>
+                </div>
+              </template>
+            </div>
+            <div x-show="!rotation?.available || !rotation?.pairs?.length" class="empty-state">
+              <svg class="icon empty-state-icon"><use href="#icon-repeat"/></svg>
+              <span class="kpi-label">No rotation data</span>
+              <span class="kpi-sub">Needs 7 days of history on multiple assets. Enable more assets in Settings.</span>
+            </div>
+          </div>
         </div>
       </div>
-      <!-- Time Range Selector -->
-      <div class="time-range">
-        <span class="time-range-label">Range:</span>
-        <button class="time-pill" :class="timeRange==='6h'&&'active'" @click="timeRange='6h';loadChartRange()">6H</button>
-        <button class="time-pill" :class="timeRange==='24h'&&'active'" @click="timeRange='24h';loadChartRange()">24H</button>
-        <button class="time-pill" :class="timeRange==='7d'&&'active'" @click="timeRange='7d';loadChartRange()">7D</button>
-        <button class="time-pill" :class="timeRange==='30d'&&'active'" @click="timeRange='30d';loadChartRange()">30D</button>
-        <button class="time-pill" :class="timeRange==='90d'&&'active'" @click="timeRange='90d';loadChartRange()">90D</button>
       </div>
+
+      <!-- DETAIL ZONE: Full-width stacked content -->
       <!-- Token Cards -->
       <div class="token-grid">
         <template x-for="a in enabledAssets" :key="a">
@@ -309,12 +463,7 @@
           </div>
         </template>
       </div>
-      <div class="insight-card" style="grid-column:1/-1">
-        <h2>Diagnostics</h2>
-        <p class="kpi-sub" style="margin-bottom:8px">Download a JSON snapshot of system state for debugging.</p>
-        <button class="btn btn-muted" x-show="adminToken" @click="downloadDiagnostics()">Export Diagnostics</button>
-        <span x-show="!adminToken" class="kpi-sub">Set Admin Token above to export diagnostics</span>
-      </div>
+
       <!-- Charts row -->
       <div class="insight-grid">
         <div class="insight-card">
@@ -342,12 +491,12 @@
                 <div>
                   <span class="kpi-label">Attestation:</span>
                   <span :class="`band-${attSignal.status === 'fresh' ? 'normal' : attSignal.status === 'aging' ? 'watch' : 'risk'}`" x-text="attSignal.label || 'Unknown'"></span>
-                  <span class="kpi-sub" x-show="attSignal?.age_days != null" x-text="` · ${(attSignal?.age_days??0).toFixed(0)}d`"></span>
+                  <span class="kpi-sub" x-show="attSignal?.age_days != null" x-text="` \u00B7 ${(attSignal?.age_days??0).toFixed(0)}d`"></span>
                 </div>
                 <div style="margin-top:4px">
                   <span class="kpi-label">Supply Feed:</span>
                   <span :class="`band-${supplyFeed.status === 'fresh' ? 'normal' : supplyFeed.status === 'aging' ? 'watch' : 'risk'}`" x-text="supplyFeed.label || 'Unknown'"></span>
-                  <span class="kpi-sub" x-show="supplyFeed?.age_minutes != null" x-text="` · ${(supplyFeed?.age_minutes??0).toFixed(0)}m`"></span>
+                  <span class="kpi-sub" x-show="supplyFeed?.age_minutes != null" x-text="` \u00B7 ${(supplyFeed?.age_minutes??0).toFixed(0)}m`"></span>
                 </div>
                 <div x-show="crossSource.discrepancy_flag" style="margin-top:4px">
                   <span class="kpi-label">Cross-Source:</span>
@@ -357,50 +506,57 @@
                 <div x-show="!crossSource.discrepancy_flag" style="margin-top:4px">
                   <span class="kpi-label">Cross-Source:</span>
                   <span class="text-green">Agreed</span>
-                  <span class="kpi-sub" x-show="crossSource?.avg_price != null" x-text="` · avg: $${(crossSource?.avg_price??0).toFixed(6)}`"></span>
+                  <span class="kpi-sub" x-show="crossSource?.avg_price != null" x-text="` \u00B7 avg: $${(crossSource?.avg_price??0).toFixed(6)}`"></span>
                 </div>
               </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div x-show="!chains?.length && !errorOverview && !_loadingDashboard" class="empty-state" style="margin-top:12px">
-        <span class="empty-state-icon">&#128202;</span>
+      <div x-show="!chains?.length && !errorOverview && !$store.dashboard.loading" class="empty-state" style="margin-top:12px">
+        <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
         <span class="kpi-label">No chain data available</span>
         <span class="kpi-sub">Chain metrics will appear once data is fetched</span>
       </div>
-    </div>
-      </div>
+
       <!-- Anomaly Events -->
       <div class="insight-card">
         <h2>Recent Anomalies</h2>
         <div x-show="anomalyEvents.anomalies && anomalyEvents.anomalies.length" style="max-height:120px;overflow-y:auto;font-size:12px;line-height:1.5">
           <template x-for="a in (anomalyEvents.anomalies || []).slice(0, 8)" :key="`${a.metric}-${a.timestamp}`">
             <div style="padding:4px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between">
-              <span><span class="kpi-label" x-text="a.metric"></span> <span :class="a.direction === 'above' ? 'text-red' : 'text-green'" x-text="a.direction === 'above' ? '&#8593;' : '&#8595;'"></span> <span x-text="a.z_score ? `z=${a.z_score.toFixed(2)}` : ''"></span></span>
+              <span><span class="kpi-label" x-text="a.metric"></span> <span :class="a.direction === 'above' ? 'text-red' : 'text-green'"><svg class="icon" x-show="a.direction === 'above'"><use href="#icon-arrow-up"/></svg><svg class="icon" x-show="a.direction === 'below'"><use href="#icon-arrow-down"/></svg></span> <span x-text="a.z_score ? `z=${a.z_score.toFixed(2)}` : ''"></span></span>
               <span class="kpi-sub" x-text="formatWhen(a.timestamp)"></span>
             </div>
           </template>
         </div>
         <div x-show="!anomalyEvents.anomalies || !anomalyEvents.anomalies.length" class="empty-state">
-          <span class="empty-state-icon">&#9888;</span>
+          <svg class="icon empty-state-icon"><use href="#icon-warning"/></svg>
           <span class="kpi-label">No anomalies detected</span>
           <span class="kpi-sub">All metrics are within normal range</span>
         </div>
       </div>
+
       <!-- Signal Trend Chart -->
       <div class="chart-card">
         <h2>Signal Score Trend <span class="time-badge" x-text="timeRange.toUpperCase()"></span></h2>
         <div class="chart-wrap"><canvas id="chart-trend-signal"></canvas></div>
       </div>
+
       <!-- Chain Supply Distribution -->
       <div class="chart-card" x-show="(chains || []).length > 0">
         <h2>Chain Supply Distribution</h2>
         <div class="chart-wrap tall"><canvas id="chart-distribution"></canvas></div>
       </div>
-      <!-- Chain Cards Grid -->
+
+      <!-- Chain Cards Grid (collapsible) -->
       <div x-show="(chains || []).length > 0">
-        <h2 class="section-title">Chain Details</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h2 class="section-title" style="margin:0">Chain Details</h2>
+          <button class="btn btn-muted" @click="showAllChains = !showAllChains" style="padding:6px 12px;font-size:12px" x-text="showAllChains ? 'Show Less' : 'Show All'"></button>
+        </div>
         <div class="chain-grid">
-          <template x-for="c in chains" :key="c.chain_name">
+          <template x-for="c in (showAllChains ? chains : chains.slice(0, 4))" :key="c.chain_name">
             <div class="chain-card glass">
               <div class="chain-header">
                 <span class="chain-name" x-text="c.chain_name"></span>
@@ -431,78 +587,77 @@
       </div>
     </div>
 
-    <!-- Tab: Forecast -->
-    <div class="tab-content" :class="tab === 'forecast' && 'active'" x-data="forecast" role="tabpanel" id="tab-forecast">
-      <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
-      <div class="chart-card">
-        <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
-        <div class="chart-wrap xl" id="chart-peg-forecast" style="position:relative">
-          <div x-show="loadingForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
-          <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress. Enable in Settings or check back soon.</div>
-          <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data available yet</div>
-        </div>
-      </div>
-      <div class="chart-card">
-        <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
-        <div class="chart-wrap xl" id="chart-supply-forecast" style="position:relative">
-          <div x-show="loadingForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
-          <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress.</div>
-          <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data available yet</div>
-        </div>
-      </div>
-      <div class="insight-grid">
-        <div class="insight-card">
-          <h2>Forecast Risk Signals</h2>
-          <div id="forecast-signals">
-            <template x-for="sig in forecastSignals" :key="sig.id ?? sig.run_id ?? sig.title">
-              <div class="signal-item" :class="`sev-${sig.severity || 'info'}`">
-                <span><strong x-text="(sig.severity || 'info').toUpperCase()"></strong> <span x-text="sig.title"></span></span>
-                <span class="signal-meta" x-text="sig.new_value ? `value: ${sig.new_value}` : ''"></span>
-              </div>
-            </template>
-            <div x-show="!forecastSignals.length" class="kpi-sub" style="padding:8px 0">No forecast risk signals</div>
+    <!-- Tab: Market (Supply + Forecast) -->
+    <div class="tab-content" x-show="$store.ui.tab === 'market'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-market">
+      <div x-data="forecast">
+        <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
+        <div class="chart-card">
+          <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
+          <div class="chart-wrap xl" id="chart-peg-forecast" style="position:relative">
+            <div x-show="loadingForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
+            <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress. Enable in Settings or check back soon.</div>
+            <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data available yet</div>
           </div>
         </div>
-        <div class="insight-card">
-          <h2>Correlations</h2>
-          <div id="correlations-preview">
-            <template x-for="pair in correlations.slice(0, 5)" :key="`${pair.metric_a}-${pair.metric_b}`">
-              <div class="signal-item">
-                <span x-text="`${pair.metric_a} ↔ ${pair.metric_b}`"></span>
-                <span :class="pair.direction === 'positive' ? 'text-green' : 'text-red'" x-text="`${pair.coefficient > 0 ? '+' : ''}${pair.coefficient}`"></span>
-              </div>
-            </template>
-            <div x-show="!correlations.length" class="kpi-sub" style="padding:8px 0">No data</div>
+        <div class="chart-card">
+          <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
+          <div class="chart-wrap xl" id="chart-supply-forecast" style="position:relative">
+            <div x-show="loadingForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
+            <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress.</div>
+            <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data available yet</div>
           </div>
         </div>
-        <div class="insight-card">
-          <h2>Forecast Accuracy</h2>
-          <div style="font-size:13px;line-height:1.7">
-            <template x-if="forecastAccuracy.results && forecastAccuracy.results.length">
-              <div>
-                <template x-for="r in forecastAccuracy.results.slice(0, 5)" :key="r.run_id">
-                  <div style="padding:6px 0;border-bottom:1px solid var(--line)">
-                    <div><strong x-text="r.target_metric"></strong> <span class="kpi-sub" x-text="`${r.model} · ${r.horizon}h`"></span></div>
-                    <div><span class="kpi-label">MAE:</span> <span x-text="r.mae"></span> <span class="kpi-label" x-show="r.mape != null">MAPE:</span> <span x-show="r.mape != null" x-text="`${r.mape}%`"></span></div>
-                    <div><span class="kpi-label">Bias:</span> <span :class="r.bias > 0 ? 'text-green' : 'text-red'" x-text="r.bias"></span> <span class="kpi-sub" x-text="`${r.matched_points} points`"></span></div>
-                  </div>
-                </template>
-              </div>
-            </template>
-            <div x-show="!forecastAccuracy.results || !forecastAccuracy.results.length" class="kpi-sub" style="padding:8px 0">No forecast runs with matching actuals</div>
+        <div class="insight-grid">
+          <div class="insight-card">
+            <h2>Forecast Risk Signals</h2>
+            <div id="forecast-signals">
+              <template x-for="sig in forecastSignals" :key="sig.id ?? sig.run_id ?? sig.title">
+                <div class="signal-item" :class="`sev-${sig.severity || 'info'}`">
+                  <span><strong x-text="(sig.severity || 'info').toUpperCase()"></strong> <span x-text="sig.title"></span></span>
+                  <span class="signal-meta" x-text="sig.new_value ? `value: ${sig.new_value}` : ''"></span>
+                </div>
+              </template>
+              <div x-show="!forecastSignals.length" class="kpi-sub" style="padding:8px 0">No forecast risk signals</div>
+            </div>
+          </div>
+          <div class="insight-card">
+            <h2>Correlations</h2>
+            <div id="correlations-preview">
+              <template x-for="pair in correlations.slice(0, 5)" :key="`${pair.metric_a}-${pair.metric_b}`">
+                <div class="signal-item">
+                  <span x-text="`${pair.metric_a} ↔ ${pair.metric_b}`"></span>
+                  <span :class="pair.direction === 'positive' ? 'text-green' : 'text-red'" x-text="`${pair.coefficient > 0 ? '+' : ''}${pair.coefficient}`"></span>
+                </div>
+              </template>
+              <div x-show="!correlations.length" class="kpi-sub" style="padding:8px 0">No data</div>
+            </div>
+          </div>
+          <div class="insight-card">
+            <h2>Forecast Accuracy</h2>
+            <div style="font-size:13px;line-height:1.7">
+              <template x-if="forecastAccuracy.results && forecastAccuracy.results.length">
+                <div>
+                  <template x-for="r in forecastAccuracy.results.slice(0, 5)" :key="r.run_id">
+                    <div style="padding:6px 0;border-bottom:1px solid var(--line)">
+                      <div><strong x-text="r.target_metric"></strong> <span class="kpi-sub" x-text="`${r.model} · ${r.horizon}h`"></span></div>
+                      <div><span class="kpi-label">MAE:</span> <span x-text="r.mae"></span> <span class="kpi-label" x-show="r.mape != null">MAPE:</span> <span x-show="r.mape != null" x-text="`${r.mape}%`"></span></div>
+                      <div><span class="kpi-label">Bias:</span> <span :class="r.bias > 0 ? 'text-green' : 'text-red'" x-text="r.bias"></span> <span class="kpi-sub" x-text="`${r.matched_points} points`"></span></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <div x-show="!forecastAccuracy.results || !forecastAccuracy.results.length" class="kpi-sub" style="padding:8px 0">No forecast runs with matching actuals</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Tab: Supply -->
-    <div class="tab-content" :class="tab === 'supply' && 'active'" x-data="market" role="tabpanel" id="tab-supply">
-      <div x-show="!totalSupply && _loadingDashboard" class="empty-state" style="margin-bottom:12px">
+      <div x-data="market">
+      <div x-show="!totalSupply && $store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
         <span class="loading-spinner" style="width:32px;height:32px;border-width:3px;margin-bottom:4px"></span>
         <span class="kpi-label">Loading supply data...</span>
       </div>
-      <div x-show="!totalSupply && !_loadingDashboard" class="empty-state" style="margin-bottom:12px">
-        <span class="empty-state-icon">&#128202;</span>
+      <div x-show="!totalSupply && !$store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
+        <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
         <span class="kpi-label">No supply data available</span>
         <span class="kpi-sub">Supply metrics will populate once chain data is fetched</span>
       </div>
@@ -524,113 +679,115 @@
       </div>
     </div>
 
-    <!-- Tab: Events -->
-    <div class="tab-content" :class="tab === 'events' && 'active'" x-data="osint" role="tabpanel" id="tab-events">
-      <div x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
-      <div class="insight-grid">
-        <div class="insight-card">
-          <h2>Signal Events</h2>
-          <div style="max-height:400px;overflow-y:auto">
-            <template x-for="ev in events.filter(e=>e.severity!=='debug')" :key="ev.id">
-              <div class="event-card" style="margin-bottom:6px">
-                <div class="event-title"><span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span> <span x-text="ev.title"></span></div>
-                <div class="event-meta" x-text="formatWhen(ev.timestamp)"></div>
-                <div class="event-summary" x-text="ev.summary"></div>
-              </div>
-            </template>
-            <div x-show="!events.filter(e=>e.severity!=='debug').length && !loadingEvents && !errorEvents" class="kpi-sub" style="padding:12px">No events in window</div>
-            <div x-show="!events.filter(e=>e.severity!=='debug').length && loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
-          </div>
-        </div>
-        <div class="insight-card">
-          <h2>OSINT Feed</h2>
-          <div style="max-height:400px;overflow-y:auto">
-            <div x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">&#9888; Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
-            <template x-for="art in osintArticles" :key="art.id">
-              <div class="event-card" style="margin-bottom:8px">
-                <div class="event-title"><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
-                <div class="event-summary" x-show="art.summary" x-text="art.summary"></div>
-                <div class="event-meta" style="margin-top:6px">
-                  <span x-text="art.source"></span>
-                  <span x-show="art.published_at"> · <span x-text="formatWhen(art.published_at)"></span></span>
-                  <span> · sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
-                  <span> · <a :href="art.url" target="_blank" rel="noopener" style="color:var(--spark);text-decoration:none">Read →</a></span>
-                </div>
-              </div>
-            </template>
-            <div x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
-            <div x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
-          </div>
-        </div>
-      </div>
-      <div class="chart-card">
-        <h2>Sentiment Timeseries (7d)</h2>
-        <div class="chart-wrap"><canvas id="chart-sentiment"></canvas></div>
-      </div>
-    </div>
-
-    <!-- Tab: Intel -->
-    <div class="tab-content" :class="tab === 'intel' && 'active'" x-data="smidgePanel" x-init="init()" role="tabpanel" id="tab-intel">
-      <div class="insight-grid">
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2>SMIDGE Score Card</h2>
-          <div x-show="loadingSmidge" class="kpi-sub"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading SMIDGE...</div>
-          <div x-show="errorSmidge" class="warning-banner visible" x-text="errorSmidge" style="margin-bottom:8px"></div>
-          <div x-show="!loadingSmidge && smidge?.available" style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:center">
-            <div id="chart-smidge-radar" class="chart-wrap" style="height:320px"></div>
-            <div style="font-size:13px;line-height:1.8">
-              <template x-for="(label, key) in (smidge?.labels || {})" :key="key">
-                <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0">
-                  <span x-text="`${key} — ${label}`"></span>
-                  <strong x-text="smidge?.dimensions?.[key] ?? '--'"></strong>
+    <!-- Tab: Intel (OSINT + SMIDGE) -->
+    <div class="tab-content" x-show="$store.ui.tab === 'intel'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-intel">
+      <div x-data="osint">
+        <div x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
+        <div class="insight-grid">
+          <div class="insight-card">
+            <h2>Signal Events</h2>
+            <div style="max-height:400px;overflow-y:auto">
+              <template x-for="ev in events.filter(e=>e.severity!=='debug')" :key="ev.id">
+                <div class="event-card" style="margin-bottom:6px">
+                  <div class="event-title"><span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span> <span x-text="ev.title"></span></div>
+                  <div class="event-meta" x-text="formatWhen(ev.timestamp)"></div>
+                  <div class="event-summary" x-text="ev.summary"></div>
                 </div>
               </template>
-              <div style="margin-top:8px;font-weight:600">Composite: <span x-text="smidge?.composite_score ?? '--'"></span>/100</div>
+              <div x-show="!events.filter(e=>e.severity!=='debug').length && !loadingEvents && !errorEvents" class="kpi-sub" style="padding:12px">No events in window</div>
+              <div x-show="!events.filter(e=>e.severity!=='debug').length && loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
             </div>
           </div>
-          <div x-show="!loadingSmidge && !errorSmidge && !smidge?.available" class="kpi-sub">SMIDGE data unavailable for this asset</div>
+          <div class="insight-card">
+            <h2>OSINT Feed</h2>
+            <div style="max-height:400px;overflow-y:auto">
+              <div x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)"><svg class="icon"><use href="#icon-warning"/></svg> Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
+              <template x-for="art in osintArticles" :key="art.id">
+                <div class="event-card" style="margin-bottom:8px">
+                  <div class="event-title"><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
+                  <div class="event-summary" x-show="art.summary" x-text="art.summary"></div>
+                  <div class="event-meta" style="margin-top:6px">
+                    <span x-text="art.source"></span>
+                    <span x-show="art.published_at"> · <span x-text="formatWhen(art.published_at)"></span></span>
+                    <span> · sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
+                    <span> · <a :href="art.url" target="_blank" rel="noopener" style="color:var(--spark);text-decoration:none">Read →</a></span>
+                  </div>
+                </div>
+              </template>
+              <div x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
+              <div x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
+            </div>
+          </div>
         </div>
-        <div class="insight-card">
-          <h2>Attestation Reports</h2>
-          <template x-for="(a, sym) in attestation" :key="sym">
-            <div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px">
-              <strong x-text="sym"></strong>
-              <div style="font-size:13px;margin-top:4px">
-                <div x-show="a.attestation_status !== 'n/a'">
-                  <span :class="`band-${statusBand(a.attestation_status)}`" x-text="a.attestation_status ?? 'unknown'"></span>
-                  <span class="kpi-sub"> &middot; <span x-text="a.attestation_age_days != null ? `${a.attestation_age_days}d since report` : 'No report date'"></span></span>
-                </div>
-                <div x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only</div>
-                <div style="margin-top:4px">
-                  <span :class="`band-${statusBand(a.supply_feed_status)}`" x-text="a.supply_feed_status ?? 'unknown'"></span>
-                  <span class="kpi-sub"> &middot; DefiLlama &middot; <span x-text="formatFeedAge(a.supply_feed_age_minutes)"></span></span>
-                </div>
+        <div class="chart-card">
+          <h2>Sentiment Timeseries (7d)</h2>
+          <div class="chart-wrap"><canvas id="chart-sentiment"></canvas></div>
+        </div>
+      </div>
+
+      <div x-data="smidgePanel" x-init="init()">
+        <div class="insight-grid">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2>SMIDGE Score Card</h2>
+            <div x-show="loadingSmidge" class="kpi-sub"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading SMIDGE...</div>
+            <div x-show="errorSmidge" class="warning-banner visible" x-text="errorSmidge" style="margin-bottom:8px"></div>
+            <div x-show="!loadingSmidge && smidge?.available" style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:center">
+              <div id="chart-smidge-radar" class="chart-wrap" style="height:320px"></div>
+              <div style="font-size:13px;line-height:1.8">
+                <template x-for="(label, key) in (smidge?.labels || {})" :key="key">
+                  <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0">
+                    <span x-text="`${key} — ${label}`"></span>
+                    <strong x-text="smidge?.dimensions?.[key] ?? '--'"></strong>
+                  </div>
+                </template>
+                <div style="margin-top:8px;font-weight:600">Composite: <span x-text="smidge?.composite_score ?? '--'"></span>/100</div>
               </div>
             </div>
-          </template>
-        </div>
-        <div class="insight-card">
-          <h2>Cross-Source Price</h2>
-          <template x-for="row in ($store.dashboard.crossSource.sources || [])" :key="row.source">
-            <div class="signal-item">
-              <span x-text="row.source"></span>
-              <span x-text="row.price != null ? `$${Number(row.price).toFixed(6)}` : 'N/A'" :class="row.price && Math.abs(row.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
+            <div x-show="!loadingSmidge && !errorSmidge && !smidge?.available" class="kpi-sub">SMIDGE data unavailable for this asset</div>
+          </div>
+          <div class="insight-card">
+            <h2>Attestation Reports</h2>
+            <template x-for="(a, sym) in attestation" :key="sym">
+              <div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px">
+                <strong x-text="sym"></strong>
+                <div style="font-size:13px;margin-top:4px">
+                  <div x-show="a.attestation_status !== 'n/a'">
+                    <span :class="`band-${statusBand(a.attestation_status)}`" x-text="a.attestation_status ?? 'unknown'"></span>
+                    <span class="kpi-sub"> &middot; <span x-text="a.attestation_age_days != null ? `${a.attestation_age_days}d since report` : 'No report date'"></span></span>
+                  </div>
+                  <div x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only</div>
+                  <div style="margin-top:4px">
+                    <span :class="`band-${statusBand(a.supply_feed_status)}`" x-text="a.supply_feed_status ?? 'unknown'"></span>
+                    <span class="kpi-sub"> &middot; DefiLlama &middot; <span x-text="formatFeedAge(a.supply_feed_age_minutes)"></span></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+          <div class="insight-card">
+            <h2>Cross-Source Price</h2>
+            <template x-for="row in ($store.dashboard.crossSource.sources || [])" :key="row.source">
+              <div class="signal-item">
+                <span x-text="row.source"></span>
+                <span x-text="row.price != null ? `$${Number(row.price).toFixed(6)}` : 'N/A'" :class="row.price && Math.abs(row.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
+              </div>
+            </template>
+            <div x-show="!($store.dashboard.crossSource.sources||[]).length" class="kpi-sub" style="padding:8px 0">No cross-source prices</div>
+            <div x-show="$store.dashboard.crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
+              Discrepancy: <strong x-text="`${$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
             </div>
-          </template>
-          <div x-show="!($store.dashboard.crossSource.sources||[]).length" class="kpi-sub" style="padding:8px 0">No cross-source prices</div>
-          <div x-show="$store.dashboard.crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
-            Discrepancy: <strong x-text="`${$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Tab: Health -->
-    <div class="tab-content" :class="tab === 'health' && 'active'" x-data="healthDashboard" x-init="init()" role="tabpanel" id="tab-health">
-      <div class="insight-grid">
-        <div class="insight-card">
-          <h2>Source Health</h2>
-          <template x-for="s in sources" :key="s.source_name">
+    <!-- Tab: System (Health + Quality) -->
+    <div class="tab-content" x-show="$store.ui.tab === 'system'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-system">
+      <div x-data="healthDashboard" x-init="init()">
+        <div class="insight-grid">
+          <div class="insight-card">
+            <h2>Source Health</h2>
+            <template x-for="s in sources" :key="s.source_name">
             <div style="padding:8px 0;border-bottom:1px solid var(--line)">
               <div style="display:flex;justify-content:space-between;align-items:center">
                 <span style="font-weight:600;font-size:13px" x-text="s.source_name"></span>
@@ -705,16 +862,139 @@
         </div>
       </div>
     </div>
+    <!-- Quality (sibling inside System) -->
+    <div x-data="qualityDashboard" x-init="loadQualityData()">
+      <div class="insight-grid">
+        <!-- Quality Dashboard Header -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
+            <div>
+              <h1 style="margin:0 0 8px 0">Data Quality Dashboard</h1>
+              <p class="kpi-sub" style="margin:0">Monitor the health and quality of your data sources and system metrics</p>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+              <button class="btn btn-primary" @click="refreshQualityData()" style="padding:10px 20px">Refresh Data</button>
+            </div>
+          </div>
+          
+          <div x-show="lastUpdated" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
+            Last updated: <strong x-text="lastUpdated"></strong>
+          </div>
+        </div>
+        
+        <!-- Overall Quality Score -->
+        <div class="insight-card">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <svg class="icon"><use href="#icon-trophy"/></svg> Overall Data Quality
+          </h2>
+          
+          <div style="text-align:center;padding:20px 0">
+            <div style="font-size:48px;font-weight:700;margin:0 0 8px 0" 
+                 :style="`color:${overallQualityScore >= 80 ? 'var(--spark)' : overallQualityScore >= 60 ? 'var(--neutral)' : 'var(--down)'}`"
+                 x-text="overallQualityScore !== null ? overallQualityScore + '%' : 'Loading...'">
+            </div>
+            <div style="font-size:14px;color:var(--muted)">Data Quality Score</div>
+          </div>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin-top:20px">
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="sourceHealthScore !== null ? sourceHealthScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Source Health</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="assetCompletenessScore !== null ? assetCompletenessScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Completeness</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="consistencyScore !== null ? consistencyScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Consistency</div>
+            </div>
+            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
+              <div style="font-size:20px;font-weight:600" x-text="freshnessScore !== null ? freshnessScore + '%' : '--'"></div>
+              <div style="font-size:12px;color:var(--muted)">Freshness</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Source Health Status -->
+        <div class="insight-card">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <svg class="icon"><use href="#icon-satellite"/></svg> Data Sources Health
+          </h2>
+          
+          <div x-show="sourcesByStatus" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+            <template x-for="(count, status) in sourcesByStatus" :key="count?.[0] || status">
+              <div style="text-align:center;padding:16px;background:var(--bg-accent);border-radius:8px">
+                <div style="font-size:24px;font-weight:700" x-text="count"></div>
+                <div style="font-size:14px;text-transform:capitalize" 
+                     :style="status === 'ok' ? 'color:var(--spark)' : status === 'degraded' ? 'color:var(--neutral)' : 'color:var(--down)'"
+                     x-text="status"></div>
+              </div>
+            </template>
+          </div>
+          
+          <div x-show="Object.keys(sourcesByStatus).length === 0" class="kpi-sub" style="padding:20px 0;text-align:center">
+            Loading source health data...
+          </div>
+        </div>
+        
+        <!-- Data Quality Details -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
+            <svg class="icon"><use href="#icon-bar-chart"/></svg> Data Quality Details
+          </h2>
+          
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+            <div>
+              <h3 style="margin:0 0 12px 0;font-size:16px">API Usage</h3>
+              <div x-show="totalApiCalls !== null">
+                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalApiCalls?.toLocaleString()"></div>
+                <div style="font-size:13px;color:var(--muted)">Total API calls today</div>
+              </div>
+              <div x-show="totalApiCalls === null" class="kpi-sub">
+                Loading...
+              </div>
+            </div>
+            
+            <div>
+              <h3 style="margin:0 0 12px 0;font-size:16px">AI Usage</h3>
+              <div x-show="totalAiTokens !== null">
+                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalAiTokens?.toLocaleString()"></div>
+                <div style="font-size:13px;color:var(--muted)">AI tokens consumed today</div>
+              </div>
+              <div x-show="totalAiTokens === null" class="kpi-sub">
+                Loading...
+              </div>
+            </div>
+            
+            <div>
+              <h3 style="margin:0 0 12px 0;font-size:16px">System Health</h3>
+              <div x-show="healthySources !== null">
+                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" 
+                     :style="healthySources > (totalSources * 0.8) ? 'color:var(--spark)' : 'color:var(--down)'" 
+                     x-text="healthySources + '/' + totalSources"></div>
+                <div style="font-size:13px;color:var(--muted)">Healthy data sources</div>
+              </div>
+              <div x-show="healthySources === null" class="kpi-sub">
+                Loading...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </div>
 
     <!-- Tab: Settings -->
-    <div class="tab-content" :class="tab === 'settings' && 'active'" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
+    <div class="tab-content" x-show="$store.ui.tab === 'settings'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
          x-init="filterSettings(); loadAiBudget();" role="tabpanel" id="tab-settings">
       <div class="insight-grid">
         <!-- Admin Token Section (always visible — enter token first) -->
         <div class="insight-card" style="grid-column:1/-1">
           <div style="display:flex;align-items:flex-start;gap:16px">
             <div style="flex:1">
-              <h2 style="margin:0 0 8px 0">🔒 Admin Authentication</h2>
+              <h2 style="margin:0 0 8px 0"><svg class="icon"><use href="#icon-lock"/></svg> Admin Authentication</h2>
               <p class="kpi-sub" style="margin:0 0 16px 0">Required for refresh operations and settings changes when HELIX_ADMIN_TOKEN is configured on the server.</p>
               <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
                 <input type="password" x-model="adminToken" placeholder="Enter admin token"
@@ -740,7 +1020,7 @@
               <div style="position:relative">
                 <input type="text" x-model="settingsSearch" placeholder="Search settings..." @input.debounce.300ms="filterSettings" 
                        style="padding:8px 12px 8px 32px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;min-width:240px">
-                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)">🔍</span>
+                <svg class="icon" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted)"><use href="#icon-search"/></svg>
               </div>
               <select x-model="settingsGroupFilter" @change="filterSettings" 
                       style="padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;min-width:160px">
@@ -886,7 +1166,7 @@
         <template x-if="filteredSettings.filter(s => s.key.startsWith('secret_')).length">
           <div class="insight-card" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-              <span>🔑</span> API Keys & Secrets
+              <svg class="icon"><use href="#icon-key"/></svg> API Keys & Secrets
             </h2>
             <p class="kpi-sub" style="margin:0 0 16px 0">Configure API keys for external services. Values are encrypted at rest and never exposed via API.</p>
             
@@ -926,7 +1206,7 @@
         <template x-if="filteredSettings.filter(s => s.key.startsWith('provider_')).length">
           <div class="insight-card" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-              <span>🌐</span> Data Providers
+              <svg class="icon"><use href="#icon-globe"/></svg> Data Providers
             </h2>
             <p class="kpi-sub" style="margin:0 0 16px 0">Enable or disable data sources for asset analytics and monitoring.</p>
             
@@ -966,7 +1246,7 @@
         <template x-if="filteredSettings.filter(s => s.key.startsWith('feature_')).length">
           <div class="insight-card" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-              <span>⚙️</span> Feature Toggles
+              <svg class="icon"><use href="#icon-sliders"/></svg> Feature Toggles
             </h2>
             <p class="kpi-sub" style="margin:0 0 16px 0">Enable or disable specific application features.</p>
             
@@ -998,7 +1278,7 @@
         <template x-if="filteredSettings.filter(s => s.key.startsWith('refresh_')).length">
           <div class="insight-card" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-              <span>⏱️</span> Refresh Intervals
+              <svg class="icon"><use href="#icon-repeat"/></svg> Refresh Intervals
             </h2>
             <p class="kpi-sub" style="margin:0 0 16px 0">Configure how frequently different data types are refreshed.</p>
             
@@ -1037,7 +1317,7 @@
         <template x-if="filteredSettings.filter(s => s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection').length">
           <div class="insight-card" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-              <span>🤖</span> AI & Intelligence
+              <svg class="icon"><use href="#icon-bot"/></svg> AI & Intelligence
             </h2>
             <p class="kpi-sub" style="margin:0 0 16px 0">Configure AI-powered features and anomaly detection.</p>
             
@@ -1115,7 +1395,7 @@
                        @dragover.prevent="handleDragOver(i)"
                        @dragend="handleDragEnd"
                        :style="`display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid ${dragOverIndex === i ? 'var(--spark)' : 'var(--line)'};border-radius:8px;background:${dragOverIndex === i ? 'var(--ok-bg)' : 'var(--panel)'};cursor:grab;transition:all .15s;user-select:none;box-shadow:${dragIndex === i ? '0 2px 8px rgba(0,0,0,0.15)' : 'none'}`">
-                    <span style="font-size:14px;color:var(--muted);cursor:grab;min-width:20px;text-align:center">&#9776;</span>
+                    <svg class="icon" style="font-size:14px;color:var(--muted);cursor:grab;min-width:20px"><use href="#icon-menu"/></svg>
                     <div style="flex:1">
                       <span style="font-weight:600;font-size:13px" x-text="p.label"></span>
                       <span style="font-size:10px;color:var(--muted);margin-left:6px;background:var(--bg-accent);padding:1px 6px;border-radius:8px" x-text="`#${i+1}`"></span>
@@ -1215,7 +1495,7 @@
         <div class="insight-card" style="grid-column:1/-1">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <h2 style="margin:0;display:flex;align-items:center;gap:8px">
-              <span>📋</span> Settings Audit Log
+              <svg class="icon"><use href="#icon-clipboard"/></svg> Settings Audit Log
             </h2>
             <div style="display:flex;gap:8px;align-items:center">
               <input type="text" x-model="auditFilter" placeholder="Filter by setting key..."
@@ -1230,15 +1510,24 @@
             <table style="width:100%;border-collapse:collapse" x-show="auditLog.length">
               <thead>
                 <tr style="border-bottom:2px solid var(--line);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:0.5px">
-                  <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('created_at')">
-                    Timestamp <span x-show="auditSortField==='created_at'" x-text="auditSortAsc?'&#9650;':'&#9660;'" style="font-size:8px"></span>
-                  </th>
-                  <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('user_username')">
-                    User <span x-show="auditSortField==='user_username'" x-text="auditSortAsc?'&#9650;':'&#9660;'" style="font-size:8px"></span>
-                  </th>
-                  <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('setting_key')">
-                    Setting <span x-show="auditSortField==='setting_key'" x-text="auditSortAsc?'&#9650;':'&#9660;'" style="font-size:8px"></span>
-                  </th>
+                    <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('created_at')">
+                      Timestamp <span x-show="auditSortField==='created_at'" style="font-size:8px">
+                        <svg class="icon" style="width:10px;height:10px" x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
+                        <svg class="icon" style="width:10px;height:10px" x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
+                      </span>
+                    </th>
+                    <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('user_username')">
+                      User <span x-show="auditSortField==='user_username'" style="font-size:8px">
+                        <svg class="icon" style="width:10px;height:10px" x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
+                        <svg class="icon" style="width:10px;height:10px" x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
+                      </span>
+                    </th>
+                    <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('setting_key')">
+                      Setting <span x-show="auditSortField==='setting_key'" style="font-size:8px">
+                        <svg class="icon" style="width:10px;height:10px" x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
+                        <svg class="icon" style="width:10px;height:10px" x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
+                      </span>
+                    </th>
                   <th style="padding:8px 8px;text-align:left">Change</th>
                   <th style="padding:8px 8px;text-align:center">History</th>
                 </tr>
@@ -1313,7 +1602,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
             <div>
               <h2 style="margin:0 0 4px 0;display:flex;align-items:center;gap:8px">
-                <span>🔁</span> Reset to Safe Defaults
+                <svg class="icon"><use href="#icon-repeat"/></svg> Reset to Safe Defaults
               </h2>
               <p class="kpi-sub" style="margin:0">Reset all settings (except API keys, secrets, and AI daily budget) to their factory defaults.</p>
             </div>
@@ -1358,7 +1647,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
             <div>
               <h2 style="margin:0 0 8px 0;display:flex;align-items:center;gap:8px">
-                <span>👥</span> User Management
+                <svg class="icon"><use href="#icon-users"/></svg> User Management
               </h2>
               <p class="kpi-sub" style="margin:0">Manage users and their permissions when multi-user mode is enabled.</p>
             </div>
@@ -1520,14 +1809,14 @@
         <!-- Settings Management Section -->
         <div class="insight-card" style="grid-column:1/-1">
           <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-            <span>📥</span> Settings Management
+            <svg class="icon"><use href="#icon-download"/></svg> Settings Management
           </h2>
           <p class="kpi-sub" style="margin:0 0 16px 0">Import or export your configuration settings.</p>
           
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
             <div style="padding:20px;border:1px solid var(--line);border-radius:8px">
               <h3 style="margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
-                <span>📤</span> Export Settings
+                <svg class="icon"><use href="#icon-upload"/></svg> Export Settings
               </h3>
               <p style="margin:0 0 16px 0;font-size:13px;color:var(--muted)">Download a backup of your current configuration.</p>
               <button class="btn btn-primary" style="padding:10px 20px" @click="exportSettings()">Export Configuration</button>
@@ -1535,7 +1824,7 @@
             
             <div style="padding:20px;border:1px solid var(--line);border-radius:8px">
               <h3 style="margin:0 0 12px 0;display:flex;align-items:center;gap:8px">
-                <span>📥</span> Import Settings
+                <svg class="icon"><use href="#icon-download"/></svg> Import Settings
               </h3>
               <p style="margin:0 0 16px 0;font-size:13px;color:var(--muted)">Upload a configuration file to restore settings.</p>
               <div style="display:flex;gap:12px;align-items:center">
@@ -1546,133 +1835,18 @@
           </div>
         </div>
         
+        <!-- Diagnostics -->
+        <div class="insight-card" style="grid-column:1/-1">
+          <h2>Diagnostics</h2>
+          <p class="kpi-sub" style="margin-bottom:8px">Download a JSON snapshot of system state for debugging.</p>
+          <button class="btn btn-muted" @click="downloadDiagnostics()">Export Diagnostics</button>
+        </div>
+
         <!-- A7: Toast Notification -->
         <div x-show="toastVisible" style="position:fixed;bottom:24px;right:24px;z-index:500;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;transition:opacity .3s"
              :style="`background:${toastType === 'error' ? 'var(--alert-bg)' : 'var(--ok-bg)'};color:${toastType === 'error' ? 'var(--down)' : 'var(--up)'};border:1px solid ${toastType === 'error' ? 'var(--down)' : 'var(--up)'}`"
              @click="hideToast()">
           <span x-text="toastMessage"></span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab: Data Quality -->
-    <div class="tab-content" :class="tab === 'quality' && 'active'" x-data="qualityDashboard" x-init="loadQualityData()" style="display:none" x-show="tab === 'quality'" role="tabpanel" id="tab-quality">
-      <div class="insight-grid">
-        <!-- Quality Dashboard Header -->
-        <div class="insight-card" style="grid-column:1/-1">
-          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
-            <div>
-              <h1 style="margin:0 0 8px 0">Data Quality Dashboard</h1>
-              <p class="kpi-sub" style="margin:0">Monitor the health and quality of your data sources and system metrics</p>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-              <button class="btn btn-primary" @click="refreshQualityData()" style="padding:10px 20px">Refresh Data</button>
-            </div>
-          </div>
-          
-          <div x-show="lastUpdated" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
-            Last updated: <strong x-text="lastUpdated"></strong>
-          </div>
-        </div>
-        
-        <!-- Overall Quality Score -->
-        <div class="insight-card">
-          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-            <span>🏆</span> Overall Data Quality
-          </h2>
-          
-          <div style="text-align:center;padding:20px 0">
-            <div style="font-size:48px;font-weight:700;margin:0 0 8px 0" 
-                 :style="`color:${overallQualityScore >= 80 ? 'var(--spark)' : overallQualityScore >= 60 ? 'var(--neutral)' : 'var(--down)'}`"
-                 x-text="overallQualityScore !== null ? overallQualityScore + '%' : 'Loading...'">
-            </div>
-            <div style="font-size:14px;color:var(--muted)">Data Quality Score</div>
-          </div>
-          
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;margin-top:20px">
-            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
-              <div style="font-size:20px;font-weight:600" x-text="sourceHealthScore !== null ? sourceHealthScore + '%' : '--'"></div>
-              <div style="font-size:12px;color:var(--muted)">Source Health</div>
-            </div>
-            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
-              <div style="font-size:20px;font-weight:600" x-text="assetCompletenessScore !== null ? assetCompletenessScore + '%' : '--'"></div>
-              <div style="font-size:12px;color:var(--muted)">Completeness</div>
-            </div>
-            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
-              <div style="font-size:20px;font-weight:600" x-text="consistencyScore !== null ? consistencyScore + '%' : '--'"></div>
-              <div style="font-size:12px;color:var(--muted)">Consistency</div>
-            </div>
-            <div style="text-align:center;padding:12px;background:var(--bg-accent);border-radius:6px">
-              <div style="font-size:20px;font-weight:600" x-text="freshnessScore !== null ? freshnessScore + '%' : '--'"></div>
-              <div style="font-size:12px;color:var(--muted)">Freshness</div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Source Health Status -->
-        <div class="insight-card">
-          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-            <span>📡</span> Data Sources Health
-          </h2>
-          
-          <div x-show="sourcesByStatus" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
-            <template x-for="(count, status) in sourcesByStatus" :key="status">
-              <div style="text-align:center;padding:16px;background:var(--bg-accent);border-radius:8px">
-                <div style="font-size:24px;font-weight:700" x-text="count"></div>
-                <div style="font-size:14px;text-transform:capitalize" 
-                     :style="status === 'ok' ? 'color:var(--spark)' : status === 'degraded' ? 'color:var(--neutral)' : 'color:var(--down)'"
-                     x-text="status"></div>
-              </div>
-            </template>
-          </div>
-          
-          <div x-show="Object.keys(sourcesByStatus).length === 0" class="kpi-sub" style="padding:20px 0;text-align:center">
-            Loading source health data...
-          </div>
-        </div>
-        
-        <!-- Data Quality Details -->
-        <div class="insight-card" style="grid-column:1/-1">
-          <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
-            <span>📊</span> Data Quality Details
-          </h2>
-          
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
-            <div>
-              <h3 style="margin:0 0 12px 0;font-size:16px">API Usage</h3>
-              <div x-show="totalApiCalls !== null">
-                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalApiCalls?.toLocaleString()"></div>
-                <div style="font-size:13px;color:var(--muted)">Total API calls today</div>
-              </div>
-              <div x-show="totalApiCalls === null" class="kpi-sub">
-                Loading...
-              </div>
-            </div>
-            
-            <div>
-              <h3 style="margin:0 0 12px 0;font-size:16px">AI Usage</h3>
-              <div x-show="totalAiTokens !== null">
-                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalAiTokens?.toLocaleString()"></div>
-                <div style="font-size:13px;color:var(--muted)">AI tokens consumed today</div>
-              </div>
-              <div x-show="totalAiTokens === null" class="kpi-sub">
-                Loading...
-              </div>
-            </div>
-            
-            <div>
-              <h3 style="margin:0 0 12px 0;font-size:16px">System Health</h3>
-              <div x-show="healthySources !== null">
-                <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" 
-                     :style="healthySources > (totalSources * 0.8) ? 'color:var(--spark)' : 'color:var(--down)'" 
-                     x-text="healthySources + '/' + totalSources"></div>
-                <div style="font-size:13px;color:var(--muted)">Healthy data sources</div>
-              </div>
-              <div x-show="healthySources === null" class="kpi-sub">
-                Loading...
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>

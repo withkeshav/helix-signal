@@ -21,6 +21,9 @@ export function registerDashboardStore(Alpine) {
     aiNarrative: '',
     aiInsights: '',
     nlpAvailable: false,
+    signalSpark: '',
+    pegSpark: '',
+    supplySpark: '',
     loading: false,
 
     init() {

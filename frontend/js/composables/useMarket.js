@@ -20,6 +20,9 @@ export function useMarket() {
     anomalyEvents: {},
     _trendCache: { signal: [], peg: [], supply: [] },
     
+    showAllChains: false,
+    aiSubTab: 'overview',
+
     // Chart-related properties
     _charts: new Map(),
     
@@ -56,6 +59,17 @@ export function useMarket() {
       const w = 60, h = 20;
       const step = w / (pts.length - 1);
       return pts.map((v, i) => `${(i * step).toFixed(1)},${(h - ((v - min) / range) * (h - 4) - 2).toFixed(1)}`).join(' ');
+    },
+    
+    _computeSpark(pts) {
+      if (!pts || pts.length < 2) return '0,10 60,10';
+      const max = Math.max(...pts), min = Math.min(...pts);
+      const range = max - min || 1;
+      const w = 60, h = 20, step = w / (pts.length - 1);
+      return pts.map((v, i) =>
+        `${(i*step).toFixed(1)},` +
+        `${(h-((v-min)/range)*(h-4)-2).toFixed(1)}`
+      ).join(' ');
     },
     
     // Formatting helpers
@@ -121,30 +135,35 @@ export function useMarket() {
     
     // Init — called automatically by Alpine when component mounts
     async init() {
-      // Skip redundant API calls if dashboard already loaded (tabs share `$store.dashboard`)
-      if (!this.$store.dashboard.chains?.length) {
-        await this.loadDashboard(this.asset);
-        await this.loadAllAssetSnapshots();
-        await this.loadAnomalies();
-        await this.loadPredictive();
-        await this.loadMarketOverview();
-        await this.loadAiExplain();
-        await this.loadNarrative();
-        await this.loadInsights();
-        await this.loadStressLeaderboard();
-        await this.loadRotation();
-      } else {
-        // Sync shared store data to this component's local state
-        const s = this.$store.dashboard;
-        this.chains = s.chains || [];
-        this.signal = s.signal || {};
-        this.crossSource = s.crossSource || {};
-        this.supplyFeed = s.supplyFeed || {};
-        this.attSignal = s.attSignal || {};
-        this.depeg = s.depeg || {};
-        this.concentration = s.concentration || {};
-        this.totalSupply = s.totalSupply;
-        this.supplyChange = s.supplyChange;
+      this.$store.dashboard.loading = true;
+      try {
+        // Skip redundant API calls if dashboard already loaded (tabs share `$store.dashboard`)
+        if (!this.$store.dashboard.chains?.length) {
+          await this.loadDashboard(this.asset);
+          await this.loadAllAssetSnapshots();
+          await this.loadAnomalies();
+          await this.loadPredictive();
+          await this.loadMarketOverview();
+          await this.loadAiExplain();
+          await this.loadNarrative();
+          await this.loadInsights();
+          await this.loadStressLeaderboard();
+          await this.loadRotation();
+        } else {
+          // Sync shared store data to this component's local state
+          const s = this.$store.dashboard;
+          this.chains = s.chains || [];
+          this.signal = s.signal || {};
+          this.crossSource = s.crossSource || {};
+          this.supplyFeed = s.supplyFeed || {};
+          this.attSignal = s.attSignal || {};
+          this.depeg = s.depeg || {};
+          this.concentration = s.concentration || {};
+          this.totalSupply = s.totalSupply;
+          this.supplyChange = s.supplyChange;
+        }
+      } finally {
+        this.$store.dashboard.loading = false;
       }
       
       // Render charts after data is loaded
@@ -158,23 +177,30 @@ export function useMarket() {
       
       // Clean up charts when switching away from tab
       this.$watch('$store.ui.tab', (newTab) => {
-        if (newTab !== 'overview' && newTab !== 'supply') {
+        if (newTab !== 'signal' && newTab !== 'market') {
           this._disposeAllCharts();
         }
       });
       
       // Reload data and charts when asset changes
-      this.$watch('$store.dashboard.asset', (newAsset) => {
-        this.loadDashboard(newAsset);
-        this.loadAllAssetSnapshots();
-        this.loadAnomalies();
-        this.loadPredictive();
-        this.loadMarketOverview();
-        this.loadAiExplain();
-        this.loadNarrative();
-        this.loadInsights();
-        this.loadStressLeaderboard();
-        this.loadRotation();
+      this.$watch('$store.dashboard.asset', async (newAsset) => {
+        if (this.chains.length === 0) this.$store.dashboard.loading = true;
+        try {
+          await Promise.all([
+            this.loadDashboard(newAsset),
+            this.loadAllAssetSnapshots(),
+            this.loadAnomalies(),
+            this.loadPredictive(),
+            this.loadMarketOverview(),
+            this.loadAiExplain(),
+            this.loadNarrative(),
+            this.loadInsights(),
+            this.loadStressLeaderboard(),
+            this.loadRotation(),
+          ]);
+        } finally {
+          this.$store.dashboard.loading = false;
+        }
         
         // Re-render charts after data reload
         this.$nextTick(() => {

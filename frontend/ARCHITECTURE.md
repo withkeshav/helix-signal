@@ -13,8 +13,8 @@ Shared reactive state is managed through Alpine stores. Each store handles a spe
 **Available Stores:**
 - `stores/dashboard.js` - Asset, time range, and core dashboard data
 - `stores/ui.js` - Theme, active tab, search state, auth tokens, version
-- `stores/osint.js` - OSINT/Events tab shared data
-- `stores/forecast.js` - Forecast tab shared data
+- `stores/osint.js` - Intel tab shared data (OSINT + SMIDGE composables)
+- `stores/forecast.js` - Market tab shared data (forecast composable)
 
 **Usage:**
 ```js
@@ -39,11 +39,11 @@ Composable functions encapsulate component-specific logic and state. Each tab/fe
 
 **Available Composables:**
 - `composables/useGovernance.js` - Settings tab logic
-- `composables/useHealth.js` - Health/status tab logic
-- `composables/useMarket.js` - Market/Overview tab logic
-- `composables/useOSINT.js` - OSINT/Events tab logic
-- `composables/useForecast.js` - Forecast tab logic
-- `composables/useQuality.js` - Data quality tab logic
+- `composables/useHealth.js` - System tab — health composable
+- `composables/useMarket.js` - Market tab logic (supply + forecast composables)
+- `composables/useOSINT.js` - Intel tab — OSINT + SMIDGE composables
+- `composables/useForecast.js` - Market tab — forecast composable
+- `composables/useQuality.js` - System tab — quality composable
 
 **Usage:**
 ```js
@@ -97,13 +97,13 @@ Tabs bind to their composables via `x-data`. This creates isolated component sco
 <!-- Settings tab -->
 <div x-data="governance" x-init="loadSettings(); loadAiBudget();">
 
-<!-- Events/Intel tabs -->  
+<!-- Intel tab -->
 <div x-data="osint">
 
-<!-- Forecast tab -->
+<!-- Market tab (forecast) -->
 <div x-data="forecast">
 
-<!-- Overview/Market tab -->
+<!-- Market tab -->
 <div x-data="market">
 ```
 
@@ -268,7 +268,7 @@ Alpine.data('mytab', useMyTab);
 - ✅ All frontend architecture overhaul complete
 - ✅ Foundation (Import map, stores, composables)
 - ✅ Core migrations (OSINT, Forecast, chart lifecycle, tests)
-- ✅ Market/Overview tab migration
+- ✅ Market tab
 - ✅ Settings completion and hardening
 
 ## Best Practices

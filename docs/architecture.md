@@ -82,7 +82,12 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 
 - `index.html` — dashboard shell, Alpine.js bindings, CDN Chart.js + ECharts
 - `js/init.js` — Alpine component (`helixApp`), chart wiring, tab loaders
-- `js/market.js`, `js/osint.js`, `js/governance.js`, `js/forecast.js` — feature modules spread into `helixApp`
+- `js/stores/` — Alpine stores: `dashboard.js` (shared data), `ui.js` (tab/admin/theme)
+- `js/composables/` — Alpine components (per-tab x-data): `useMarket.js`, `useOSINT.js`, `useSMIDGE.js`, `useForecast.js`, `useGovernance.js`
+- `js/charts.js` — Chart.js + ECharts rendering (extracted from init.js)
+- `js/utils.js` — Shared utility functions (formatUsd, formatWhen, etc.)
+- `styles.css` — Design system: tokens, glass, elevation, skeleton, icon utilities
+- 5-tab layout: Signal (hero gauge + AI summary + risk/charts) | Market (forecast + supply) | Intel (OSINT + SMIDGE) | System (health + quality) | Settings (governance)
 - nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
 - Frontend container binds to host port 80 (mapped from container port 80)
 - Content-Security-Policy uses SHA-256 hashes to allow specific inline scripts (like importmap) without using 'unsafe-inline'

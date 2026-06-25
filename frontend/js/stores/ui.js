@@ -1,11 +1,10 @@
 export function registerUiStore(Alpine) {
   Alpine.store('ui', {
-    tab: 'overview',
+    tab: 'signal',
     theme: 'light',
     searchQuery: '',
     searchResults: [],
     adminToken: sessionStorage.getItem('helix_admin_token') || '',
-    evidenceOpen: false,
     enabledAssets: [],
     refreshing: false,
 

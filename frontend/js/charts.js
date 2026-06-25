@@ -87,6 +87,18 @@ export function loadTrendChart() {
         if (this._charts.has('chart-trend-signal')) this._disposeChart(this._charts.get('chart-trend-signal'));
         if (typeof Chart.getChart === 'function') Chart.getChart('chart-trend-signal')?.destroy();
         const pts = t.points.map(p => ({ x: new Date(p.timestamp).getTime(), y: p.signal_score != null ? Number(p.signal_score) : null }));
+        // Sparkline wiring
+        if (t.points && t.points.length >= 2 && this.$store) {
+          const raw = t.points;
+          const sig = raw.map(p => p.signal_score);
+          const peg = raw.map(p => p.price);
+          const sup = raw.map(p => p.total_supply);
+          if (typeof this._computeSpark === 'function') {
+            this.$store.dashboard.signalSpark = this._computeSpark(sig);
+            this.$store.dashboard.pegSpark = this._computeSpark(peg);
+            this.$store.dashboard.supplySpark = this._computeSpark(sup);
+          }
+        }
         this._charts.set('chart-trend-signal', new Chart(el.getContext('2d'), {
           type: 'line',
           data: { datasets: [{ data: pts, borderColor: primary, backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.25, pointRadius: 0, borderWidth: 2 }] },

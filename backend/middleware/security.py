@@ -11,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import JSONResponse, Response
 
 VALID_SYMBOL = re.compile(r"^[A-Z0-9]{2,16}$")
-VALID_WINDOWS = frozenset({"24h", "7d", "30d", "90d"})
+VALID_WINDOWS = frozenset({"6h", "24h", "7d", "30d", "90d"})
 
 _CSP = os.getenv(
     "CONTENT_SECURITY_POLICY",

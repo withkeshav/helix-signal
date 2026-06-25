@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### UX/UI Overhaul (Layers 0–8)
+- **6h window fix** — `VALID_WINDOWS` in security.py now includes "6h" (was missing, causing 400 errors on 6H pill clicks)
+- **Sparkline KPIs** — Three SVG sparklines (signal, peg, supply) extracted from `/api/trends` via `_computeSpark()` in `useMarket.js` and rendered as `<polyline>` elements in index.html KPI cards
+- **Tab restructure (5-tab)** — Old 6-tab layout (Overview, Supply, Forecast, Events, Health, Quality, Settings) merged to 5 tabs: Signal | Market | Intel | System | Settings. Content deduplicated, sibling x-data scopes preserved
+- **Signal tab hero layout** — 3-zone restructure: HERO (gauge + AI summary with in-card sub-tabs), CONTEXT (Risk Terminal + Stress/Rotation), DETAIL (charts + chain cards). Time Range selector moved inside AI Summary card
+- **Chain cards collapsible** — "Show All" / "Show Less" toggle on Chain Details grid via `showAllChains` flag
+- **Evidence Drawer removed** — Entire evidence drawer component (HTML/CSS/JS) deleted. `showEvidence`, `copyEvidence` methods and `evidenceOpen` store key removed
+- **Signal Score KPI removed** — Redundant KPI card removed from global kpi-row
+- **Diagnostics moved to System tab** — Diagnostics card relocated from Signal tab to System tab
+- **Card elevation CSS** — Added `.card-raised` and `.card-flat` classes for design hierarchy
+- **Micro-interactions** — `transform:scale(0.97)` on button presses, `transition` on interactive card elements
+- **Lucide SVG icon system** — `.icon`, `.icon-sm`, `.icon-lg`, `.icon-xl` CSS classes for Lucide-compatible SVG sprites
+- **Skeleton loading screens** — `.skeleton`, `.skeleton-text`, `.skeleton-title`, `.skeleton-card`, `.skeleton-circle` CSS classes with shimmer animation
+
 ## 3.10.0 (2026-06-24)
 
 ### Security

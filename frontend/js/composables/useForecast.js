@@ -42,8 +42,8 @@ export function useForecast() {
     init() {
       this.$nextTick(() => {
         // Load data if we're on forecast tab
-        const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
-        if (currentTab === 'forecast') {
+        const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'signal';
+        if (currentTab === 'market') {
           const asset = this.$store.dashboard.asset || 'USDT';
           this.loadForecastData(asset);
           this.loadForecastAccuracy(asset);
@@ -72,23 +72,23 @@ export function useForecast() {
 
         // Clean up charts when switching away from tab
         this.$watch('$store.ui.tab', (newTab) => {
-          if (newTab !== 'forecast') {
+          if (newTab !== 'market') {
             this._destroyCharts();
           }
         });
 
         // Reload data when asset changes
         this.$watch('$store.dashboard.asset', (newAsset) => {
-          const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'overview';
-          if (currentTab === 'forecast') {
+          const currentTab = this.$store.ui.tab || location.hash.slice(1) || 'signal';
+          if (currentTab === 'market') {
             this.loadForecastData(newAsset);
             this.loadForecastAccuracy(newAsset);
           }
         });
 
-        // Load data when tab changes to forecast
+        // Load data when tab changes to market
         this.$watch('$store.ui.tab', (newTab) => {
-          if (newTab === 'forecast') {
+          if (newTab === 'market') {
             const asset = this.$store.dashboard.asset || 'USDT';
             this.loadForecastData(asset);
             this.loadForecastAccuracy(asset);

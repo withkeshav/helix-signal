@@ -129,8 +129,9 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
-| v3.10.2 | `3a37921` | 2026-06-24 | Pre-fix prod HEAD |
-| f6f1d40 | `f6f1d40` | 2026-06-25 | Playbook seed fix + fail-loud lifespan (not yet in prod) |
+| v3.10.3 | `0496bea` | 2026-06-25 | Current prod HEAD — bugfix audit completed |
+| v3.10.2 | `c56df3b` | 2026-06-24 | UI/UX redesign rollout |
+| v3.10.1 | `6757a71` | 2026-06-24 | Bugfix audit pass (auth, security, perf) |
 
 ---
 

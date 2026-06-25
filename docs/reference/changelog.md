@@ -16,6 +16,56 @@
 - **Lucide SVG icon system** — `.icon`, `.icon-sm`, `.icon-lg`, `.icon-xl` CSS classes for Lucide-compatible SVG sprites
 - **Skeleton loading screens** — `.skeleton`, `.skeleton-text`, `.skeleton-title`, `.skeleton-card`, `.skeleton-circle` CSS classes with shimmer animation
 
+## 3.10.3 (2026-06-25)
+
+### Fixed
+- **Postgres playbook seed crash** — `is_builtin = 1` fails on Postgres BOOLEAN. Replaced with ORM `Playbook.is_builtin.is_(True)`.
+- **Fail-loud lifespan** — Wrapped `lifespan()` startup in try/except that logs traceback to stderr.
+- **Re-export `_within_budget`** — Added to `ai_router.py` imports for `osint.py`/`sentiment.py` consumers.
+
+## 3.10.2 (2026-06-24)
+
+### Fixed
+- **cache.py SyntaxError** — Indented try/except mismatch.
+
+## 3.10.1 (2026-06-24)
+
+Bugfix audit pass — 8 groups across auth, security, reliability, performance, code quality.
+
+### Auth
+- Fix ghost identity in token parsing (A-3)
+- Fix user list crash on null `email`/`login_enabled` (B-2)
+
+### Security
+- SSRF protection for webhook URLs (A-2)
+- Require admin auth on sources endpoints (F-1)
+- Narrow CORS from wildcard `*` (A-1)
+- Remove `unsafe-eval` from CSP (A-8)
+
+### Auth hardening
+- Fix null user crash in audit logs (B-1)
+- Add `X-Frame-Options: DENY` (A-7)
+
+### Reliability
+- Fix `AttributeError` in `_attach_daily_latest` (F-4)
+- Atomic import lock via `INSERT ... WHERE NOT EXISTS` (F-5)
+- Guard background tasks behind startup flags (C-1 + F-6)
+
+### Performance
+- Bulk DB queries for settings page load (D-2)
+- Bulk freshness query for asset cache (D-3)
+
+### Information disclosure
+- Remove `platform.node()` from diagnostics (A-6)
+- Sanitize error responses (F-2)
+
+### Performance
+- Replace nested z-score loop with generator (D-1)
+
+### Code quality
+- Remove ~100 unused imports (E-1)
+- Replace bare `except Exception: pass` with logged warnings (E-2)
+
 ## 3.10.0 (2026-06-24)
 
 ### Security

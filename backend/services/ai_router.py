@@ -69,7 +69,7 @@ def _reset_local_if_new_day() -> None:
 
 
 from services.components.ai.cache import _AI_CACHE, _CACHE_TTL_SECONDS, _FEATURE_CACHE_TTL, cache_get_enhanced, cache_set_enhanced
-from services.components.ai.budget import _deduct_tokens
+from services.components.ai.budget import _deduct_tokens, get_budget_status
 
 
 # ---------------------------------------------------------------------------

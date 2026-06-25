@@ -1,5 +1,12 @@
 # Helix Signal Changelog
 
+## v3.10.3 (2026-06-25)
+
+- **Fix: Postgres playbook seed crash** — `_seed_builtin_playbooks` used `is_builtin = 1`, which fails on PostgreSQL BOOLEAN (`operator does not exist: boolean = integer`), causing uvicorn STARTUP_FAILURE (exit 3) during lifespan startup after alembic. Replaced with ORM `Playbook.is_builtin.is_(True)` filter, safe on both SQLite and Postgres.
+- **Fix: Fail-loud lifespan** — Wrapped `lifespan()` startup in `try`/`except` that logs `lifespan.startup_failed` with full traceback to stderr before re-raising. Future startup crashes are visible even without container log capture.
+- **Fix: Re-export `_within_budget`** — Added `_within_budget` to `ai_router.py` imports for `osint.py` and `sentiment.py` consumers.
+- Rollback anchor: `c1e38bf`
+
 ## v3.10.2 (2026-06-24)
 
 - Fix cache.py SyntaxError from indented try/except mismatch

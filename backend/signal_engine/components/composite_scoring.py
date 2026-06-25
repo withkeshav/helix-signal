@@ -3,9 +3,8 @@
 from typing import Dict, Any
 from datetime import datetime, timezone
 
-from signal_engine.components.peg_analysis import depeg_index_score, peg_deviation, peg_status_label
+from signal_engine.components.peg_analysis import depeg_index_score
 from signal_engine.components.concentration import concentration_component
-from signal_engine.components.supply_momentum import supply_momentum_component
 
 # ASSET-LEVEL SIGNAL SCORE WEIGHTS (5-component architecture)
 # depeg_index    0.35  (peg deviation pressure)

@@ -71,14 +71,13 @@ def investigate_anomaly(
     z_items = anomaly_results.get("z_score", {})
     anomalies = anomaly_results.get("anomalies", [])
 
-    highest_z = 0.0
-    for metric_key in ("supply", "price", "depeg_index"):
-        items = z_items.get(metric_key, [])
-        if isinstance(items, list):
-            for item in items:
-                z = abs(item.get("z_score", 0))
-                if z > highest_z:
-                    highest_z = z
+    highest_z = max(
+        (abs(item.get("z_score", 0))
+         for key in ("supply", "price", "depeg_index")
+         for item in z_items.get(key, [])
+         if isinstance(z_items.get(key), list)),
+        default=0.0,
+    )
 
     anomaly_summary = "; ".join(
         f"{a.get('metric','?')} z={a.get('z_score',0):.1f}"

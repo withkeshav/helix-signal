@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import time
 from collections import OrderedDict
@@ -67,8 +68,8 @@ def _reset_local_if_new_day() -> None:
         _LOCAL_TOKEN_DATE = today
 
 
-from services.components.ai.cache import _AI_CACHE, _CACHE_EVICTIONS, _CACHE_TTL_SECONDS, _FEATURE_CACHE_TTL, cache_get_enhanced, cache_set_enhanced, semantic_cache_search, get_cache_stats as get_component_cache_stats
-from services.components.ai.budget import _deduct_tokens, _within_budget, get_budget_status
+from services.components.ai.cache import _AI_CACHE, _CACHE_TTL_SECONDS, _FEATURE_CACHE_TTL, cache_get_enhanced, cache_set_enhanced
+from services.components.ai.budget import _deduct_tokens
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +166,6 @@ def get_cache_stats() -> dict[str, Any]:
 
 # Import provider implementations from components
 from services.components.ai.providers import (
-    ollama_cloud as _ollama_cloud_impl,
-    groq as _groq_impl,
-    cloudflare_ai as _cloudflare_ai_impl,
     openrouter_lite as _openrouter_lite_impl
 )
 
@@ -368,7 +366,7 @@ def _get_provider_priority_list(db: Any = None) -> list[str]:
                 if isinstance(parsed, list) and parsed:
                     return parsed
         except Exception:
-            pass
+            logging.getLogger(__name__).warning("Failed to read provider priority from settings", exc_info=True)
 
     return _env_based_priority(mode)
 
@@ -396,7 +394,7 @@ def _resolve_api_key(env_key: str, db: Any = None) -> str:
             if val:
                 return val
         except Exception:
-            pass
+            logging.getLogger(__name__).warning("Failed to resolve API key from settings", exc_info=True)
     return os.getenv(env_key, "").strip()
 
 
@@ -699,7 +697,7 @@ def _read_cache_settings_from_db(db: Any) -> None:
         if val is not None:
             _MAX_SEMANTIC_CACHE_ENTRIES = int(val)
     except Exception:
-        pass
+        logging.getLogger(__name__).warning("Failed to load cache configuration from settings", exc_info=True)
 
 
 # ---------------------------------------------------------------------------

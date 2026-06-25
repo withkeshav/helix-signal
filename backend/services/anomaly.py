@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -42,7 +41,7 @@ def _std_floor() -> float:
         if val is not None:
             return float(val)
     except Exception:
-        pass
+        log.warning("_std_floor lookup failed, using env fallback", exc_info=True)
     return float(os.getenv("ANOMALY_STD_FLOOR", "0.001"))
 
 

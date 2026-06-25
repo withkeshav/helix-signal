@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import time
 from collections import OrderedDict
@@ -40,7 +41,7 @@ def _get_feature_cache_ttl() -> dict[str, int]:
         if mn_ttl is not None:
             default_ttl["market_narrative"] = int(mn_ttl)
     except Exception:
-        pass
+        logging.getLogger(__name__).debug("Feature cache TTL lookup failed", exc_info=True)
     return default_ttl
 
 _FEATURE_CACHE_TTL: dict[str, int] = _get_feature_cache_ttl()
@@ -91,7 +92,7 @@ def cache_get_enhanced(key: str, feature: Optional[str] = None) -> Optional[Dict
             if val:
                 return val
         except Exception:
-            pass
+            logging.getLogger(__name__).debug("Redis cache get failed", exc_info=True)
     
     # Fallback to in-memory cache
     entry = _AI_CACHE.get(key)
@@ -119,7 +120,7 @@ def cache_set_enhanced(key: str, feature: str, prompt: str, payload: Dict[str, A
             ttl = _FEATURE_CACHE_TTL.get(feature, _CACHE_TTL_SECONDS)
             rc.set(_AI_REDIS_CACHE_PREFIX + key, payload, ex=ttl)
         except Exception:
-            pass
+            logging.getLogger(__name__).debug("Redis cache set failed", exc_info=True)
     
     # Store in in-memory cache
     if key in _AI_CACHE:

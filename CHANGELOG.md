@@ -10,6 +10,7 @@
 - **Fix: Chart.js removal** — Dropped Chart.js CDN (-250KB), rewrote charts.js to ECharts-only.
 - **Fix: OSINT timeouts** — Added per-source 15s timeouts to RSS fetches and 20s timeout to Twitter GraphQL calls.
 - **Fix: Audit follow-up** — Fixed `_makeBar`/`_renderForecastCanvas` exports (runtime import error), moved ECharts instances to `_echarts` map, replaced `immutable` cache with `no-cache` on non-hashed assets, added HSTS to static assets location, removed redundant `--save 3600 1` from Redis, added dependabot npm tracking for CDN deps.
+- **Chore: Remove redundant docker profiles** — All services had `profiles: ["data"]`; stripped from postgres, redis, backend, frontend. `docker compose up -d` now works without `--profile data`. Updated CI, docs, and .env.example references.
 - Rollback anchor: `c1e38bf`
 
 ## v3.10.2 (2026-06-24)

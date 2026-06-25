@@ -3,7 +3,6 @@ services:
     image: timescale/timescaledb:2.26.4-pg16
     container_name: helix-postgres
     restart: unless-stopped
-    profiles: ["data"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-helix}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -33,7 +32,6 @@ services:
     image: redis:7.4.9-alpine
     container_name: helix-redis
     restart: unless-stopped
-    profiles: ["data"]
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save 300 100 --appendonly yes
     networks:
       - internal
@@ -49,7 +47,6 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    profiles: ["data"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,7 +97,6 @@ services:
     build:
       context: ./frontend
     restart: unless-stopped
-    profiles: ["data"]
     ports:
       - "80:80"
     security_opt:

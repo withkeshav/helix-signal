@@ -66,7 +66,7 @@ jobs:
       - name: Set up Docker Compose
         run: |
           printf "POSTGRES_PASSWORD=smoketest-ci\nAI_MODE=ai_off\nHELIX_SKIP_STARTUP_REFRESH=1\n" > .env
-          docker compose --profile data up -d --build
+          docker compose up -d --build
           echo "Waiting for services to become healthy..."
           for i in $(seq 1 60); do
             if curl -sf http://localhost/api/health > /dev/null 2>&1; then
@@ -77,7 +77,7 @@ jobs:
           done
           if ! curl -sf http://localhost/ > /dev/null 2>&1; then
             echo "FAILED: frontend never became healthy"
-            docker compose --profile data logs --tail=50 frontend
+            docker compose logs --tail=50 frontend
             exit 1
           fi
 
@@ -199,8 +199,8 @@ jobs:
           script: |
             cd /apps/helix-signal
             git pull origin main
-            docker compose --profile data pull
-            docker compose --profile data up -d --no-build
+            docker compose pull
+            docker compose up -d --no-build
             echo "Deploy complete, verifying..."
             for i in $(seq 1 30); do
               if curl -sf http://localhost/api/health > /dev/null 2>&1; then

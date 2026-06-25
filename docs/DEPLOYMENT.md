@@ -27,15 +27,7 @@ curl -sf http://localhost/api/health | python3 -m json.tool
 
 ## Tracked Items
 
-### 1. Profile: `data` services
-
-`scripts/deploy.sh` does **not** pass `--profile data` by default. If the compose file profiles the `postgres`/`redis` services behind `data`, they will **not** start without the flag.
-
-**Action:** Either:
-- Add `COMPOSE_PROFILES=data` to prod `.env`
-- Or pass `--profile data` to every `docker compose up` invocation
-
-### 2. Dual `--no-cache` rebuild on large changes
+### 1. Dual `--no-cache` rebuild on large changes
 
 When both backend and frontend change significantly (e.g. UI redesign, model changes), rebuild without cache:
 

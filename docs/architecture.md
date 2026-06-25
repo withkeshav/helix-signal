@@ -41,7 +41,7 @@ backend:8000 (internal network only)
     v
 SQLite at /data/helix.db (volume helix_data) — default local profile
 
-Optional VPS data profile (`docker compose --profile data`):
+Optional VPS data profile:
 
 ```text
 postgres (TimescaleDB)  redis (cache + Celery broker)
@@ -50,7 +50,7 @@ postgres (TimescaleDB)  redis (cache + Celery broker)
     +---- mlflow:5000
 ```
 
-**VPS (single-node):** use `docker compose --profile data`; cap Redis at 128MB; set Postgres `shared_buffers` ~25% RAM on the host; keep `AI_MODE=ai_off` unless you need LLM summaries. Add a host swap file before enabling Timescale compression or Celery ML tasks.
+**VPS (single-node):** cap Redis at 128MB; set Postgres `shared_buffers` ~25% RAM on the host; keep `AI_MODE=ai_off` unless you need LLM summaries. Add a host swap file before enabling Timescale compression or Celery ML tasks.
 
 **SQLite → Postgres cutover:** run `scripts/migrate_sqlite_to_postgres.py` after backups; use `--verify-only` before switching `DATABASE_URL`. Local step-by-step runbook: `.progress/SERVER_MIGRATION.md` (not in git).
 ```

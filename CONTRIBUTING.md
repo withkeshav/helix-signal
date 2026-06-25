@@ -161,7 +161,7 @@ Guidelines:
 
 ## CI / GitHub Actions Requirements
 
-The `smoke` job spins up the full Docker Compose stack (`--profile data`),
+The `smoke` job spins up the full Docker Compose stack,
 which requires certain environment variables. These must be set as
 **repository secrets** in GitHub Settings → Secrets and Variables → Actions.
 

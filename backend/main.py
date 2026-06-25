@@ -16,6 +16,8 @@ from separate modules in the routes/ directory.
 
 import asyncio
 import os
+import sys
+import traceback
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, Request
@@ -103,95 +105,100 @@ async def _osint_attestation_refresh() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    try:
+        init_db()
 
-    discover_plugins()
+        discover_plugins()
 
-    from providers.settings import get_setting
+        from providers.settings import get_setting
 
-    scheduler = AsyncIOScheduler()
-    disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
-    listener_task = None
-    fred_task = None
+        scheduler = AsyncIOScheduler()
+        disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
+        listener_task = None
+        fred_task = None
 
-    with SessionLocal() as setup_db:
-        skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
+        with SessionLocal() as setup_db:
+            skip_refresh = os.getenv("HELIX_SKIP_STARTUP_REFRESH", "").strip().lower() in ("1", "true", "yes")
+            if not skip_refresh:
+                interval_seconds = max(60, get_setting("refresh_core_seconds", setup_db) or int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")))
+                scheduler.add_job(
+                    _refresh_job,
+                    "interval",
+                    seconds=interval_seconds,
+                    id="defillama-refresh",
+                    replace_existing=True,
+                )
+            osint_minutes = max(15, get_setting("refresh_osint_minutes", setup_db) or 60)
+
+        scheduler.add_job(
+            _retention_job,
+            "cron",
+            hour=3,
+            minute=15,
+            id="history-retention",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _osint_job,
+            "interval",
+            minutes=osint_minutes,
+            id="osint-ingest",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _osint_attestation_refresh,
+            "interval",
+            minutes=osint_minutes,
+            id="osint-attestation-refresh",
+            replace_existing=True,
+        )
+        scheduler.start()
+        app.state.scheduler = scheduler
+
+        loop = asyncio.get_running_loop()
+        if not skip_refresh and not disable_bg:
+            loop.create_task(asyncio.to_thread(_osint_job))
+            loop.create_task(_osint_attestation_refresh())
+
         if not skip_refresh:
-            interval_seconds = max(60, get_setting("refresh_core_seconds", setup_db) or int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")))
-            scheduler.add_job(
-                _refresh_job,
-                "interval",
-                seconds=interval_seconds,
-                id="defillama-refresh",
-                replace_existing=True,
-            )
-        osint_minutes = max(15, get_setting("refresh_osint_minutes", setup_db) or 60)
+            await _refresh_job()
 
-    scheduler.add_job(
-        _retention_job,
-        "cron",
-        hour=3,
-        minute=15,
-        id="history-retention",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        _osint_job,
-        "interval",
-        minutes=osint_minutes,
-        id="osint-ingest",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        _osint_attestation_refresh,
-        "interval",
-        minutes=osint_minutes,
-        id="osint-attestation-refresh",
-        replace_existing=True,
-    )
-    scheduler.start()
-    app.state.scheduler = scheduler
+        if not skip_refresh:
+            db = SessionLocal()
+            try:
+                row_count = db.query(AssetTrendSnapshot).count()
+                if row_count < 24:
+                    log.info("auto_backfill.start", reason="fresh_db", current_rows=row_count)
+                    enabled = load_enabled_assets()
+                    for asset in enabled:
+                        sym = asset.get("symbol", "")
+                        if sym:
+                            try:
+                                run_backfill(db, asset=sym, days=7, _internal=True)
+                                log.info("auto_backfill.complete", asset=sym)
+                            except Exception as exc:
+                                log.warning("auto_backfill.failed", asset=sym, error=str(exc))
+                    db.commit()
+            finally:
+                db.close()
 
-    loop = asyncio.get_running_loop()
-    if not skip_refresh and not disable_bg:
-        loop.create_task(asyncio.to_thread(_osint_job))
-        loop.create_task(_osint_attestation_refresh())
+        if not disable_bg:
+            try:
+                from chain.web3_listener import start_block_listener
+                listener_task = await start_block_listener()
+            except Exception as exc:
+                log.warning("block_listener.start_failed", error=str(exc))
 
-    if not skip_refresh:
-        await _refresh_job()
-
-    if not skip_refresh:
-        db = SessionLocal()
-        try:
-            row_count = db.query(AssetTrendSnapshot).count()
-            if row_count < 24:
-                log.info("auto_backfill.start", reason="fresh_db", current_rows=row_count)
-                enabled = load_enabled_assets()
-                for asset in enabled:
-                    sym = asset.get("symbol", "")
-                    if sym:
-                        try:
-                            run_backfill(db, asset=sym, days=7, _internal=True)
-                            log.info("auto_backfill.complete", asset=sym)
-                        except Exception as exc:
-                            log.warning("auto_backfill.failed", asset=sym, error=str(exc))
-                db.commit()
-        finally:
-            db.close()
-
-    if not disable_bg:
-        try:
-            from chain.web3_listener import start_block_listener
-            listener_task = await start_block_listener()
-        except Exception as exc:
-            log.warning("block_listener.start_failed", error=str(exc))
-
-        try:
-            from chain.fred_api import start_fred_poller
-            loop = asyncio.get_running_loop()
-            fred_task = loop.create_task(start_fred_poller())
-        except Exception as exc:
-            log.warning("fred_poller.start_failed", error=str(exc))
+            try:
+                from chain.fred_api import start_fred_poller
+                loop = asyncio.get_running_loop()
+                fred_task = loop.create_task(start_fred_poller())
+            except Exception as exc:
+                log.warning("fred_poller.start_failed", error=str(exc))
+    except Exception:
+        log.exception("lifespan.startup_failed")
+        traceback.print_exc(file=sys.stderr)
+        raise
 
     try:
         yield

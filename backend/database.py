@@ -455,10 +455,8 @@ def _seed_builtin_playbooks() -> None:
 
     with SessionLocal() as session:
         existing = {
-            row[0]
-            for row in session.execute(
-                text("SELECT name FROM playbooks WHERE is_builtin = 1")
-            ).fetchall()
+            pb.name
+            for pb in session.query(Playbook).filter(Playbook.is_builtin.is_(True)).all()
         }
         now = datetime.now(timezone.utc)
         for name, data in PLAYBOOKS.items():

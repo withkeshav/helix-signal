@@ -91,8 +91,8 @@ def cache_get_enhanced(key: str, feature: Optional[str] = None) -> Optional[Dict
             val = rc.get(_AI_REDIS_CACHE_PREFIX + key)
             if val:
                 return val
-    except Exception:
-        logging.getLogger(__name__).debug("Redis cache get failed", exc_info=True)
+        except Exception:
+            logging.getLogger(__name__).debug("Redis cache get failed", exc_info=True)
     
     # Fallback to in-memory cache
     entry = _AI_CACHE.get(key)

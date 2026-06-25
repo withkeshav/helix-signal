@@ -1,5 +1,10 @@
 # Helix Signal Changelog
 
+## v3.10.2 (2026-06-24)
+
+- Fix cache.py SyntaxError from indented try/except mismatch
+- Re-release after Cursor re-verify
+
 ## v3.10.1 (2026-06-24)
 
 Bugfix audit pass — 8 groups of fixes across auth, security, reliability, performance, and code quality.

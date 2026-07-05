@@ -9,6 +9,7 @@ This script automates the process of adding a new stablecoin asset by:
 4. Validating the configuration
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -55,6 +56,8 @@ def validate_asset_config(symbol: str, name: str, defillama_symbol: str, peg_typ
         print(f"Error: Peg type must be one of {valid_peg_types}")
         return False
     
+    valid_types = ["fiat_backed", "crypto_collateralized", "yield_bearing", "algorithmic"]
+    
     return True
 
 def add_asset_to_config(
@@ -62,13 +65,18 @@ def add_asset_to_config(
     name: str, 
     defillama_symbol: str,
     peg_type: str = "peggedUSD",
-    enabled: bool = True
+    enabled: bool = True,
+    stablecoin_type: str = "fiat_backed",
 ) -> bool:
     """Add asset to config/assets.json."""
     config_path = Path("config/assets.json")
     assets = load_json_file(config_path)
     
     if assets is None:
+        return False
+    
+    if stablecoin_type not in valid_types:
+        print(f"Error: Type must be one of {valid_types}")
         return False
     
     # Check if asset already exists
@@ -88,7 +96,8 @@ def add_asset_to_config(
         "defillama_symbol": defillama_symbol,
         "peg_type": peg_type,
         "enabled": enabled,
-        "default": False  # New assets are not default
+        "default": False,  # New assets are not default
+        "type": stablecoin_type,
     }
     
     assets.append(new_asset)
@@ -201,23 +210,34 @@ def validate_configuration(symbol: str) -> bool:
 
 def main():
     """Main function to add a new stablecoin."""
-    if len(sys.argv) < 3:
-        print("Usage: python add_stablecoin.py <symbol> <name> [defillama_symbol] [peg_type]")
-        print("Example: python add_stablecoin.py USDD 'Decentralized USD' USDD peggedUSD")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Add a new stablecoin to Helix Signal")
+    parser.add_argument("symbol", help="Asset symbol (e.g. USDD)")
+    parser.add_argument("name", help="Full asset name (e.g. 'Decentralized USD')")
+    parser.add_argument("defillama_symbol", nargs="?", default=None, help="DefiLlama symbol (defaults to symbol)")
+    parser.add_argument("peg_type", nargs="?", default="peggedUSD", help="Peg type (default: peggedUSD)")
+    parser.add_argument("--type", dest="stablecoin_type", default="fiat_backed",
+                        choices=["fiat_backed", "crypto_collateralized", "yield_bearing", "algorithmic"],
+                        help="Stablecoin type taxonomy (default: fiat_backed)")
+    args = parser.parse_args()
     
-    symbol = sys.argv[1]
-    name = sys.argv[2]
-    defillama_symbol = sys.argv[3] if len(sys.argv) > 3 else symbol
-    peg_type = sys.argv[4] if len(sys.argv) > 4 else "peggedUSD"
+    symbol = args.symbol
+    name = args.name
+    defillama_symbol = args.defillama_symbol or symbol
+    peg_type = args.peg_type
+    
+    valid_types = ["fiat_backed", "crypto_collateralized", "yield_bearing", "algorithmic"]
+    if args.stablecoin_type not in valid_types:
+        print(f"Error: --type must be one of {valid_types}")
+        sys.exit(1)
     
     print(f"Adding new stablecoin asset: {symbol}")
     print(f"Name: {name}")
     print(f"DefiLlama Symbol: {defillama_symbol}")
     print(f"Peg Type: {peg_type}")
+    print(f"Type: {args.stablecoin_type}")
     
     # Add to config
-    if not add_asset_to_config(symbol, name, defillama_symbol, peg_type):
+    if not add_asset_to_config(symbol, name, defillama_symbol, peg_type, stablecoin_type=args.stablecoin_type):
         print("Failed to add asset to configuration")
         sys.exit(1)
     

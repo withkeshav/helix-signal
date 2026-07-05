@@ -1,34 +1,26 @@
 [
-  {
-    "symbol": "USDT",
-    "name": "Tether USD",
-    "defillama_symbol": "USDT",
-    "peg_type": "peggedUSD",
-    "enabled": true,
-    "default": true
-  },
-  {
-    "symbol": "USDC",
-    "name": "USD Coin",
-    "defillama_symbol": "USDC",
-    "peg_type": "peggedUSD",
-    "enabled": true,
-    "default": false
-  },
-  {
-    "symbol": "DAI",
-    "name": "Dai",
-    "defillama_symbol": "DAI",
-    "peg_type": "peggedUSD",
-    "enabled": true,
-    "default": false
-  },
-  {
-    "symbol": "PYUSD",
-    "name": "PayPal USD",
-    "defillama_symbol": "PYUSD",
-    "peg_type": "peggedUSD",
-    "enabled": true,
-    "default": false
-  }
+  {"symbol": "USDT", "name": "Tether USD", "defillama_symbol": "USDT", "peg_type": "peggedUSD", "enabled": true, "default": true, "type": "fiat_backed"},
+  {"symbol": "USDC", "name": "USD Coin", "defillama_symbol": "USDC", "peg_type": "peggedUSD", "enabled": true, "default": false, "type": "fiat_backed"},
+  {"symbol": "PYUSD", "name": "PayPal USD", "defillama_symbol": "PYUSD", "peg_type": "peggedUSD", "enabled": true, "default": false, "type": "fiat_backed"},
+  {"symbol": "FDUSD", "name": "First Digital USD", "defillama_symbol": "FDUSD", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "fiat_backed"},
+  {"symbol": "GUSD", "name": "Gemini Dollar", "defillama_symbol": "GUSD", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "fiat_backed"},
+  {"symbol": "RLUSD", "name": "Ripple USD", "defillama_symbol": "RLUSD", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "fiat_backed"},
+  {"symbol": "USD1", "name": "USD1", "defillama_symbol": "USD1", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "fiat_backed"},
+  {"symbol": "USDG", "name": "USDG", "defillama_symbol": "USDG", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "fiat_backed"},
+  {"symbol": "DAI", "name": "Dai", "defillama_symbol": "DAI", "peg_type": "peggedUSD", "enabled": true, "default": false, "type": "crypto_collateralized"},
+  {"symbol": "USDS", "name": "USDS", "defillama_symbol": "USDS", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "crypto_collateralized"},
+  {"symbol": "LUSD", "name": "Liquity USD", "defillama_symbol": "LUSD", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "crypto_collateralized"},
+  {"symbol": "GHO", "name": "GHO", "defillama_symbol": "GHO", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "crypto_collateralized"},
+  {"symbol": "crvUSD", "name": "Curve USD", "defillama_symbol": "crvUSD", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "crypto_collateralized"},
+  {"symbol": "USDY", "name": "Ondo USD Yield", "defillama_symbol": "USDY", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "BUIDL", "name": "BlackRock USD Liquidity", "defillama_symbol": "BUIDL", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "USYC", "name": "USYC", "defillama_symbol": "USYC", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "sDAI", "name": "Savings Dai", "defillama_symbol": "sDAI", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "sUSDS", "name": "Savings USDS", "defillama_symbol": "sUSDS", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "aUSDC", "name": "Aave USDC", "defillama_symbol": "aUSDC", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "syrupUSDC", "name": "Syrup USDC", "defillama_symbol": "syrupUSDC", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "USDe", "name": "Ethena USDe", "defillama_symbol": "USDe", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "sUSDe", "name": "Staked USDe", "defillama_symbol": "sUSDe", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "yield_bearing"},
+  {"symbol": "USDD", "name": "USDD", "defillama_symbol": "USDD", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "algorithmic"},
+  {"symbol": "FRAX", "name": "Frax", "defillama_symbol": "FRAX", "peg_type": "peggedUSD", "enabled": false, "default": false, "type": "algorithmic"}
 ]

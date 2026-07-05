@@ -12,6 +12,39 @@ from signal_engine.core import cross_source_price_check
 from signal_engine.metrics_v3 import estimate_slippage
 from services.velocity import compute_supply_velocity
 
+# --- V4 stablecoin taxonomy (24 coins × 4 types) ---
+
+STABLECOIN_TAXONOMY = {
+    # ---- Fiat-Backed (8) ----
+    "USDT":  {"type": "fiat_backed", "sub_type": "offshore_issuer",   "yield_bearing": False},
+    "USDC":  {"type": "fiat_backed", "sub_type": "regulated_us",      "yield_bearing": False},
+    "PYUSD": {"type": "fiat_backed", "sub_type": "regulated_us",      "yield_bearing": False},
+    "FDUSD": {"type": "fiat_backed", "sub_type": "offshore_issuer",   "yield_bearing": False},
+    "GUSD":  {"type": "fiat_backed", "sub_type": "regulated_us",      "yield_bearing": False},
+    "RLUSD": {"type": "fiat_backed", "sub_type": "regulated_us",      "yield_bearing": False},
+    "USD1":  {"type": "fiat_backed", "sub_type": "political_actor",   "yield_bearing": False},
+    "USDG":  {"type": "fiat_backed", "sub_type": "consortium",        "yield_bearing": False},
+    # ---- Crypto-Collateralized (5) ----
+    "DAI":   {"type": "crypto_collateralized", "sub_type": "multi_collateral", "yield_bearing": False},
+    "USDS":  {"type": "crypto_collateralized", "sub_type": "sky_protocol",     "yield_bearing": False},
+    "LUSD":  {"type": "crypto_collateralized", "sub_type": "eth_only",         "yield_bearing": False},
+    "GHO":   {"type": "crypto_collateralized", "sub_type": "aave_backed",      "yield_bearing": False},
+    "crvUSD":{"type": "crypto_collateralized", "sub_type": "llamma_amm",       "yield_bearing": False},
+    # ---- Yield-Bearing (9) ----
+    "USDY":     {"type": "yield_bearing", "sub_type": "tbill_tokenized",     "yield_bearing": True},
+    "BUIDL":    {"type": "yield_bearing", "sub_type": "tbill_tokenized",     "yield_bearing": True},
+    "USYC":     {"type": "yield_bearing", "sub_type": "tbill_tokenized",     "yield_bearing": True},
+    "sDAI":     {"type": "yield_bearing", "sub_type": "defi_lending",        "yield_bearing": True},
+    "sUSDS":    {"type": "yield_bearing", "sub_type": "defi_lending",        "yield_bearing": True},
+    "aUSDC":    {"type": "yield_bearing", "sub_type": "defi_lending",        "yield_bearing": True},
+    "syrupUSDC":{"type": "yield_bearing", "sub_type": "undercollat_lending", "yield_bearing": True},
+    "USDe":     {"type": "yield_bearing", "sub_type": "delta_neutral",       "yield_bearing": False},
+    "sUSDe":    {"type": "yield_bearing", "sub_type": "delta_neutral",       "yield_bearing": True},
+    # ---- Algorithmic (2) ----
+    "USDD":  {"type": "algorithmic", "sub_type": "reserve_backed", "yield_bearing": False},
+    "FRAX":  {"type": "algorithmic", "sub_type": "fractional",     "yield_bearing": False},
+}
+
 
 def _aggregate_supply_totals(chains_orm: list[AssetChainSnapshot]) -> tuple[float | None, float, float, float]:
     raw_total = sum((c.supply_current or 0.0) for c in chains_orm)
@@ -64,8 +97,9 @@ def _aggregate_liquidity_metrics(chains_orm: list[AssetChainSnapshot]) -> tuple[
     return slippage_10k_bps, slippage_100k_bps, top3_pool_share_pct
 
 
-def _cross_source_fields(chains_orm: list[AssetChainSnapshot]) -> tuple[int, float]:
+def _cross_source_fields(chains_orm: list[AssetChainSnapshot], *, asset_symbol: str | None = None) -> tuple[int, float]:
     prices: dict[str, float | None] = {}
+    sym = asset_symbol or (chains_orm[0].asset_symbol if chains_orm else None)
     for c in chains_orm:
         if c.price is not None:
             prices.setdefault("defillama", c.price)
@@ -82,6 +116,14 @@ def _cross_source_fields(chains_orm: list[AssetChainSnapshot]) -> tuple[int, flo
             prices["dexscreener"] = c.price_dexscreener
         if c.price is not None and "defillama" not in prices:
             prices["defillama"] = c.price
+    if sym:
+        try:
+            from sources.chainlink_oracle import get_cached_oracle_price, fetch_oracle_price
+            oracle_p = get_cached_oracle_price(sym) or fetch_oracle_price(sym)
+            if oracle_p is not None:
+                prices["chainlink"] = oracle_p
+        except Exception:
+            pass
     check = cross_source_price_check(prices)
     agreement = int(check.get("sources_agreeing") or 0)
     discrepancy = float(check.get("max_discrepancy_pct") or 0.0)
@@ -103,7 +145,8 @@ def build_risk_score_kwargs(
     price = next((c.price for c in chains_orm if c.price is not None), None)
     slippage_10k, slippage_100k, top3_pool = _aggregate_liquidity_metrics(chains_orm)
     tvl_change = _aggregate_tvl_change_24h_pct(chains_orm)
-    cross_agreement, cross_disc = _cross_source_fields(chains_orm)
+    asset_symbol = chains_orm[0].asset_symbol if chains_orm else None
+    cross_agreement, cross_disc = _cross_source_fields(chains_orm, asset_symbol=asset_symbol)
 
     return dict(
         price=price,
@@ -149,6 +192,27 @@ def inject_velocity(
     return kwargs
 
 
+def inject_onchain(
+    db: Session | None,
+    kwargs: dict[str, Any],
+    *,
+    asset_symbol: str | None,
+) -> dict[str, Any]:
+    if db is None or not asset_symbol:
+        return kwargs
+    try:
+        from services.onchain import onchain_risk_inputs
+        onchain = onchain_risk_inputs(asset_symbol, db)
+        if onchain.get("onchain_available"):
+            kwargs["whale_net_outflow_usd"] = onchain.get("whale_net_outflow_usd")
+            kwargs["whale_alert"] = onchain.get("whale_alert")
+            kwargs["top10_holder_share_pct"] = onchain.get("top10_holder_share_pct")
+            kwargs["net_mint_burn_usd_24h"] = onchain.get("net_mint_burn_usd_24h")
+    except Exception:
+        pass
+    return kwargs
+
+
 def compute_unified_risk_score(
     chains_orm: list[AssetChainSnapshot],
     *,
@@ -170,4 +234,5 @@ def compute_unified_risk_score(
     )
     sym = asset_symbol or (chains_orm[0].asset_symbol if chains_orm else None)
     kwargs = inject_velocity(db, kwargs, asset_symbol=sym)
+    kwargs = inject_onchain(db, kwargs, asset_symbol=sym)
     return scoring.compute_risk_score(**kwargs)

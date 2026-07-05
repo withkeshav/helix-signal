@@ -34,6 +34,13 @@ RSS_FEEDS = {
     "decrypt": "https://decrypt.co/feed",
     "bitcoincom": "https://news.bitcoin.com/feed/",
     "thedefiant": "https://thedefiant.io/api/feed",
+    "protos": "https://protos.com/rss",
+    "dinews": "https://www.dlnews.com/feed/rss",
+    "chainalysis": "https://www.chainalysis.com/blog/feed/",
+    "nansen": "https://www.nansen.ai/feed",
+    "defillama": "https://defillama.com/rss",
+    "bis": "https://www.bis.org/feed.rss",
+    "fsb": "https://www.fsb.org/rss/",
 }
 
 CRYPTOCURRENCY_CV_URL = "https://api.cryptocurrency.cv/v1/news/latest"
@@ -121,7 +128,13 @@ def _fetch_cryptocurrency_cv() -> list[dict[str, Any]]:
         return []
 
 
-_STABLECOIN_KEYWORDS = {"USDT", "USDC", "DAI", "PYUSD", "TETHER", "CIRCLE", "MAKER", "PAYPAL"}
+_STABLECOIN_KEYWORDS = {
+    "USDT", "USDC", "DAI", "PYUSD", "TETHER", "CIRCLE", "MAKER", "PAYPAL",
+    "FDUSD", "GUSD", "RLUSD", "USD1", "USDG", "USDS", "LUSD", "GHO",
+    "crvUSD", "USDY", "BUIDL", "USYC", "sDAI", "sUSDS", "aUSDC",
+    "syrupUSDC", "USDe", "sUSDe", "USDD", "FRAX", "USDP", "TUSD",
+    "FRAX", "LQTY", "SKY", "ETHE", "ONDO",
+}
 
 
 def _classify_asset(text: str) -> list[str]:
@@ -131,6 +144,45 @@ def _classify_asset(text: str) -> list[str]:
         if kw in upper:
             found.append(kw)
     return found
+
+
+CLASSIFIER_SYSTEM_PROMPT = (
+    "You are a stablecoin intelligence classifier. Given a news article title and summary, "
+    "return JSON with: event_type (one of: DEPEG, HACK EXPLOIT, ADDRESS FREEZE BLACKLIST, "
+    "OFAC SANCTION, LAW ENFORCEMENT SEIZURE, REGULATION LAW, MONEY LAUNDERING CASE, "
+    "SCAM FRAUD, OTHER), affected_assets (list of coin symbols), severity (info/warning/critical), "
+    "driver_category (onchain/regulatory/economic/operational/geopolitical), "
+    "extracted_numbers (list of floats), is_leading_indicator (bool), "
+    "confidence (0.0-1.0), source_authority (0.0-1.0). "
+    "Return ONLY valid JSON, no commentary."
+)
+
+
+def classify_article_structured(title: str, summary: str) -> dict[str, Any]:
+    """Use Ollama Cloud to classify a stablecoin article into structured fields."""
+    try:
+        from services.components.ai.providers._ollama_cloud import _ollama_cloud
+        text = f"Title: {title}\nSummary: {summary}"
+        result = _ollama_cloud(system=CLASSIFIER_SYSTEM_PROMPT, user=text, json_mode=True)
+        raw = result.get("content", "{}") if isinstance(result, dict) else str(result)
+        parsed = json.loads(raw)
+        return {
+            "event_type": parsed.get("event_type", "OTHER"),
+            "affected_assets": parsed.get("affected_assets", []),
+            "severity": parsed.get("severity", "info"),
+            "driver_category": parsed.get("driver_category", "economic"),
+            "extracted_numbers": parsed.get("extracted_numbers", []),
+            "is_leading_indicator": bool(parsed.get("is_leading_indicator", False)),
+            "confidence": float(parsed.get("confidence", 0.5)),
+            "source_authority": float(parsed.get("source_authority", 0.5)),
+        }
+    except Exception:
+        log.exception("classify_article_structured.failed")
+        return {
+            "event_type": "OTHER", "affected_assets": [], "severity": "info",
+            "driver_category": "economic", "extracted_numbers": [],
+            "is_leading_indicator": False, "confidence": 0.0, "source_authority": 0.0,
+        }
 
 
 def _compute_sentiment(text: str, nlp_enabled: bool | None = None) -> dict[str, Any]:
@@ -176,7 +228,13 @@ def ingest_osint_feed(db: Session) -> int:
     titles = [a["title"] for a in all_articles]
     sentiments = _batch_sentiment(titles, nlp_active)
 
+    classification_cache: dict[str, dict[str, Any]] = {}
     for art, sentiment in zip(all_articles, sentiments):
+        classify_key = art["title"][:100]
+        if classify_key not in classification_cache:
+            classification_cache[classify_key] = classify_article_structured(art["title"], art.get("summary", ""))
+        cls = classification_cache[classify_key]
+
         article = OsintArticle(
             source=art["source"],
             title=art["title"],
@@ -186,6 +244,11 @@ def ingest_osint_feed(db: Session) -> int:
             sentiment_score=sentiment["score"],
             sentiment_label=sentiment["label"],
             entities=json.dumps(art["assets"]) if art["assets"] else None,
+            event_type=cls["event_type"],
+            driver_category=cls["driver_category"],
+            source_authority=cls["source_authority"],
+            is_leading_indicator=cls["is_leading_indicator"],
+            extracted_numbers_json=json.dumps(cls["extracted_numbers"]) if cls.get("extracted_numbers") else None,
         )
         db.add(article)
         db.flush()

@@ -79,5 +79,86 @@
     "channels": ["dashboard"],
     "cooldown_minutes": 0,
     "enabled": false
+  },
+  {
+    "type": "yield_apy_collapse",
+    "condition": "rule_10_yield_apy_collapse",
+    "persistence_minutes": 30,
+    "severity": "warning",
+    "channels": ["dashboard", "webhook"],
+    "cooldown_minutes": 120,
+    "enabled": true
+  },
+  {
+    "type": "funding_rate_negative",
+    "condition": "rule_11_funding_rate_negative",
+    "persistence_minutes": 0,
+    "severity": "warning",
+    "channels": ["dashboard", "webhook"],
+    "cooldown_minutes": 120,
+    "enabled": true
+  },
+  {
+    "type": "insurance_coverage_critical",
+    "condition": "rule_12_insurance_coverage",
+    "persistence_minutes": 15,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "collateral_warning",
+    "condition": "rule_13_collateral_warning",
+    "persistence_minutes": 30,
+    "severity": "warning",
+    "channels": ["dashboard", "webhook"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "liquidation_cascade",
+    "condition": "rule_14_liquidation_cascade",
+    "persistence_minutes": 15,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "reserve_coverage_warning",
+    "condition": "rule_15_reserve_coverage",
+    "persistence_minutes": 0,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord"],
+    "cooldown_minutes": 60,
+    "enabled": true
+  },
+  {
+    "type": "attestation_stale",
+    "condition": "rule_16_attestation_stale",
+    "persistence_minutes": 0,
+    "severity": "warning",
+    "channels": ["dashboard"],
+    "cooldown_minutes": 1440,
+    "enabled": true
+  },
+  {
+    "type": "osint_critical_event",
+    "condition": "rule_17_osint_critical",
+    "persistence_minutes": 0,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord"],
+    "cooldown_minutes": 30,
+    "enabled": true
+  },
+  {
+    "type": "issuer_freeze_detected",
+    "condition": "rule_22_issuer_freeze",
+    "persistence_minutes": 0,
+    "severity": "critical",
+    "channels": ["dashboard", "webhook", "discord"],
+    "cooldown_minutes": 30,
+    "enabled": true
   }
 ]

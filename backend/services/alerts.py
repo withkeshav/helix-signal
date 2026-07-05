@@ -138,6 +138,90 @@ def _eval_supply_age(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
     return False
 
 
+@_register_condition("rule_10_yield_apy_collapse")
+def _eval_yield_apy_collapse(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    apy_current = bundle.get("apy_current")
+    apy_7d_ago = bundle.get("apy_7d_ago")
+    if apy_current is not None and apy_7d_ago is not None and apy_7d_ago > 0:
+        drop_pct = (apy_7d_ago - apy_current) / apy_7d_ago
+        if drop_pct > 0.30:
+            bundle["_meta"]["apy_drop_pct"] = round(drop_pct * 100, 1)
+            return True
+    return False
+
+
+@_register_condition("rule_11_funding_rate_negative")
+def _eval_funding_rate_negative(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    bundle["_meta"]["funding_rate_7d_negative_hours"] = funding_hours = bundle.get("funding_rate_7d_negative_hours", 0)
+    return funding_hours >= 8
+
+
+@_register_condition("rule_12_insurance_coverage")
+def _eval_insurance_coverage(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    coverage = bundle.get("insurance_fund_coverage")
+    if coverage is not None and coverage < 0.02:
+        bundle["_meta"]["insurance_fund_coverage"] = coverage
+        return True
+    return False
+
+
+@_register_condition("rule_13_collateral_warning")
+def _eval_collateral_warning(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    headroom = bundle.get("collateral_headroom_pct")
+    if headroom is not None and headroom < 15:
+        bundle["_meta"]["collateral_headroom_pct"] = headroom
+        return True
+    return False
+
+
+@_register_condition("rule_14_liquidation_cascade")
+def _eval_liquidation_cascade(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    queue = bundle.get("liquidation_queue_usd")
+    if queue is not None and queue > 50_000_000:
+        bundle["_meta"]["liquidation_queue_usd"] = queue
+        return True
+    return False
+
+
+@_register_condition("rule_15_reserve_coverage")
+def _eval_reserve_coverage(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    ratio = bundle.get("coverage_ratio")
+    if ratio is not None and ratio < 1.02:
+        bundle["_meta"]["coverage_ratio"] = ratio
+        return True
+    return False
+
+
+@_register_condition("rule_16_attestation_stale")
+def _eval_attestation_stale(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    lag = bundle.get("attestation_lag_days")
+    if lag is not None and lag > 30:
+        bundle["_meta"]["attestation_lag_days"] = lag
+        return True
+    return False
+
+
+@_register_condition("rule_17_osint_critical")
+def _eval_osint_critical(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    event_type = bundle.get("osint_event_type", "")
+    source_authority = bundle.get("osint_source_authority", 0)
+    if event_type in ("DEPEG_CONFIRMED", "PROTOCOL_EXPLOIT", "ISSUER_FREEZE", "SANCTIONS_ACTION") and source_authority >= 0.70:
+        bundle["_meta"]["osint_event_type"] = event_type
+        bundle["_meta"]["osint_source_authority"] = source_authority
+        return True
+    return False
+
+
+@_register_condition("rule_22_issuer_freeze")
+def _eval_issuer_freeze(bundle: dict[str, Any], rule: dict[str, Any]) -> bool:
+    frozen_usd = bundle.get("frozen_balance_usd")
+    if frozen_usd is not None and frozen_usd > 1_000_000:
+        bundle["_meta"]["frozen_balance_usd"] = frozen_usd
+        bundle["_meta"]["frozen_address"] = bundle.get("frozen_address", "")
+        return True
+    return False
+
+
 def _extract_threshold(condition: str, prefix: str) -> float:
     """Extract numeric threshold from a condition string like 'depeg_bps > 50'."""
     try:

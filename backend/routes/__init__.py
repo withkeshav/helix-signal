@@ -24,6 +24,9 @@ def register_routes(app):
     from routes.settings_audit import router as settings_audit_router
     from routes.settings_import_export import router as settings_import_export_router
     from routes.users import router as users_router
+    from routes.dews import router as dews_router
+    from routes.onchain import router as onchain_router
+    from routes.external_intel_webhook import router as external_intel_webhook_router
 
     app.include_router(admin_router, prefix="/api", tags=["admin"])
     app.include_router(ai_router, prefix="/api", tags=["ai"])
@@ -47,3 +50,6 @@ def register_routes(app):
     app.include_router(settings_audit_router, prefix="/api", tags=["settings"])
     app.include_router(settings_import_export_router, prefix="/api", tags=["settings"])
     app.include_router(users_router, prefix="/api", tags=["users"])
+    app.include_router(dews_router, prefix="/api", tags=["dews"])
+    app.include_router(onchain_router, prefix="/api", tags=["onchain"])
+    app.include_router(external_intel_webhook_router, prefix="/api", tags=["webhooks"])

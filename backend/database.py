@@ -201,6 +201,11 @@ class OsintArticle(Base):
     sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
     entities: Mapped[str | None] = mapped_column(Text, nullable=True)
     topics: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event_type: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    driver_category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source_authority: Mapped[float | None] = mapped_column(Float, nullable=True)
+    is_leading_indicator: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    extracted_numbers_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     asset_links: Mapped[list["OsintArticleAsset"]] = relationship("OsintArticleAsset", back_populates="article", cascade="all, delete-orphan")
 

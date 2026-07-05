@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 
 from signal_engine.components.peg_analysis import depeg_index_score
 from signal_engine.components.concentration import concentration_component
+from signal_engine.components.reserve_coverage import compute_reserve_coverage
+from signal_engine.components.collateral_health import compute_collateral_health
+from signal_engine.components.funding_rate_health import compute_funding_rate_health
+from signal_engine.components.yield_sustainability import compute_yield_sustainability
 
 # ASSET-LEVEL SIGNAL SCORE WEIGHTS (5-component architecture)
 # Base (stable regime) — depeg 0.35, concentration 0.20, velocity 0.15, liquidity 0.10, age 0.20
@@ -145,7 +149,147 @@ def apply_osint_amplifier(raw_score: float, event_type: str, source_authority: f
 
 def _compute_v4_risk_score(stablecoin_type: str, **kwargs) -> Dict[str, Any]:
     """V4 dispatch: select weight matrix by stablecoin sub-type, apply V4 component scorers."""
-    return compute_risk_score(**kwargs)  # placeholder — real V4 component scorers in Sprint 3
+    sub_type_map = {
+        "fiat_backed": "fiat_backed",
+        "crypto_collateralized": "crypto_collateralized",
+        "algorithmic": "algorithmic",
+        "yield_bearing": None,
+    }
+    v4_key = sub_type_map.get(stablecoin_type)
+    if not v4_key:
+        sub_type = kwargs.get("sub_type", "")
+        if "delta_neutral" in sub_type:
+            v4_key = "yield_bearing_delta_neutral"
+        elif "tbill" in sub_type:
+            v4_key = "yield_bearing_tbill"
+        elif "defi" in sub_type or "lending" in sub_type:
+            v4_key = "yield_bearing_defi_lending"
+        else:
+            v4_key = "yield_bearing_delta_neutral"
+
+    weights = V4_WEIGHT_MATRICES.get(v4_key, V4_WEIGHT_MATRICES["fiat_backed"])
+
+    depeg_score = kwargs.get("depeg_index") or depeg_index_score(kwargs.get("price"))
+    concentration_score = kwargs.get("concentration_score") or 0
+    v4_inputs = kwargs.get("v4_snapshot_inputs", {})
+
+    component_scores: dict[str, tuple[int, dict[str, Any]]] = {}
+
+    component_scores["depeg_component"] = (int(depeg_score), {"price": kwargs.get("price")})
+
+    conc_detail: dict[str, Any] = {}
+    if "chain_shares" in kwargs:
+        _, conc_detail = concentration_component(kwargs.get("chain_shares", []))
+    component_scores["concentration_component"] = (int(concentration_score), conc_detail)
+
+    if "reserve_coverage" in weights:
+        rc_score, rc_detail = compute_reserve_coverage(v4_inputs)
+        component_scores["reserve_coverage"] = (rc_score, rc_detail)
+
+    if "collateral_health" in weights:
+        asset_symbol = kwargs.get("asset_symbol", "")
+        ch_score, ch_detail = compute_collateral_health(asset_symbol, v4_inputs)
+        component_scores["collateral_health"] = (ch_score, ch_detail)
+
+    if "funding_rate_health" in weights:
+        fr_score, fr_detail = compute_funding_rate_health(v4_inputs)
+        component_scores["funding_rate_health"] = (fr_score, fr_detail)
+
+    if "yield_sustainability" in weights:
+        sub_type = kwargs.get("sub_type", "default")
+        ys_score, ys_detail = compute_yield_sustainability(sub_type, v4_inputs)
+        component_scores["yield_sustainability"] = (ys_score, ys_detail)
+
+    if "attestation_freshness" in weights:
+        attestation_lag = v4_inputs.get("attestation_lag_days", 0) or 0
+        af_score = 0
+        if attestation_lag > 60:
+            af_score = 75
+        elif attestation_lag > 30:
+            af_score = 50
+        elif attestation_lag > 14:
+            af_score = 25
+        component_scores["attestation_freshness"] = (af_score, {"attestation_lag_days": attestation_lag})
+
+    if "regulatory_compliance" in weights:
+        genius = v4_inputs.get("genius_act_compliant", False)
+        mica = v4_inputs.get("mica_status", "unknown")
+        rc2_score = 0 if (genius or mica == "compliant") else 25
+        component_scores["regulatory_compliance"] = (rc2_score, {"genius_act_compliant": genius, "mica_status": mica})
+
+    if "insurance_fund_coverage" in weights:
+        ifc = v4_inputs.get("insurance_fund_coverage") or 0
+        if_score = 0
+        if ifc < 0.01:
+            if_score = 75
+        elif ifc < 0.03:
+            if_score = 50
+        elif ifc < 0.05:
+            if_score = 25
+        component_scores["insurance_fund_coverage"] = (if_score, {"insurance_coverage": ifc})
+
+    if "cex_counterparty_health" in weights:
+        counterparty_risk = v4_inputs.get("counterparty_risk", "low")
+        cex_map = {"low": 0, "medium": 30, "high": 60, "critical": 100}
+        cex_score = cex_map.get(counterparty_risk, 0)
+        component_scores["cex_counterparty_health"] = (cex_score, {"counterparty_risk": counterparty_risk})
+
+    if "redemption_liquidity" in weights:
+        redemption_lag = v4_inputs.get("redemption_lag_hours", 0) or 0
+        rl_score = 0
+        if redemption_lag > 72:
+            rl_score = 75
+        elif redemption_lag > 24:
+            rl_score = 50
+        elif redemption_lag > 8:
+            rl_score = 25
+        component_scores["redemption_liquidity"] = (rl_score, {"redemption_lag_hours": redemption_lag})
+
+    if "underlying_protocol_health" in weights:
+        lending_util = v4_inputs.get("lending_utilization_pct", 0) or 0
+        uph_score = 0
+        if lending_util > 95:
+            uph_score = 80
+        elif lending_util > 85:
+            uph_score = 50
+        elif lending_util > 70:
+            uph_score = 25
+        component_scores["underlying_protocol_health"] = (uph_score, {"lending_utilization_pct": lending_util})
+
+    if "mint_burn_ratio" in weights:
+        mint_burn = kwargs.get("net_mint_burn_usd_24h", 0) or 0
+        mb_score = 0
+        if abs(mint_burn) > 50_000_000:
+            mb_score = 60
+        elif abs(mint_burn) > 10_000_000:
+            mb_score = 30
+        component_scores["mint_burn_ratio"] = (mb_score, {"net_mint_burn_usd_24h": mint_burn})
+
+    if "liquidity_depth" in weights:
+        liq_score = liquidity_depth_score(kwargs.get("slippage_100k_bps", 0) or 0)
+        component_scores["liquidity_depth"] = (int(liq_score), {"slippage_100k_bps": kwargs.get("slippage_100k_bps", 0)})
+
+    if "velocity_component" in weights:
+        vel = kwargs.get("supply_velocity_1h", 0) or 0
+        v_score = min(25, abs(float(vel)) * 5)
+        component_scores["velocity_component"] = (int(v_score), {"supply_velocity_1h": vel})
+
+    final_score = 0.0
+    components_detail: dict[str, Any] = {}
+    for name, (score, detail) in component_scores.items():
+        w = weights.get(name, 0)
+        final_score += score * w
+        components_detail[name] = {"score": score, "weight": w, "detail": detail}
+
+    final_score = max(0, min(100, round(final_score)))
+    band = _score_to_band(final_score)
+
+    return {
+        "score": final_score,
+        "band": band,
+        "regime": "v4_dispatch",
+        "components": components_detail,
+    }
 
 
 def compute_risk_score(**kwargs) -> Dict[str, Any]:

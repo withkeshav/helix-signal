@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from database import AssetChainSnapshot
+from database import AssetChainSnapshot, FiatReserveSnapshot, CollateralSnapshot, YieldBearingSnapshot
 from signal_engine import scoring
 from signal_engine.core import cross_source_price_check
 from signal_engine.metrics_v3 import estimate_slippage
@@ -192,6 +193,54 @@ def inject_velocity(
     return kwargs
 
 
+def type_specific_inputs(
+    db: Session | None,
+    *,
+    asset_symbol: str | None,
+    stablecoin_type: str | None,
+) -> dict[str, Any]:
+    """Query V4 snapshot tables and return merged v4_snapshot_inputs dict."""
+    if db is None or not asset_symbol or not stablecoin_type:
+        return {}
+    now = datetime.now(timezone.utc)
+    v4_inputs: dict[str, Any] = {}
+
+    try:
+        fiat = db.query(FiatReserveSnapshot).filter(
+            FiatReserveSnapshot.asset_symbol == asset_symbol.upper(),
+        ).order_by(FiatReserveSnapshot.created_at.desc()).first()
+        if fiat:
+            v4_inputs["coverage_ratio"] = fiat.coverage_ratio
+            v4_inputs["reserve_composition"] = fiat.reserve_composition
+            v4_inputs["attestation_lag_days"] = fiat.attestation_lag_days
+            v4_inputs["genius_act_compliant"] = fiat.genius_act_compliant
+            v4_inputs["mica_status"] = fiat.mica_status
+
+        coll = db.query(CollateralSnapshot).filter(
+            CollateralSnapshot.asset_symbol == asset_symbol.upper(),
+        ).order_by(CollateralSnapshot.timestamp.desc()).first()
+        if coll:
+            v4_inputs["collateral_ratio"] = coll.collateral_ratio
+            v4_inputs["liquidation_queue_usd"] = coll.liquidation_queue_usd
+            v4_inputs["debt_ceiling_utilization_pct"] = coll.debt_ceiling_utilization_pct
+            v4_inputs["recovery_mode"] = (coll.collateral_assets_json or {}).get("recovery_mode", False) if coll.collateral_assets_json else False
+
+        yb = db.query(YieldBearingSnapshot).filter(
+            YieldBearingSnapshot.asset_symbol == asset_symbol.upper(),
+        ).order_by(YieldBearingSnapshot.timestamp.desc()).first()
+        if yb:
+            v4_inputs["current_apy"] = yb.current_apy
+            v4_inputs["yield_source"] = yb.yield_source
+            v4_inputs["insurance_fund_usd"] = yb.insurance_fund_usd
+            v4_inputs["insurance_fund_coverage"] = yb.insurance_fund_coverage
+            v4_inputs["staking_ratio"] = yb.staking_ratio
+            v4_inputs["lending_utilization_pct"] = yb.lending_utilization_pct
+    except Exception:
+        pass
+
+    return v4_inputs
+
+
 def inject_onchain(
     db: Session | None,
     kwargs: dict[str, Any],
@@ -223,6 +272,7 @@ def compute_unified_risk_score(
     attestation_age_days: float | None = None,
     db: Session | None = None,
     asset_symbol: str | None = None,
+    stablecoin_type: str | None = None,
 ) -> dict[str, Any]:
     kwargs = build_risk_score_kwargs(
         chains_orm,
@@ -235,4 +285,7 @@ def compute_unified_risk_score(
     sym = asset_symbol or (chains_orm[0].asset_symbol if chains_orm else None)
     kwargs = inject_velocity(db, kwargs, asset_symbol=sym)
     kwargs = inject_onchain(db, kwargs, asset_symbol=sym)
+    if stablecoin_type:
+        kwargs["stablecoin_type"] = stablecoin_type
+        kwargs["v4_snapshot_inputs"] = type_specific_inputs(db, asset_symbol=sym, stablecoin_type=stablecoin_type)
     return scoring.compute_risk_score(**kwargs)

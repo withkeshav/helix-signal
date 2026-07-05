@@ -35,7 +35,25 @@ def test_liquidity_depth_component():
     assert high["components"]["liquidity_depth"]["score"] > low["components"]["liquidity_depth"]["score"]
 
 
+def test_onchain_overlay_increases_score():
+    from signal_engine.components.composite_scoring import compute_risk_score
+    base = compute_risk_score(price=1.0, chain_shares=[0.5, 0.5], age_seconds=0)
+    with_onchain = compute_risk_score(
+        price=1.0,
+        chain_shares=[0.5, 0.5],
+        age_seconds=0,
+        whale_alert=True,
+        whale_net_outflow_usd=8_000_000,
+        top10_holder_share_pct=60,
+        net_mint_burn_usd_24h=-15_000_000,
+    )
+    assert with_onchain["score"] >= base["score"]
+    assert with_onchain["components"]["onchain"]["score"] > 0
+    assert with_onchain["components"]["onchain"]["detail"]["available"] is True
+
+
 def test_composite_bands():
-    assert scoring.composite_band(10) == "Healthy"
+    assert scoring.composite_band(10) == "Normal"
     assert scoring.composite_band(50) == "Watch"
-    assert scoring.composite_band(80) == "Alert"
+    assert scoring.composite_band(70) == "Alert"
+    assert scoring.composite_band(90) == "Critical"

@@ -55,9 +55,11 @@ def concentration_component(
 
 
 def composite_band(score: int) -> str:
-    """Convert concentration score to band label."""
-    if score <= 25:
-        return "Healthy"
+    """Convert concentration score to unified V4 band label."""
+    if score <= 20:
+        return "Normal"
     if score <= 50:
         return "Watch"
-    return "Alert"
+    if score <= 75:
+        return "Alert"
+    return "Critical"

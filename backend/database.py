@@ -2,7 +2,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, text, inspect
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, func, text, inspect
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -407,6 +408,148 @@ class SettingsAuditLog(Base):
         index=True,
     )
 
+
+# ---- V4 additional models ----
+
+class FiatReserveSnapshot(Base):
+    """Fiat reserve attestation snapshots (Tether, Circle, Paxos, etc.)."""
+
+    __tablename__ = "fiat_reserve_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    attestation_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reserve_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    circulating_supply: Mapped[float | None] = mapped_column(Float, nullable=True)
+    coverage_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    reserve_composition: Mapped[dict | None] = mapped_column(postgresql.JSON, nullable=True)
+    attestation_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    attestation_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    attestation_lag_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    genius_act_compliant: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    mica_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_fiat_reserve_asset_ts", "asset_symbol", "attestation_date"),
+        Index("ix_fiat_reserve_created", "created_at"),
+    )
+
+
+class CollateralSnapshot(Base):
+    """Crypto-collateralization snapshots (DAI, LUSD, GHO, etc.)."""
+
+    __tablename__ = "collateral_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    collateral_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    collateral_assets_json: Mapped[dict | None] = mapped_column(postgresql.JSON, nullable=True)
+    liquidation_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    liquidation_queue_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    debt_ceiling_utilization_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    largest_vault_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    collateral_health_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_collateral_asset_ts", "asset_symbol", "timestamp"),
+    )
+
+
+class YieldBearingSnapshot(Base):
+    """Yield-bearing stablecoin snapshots (sDAI, sUSDS, USDe, etc.)."""
+
+    __tablename__ = "yield_bearing_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    current_apy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    apy_7d_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    apy_7d_delta: Mapped[float | None] = mapped_column(Float, nullable=True)
+    yield_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    yield_sustainability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    funding_rate_current: Mapped[float | None] = mapped_column(Float, nullable=True)
+    funding_rate_7d_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    insurance_fund_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    insurance_fund_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
+    staking_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lending_utilization_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_yield_bearing_asset_ts", "asset_symbol", "timestamp"),
+    )
+
+
+class FundingRateSnapshot(Base):
+    """Per-exchange funding rate snapshots for perpetual swaps."""
+
+    __tablename__ = "funding_rate_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    exchange: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    symbol: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    funding_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    annualized_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    next_funding_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_funding_rate_exchange_ts", "exchange", "timestamp"),
+    )
+
+
+class WhaleActivitySnapshot(Base):
+    """Holder concentration and large-transfer snapshots."""
+
+    __tablename__ = "whale_activity_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    chain: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    top10_holder_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    top10_holder_pct_delta_24h: Mapped[float | None] = mapped_column(Float, nullable=True)
+    large_transfer_count_24h: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exchange_inflow_usd_24h: Mapped[float | None] = mapped_column(Float, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_whale_asset_ts", "asset_symbol", "timestamp"),
+    )
+
+
+class BlacklistEvent(Base):
+    """Issuer blacklist/freeze events across chains."""
+
+    __tablename__ = "blacklist_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    chain: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    frozen_address: Mapped[str | None] = mapped_column(String(100), index=True)
+    frozen_balance_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    event_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    tx_hash: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    block_number: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    intelligence_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_blacklist_asset_ts", "asset_symbol", "timestamp"),
+        Index("ix_blacklist_frozen_addr", "frozen_address"),
+    )
 
 
 def get_db():

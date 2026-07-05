@@ -103,10 +103,108 @@ async def _osint_attestation_refresh() -> None:
         log.exception("osint_attestation_refresh.failed")
 
 
+async def _ethena_job() -> None:
+    """Poll Ethena protocol for USDe/sUSDe data."""
+    db = SessionLocal()
+    try:
+        from sources.plugins.ethena_plugin import fetch as ethena_fetch
+        await ethena_fetch(db)
+    except Exception:
+        log.exception("ethena_job.failed")
+    finally:
+        db.close()
+
+
+async def _coinglass_job() -> None:
+    """Poll Coinglass for ETH funding rates."""
+    db = SessionLocal()
+    try:
+        from sources.plugins.coinglass_plugin import fetch as coinglass_fetch
+        await coinglass_fetch(db)
+    except Exception:
+        log.exception("coinglass_job.failed")
+    finally:
+        db.close()
+
+
+async def _sky_job() -> None:
+    """Poll Sky Protocol for DAI/USDS collateral and DSR."""
+    db = SessionLocal()
+    try:
+        from sources.plugins.sky_protocol_plugin import fetch as sky_fetch
+        await sky_fetch(db)
+    except Exception:
+        log.exception("sky_job.failed")
+    finally:
+        db.close()
+
+
+async def _liquity_job() -> None:
+    """Poll Liquity protocol for LUSD stats."""
+    db = SessionLocal()
+    try:
+        from sources.plugins.liquity_plugin import fetch as liquity_fetch
+        await liquity_fetch(db)
+    except Exception:
+        log.exception("liquity_job.failed")
+    finally:
+        db.close()
+
+
+async def _aave_job() -> None:
+    """Poll Aave for GHO supply/borrow data."""
+    db = SessionLocal()
+    try:
+        from sources.plugins.aave_plugin import fetch as aave_fetch
+        await aave_fetch(db)
+    except Exception:
+        log.exception("aave_job.failed")
+    finally:
+        db.close()
+
+
+async def _ondo_job() -> None:
+    """Poll Ondo for USDY NAV/supply/APY."""
+    db = SessionLocal()
+    try:
+        from sources.plugins.ondo_plugin import fetch as ondo_fetch
+        await ondo_fetch(db)
+    except Exception:
+        log.exception("ondo_job.failed")
+    finally:
+        db.close()
+
+
+async def _blacklist_job() -> None:
+    """Poll Ethereum + Tron for USDT/USDC/PYUSD freeze events."""
+    db = SessionLocal()
+    try:
+        from chain.intelligence.blacklist_monitor import poll as blacklist_poll
+        await blacklist_poll(db)
+    except Exception:
+        log.exception("blacklist_job.failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         init_db()
+
+        try:
+            from scripts.seed_admin import ensure_admin_user
+            if ensure_admin_user():
+                log.info("admin_user.seeded")
+        except Exception as exc:
+            log.warning("admin_user.seed_failed", error=str(exc))
+
+        try:
+            from scripts.train_anomaly import train_anomaly_detector
+            if train_anomaly_detector():
+                log.info("anomaly_detector.trained")
+        except Exception as exc:
+            log.warning("anomaly_detector.train_failed", error=str(exc))
 
         discover_plugins()
 
@@ -150,6 +248,55 @@ async def lifespan(app: FastAPI):
             "interval",
             minutes=osint_minutes,
             id="osint-attestation-refresh",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _blacklist_job,
+            "interval",
+            seconds=get_setting("blacklist_poll_interval_seconds", setup_db) or 300,
+            id="blacklist-monitor",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _coinglass_job,
+            "interval",
+            seconds=get_setting("funding_rate_poll_interval_seconds", setup_db) or 300,
+            id="funding-rate-poll",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _ethena_job,
+            "interval",
+            minutes=15,
+            id="ethena-poll",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _sky_job,
+            "interval",
+            minutes=15,
+            id="sky-poll",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _liquity_job,
+            "interval",
+            minutes=15,
+            id="liquity-poll",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _aave_job,
+            "interval",
+            minutes=15,
+            id="aave-poll",
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _ondo_job,
+            "interval",
+            minutes=15,
+            id="ondo-poll",
             replace_existing=True,
         )
         scheduler.start()

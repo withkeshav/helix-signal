@@ -91,7 +91,43 @@ def _init_schema(con: duckdb.DuckDBPyConnection) -> None:
             created_at TIMESTAMP WITH TIME ZONE
         )
     """)
-
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS yield_time_series (
+            id BIGINT,
+            asset_symbol VARCHAR,
+            current_apy DOUBLE,
+            apy_7d_avg DOUBLE,
+            funding_rate_current DOUBLE,
+            insurance_fund_coverage DOUBLE,
+            staking_ratio DOUBLE,
+            lending_utilization_pct DOUBLE,
+            timestamp TIMESTAMP WITH TIME ZONE
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS whale_time_series (
+            id BIGINT,
+            asset_symbol VARCHAR,
+            chain VARCHAR,
+            top10_holder_pct DOUBLE,
+            top10_holder_pct_delta_24h DOUBLE,
+            large_transfer_count_24h INTEGER,
+            exchange_inflow_usd_24h DOUBLE,
+            timestamp TIMESTAMP WITH TIME ZONE
+        )
+    """)
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS blacklist_time_series (
+            id BIGINT,
+            asset_symbol VARCHAR,
+            chain VARCHAR,
+            frozen_address VARCHAR,
+            frozen_balance_usd DOUBLE,
+            event_type VARCHAR,
+            tx_hash VARCHAR,
+            timestamp TIMESTAMP WITH TIME ZONE
+        )
+    """)
 
 def close_duckdb() -> None:
     global _con

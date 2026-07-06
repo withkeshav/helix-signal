@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import bcrypt
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import User
@@ -21,17 +22,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_user(db: Session, user_id: int) -> Optional[User]:
     """Get a user by ID."""
-    return db.query(User).filter(User.id == user_id).first()
+    return db.execute(select(User).where(User.id == user_id)).scalars().first()
 
 
 def get_user_by_username(db: Session, username: str) -> Optional[User]:
     """Get a user by username."""
-    return db.query(User).filter(User.username == username).first()
+    return db.execute(select(User).where(User.username == username)).scalars().first()
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Get a user by email."""
-    return db.query(User).filter(User.email == email).first()
+    return db.execute(select(User).where(User.email == email)).scalars().first()
 
 
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
@@ -89,4 +90,4 @@ def delete_user(db: Session, user_id: int) -> bool:
 
 def get_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
     """Get all users."""
-    return db.query(User).offset(skip).limit(limit).all()
+    return db.execute(select(User).offset(skip).limit(limit)).scalars().all()

@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone, date
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import SourceUsage
@@ -51,10 +52,12 @@ def increment_source_usage(db: Session, source_name: str) -> None:
     
     if today not in _source_usage_cache[source_name]:
         # Check if record exists in database
-        usage = db.query(SourceUsage).filter(
-            SourceUsage.source_name == source_name,
-            SourceUsage.usage_date == today,
-        ).first()
+        usage = db.execute(
+            select(SourceUsage).where(
+                SourceUsage.source_name == source_name,
+                SourceUsage.usage_date == today,
+            )
+        ).scalars().first()
         
         if usage:
             _source_usage_cache[source_name][today] = usage.call_count
@@ -71,10 +74,12 @@ def flush_source_usage(db: Session) -> None:
     
     for source_name, dates in _source_usage_cache.items():
         if today in dates:
-            usage = db.query(SourceUsage).filter(
-                SourceUsage.source_name == source_name,
-                SourceUsage.usage_date == today,
-            ).first()
+            usage = db.execute(
+                select(SourceUsage).where(
+                    SourceUsage.source_name == source_name,
+                    SourceUsage.usage_date == today,
+                )
+            ).scalars().first()
 
             if usage:
                 usage.call_count = dates[today]
@@ -97,12 +102,12 @@ def flush_source_usage(db: Session) -> None:
 def get_source_usage(db: Session, source_name: str | None = None) -> list[dict[str, Any]]:
     """Get usage stats for all sources or a specific source."""
     today = date.today().isoformat()
-    query = db.query(SourceUsage)
+    stmt = select(SourceUsage)
 
     if source_name:
-        query = query.filter(SourceUsage.source_name == source_name)
+        stmt = stmt.where(SourceUsage.source_name == source_name)
 
-    usage_records = query.filter(SourceUsage.usage_date == today).all()
+    usage_records = db.execute(stmt.where(SourceUsage.usage_date == today)).scalars().all()
 
     result = []
     for record in usage_records:
@@ -120,7 +125,7 @@ def get_source_usage_summary(db: Session) -> dict[str, Any]:
     """Get a summary of all source usage for today."""
     today = date.today().isoformat()
 
-    usage_records = db.query(SourceUsage).filter(SourceUsage.usage_date == today).all()
+    usage_records = db.execute(select(SourceUsage).where(SourceUsage.usage_date == today)).scalars().all()
 
     sources = {}
     total_calls = 0

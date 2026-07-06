@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -18,7 +19,7 @@ from database import (
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "3.10.3"
+HELIX_VERSION = "4.0.0"
 
 RETENTION_DEFAULTS: dict[str, int] = {
     "asset_trend_snapshots": 90,
@@ -51,25 +52,17 @@ def prune_old_history(db: Session) -> dict[str, Any]:
     osint_cutoff = now - timedelta(days=_retention_days("osint_articles"))
 
     asset_deleted = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.timestamp < trend_cutoff)
-        .delete(synchronize_session=False)
-    )
+        db.execute(delete(AssetTrendSnapshot).where(AssetTrendSnapshot.timestamp < trend_cutoff))
+    ).rowcount
     chain_deleted = (
-        db.query(ChainTrendSnapshot)
-        .filter(ChainTrendSnapshot.timestamp < trend_cutoff)
-        .delete(synchronize_session=False)
-    )
+        db.execute(delete(ChainTrendSnapshot).where(ChainTrendSnapshot.timestamp < trend_cutoff))
+    ).rowcount
     events_deleted = (
-        db.query(SignalEvent)
-        .filter(SignalEvent.timestamp < event_cutoff)
-        .delete(synchronize_session=False)
-    )
+        db.execute(delete(SignalEvent).where(SignalEvent.timestamp < event_cutoff))
+    ).rowcount
     osint_deleted = (
-        db.query(OsintArticle)
-        .filter(OsintArticle.fetched_at < osint_cutoff)
-        .delete(synchronize_session=False)
-    )
+        db.execute(delete(OsintArticle).where(OsintArticle.fetched_at < osint_cutoff))
+    ).rowcount
 
     db.commit()
 

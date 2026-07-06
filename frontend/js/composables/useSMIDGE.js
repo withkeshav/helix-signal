@@ -1,4 +1,4 @@
-import { renderSmidgeRadar, destroySmidgeChart } from '../charts.js';
+import { renderSmidgeRadar, destroySmidgeChart, reserveGrade } from '../charts.js';
 import { statusBand, formatFeedAge } from '../utils.js';
 
 export function useSMIDGE() {
@@ -8,6 +8,7 @@ export function useSMIDGE() {
     errorSmidge: '',
     statusBand,
     formatFeedAge,
+    reserveGrade,
 
     get attestation() { return this.$store.osint.attestation; },
 

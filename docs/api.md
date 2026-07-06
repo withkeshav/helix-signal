@@ -167,7 +167,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "3.10.3"
+  "version": "4.0.0"
 }
 ```
 
@@ -191,4 +191,19 @@ Typed Pydantic response models in `backend/schemas.py`:
 | `ChainTrendResponseOut` | `/api/trends/chains` |
 | `SignalEventsResponseOut` | `/api/events` |
 | `SourceStatusOut` | `/api/sources/status` |
-| `SourceUsageResponse` | `/api/sources/usage` (raw dict, not a Pydantic model) |
+ | `SourceUsageResponse` | `/api/sources/usage` (raw dict, not a Pydantic model) |
+
+## V4 — Intelligence & Forensics
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/dews?asset=USDT` | DEWS anomaly scoring — tiered depeg-watch score, z-score, CUSUM, ONNX probability, whale flow, holder concentration | Public |
+| GET | `/api/onchain/whale-flow?asset=USDT` | Whale net inflow/outflow (24h) by asset, alert threshold breached | Public |
+| GET | `/api/onchain/holder-concentration?asset=USDT` | Top-10 holder share %, mint/burn velocity | Public |
+| GET | `/api/v1/blacklist/stats` | Blacklist aggregate stats (total events, frozen USD, by asset/chain, last 30d) | Public |
+| GET | `/api/v1/blacklist/events` | Blacklist event list with optional `?asset=`, `?chain=`, `?limit=`, `?offset=` | Admin token |
+| GET | `/api/v1/assets/{symbol}/narrative` | AI-generated market narrative, sentiment, and context | Public |
+| GET | `/api/v1/assets/{symbol}/yield` | Protocol yield analysis (APY, TVL, sustainability) | Public |
+| GET | `/api/v1/assets/{symbol}/collateral` | Collateral composition breakdown by chain/protocol | Public |
+| GET | `/api/v1/assets/{symbol}/reserve` | Reserve attestation data and timestamp verification | Public |
+| POST | `/api/v1/investigate` | 8-step investigation pipeline — peel chain, bridge hops, clustering, blacklist, OSINT, timeline, risk, AI narrative | Admin token |

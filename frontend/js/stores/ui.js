@@ -5,8 +5,43 @@ export function registerUiStore(Alpine) {
     searchQuery: '',
     searchResults: [],
     adminToken: sessionStorage.getItem('helix_admin_token') || '',
+    loginUsername: '',
+    loginPassword: '',
+    authError: '',
     enabledAssets: [],
     refreshing: false,
+    toastMessage: '',
+    toastType: 'info',
+    toastVisible: false,
+    toastTimer: null,
+    modalVisible: false,
+    modalTitle: '',
+    modalBody: '',
+
+    showToast(message, type = 'info', duration = 4000) {
+      this.toastMessage = message;
+      this.toastType = type;
+      this.toastVisible = true;
+      clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => { this.toastVisible = false; }, duration);
+    },
+
+    hideToast() {
+      this.toastVisible = false;
+      clearTimeout(this.toastTimer);
+    },
+
+    showModal(title, bodyHtml) {
+      this.modalTitle = title;
+      this.modalBody = bodyHtml;
+      this.modalVisible = true;
+    },
+
+    closeModal() {
+      this.modalVisible = false;
+      this.modalTitle = '';
+      this.modalBody = '';
+    },
 
     setTheme(t) {
       this.theme = t;
@@ -24,6 +59,41 @@ export function registerUiStore(Alpine) {
 
     adminHeaders() {
       return this.adminToken ? { 'X-Admin-Token': this.adminToken } : {};
+    },
+
+    async login() {
+      this.authError = '';
+      const body = new URLSearchParams({
+        username: this.loginUsername,
+        password: this.loginPassword,
+      });
+      try {
+        const r = await fetch('/api/auth/login', {
+          method: 'POST',
+          body,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        if (!r.ok) {
+          this.authError = 'Invalid credentials';
+          return false;
+        }
+        const data = await r.json();
+        this.adminToken = data.access_token || '';
+        sessionStorage.setItem('helix_admin_token', this.adminToken);
+        this.loginPassword = '';
+        return true;
+      } catch {
+        this.authError = 'Login failed — check network';
+        return false;
+      }
+    },
+
+    logout() {
+      this.adminToken = '';
+      this.loginUsername = '';
+      this.loginPassword = '';
+      this.authError = '';
+      sessionStorage.removeItem('helix_admin_token');
     },
   });
 }

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -10,24 +12,31 @@ import httpx
 from sources.base import AbstractSource, http_get_with_retry, async_http_get_with_retry
 from services.source_usage import _check_source_rate_limit, _record_source_call
 
-DEXSCREENER_SEARCH_URL = "https://api.dexscreener.com/latest/dex/search"
-DEXSCREENER_PAIRS_URL = "https://api.dexscreener.com/latest/dex/pairs"
 DEXSCREENER_TOKEN_URL = "https://api.dexscreener.com/token-pairs/v1/{chain}/{address}"
 DEFAULT_TIMEOUT = 15
-MAX_RETRIES = 2
 
-STABLECOIN_ADDRESSES: dict[str, list[tuple[str, str]]] = {
-    "ethereum": [
-        ("USDT", "0xdAC17F958D2ee523a2206206994597C13D831ec7"),
-        ("USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
-        ("DAI", "0x6B175474E89094C44Da98b954EedeAC495271d0F"),
-    ],
-    "solana": [
-        ("USDT", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"),
-        ("USDC", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-    ],
-    # Limit to just 2 major chains to reduce API calls and stay within rate limits
-}
+_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "dexscreener_addresses.json"
+
+
+def _load_stablecoin_addresses() -> dict[str, list[tuple[str, str]]]:
+    """Load per-chain token addresses from config (transform.md §5.4 — un-hardcode)."""
+    if _CONFIG_PATH.is_file():
+        raw = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        return {
+            chain: [(sym, addr) for sym, addr in pairs]
+            for chain, pairs in raw.items()
+        }
+    return {
+        "ethereum": [
+            ("USDT", "0xdAC17F958D2ee523a2206206994597C13D831ec7"),
+            ("USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
+            ("DAI", "0x6B175474E89094C44Da98b954EedeAC495271d0F"),
+        ],
+        "solana": [
+            ("USDT", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"),
+            ("USDC", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+        ],
+    }
 
 
 class DexScreenerSource(AbstractSource):
@@ -46,7 +55,7 @@ class DexScreenerSource(AbstractSource):
     def _do_fetch(self, session: httpx.Client, symbols: list[str]) -> list[dict[str, Any]]:
         all_pairs: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for chain, tokens in STABLECOIN_ADDRESSES.items():
+        for chain, tokens in _load_stablecoin_addresses().items():
             for sym, addr in tokens:
                 if sym not in symbols:
                     continue
@@ -74,7 +83,7 @@ class DexScreenerSource(AbstractSource):
     async def _do_async_fetch(self, client: httpx.AsyncClient, symbols: list[str]) -> list[dict[str, Any]]:
         all_pairs: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for chain, tokens in STABLECOIN_ADDRESSES.items():
+        for chain, tokens in _load_stablecoin_addresses().items():
             for sym, addr in tokens:
                 if sym not in symbols:
                     continue

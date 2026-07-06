@@ -20,6 +20,7 @@ export function useHealth() {
     async _loadAll() {
       this.loading = true;
       this.error = '';
+      const failures = [];
       try {
         const [sourcesRes, usageRes, dashRes, eventsRes] = await Promise.all([
           fetch('/api/sources/status', { cache: 'no-store' }),
@@ -27,8 +28,16 @@ export function useHealth() {
           fetch('/api/dashboard', { cache: 'no-store' }),
           fetch('/api/events?limit=50', { cache: 'no-store' }),
         ]);
-        if (sourcesRes.ok) this.sources = await sourcesRes.json();
-        if (usageRes.ok) this.sourceUsage = await usageRes.json();
+        if (sourcesRes.ok) {
+          this.sources = await sourcesRes.json();
+        } else {
+          failures.push(`sources (${sourcesRes.status})`);
+        }
+        if (usageRes.ok) {
+          this.sourceUsage = await usageRes.json();
+        } else {
+          failures.push(`usage (${usageRes.status})`);
+        }
         if (dashRes.ok) {
           const d = await dashRes.json();
           this.freshness = d.freshness || {};
@@ -37,10 +46,17 @@ export function useHealth() {
             { label: 'Using cached data', value: d.data_quality?.using_cached_data ? 'Yes' : 'No' },
             { label: 'NLP available', value: d.data_quality?.nlp_available ? 'Yes' : 'No' },
           ];
+        } else {
+          failures.push(`dashboard (${dashRes.status})`);
         }
         if (eventsRes.ok) {
           const j = await eventsRes.json();
           this.events = j.events || [];
+        } else {
+          failures.push(`events (${eventsRes.status})`);
+        }
+        if (failures.length) {
+          this.error = `Failed to load: ${failures.join(', ')}`;
         }
       } catch (e) {
         this.error = `Failed to load health data: ${e.message}`;

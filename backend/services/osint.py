@@ -1,188 +1,27 @@
 from __future__ import annotations
 
-import asyncio
-import html as html_mod
 import json
 import logging
-import os
-import re
-import defusedxml.ElementTree as ET
-import calendar
-import time
 from datetime import datetime, timedelta, timezone
-from html.parser import HTMLParser
 from typing import Any
 
-import httpx
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 from structlog import get_logger
 
-from database import OsintArticle, OsintArticleAsset, SignalEvent, SourceStatus
+from database import OsintArticle, OsintArticleAsset, SignalEvent
+from services.attestation import get_attestation_status, refresh_attestation_reports
+from services.rss_feed import (
+    ENABLE_NLP,
+    RSS_FEEDS,
+    _classify_asset,
+    _fetch_cryptocurrency_cv,
+    _fetch_rss,
+    _strip_html,
+    classify_article_structured,
+)
 
 log = get_logger(__name__)
-
-RSS_USER_AGENT = (
-    "Mozilla/5.0 (compatible; HelixSignal/1.0; +https://github.com/withkeshav/helix-signal)"
-)
-
-RSS_FEEDS = {
-    "coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss",
-    "cointelegraph": "https://cointelegraph.com/rss",
-    # Disabled: Cloudflare returns 403 on server IPs even with a browser User-Agent.
-    # "theblock": "https://www.theblock.co/rss.xml",
-    "cryptoslate": "https://cryptoslate.com/feed/",
-    "decrypt": "https://decrypt.co/feed",
-    "bitcoincom": "https://news.bitcoin.com/feed/",
-    "thedefiant": "https://thedefiant.io/api/feed",
-    "protos": "https://protos.com/rss",
-    "dinews": "https://www.dlnews.com/feed/rss",
-    "chainalysis": "https://www.chainalysis.com/blog/feed/",
-    "nansen": "https://www.nansen.ai/feed",
-    "defillama": "https://defillama.com/rss",
-    "bis": "https://www.bis.org/feed.rss",
-    "fsb": "https://www.fsb.org/rss/",
-}
-
-CRYPTOCURRENCY_CV_URL = "https://api.cryptocurrency.cv/v1/news/latest"
-ENABLE_NLP = os.getenv("ENABLE_NLP", "true").strip().lower() in ("1", "true", "yes")
-
-
-class _HTMLStripper(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self._text: list[str] = []
-
-    def handle_data(self, data: str) -> None:
-        self._text.append(data)
-
-    def get_text(self) -> str:
-        return "".join(self._text)
-
-
-def _strip_html(raw: str) -> str:
-    if not raw:
-        return ""
-    stripper = _HTMLStripper()
-    stripper.feed(raw)
-    return html_mod.unescape(stripper.get_text()).strip()
-
-
-def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
-    try:
-        resp = httpx.get(
-            url,
-            timeout=15,
-            headers={"User-Agent": RSS_USER_AGENT},
-        )
-        resp.raise_for_status()
-        root = ET.fromstring(resp.text)
-        articles: list[dict[str, Any]] = []
-        for item in root.iter("item"):
-            title = item.findtext("title", "")
-            link = item.findtext("link", "")
-            desc = _strip_html(item.findtext("description", ""))
-            pub_date = item.findtext("pubDate", "")
-            dt = _parse_rss_date(pub_date)
-            articles.append({"title": title, "url": link, "summary": desc, "published_at": dt, "source": source})
-        return articles
-    except Exception as exc:
-        log.warning("rss_fetch_failed", source=source, error=str(exc))
-        return []
-
-
-def _parse_rss_date(date_str: str) -> datetime | None:
-    try:
-        from email.utils import parsedate_to_datetime
-        return parsedate_to_datetime(date_str).replace(tzinfo=timezone.utc)
-    except Exception:
-        return None
-
-
-def _fetch_cryptocurrency_cv() -> list[dict[str, Any]]:
-    try:
-        resp = httpx.get(CRYPTOCURRENCY_CV_URL, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()
-        articles: list[dict[str, Any]] = []
-        for post in data.get("results") or data.get("data") or data.get("articles") or []:
-            if not isinstance(post, dict):
-                continue
-            title = post.get("title", "")
-            url = post.get("url", "") or post.get("link", "")
-            published = post.get("published_at") or post.get("publishedAt") or post.get("date") or post.get("createdAt")
-            dt = None
-            if published:
-                try:
-                    dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
-                except Exception:
-                    logging.getLogger(__name__).debug("Failed to parse OSINT article date", exc_info=True)
-            articles.append({
-                "title": title,
-                "url": url,
-                "summary": post.get("description", "") or post.get("summary", ""),
-                "published_at": dt,
-                "source": post.get("source", "") or "cryptocurrency_cv",
-            })
-        return articles
-    except Exception:
-        return []
-
-
-_STABLECOIN_KEYWORDS = {
-    "USDT", "USDC", "DAI", "PYUSD", "TETHER", "CIRCLE", "MAKER", "PAYPAL",
-    "FDUSD", "GUSD", "RLUSD", "USD1", "USDG", "USDS", "LUSD", "GHO",
-    "crvUSD", "USDY", "BUIDL", "USYC", "sDAI", "sUSDS", "aUSDC",
-    "syrupUSDC", "USDe", "sUSDe", "USDD", "FRAX", "USDP", "TUSD",
-    "FRAX", "LQTY", "SKY", "ETHE", "ONDO",
-}
-
-
-def _classify_asset(text: str) -> list[str]:
-    upper = text.upper()
-    found: list[str] = []
-    for kw in _STABLECOIN_KEYWORDS:
-        if kw in upper:
-            found.append(kw)
-    return found
-
-
-CLASSIFIER_SYSTEM_PROMPT = (
-    "You are a stablecoin intelligence classifier. Given a news article title and summary, "
-    "return JSON with: event_type (one of: DEPEG, HACK EXPLOIT, ADDRESS FREEZE BLACKLIST, "
-    "OFAC SANCTION, LAW ENFORCEMENT SEIZURE, REGULATION LAW, MONEY LAUNDERING CASE, "
-    "SCAM FRAUD, OTHER), affected_assets (list of coin symbols), severity (info/warning/critical), "
-    "driver_category (onchain/regulatory/economic/operational/geopolitical), "
-    "extracted_numbers (list of floats), is_leading_indicator (bool), "
-    "confidence (0.0-1.0), source_authority (0.0-1.0). "
-    "Return ONLY valid JSON, no commentary."
-)
-
-
-def classify_article_structured(title: str, summary: str) -> dict[str, Any]:
-    """Use Ollama Cloud to classify a stablecoin article into structured fields."""
-    try:
-        from services.components.ai.providers._ollama_cloud import _ollama_cloud
-        text = f"Title: {title}\nSummary: {summary}"
-        result = _ollama_cloud(system=CLASSIFIER_SYSTEM_PROMPT, user=text, json_mode=True)
-        raw = result.get("content", "{}") if isinstance(result, dict) else str(result)
-        parsed = json.loads(raw)
-        return {
-            "event_type": parsed.get("event_type", "OTHER"),
-            "affected_assets": parsed.get("affected_assets", []),
-            "severity": parsed.get("severity", "info"),
-            "driver_category": parsed.get("driver_category", "economic"),
-            "extracted_numbers": parsed.get("extracted_numbers", []),
-            "is_leading_indicator": bool(parsed.get("is_leading_indicator", False)),
-            "confidence": float(parsed.get("confidence", 0.5)),
-            "source_authority": float(parsed.get("source_authority", 0.5)),
-        }
-    except Exception:
-        log.exception("classify_article_structured.failed")
-        return {
-            "event_type": "OTHER", "affected_assets": [], "severity": "info",
-            "driver_category": "economic", "extracted_numbers": [],
-            "is_leading_indicator": False, "confidence": 0.0, "source_authority": 0.0,
-        }
 
 
 def _compute_sentiment(text: str, nlp_enabled: bool | None = None) -> dict[str, Any]:
@@ -260,15 +99,15 @@ def ingest_osint_feed(db: Session) -> int:
 
 
 def _article_exists(db: Session, title: str, source: str) -> bool:
-    return db.query(OsintArticle).filter(OsintArticle.title == title, OsintArticle.source == source).first() is not None
+    return db.execute(select(OsintArticle).where(OsintArticle.title == title, OsintArticle.source == source)).scalars().first() is not None
 
 
 def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
-    q = db.query(OsintArticle).options(joinedload(OsintArticle.asset_links)).order_by(OsintArticle.published_at.desc().nullslast())
+    stmt = select(OsintArticle).options(joinedload(OsintArticle.asset_links)).order_by(OsintArticle.published_at.desc().nullslast())
     if asset:
         sym = asset.strip().upper()
-        q = q.join(OsintArticle.asset_links).filter(OsintArticleAsset.asset_symbol == sym)
-    articles = q.limit(limit).all()
+        stmt = stmt.join(OsintArticle.asset_links).where(OsintArticleAsset.asset_symbol == sym)
+    articles = db.execute(stmt.limit(limit)).scalars().all()
     return [
         {
             "id": a.id,
@@ -286,13 +125,12 @@ def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) ->
 
 
 def get_sentiment_timeseries(db: Session, *, asset: str | None = None, window_days: int = 7) -> list[dict[str, Any]]:
-    from datetime import timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
-    q = db.query(OsintArticle).filter(OsintArticle.published_at >= cutoff).order_by(OsintArticle.published_at.asc())
+    stmt = select(OsintArticle).where(OsintArticle.published_at >= cutoff).order_by(OsintArticle.published_at.asc())
     if asset:
         sym = asset.strip().upper()
-        q = q.join(OsintArticle.asset_links).filter(OsintArticleAsset.asset_symbol == sym)
-    articles = q.all()
+        stmt = stmt.join(OsintArticle.asset_links).where(OsintArticleAsset.asset_symbol == sym)
+    articles = db.execute(stmt).scalars().all()
     if not articles:
         return []
     by_day: dict[str, list[float]] = {}
@@ -303,391 +141,25 @@ def get_sentiment_timeseries(db: Session, *, asset: str | None = None, window_da
     return [{"date": d, "avg_sentiment": round(sum(scores) / len(scores), 4), "count": len(scores)} for d, scores in sorted(by_day.items())]
 
 
-ATTESTATION_CHECKLIST: dict[str, dict[str, Any]] = {
-    "USDT": {"issuer": "Tether", "url": "https://tether.to/en/transparency/", "last_report": None, "observability": "attestation"},
-    "USDC": {"issuer": "Circle", "url": "https://www.circle.com/en/transparency", "last_report": None, "observability": "attestation"},
-    "DAI": {"issuer": "MakerDAO", "url": "https://makerdao.com/en/", "last_report": None, "observability": "onchain_feed"},
-    "PYUSD": {"issuer": "Paxos/PayPal", "url": "https://paxos.com/pyusd-transparency/", "last_report": None, "observability": "attestation"},
-}
-
-_ATTESTATION_CACHE: dict[str, Any] = {"fetched_at": None, "reports": {}}
-_LLM_EXTRACT_CACHE: dict[str, tuple[float, datetime | None]] = {}
-_ATTESTATION_CACHE_TTL_SECONDS: int = 21600
-
-
-def _attestation_cache_ttl() -> int:
-    return _ATTESTATION_CACHE_TTL_SECONDS
-
-
-def _llm_extract_cache_ttl() -> int:
-    from providers.settings import get_setting
-    try:
-        val = get_setting("llm_extract_cache_ttl")
-        if val is not None:
-            return int(val)
-    except Exception:
-        logging.getLogger(__name__).debug("LLM extract cache TTL lookup failed", exc_info=True)
-    return int(os.getenv("LLM_EXTRACT_CACHE_TTL", "86400"))
-_ATTESTATION_HINT_WORDS = ("attestation", "reserve", "transparency", "report", "proof")
-_MONTH_NAMES = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|January|February|March|April|June|July|August|September|October|November|December"
-_DATE_PATTERNS = (
-    re.compile(r"\b(20\d{2})-(\d{2})-(\d{2})\b"),
-    re.compile(rf"\b({_MONTH_NAMES})\s+(\d{{1,2}}),\s*(20\d{{2}})\b", re.IGNORECASE),
-    re.compile(rf"\b(\d{{1,2}})\s+({_MONTH_NAMES})\s+(20\d{{2}})\b", re.IGNORECASE),
-)
-_MONTH_MAP = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-
-
-def _normalize_month(month: str) -> int | None:
-    return _MONTH_MAP.get(month.strip()[:4].lower())
-
-
-def _is_valid_report_date(dt: datetime) -> bool:
-    now = datetime.now(timezone.utc)
-    return datetime(2020, 1, 1, tzinfo=timezone.utc) <= dt <= (now + timedelta(days=1))
-
-
-def _extract_report_date_from_text(raw: str) -> datetime | None:
-    text = re.sub(r"\s+", " ", raw)
-    lower = text.lower()
-    candidates: list[datetime] = []
-    for pattern in _DATE_PATTERNS:
-        for match in pattern.finditer(text):
-            start, end = match.span()
-            context = lower[max(0, start - 120): min(len(lower), end + 120)]
-            if not any(hint in context for hint in _ATTESTATION_HINT_WORDS):
-                continue
-            dt: datetime | None = None
-            try:
-                if pattern is _DATE_PATTERNS[0]:
-                    year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
-                    dt = datetime(year, month, day, tzinfo=timezone.utc)
-                elif pattern is _DATE_PATTERNS[1]:
-                    month = _normalize_month(match.group(1))
-                    day = int(match.group(2))
-                    year = int(match.group(3))
-                    if month is not None:
-                        dt = datetime(year, month, day, tzinfo=timezone.utc)
-                else:
-                    day = int(match.group(1))
-                    month = _normalize_month(match.group(2))
-                    year = int(match.group(3))
-                    if month is not None:
-                        dt = datetime(year, month, day, tzinfo=timezone.utc)
-            except Exception:
-                dt = None
-            if dt and _is_valid_report_date(dt):
-                candidates.append(dt)
-    return max(candidates) if candidates else None
-
-
-def _extract_latest_monthly_attestation_date(raw: str) -> datetime | None:
-    # Paxos pages often publish month-only attestation markers (e.g. "2026 Jan Feb Mar")
-    # with no day value. We map to the month-end date as a conservative representation.
-    text = re.sub(r"\s+", " ", raw)
-    lower = text.lower()
-    anchor = lower.find("attestations")
-    scoped = text[anchor:] if anchor >= 0 else text
-    year_pattern = re.compile(r"(20\d{2})")
-    month_pattern = re.compile(r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\b", re.IGNORECASE)
-    years = [(m.start(), int(m.group(1))) for m in year_pattern.finditer(scoped)]
-    if not years:
-        return None
-    best: datetime | None = None
-    for idx, (pos, year) in enumerate(years):
-        next_pos = years[idx + 1][0] if idx + 1 < len(years) else len(scoped)
-        segment = scoped[pos:next_pos]
-        months = []
-        for mm in month_pattern.finditer(segment):
-            m = _MONTH_MAP.get(mm.group(1).lower())
-            if m is not None:
-                months.append(m)
-        if not months:
-            continue
-        latest_month = max(months)
-        day = calendar.monthrange(year, latest_month)[1]
-        candidate = datetime(year, latest_month, day, tzinfo=timezone.utc)
-        if _is_valid_report_date(candidate) and (best is None or candidate > best):
-            best = candidate
-    return best
-
-
-def _fetch_last_report_date(url: str) -> datetime | None:
-    try:
-        resp = httpx.get(url, timeout=20, follow_redirects=True)
-        resp.raise_for_status()
-        raw_html = resp.text
-
-        if "paxos.com/pyusd-transparency" in url:
-            from_index = _fetch_pyusd_attestation_date_from_framer_index(raw_html)
-            if from_index is not None:
-                return from_index
-
-        llm_result = _extract_report_date_via_llm(raw_html)
-        if llm_result is not None:
-            return llm_result
-
-        exact = _extract_report_date_from_text(raw_html)
-        if exact is not None:
-            return exact
-        return _extract_latest_monthly_attestation_date(raw_html)
-    except Exception:
-        return None
-
-
-def _fetch_pyusd_attestation_date_from_framer_index(page_html: str) -> datetime | None:
-    m = re.search(r'framer-search-index"\s+content="([^"]+)"', page_html)
-    if not m:
-        return None
-    index_url = m.group(1).replace("&amp;", "&")
-    try:
-        idx_resp = httpx.get(index_url, timeout=20, follow_redirects=True)
-        idx_resp.raise_for_status()
-        payload = idx_resp.json()
-    except Exception:
-        return None
-    if not isinstance(payload, dict):
-        return None
-
-    entry = payload.get("/pyusd-transparency")
-    if entry is None:
-        for key, val in payload.items():
-            if isinstance(key, str) and "pyusd-transparency" in key and isinstance(val, dict):
-                entry = val
-                break
-    if not isinstance(entry, dict):
-        return None
-
-    chunks: list[str] = []
-    for fld in ("h1", "h2", "h3", "p", "description", "title"):
-        val = entry.get(fld)
-        if isinstance(val, list):
-            chunks.extend(str(x) for x in val)
-        elif isinstance(val, str):
-            chunks.append(val)
-    if not chunks:
-        return None
-    joined = " ".join(chunks)
-    return _extract_latest_monthly_attestation_date(joined)
-
-
-def _dense_text_from_html(raw: str, max_chars: int = 8000) -> str:
-    text = _strip_html(raw)
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-    dense = " ".join(lines)
-    return dense[:max_chars]
-
-
-def _extract_report_date_via_llm(raw_html: str) -> datetime | None:
-    from services.ai_router import ai_mode, _within_budget
-
-    if ai_mode() == "ai_off":
-        return None
-
-    api_key = os.getenv("OLLAMA_API_KEY", "").strip()
-    if not api_key:
-        return None
-
-    url_hash = str(hash(raw_html[:200]))
-    cached = _LLM_EXTRACT_CACHE.get(url_hash)
-    if cached is not None:
-        ts, result = cached
-        if time.time() - ts < _llm_extract_cache_ttl():
-            return result
-    model = os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
-    dense = _dense_text_from_html(raw_html)
-
-    estimated_tokens = len(dense.split()) // 2 + 100
-    if not _within_budget(estimated_tokens):
-        return None
-
-    system_prompt = (
-        "You are a financial document parser. Extract the issuer attestation report date "
-        "from the text below. Look for dates associated with Tether, Circle, or Paxos "
-        "attestation or transparency reports. "
-        "Respond ONLY with a valid JSON object in exactly this format, nothing else:\n"
-        '{"report_date": "YYYY-MM-DD"}\n'
-        "If no clear attestation report date is found, respond with:\n"
-        '{"report_date": null}'
-    )
-
-    try:
-        resp = httpx.post(
-            "https://ollama.com/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Web page content:\n\n{dense}"},
-                ],
-                "temperature": 0.0,
-                "max_tokens": 100,
-            },
-            timeout=30.0,
-        )
-        resp.raise_for_status()
-        body = resp.json()
-        text = body["choices"][0]["message"]["content"].strip()
-        parsed = json.loads(text)
-        date_str = parsed.get("report_date")
-        if date_str:
-            result = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
-            _LLM_EXTRACT_CACHE[url_hash] = (time.time(), result)
-            return result
-        _LLM_EXTRACT_CACHE[url_hash] = (time.time(), None)
-        return None
-    except Exception:
-        _LLM_EXTRACT_CACHE[url_hash] = (time.time(), None)
-        return None
-
-
-def refresh_attestation_reports(*, force: bool = False) -> dict[str, datetime | None]:
-    fetched_at = _ATTESTATION_CACHE.get("fetched_at")
-    now = datetime.now(timezone.utc)
-    if not force and isinstance(fetched_at, datetime):
-        if (now - fetched_at).total_seconds() < _attestation_cache_ttl():
-            return dict(_ATTESTATION_CACHE.get("reports") or {})
-
-    reports: dict[str, datetime | None] = {}
-    for sym, info in ATTESTATION_CHECKLIST.items():
-        if info.get("observability") != "attestation":
-            reports[sym] = None
-            continue
-        reports[sym] = _fetch_last_report_date(str(info.get("url") or ""))
-
-    _ATTESTATION_CACHE["fetched_at"] = now
-    _ATTESTATION_CACHE["reports"] = reports
-    return dict(reports)
-
-
-async def _fetch_attestation_report_background(sym: str, info: dict[str, Any]) -> tuple[str, datetime | None]:
-    if info.get("observability") != "attestation":
-        return (sym, None)
-    url = str(info.get("url") or "")
-    try:
-        result = await asyncio.to_thread(_fetch_last_report_date, url)
-        return (sym, result)
-    except Exception:
-        return (sym, None)
-
-
-async def _refresh_attestation_reports_async() -> None:
-    """Async background refresh - updates _ATTESTATION_CACHE."""
-    reports: dict[str, datetime | None] = {}
-    tasks = [
-        _fetch_attestation_report_background(sym, info)
-        for sym, info in ATTESTATION_CHECKLIST.items()
-    ]
-    for task in asyncio.as_completed(tasks):
-        sym, report = await task
-        reports[sym] = report
-
-    _ATTESTATION_CACHE["fetched_at"] = datetime.now(timezone.utc)
-    _ATTESTATION_CACHE["reports"] = reports
-
-
-def _attestation_status_from_age_days(age_days: int | None) -> str:
-    if age_days is None:
-        return "unknown"
-    if age_days < 90:
-        return "fresh"
-    if age_days < 180:
-        return "aging"
-    return "stale"
-
-
-def _supply_feed_status_from_age_seconds(age_seconds: float | None) -> str:
-    if age_seconds is None:
-        return "unknown"
-    if age_seconds <= 900:
-        return "fresh"
-    if age_seconds <= 3600:
-        return "aging"
-    return "stale"
-
-
-def _supply_feed_block(defillama: SourceStatus | None, *, now: datetime) -> dict[str, Any]:
-    updated_at: datetime | None = None
-    if defillama and defillama.last_successful_fetch:
-        updated_at = defillama.last_successful_fetch
-        if updated_at.tzinfo is None:
-            updated_at = updated_at.replace(tzinfo=timezone.utc)
-    age_seconds = (now - updated_at).total_seconds() if updated_at else None
-    age_minutes = round(age_seconds / 60.0, 1) if age_seconds is not None else None
-    return {
-        "supply_feed_source": "defillama",
-        "supply_feed_status": _supply_feed_status_from_age_seconds(age_seconds),
-        "supply_feed_updated_at": updated_at.isoformat().replace("+00:00", "Z") if updated_at else None,
-        "supply_feed_age_minutes": age_minutes,
-    }
-
-
-def get_attestation_status(db: Session | None = None) -> dict[str, Any]:
-    now = datetime.now(timezone.utc)
-    cached_reports = _ATTESTATION_CACHE.get("reports")
-    if cached_reports is not None:
-        report_map = cached_reports
-    else:
-        report_map = {}
-    
-    defillama = None
-    if db is not None:
-        defillama = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
-    feed = _supply_feed_block(defillama, now=now)
-    result = {}
-    for sym, info in ATTESTATION_CHECKLIST.items():
-        observability = info.get("observability")
-        report: datetime | None = None
-        attestation_status = "unknown"
-        if observability == "attestation":
-            report = report_map.get(sym)
-            if report and report.tzinfo is None:
-                report = report.replace(tzinfo=timezone.utc)
-            age_days = (now - report).days if report else None
-            attestation_status = _attestation_status_from_age_days(age_days)
-        elif observability == "onchain_feed":
-            attestation_status = "n/a"
-
-        age_days = (now - report).days if report else None
-        result[sym] = {
-            "issuer": info["issuer"],
-            "url": info["url"],
-            "observability": observability,
-            # Issuer attestation report (only when provably parsed from issuer source)
-            "attestation_status": attestation_status,
-            "attestation_last_report": report.isoformat().replace("+00:00", "Z") if report else None,
-            "attestation_age_days": age_days,
-            # Backward-compatible aliases used by older frontend bindings
-            "status": attestation_status,
-            "last_report": report.isoformat().replace("+00:00", "Z") if report else None,
-            "age_days": age_days,
-            **feed,
-        }
-    return result
-
-
 def correlate_sentiment_depeg(db: Session, *, asset: str, window_hours: int = 24) -> dict[str, Any]:
-    from datetime import timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
     sym = asset.strip().upper()
-    articles = db.query(OsintArticle).filter(
-        OsintArticle.published_at >= cutoff,
-        OsintArticle.sentiment_score < -0.3,
-    ).join(OsintArticle.asset_links).filter(
-        OsintArticleAsset.asset_symbol == sym,
-    ).order_by(OsintArticle.published_at.desc()).all()
-    depeg_events = db.query(SignalEvent).filter(
-        SignalEvent.event_type.like("%depeg%"),
-        SignalEvent.timestamp >= cutoff,
-        SignalEvent.asset_symbol == sym,
-    ).order_by(SignalEvent.timestamp.desc()).all()
+    articles = db.execute(
+        select(OsintArticle)
+        .where(OsintArticle.published_at >= cutoff, OsintArticle.sentiment_score < -0.3)
+        .join(OsintArticle.asset_links)
+        .where(OsintArticleAsset.asset_symbol == sym)
+        .order_by(OsintArticle.published_at.desc())
+    ).scalars().all()
+    depeg_events = db.execute(
+        select(SignalEvent)
+        .where(
+            SignalEvent.event_type.like("%depeg%"),
+            SignalEvent.timestamp >= cutoff,
+            SignalEvent.asset_symbol == sym,
+        )
+        .order_by(SignalEvent.timestamp.desc())
+    ).scalars().all()
     negative_count = len(articles)
     depeg_count = len(depeg_events)
     correlation_found = negative_count > 0 and depeg_count > 0

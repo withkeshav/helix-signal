@@ -11,6 +11,7 @@ import smtplib
 from email.mime.text import MIMEText
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import SignalEvent, SourceStatus
@@ -249,7 +250,7 @@ def load_alert_rules() -> list[dict]:
 def evaluate_alerts(db: Session, *, bundle: dict[str, Any], asset_symbol: str, now: datetime) -> list[dict[str, Any]]:
     rules = load_alert_rules()
     fired: list[dict[str, Any]] = []
-    sources_orm = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
+    sources_orm = db.execute(select(SourceStatus).order_by(SourceStatus.id.asc())).scalars().all()
     bundle["_meta"] = {}
     bundle["_sources"] = sources_orm
 
@@ -287,10 +288,12 @@ def _recently_fired(db: Session, dedup_key: str, cooldown_minutes: int, now: dat
     if cooldown_minutes <= 0:
         return False
     cutoff = now - timedelta(minutes=cooldown_minutes)
-    existing = db.query(SignalEvent).filter(
-        SignalEvent.event_type == dedup_key,
-        SignalEvent.timestamp >= cutoff,
-    ).first()
+    existing = db.execute(
+        select(SignalEvent).where(
+            SignalEvent.event_type == dedup_key,
+            SignalEvent.timestamp >= cutoff,
+        )
+    ).scalars().first()
     return existing is not None
 
 

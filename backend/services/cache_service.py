@@ -140,8 +140,3 @@ class CacheService:
 
 # Global cache service instance
 cache_service = CacheService()
-
-
-def get_cache_service() -> CacheService:
-    """Factory function to get cache service instance."""
-    return cache_service

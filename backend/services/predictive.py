@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, AssetTrendSnapshot
@@ -24,10 +25,13 @@ def _expected_shortfall(returns: list[float], alpha: float = 0.95) -> float | No
 
 def _historical_price_returns(db: Session, asset_symbol: str, limit: int = 288) -> list[float]:
     history = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == asset_symbol.upper())
-        .order_by(AssetTrendSnapshot.timestamp.desc())
-        .limit(limit)
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == asset_symbol.upper())
+            .order_by(AssetTrendSnapshot.timestamp.desc())
+            .limit(limit)
+        )
+        .scalars()
         .all()
     )
     if len(history) < 2:
@@ -93,7 +97,7 @@ def run_predictive_bundle(
     if bundle is None:
         return {"asset_symbol": sym, "available": False}
 
-    chains = db.query(AssetChainSnapshot).filter(AssetChainSnapshot.asset_symbol == bundle.asset_symbol).all()
+    chains = db.execute(select(AssetChainSnapshot).where(AssetChainSnapshot.asset_symbol == bundle.asset_symbol)).scalars().all()
     _refresh_interval = int(get_setting("refresh_core_seconds", db) or 300)
     risk = compute_unified_risk_score(
         chains,

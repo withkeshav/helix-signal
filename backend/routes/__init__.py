@@ -27,6 +27,10 @@ def register_routes(app):
     from routes.dews import router as dews_router
     from routes.onchain import router as onchain_router
     from routes.external_intel_webhook import router as external_intel_webhook_router
+    from routes.investigate import router as investigate_router
+    from routes.yield_intelligence import router as yield_intelligence_router
+    from routes.blacklist import router as blacklist_router
+    from routes.narrative import router as narrative_router
 
     app.include_router(admin_router, prefix="/api", tags=["admin"])
     app.include_router(ai_router, prefix="/api", tags=["ai"])
@@ -53,3 +57,7 @@ def register_routes(app):
     app.include_router(dews_router, prefix="/api", tags=["dews"])
     app.include_router(onchain_router, prefix="/api", tags=["onchain"])
     app.include_router(external_intel_webhook_router, prefix="/api", tags=["webhooks"])
+    app.include_router(investigate_router, prefix="/api/v1", tags=["investigate"])
+    app.include_router(yield_intelligence_router, prefix="/api/v1", tags=["yield"])
+    app.include_router(blacklist_router, prefix="/api/v1", tags=["blacklist"])
+    app.include_router(narrative_router, prefix="/api/v1", tags=["narrative"])

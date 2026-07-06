@@ -54,8 +54,7 @@ def build_default_registry(db: Session | None = None) -> SourceRegistry:
         if plugin_src is not None:
             r.register(plugin_src)
         else:
-            from sources.chainlink import ChainlinkSource
-            r.register(ChainlinkSource())
+            log.debug("chainlink_plugin_not_loaded")
     return r
 
 
@@ -213,6 +212,12 @@ async def refresh_chain_data(db: Session) -> None:
         cg_ok = cg_transformed is not None
         dx_transformed, dx_error = dx_result
         dx_ok = dx_transformed is not None
+
+        try:
+            from sources.chainlink_oracle import refresh_oracle_prices
+            refresh_oracle_prices(all_symbols)
+        except Exception as exc:
+            log.debug("chainlink_oracle.refresh_skipped", error=str(exc))
 
         dl_results = await asyncio.gather(
             *[_fetch_asset(i, asset, tvl_map) for i, asset in enumerate(enabled_assets)]
@@ -386,6 +391,11 @@ async def refresh_chain_data(db: Session) -> None:
                     except Exception:
                         log.warning("Anomaly detection failed for symbol", symbol=sym, exc_info=True)
             flush_source_usage(db)  # Flush cached source usage
+            try:
+                from services.onchain import refresh_onchain_signals
+                refresh_onchain_signals(db, symbols=symbols)
+            except Exception:
+                log.warning("onchain.refresh_failed", exc_info=True)
             for sym in symbols:
                 invalidate_dashboard(sym)
         else:

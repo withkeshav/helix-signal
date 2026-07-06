@@ -256,3 +256,29 @@ class SignalEventOut(BaseModel):
 class SignalEventsResponseOut(BaseModel):
     generated_at: datetime
     events: list[SignalEventOut]
+
+
+# --- V4 investigation ---
+
+
+class InvestigateRequest(BaseModel):
+    address: str
+    chain: str = "ethereum"
+    asset: str = "USDT"
+
+
+class InvestigationReportOut(BaseModel):
+    seed_address: str
+    chain: str
+    asset_symbol: str
+    peel_hops: list[dict]
+    cluster: dict
+    bridge_hops: list[dict]
+    blacklist_hits: list[dict]
+    osint_articles: list[dict]
+    total_value_usd: float
+    timeline: list[dict]
+    narrative: str
+    risk_level: str
+    generated_at: str
+    errors: list[str] = []

@@ -18,6 +18,7 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, SourceStatus
@@ -41,7 +42,7 @@ from schemas import (
 from schemas import TrendPointOut, TrendSummaryOut
 from signal_engine import scoring
 from signal_engine.core import get_asset_by_symbol, get_default_asset_symbol
-from signal_engine.risk_inputs import build_risk_score_kwargs, inject_velocity
+from signal_engine.risk_inputs import build_risk_score_kwargs, inject_velocity, inject_onchain
 from utils import utc_normalize, window_delta
 
 
@@ -124,29 +125,30 @@ def build_trend_summary(points: list[TrendPointOut], *, window: str, now: dateti
     )
 
 
-def build_dashboard_response(db: Session, asset: str | None = None) -> DashboardResponse:
-    selected_symbol = (asset or get_default_asset_symbol()).upper()
-    selected_asset = get_asset_by_symbol(selected_symbol)
-    if selected_asset is None or not bool(selected_asset.get("enabled")):
-        raise HTTPException(status_code=404, detail=f"Asset '{selected_symbol}' is not enabled")
-
-    from providers.settings import get_setting
-    refresh_interval = int(get_setting("refresh_core_seconds", db) or 300)
-
+def _fetch_chain_and_sources(
+    db: Session, selected_symbol: str, refresh_interval: int
+) -> tuple[list[AssetChainSnapshot], list[SourceStatus], SourceStatus | None, str, str | None]:
     chains_orm = (
-        db.query(AssetChainSnapshot)
-        .filter(AssetChainSnapshot.asset_symbol == selected_symbol)
-        .order_by(AssetChainSnapshot.supply_current.desc(), AssetChainSnapshot.chain_name.asc())
+        db.execute(
+            select(AssetChainSnapshot)
+            .where(AssetChainSnapshot.asset_symbol == selected_symbol)
+            .order_by(AssetChainSnapshot.supply_current.desc(), AssetChainSnapshot.chain_name.asc())
+        )
+        .scalars()
         .all()
     )
-    sources_orm = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
-    sources = [SourceStatusOut.model_validate(s) for s in sources_orm]
-
+    sources_orm = db.execute(select(SourceStatus).order_by(SourceStatus.id.asc())).scalars().all()
     defillama = next((s for s in sources_orm if s.source_name == "defillama"), None)
     source_status = defillama.status if defillama else "unknown"
+    source_error = defillama.last_error if defillama else None
+    return chains_orm, sources_orm, defillama, source_status, source_error
 
+
+def _compute_freshness_and_supply(
+    chains_orm: list[AssetChainSnapshot], defillama: SourceStatus | None,
+    source_status: str, refresh_interval: int,
+) -> tuple[FreshnessOut, float | None, float | None, list[float], bool]:
     newest_chain_snapshot = max((utc_normalize(c.fetched_at) for c in chains_orm), default=None) if chains_orm else None
-
     freshness_dict = scoring.compute_freshness(
         source_status=source_status,
         last_successful_fetch=utc_normalize(defillama.last_successful_fetch) if defillama else None,
@@ -154,159 +156,114 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         refresh_interval_seconds=refresh_interval,
     )
     freshness = FreshnessOut(**freshness_dict)
-
     raw_total = sum((c.supply_current or 0.0) for c in chains_orm)
     total_supply = raw_total if raw_total > 0 else None
-
     total_prev_day = sum((c.supply_prev_day or 0.0) for c in chains_orm)
-    total_prev_week = sum((c.supply_prev_week or 0.0) for c in chains_orm)
-    total_prev_month = sum((c.supply_prev_month or 0.0) for c in chains_orm)
-
     total_change_24h_pct: float | None = None
     if total_supply is not None and total_prev_day > 0:
         total_change_24h_pct = ((total_supply - total_prev_day) / total_prev_day) * 100.0
-
     chain_shares: list[float] = []
     if total_supply and total_supply > 0:
         for c in chains_orm:
             if c.supply_current is not None and c.supply_current > 0:
                 chain_shares.append(float(c.supply_current) / float(total_supply))
-
     source_ok = defillama is not None and defillama.status == "ok"
-    source_error = defillama.last_error if defillama else None
+    return freshness, total_supply, total_change_24h_pct, chain_shares, source_ok
 
+
+def _compute_depeg_and_risk(
+    db: Session, selected_symbol: str, chains_orm: list[AssetChainSnapshot],
+    total_supply: float | None, chain_shares: list[float],
+    source_ok: bool, source_error: str | None, freshness_dict: dict,
+    refresh_interval: int,
+) -> tuple[DepegIndexOut, AssetSignalOut, ChainConcentrationOut]:
     price = next((c.price for c in chains_orm if c.price is not None), None)
-
-    if price is not None:
-        dev_abs, dev_pct = scoring.peg_deviation(price)
-    else:
-        dev_abs, dev_pct = None, None
+    dev_abs, dev_pct = scoring.peg_deviation(price) if price is not None else (None, None)
     depeg_index = DepegIndexOut(
         score=scoring.depeg_index_score(price),
-        current_price=price,
-        deviation_abs=dev_abs,
-        deviation_pct=dev_pct,
+        current_price=price, deviation_abs=dev_abs, deviation_pct=dev_pct,
         peg_status=scoring.peg_status_label(price),
     )
-
     risk_kwargs = build_risk_score_kwargs(
-        chains_orm,
-        source_ok=source_ok,
-        source_error=source_error,
+        chains_orm, source_ok=source_ok, source_error=source_error,
         age_seconds=freshness_dict.get("age_seconds"),
         refresh_interval_seconds=refresh_interval,
     )
     risk_kwargs = inject_velocity(db, risk_kwargs, asset_symbol=selected_symbol)
-
+    risk_kwargs = inject_onchain(db, risk_kwargs, asset_symbol=selected_symbol)
     conc_s, conc_detail = scoring.concentration_component(
-        chain_shares,
-        top3_dex_pool_share=risk_kwargs.get("top3_dex_pool_share"),
+        chain_shares, top3_dex_pool_share=risk_kwargs.get("top3_dex_pool_share"),
     )
     asset_signal_dict = scoring.compute_risk_score(**risk_kwargs)
-
     top_chain_name: str | None = None
     if total_supply and total_supply > 0 and chains_orm:
         top_row = max(chains_orm, key=lambda c: (c.supply_current or 0.0))
         if (top_row.supply_current or 0.0) > 0:
             top_chain_name = top_row.chain_name
-
     chain_concentration = ChainConcentrationOut(
-        top_chain=top_chain_name,
-        top_chain_share_pct=conc_detail.get("top_chain_share_pct"),
-        hhi=conc_detail.get("hhi"),
-        label=scoring.composite_band(conc_s),
+        top_chain=top_chain_name, top_chain_share_pct=conc_detail.get("top_chain_share_pct"),
+        hhi=conc_detail.get("hhi"), label=scoring.composite_band(conc_s),
     )
     asset_signal = AssetSignalOut(
-        score=int(asset_signal_dict["score"]),
-        band=str(asset_signal_dict["band"]),
+        score=int(asset_signal_dict["score"]), band=str(asset_signal_dict["band"]),
         components=dict(asset_signal_dict["components"]),
     )
+    return depeg_index, asset_signal, chain_concentration
 
-    now = datetime.now(timezone.utc)
-    dashboard_chains: list[DashboardChainRow] = []
+
+def _build_chain_rows(
+    chains_orm: list[AssetChainSnapshot], selected_symbol: str, selected_asset: dict,
+    total_supply: float | None, source_ok: bool, refresh_interval: int, now: datetime,
+) -> list[DashboardChainRow]:
     asset_name = selected_asset.get("name")
-
+    rows: list[DashboardChainRow] = []
     for c in chains_orm:
         fetched = utc_normalize(c.fetched_at)
         age_s = (now - fetched).total_seconds() if fetched else None
-
         sm_raw = scoring.chain_supply_momentum(
-            supply_current=c.supply_current,
-            supply_prev_day=c.supply_prev_day,
-            supply_prev_week=c.supply_prev_week,
-            supply_prev_month=c.supply_prev_month,
+            supply_current=c.supply_current, supply_prev_day=c.supply_prev_day,
+            supply_prev_week=c.supply_prev_week, supply_prev_month=c.supply_prev_month,
         )
-        supply_momentum = SupplyMomentumOut(**sm_raw)
-
         share_pct = (
             (float(c.supply_current) / float(total_supply)) * 100.0
-            if total_supply and c.supply_current is not None and total_supply > 0
-            else None
+            if total_supply and c.supply_current is not None and total_supply > 0 else None
         )
-
-        cur_supply = float(c.supply_current or 0.0)
         mom_hint, _ = scoring.supply_momentum_component(
-            supply_current=cur_supply,
-            supply_prev_day=c.supply_prev_day,
-            supply_prev_week=c.supply_prev_week,
-            supply_prev_month=c.supply_prev_month,
+            supply_current=float(c.supply_current or 0.0), supply_prev_day=c.supply_prev_day,
+            supply_prev_week=c.supply_prev_week, supply_prev_month=c.supply_prev_month,
         )
-
         cs_raw = scoring.chain_row_signal(
-            chain_share_pct=share_pct,
-            peg_price=c.price,
-            momentum_score_hint=mom_hint,
+            chain_share_pct=share_pct, peg_price=c.price, momentum_score_hint=mom_hint,
         )
-        chain_signal = ChainSignalOut(score=int(cs_raw["score"]), band=str(cs_raw["band"]))
-
         dc_raw = scoring.chain_data_confidence(
-            source_ok=source_ok,
-            chain_snapshot_age_seconds=age_s,
+            source_ok=source_ok, chain_snapshot_age_seconds=age_s,
             refresh_interval_seconds=refresh_interval,
         )
-        data_confidence = DataConfidenceOut(
-            score=int(dc_raw["score"]),
-            label=str(dc_raw["label"]),
-            reason=str(dc_raw["reason"]),
-        )
+        rows.append(DashboardChainRow(
+            asset_symbol=selected_symbol, asset_name=asset_name, chain_name=c.chain_name,
+            supply_current=c.supply_current, supply_prev_day=c.supply_prev_day,
+            supply_prev_week=c.supply_prev_week, supply_prev_month=c.supply_prev_month,
+            chain_tvl=c.tvl, price=c.price, price_coingecko=c.price_coingecko,
+            price_dexscreener=c.price_dexscreener, market_cap=c.market_cap,
+            volume_24h=c.volume_24h, total_liquidity_usd=c.total_liquidity_usd,
+            top3_pool_share_pct=c.top3_pool_share_pct, pool_count=c.pool_count,
+            peg_type=c.peg_type, fetched_at=c.fetched_at,
+            supply_momentum=SupplyMomentumOut(**sm_raw),
+            chain_share_pct=round(share_pct, 4) if share_pct is not None else None,
+            chain_signal=ChainSignalOut(score=int(cs_raw["score"]), band=str(cs_raw["band"])),
+            data_confidence=DataConfidenceOut(score=int(dc_raw["score"]), label=str(dc_raw["label"]), reason=str(dc_raw["reason"])),
+        ))
+    return rows
 
-        dashboard_chains.append(
-            DashboardChainRow(
-                asset_symbol=selected_symbol,
-                asset_name=asset_name,
-                chain_name=c.chain_name,
-                supply_current=c.supply_current,
-                supply_prev_day=c.supply_prev_day,
-                supply_prev_week=c.supply_prev_week,
-                supply_prev_month=c.supply_prev_month,
-                chain_tvl=c.tvl,
-                price=c.price,
-                price_coingecko=c.price_coingecko,
-                price_dexscreener=c.price_dexscreener,
-                market_cap=c.market_cap,
-                volume_24h=c.volume_24h,
-                total_liquidity_usd=c.total_liquidity_usd,
-                top3_pool_share_pct=c.top3_pool_share_pct,
-                pool_count=c.pool_count,
-                peg_type=c.peg_type,
-                fetched_at=c.fetched_at,
-                supply_momentum=supply_momentum,
-                chain_share_pct=round(share_pct, 4) if share_pct is not None else None,
-                chain_signal=chain_signal,
-                data_confidence=data_confidence,
-            )
-        )
 
-    generated_at = datetime.now(timezone.utc)
-
-    degraded_sources = [s.source_name for s in sources_orm if s.status != "ok"]
-    using_cached = len(degraded_sources) > 0
-
+def _compute_cross_source_and_feed(
+    chains_orm: list[AssetChainSnapshot], selected_symbol: str,
+    now: datetime, sources_orm: list[SourceStatus],
+) -> tuple[CrossSourceSignalOut, SupplyFeedOut]:
     prices_all = [c.price for c in chains_orm if c.price is not None]
     prices_cg = [c.price_coingecko for c in chains_orm if c.price_coingecko is not None]
     prices_ds = [c.price_dexscreener for c in chains_orm if c.price_dexscreener is not None]
     all_prices = prices_all + prices_cg + prices_ds
-    cross_source = CrossSourceSignalOut()
     source_rows: list[dict] = []
     ref_chain = next((c for c in chains_orm if c.price is not None or c.price_coingecko or c.price_dexscreener), None)
     if ref_chain:
@@ -316,19 +273,25 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
             source_rows.append({"source": "CoinGecko", "price": ref_chain.price_coingecko})
         if ref_chain.price_dexscreener is not None:
             source_rows.append({"source": "DexScreener", "price": ref_chain.price_dexscreener})
+    try:
+        from sources.chainlink_oracle import get_cached_oracle_price
+        oracle_p = get_cached_oracle_price(selected_symbol)
+        if oracle_p is not None:
+            source_rows.append({"source": "Chainlink", "price": oracle_p})
+            all_prices.append(oracle_p)
+    except Exception:
+        pass
+    cross_source = CrossSourceSignalOut()
     if len(all_prices) >= 2:
         avg_p = sum(all_prices) / len(all_prices)
         max_disc = max(abs(p - avg_p) / avg_p * 100 if avg_p else 0 for p in all_prices)
         cross_source = CrossSourceSignalOut(
             sources_agreeing=len(source_rows) or len(all_prices),
-            max_discrepancy_pct=round(max_disc, 4),
-            discrepancy_flag=max_disc > 0.5,
-            avg_price=round(avg_p, 6),
-            sources=source_rows,
+            max_discrepancy_pct=round(max_disc, 4), discrepancy_flag=max_disc > 0.5,
+            avg_price=round(avg_p, 6), sources=source_rows,
         )
     elif source_rows:
         cross_source = CrossSourceSignalOut(sources=source_rows, sources_agreeing=len(source_rows))
-
     supply_feed = SupplyFeedOut()
     defillama_source = next((s for s in sources_orm if s.source_name == "defillama"), None)
     if defillama_source and defillama_source.last_successful_fetch:
@@ -339,7 +302,10 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
             label="Fresh" if feed_age < 15 else ("Aging" if feed_age < 60 else "Stale"),
             note=f"DefiLlama supply feed last updated {feed_age:.0f} min ago",
         )
+    return cross_source, supply_feed
 
+
+def _compute_attestation_and_nlp(db: Session, selected_symbol: str) -> tuple[AttestationOut, bool]:
     attestation_signal = AttestationOut()
     try:
         from services.osint import get_attestation_status
@@ -350,42 +316,48 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
             if att_age is not None:
                 att_status = "fresh" if att_age < 90 else ("aging" if att_age < 180 else "stale")
                 attestation_signal = AttestationOut(
-                    status=att_status,
-                    age_days=att_age,
+                    status=att_status, age_days=att_age,
                     last_report_date=a.get("latest_attestation_report_date"),
                     label="Fresh" if att_age < 90 else ("Aging" if att_age < 180 else "Stale"),
                     note=f"{att_age:.0f}d since last attestation report",
                 )
     except Exception:
         logging.getLogger(__name__).debug("Attestation lookup failed", exc_info=True)
-
     from providers.settings import get_setting
     nlp_from_settings = get_setting("feature_nlp_sentiment", db)
     nlp_from_env = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
     nlp_enabled = nlp_from_settings if isinstance(nlp_from_settings, bool) else nlp_from_env
+    return attestation_signal, nlp_enabled
+
+
+def build_dashboard_response(db: Session, asset: str | None = None) -> DashboardResponse:
+    selected_symbol = (asset or get_default_asset_symbol()).upper()
+    selected_asset = get_asset_by_symbol(selected_symbol)
+    if selected_asset is None or not bool(selected_asset.get("enabled")):
+        raise HTTPException(status_code=404, detail=f"Asset '{selected_symbol}' is not enabled")
+
+    from providers.settings import get_setting
+    refresh_interval = int(get_setting("refresh_core_seconds", db) or 300)
+
+    chains_orm, sources_orm, defillama, source_status, source_error = _fetch_chain_and_sources(db, selected_symbol, refresh_interval)
+    freshness, total_supply, total_change_24h_pct, chain_shares, source_ok = _compute_freshness_and_supply(chains_orm, defillama, source_status, refresh_interval)
+    depeg_index, asset_signal, chain_concentration = _compute_depeg_and_risk(db, selected_symbol, chains_orm, total_supply, chain_shares, source_ok, source_error, freshness.model_dump() if hasattr(freshness, 'model_dump') else {}, refresh_interval)
+
+    now = datetime.now(timezone.utc)
+    dashboard_chains = _build_chain_rows(chains_orm, selected_symbol, selected_asset, total_supply, source_ok, refresh_interval, now)
+    cross_source, supply_feed = _compute_cross_source_and_feed(chains_orm, selected_symbol, now, sources_orm)
+    attestation_signal, nlp_enabled = _compute_attestation_and_nlp(db, selected_symbol)
+
+    sources = [SourceStatusOut.model_validate(s) for s in sources_orm]
+    degraded_sources = [s.source_name for s in sources_orm if s.status != "ok"]
 
     return DashboardResponse(
-        asset=AssetMetadataOut(
-            symbol=selected_symbol,
-            name=selected_asset.get("name"),
-            peg_type=selected_asset.get("peg_type"),
-        ),
-        generated_at=generated_at,
-        refresh_interval_seconds=refresh_interval,
-        freshness=freshness,
-        asset_signal=asset_signal,
-        depeg_index=depeg_index,
-        chain_concentration=chain_concentration,
-        cross_source_signal=cross_source,
-        supply_feed=supply_feed,
-        attestation=attestation_signal,
-        total_supply_current=total_supply,
-        total_supply_change_24h_pct=total_change_24h_pct,
-        chains=dashboard_chains,
-        sources=sources,
-        data_quality=DataQualityOut(
-            degraded_sources=degraded_sources,
-            using_cached_data=using_cached,
-            nlp_available=nlp_enabled,
-        ),
+        asset=AssetMetadataOut(symbol=selected_symbol, name=selected_asset.get("name"), peg_type=selected_asset.get("peg_type")),
+        generated_at=now, refresh_interval_seconds=refresh_interval,
+        freshness=freshness, asset_signal=asset_signal, depeg_index=depeg_index,
+        chain_concentration=chain_concentration, cross_source_signal=cross_source,
+        supply_feed=supply_feed, attestation=attestation_signal,
+        total_supply_current=total_supply, total_supply_change_24h_pct=total_change_24h_pct,
+        chains=dashboard_chains, sources=sources,
+        data_quality=DataQualityOut(degraded_sources=degraded_sources, using_cached_data=len(degraded_sources) > 0, nlp_available=nlp_enabled),
     )

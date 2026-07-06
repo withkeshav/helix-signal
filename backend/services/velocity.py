@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot
@@ -19,12 +20,15 @@ def _fetch_raw_history(
 ) -> tuple[list[datetime], list[float], list[int]]:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
     rows = (
-        db.query(AssetTrendSnapshot)
-        .filter(
-            AssetTrendSnapshot.asset_symbol == asset_symbol,
-            AssetTrendSnapshot.timestamp >= cutoff,
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(
+                AssetTrendSnapshot.asset_symbol == asset_symbol,
+                AssetTrendSnapshot.timestamp >= cutoff,
+            )
+            .order_by(AssetTrendSnapshot.timestamp.asc())
         )
-        .order_by(AssetTrendSnapshot.timestamp.asc())
+        .scalars()
         .all()
     )
     if len(rows) < min_points:

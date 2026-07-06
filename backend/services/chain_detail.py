@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, ChainTrendSnapshot, SignalEvent
@@ -17,7 +17,7 @@ from utils import utc_normalize, chain_key_from_name, signal_event_rows_to_out
 
 def _resolve_chain_name(db: Session, *, asset: str, chain_key: str) -> str | None:
     needle = chain_key.strip().lower()
-    rows = db.query(AssetChainSnapshot).filter(AssetChainSnapshot.asset_symbol == asset).all()
+    rows = db.execute(select(AssetChainSnapshot).where(AssetChainSnapshot.asset_symbol == asset)).scalars().all()
     for r in rows:
         if chain_key_from_name(r.chain_name) == needle:
             return r.chain_name
@@ -36,8 +36,11 @@ def build_chain_detail(db: Session, *, chain_key: str, asset: str) -> dict[str, 
         raise HTTPException(status_code=404, detail=f"Chain '{chain_key}' not found for asset '{sym}'")
 
     snap = (
-        db.query(AssetChainSnapshot)
-        .filter(AssetChainSnapshot.asset_symbol == sym, AssetChainSnapshot.chain_name == chain_name)
+        db.execute(
+            select(AssetChainSnapshot)
+            .where(AssetChainSnapshot.asset_symbol == sym, AssetChainSnapshot.chain_name == chain_name)
+        )
+        .scalars()
         .first()
     )
     snapshot: dict[str, Any] | None = None
@@ -54,13 +57,16 @@ def build_chain_detail(db: Session, *, chain_key: str, asset: str) -> dict[str, 
     now = datetime.now(timezone.utc)
     cutoff = now - timedelta(days=7)
     trend_rows = (
-        db.query(ChainTrendSnapshot)
-        .filter(
-            ChainTrendSnapshot.asset_symbol == sym,
-            ChainTrendSnapshot.chain_key == ck,
-            ChainTrendSnapshot.timestamp >= cutoff,
+        db.execute(
+            select(ChainTrendSnapshot)
+            .where(
+                ChainTrendSnapshot.asset_symbol == sym,
+                ChainTrendSnapshot.chain_key == ck,
+                ChainTrendSnapshot.timestamp >= cutoff,
+            )
+            .order_by(ChainTrendSnapshot.timestamp.asc())
         )
-        .order_by(ChainTrendSnapshot.timestamp.asc())
+        .scalars()
         .all()
     )
     trend_points = [
@@ -77,13 +83,16 @@ def build_chain_detail(db: Session, *, chain_key: str, asset: str) -> dict[str, 
     ]
 
     event_rows = (
-        db.query(SignalEvent)
-        .filter(
-            or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"),
-            or_(SignalEvent.chain_key == ck, SignalEvent.chain_key.is_(None)),
+        db.execute(
+            select(SignalEvent)
+            .where(
+                or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"),
+                or_(SignalEvent.chain_key == ck, SignalEvent.chain_key.is_(None)),
+            )
+            .order_by(desc(SignalEvent.timestamp))
+            .limit(50)
         )
-        .order_by(desc(SignalEvent.timestamp))
-        .limit(50)
+        .scalars()
         .all()
     )
 

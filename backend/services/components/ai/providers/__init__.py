@@ -1,8 +1,5 @@
-"""AI provider implementations."""
+"""AI provider implementations (extracted modules used by ai_router)."""
 
-from .ollama import ollama_cloud
-from .groq import groq
-from .cloudflare import cloudflare_ai
 from .openrouter import openrouter_lite
 
-__all__ = ["ollama_cloud", "groq", "cloudflare_ai", "openrouter_lite"]
+__all__ = ["openrouter_lite"]

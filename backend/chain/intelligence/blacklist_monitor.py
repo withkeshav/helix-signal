@@ -1,18 +1,22 @@
 """Blacklist monitor — poll USDT/USDC/PYUSD freeze events from Ethereum + Tron.
 
 Fires SignalEvent alert when frozen_balance_usd > $1M.
+Provides monthly freeze statistics per issuer.
+Generates LLM intelligence notes for freezes >$1M.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from structlog import get_logger
 
 from database import BlacklistEvent, SignalEvent
@@ -42,6 +46,8 @@ TRON_USDT_CONTRACT = {
 }
 
 ALERT_THRESHOLD_USD = 1_000_000
+LLM_NOTE_THRESHOLD_USD = 1_000_000
+MONTHLY_STATS_DAYS = 30
 ETH_RPC_URL = os.getenv("ALCHEMY_API_KEY", "")
 if ETH_RPC_URL:
     ETH_RPC_URL = f"https://eth-mainnet.g.alchemy.com/v2/{ETH_RPC_URL}"
@@ -57,6 +63,55 @@ async def poll(db: Session) -> dict[str, Any]:
     total = ethereum_result.get("events", 0) + tron_result.get("events", 0)
     log.info("blacklist.poll_complete", events=total)
     return {"status": "ok", "ethereum": ethereum_result, "tron": tron_result}
+
+
+def get_monthly_freeze_stats(db: Session) -> list[dict[str, Any]]:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=MONTHLY_STATS_DAYS)
+    rows = (
+        db.query(
+            BlacklistEvent.asset_symbol,
+            BlacklistEvent.chain,
+            func.count(BlacklistEvent.id).label("event_count"),
+            func.sum(BlacklistEvent.frozen_balance_usd).label("total_frozen_usd"),
+        )
+        .filter(BlacklistEvent.timestamp >= cutoff)
+        .group_by(BlacklistEvent.asset_symbol, BlacklistEvent.chain)
+        .all()
+    )
+    return [
+        {
+            "asset_symbol": r.asset_symbol,
+            "chain": r.chain,
+            "event_count": r.event_count,
+            "total_frozen_usd": round(float(r.total_frozen_usd or 0), 2),
+        }
+        for r in rows
+    ]
+
+
+async def _generate_intel_note(db: Session, address: str, amount: float, asset: str, chain: str) -> str:
+    prompt = (
+        f"Provide a one-paragraph intelligence assessment of the following stablecoin freeze event. "
+        f"Asset: {asset}, Chain: {chain}, Amount: ${amount:,.0f}, "
+        f"Frozen Address: {address[:20]}... "
+        f"Include: possible reasons for freeze, risk implications for {asset} peg stability, "
+        f"and whether this is related to sanctioned entities, exchange security, or regulatory action."
+    )
+    try:
+        from services.ai_router import _ollama_cloud
+        api_key = get_setting("secret_ollama_api_key", db)
+        result = await asyncio.to_thread(
+            _ollama_cloud,
+            prompt=prompt,
+            max_tokens=150,
+            system="You are a blockchain intelligence analyst. Provide concise, factual assessments.",
+            _resolved_api_key=str(api_key or ""),
+        )
+        if result and result.get("text"):
+            return result["text"].strip()
+    except Exception:
+        log.exception("blacklist.intel_note_failed")
+    return f"DestroyedBlackFunds {amount} {asset} on {chain}"
 
 
 async def _poll_ethereum(db: Session) -> dict[str, Any]:
@@ -111,6 +166,16 @@ async def _poll_ethereum(db: Session) -> dict[str, Any]:
                 if existing:
                     continue
 
+                note = (
+                    await _generate_intel_note(
+                        db,
+                        "0x" + frozen_address[-40:].lower() if frozen_address else "",
+                        frozen_usd, sym, "ethereum",
+                    )
+                    if frozen_usd > LLM_NOTE_THRESHOLD_USD
+                    else f"DestroyedBlackFunds {frozen_amount} {sym} on Ethereum"
+                )
+
                 event = BlacklistEvent(
                     asset_symbol=sym,
                     chain="ethereum",
@@ -119,7 +184,7 @@ async def _poll_ethereum(db: Session) -> dict[str, Any]:
                     event_type="freeze",
                     tx_hash=tx_hash,
                     block_number=block_num,
-                    intelligence_note=f"DestroyedBlackFunds {frozen_amount} {sym} on Ethereum",
+                    intelligence_note=note,
                     timestamp=datetime.now(timezone.utc),
                 )
                 db.add(event)
@@ -186,6 +251,12 @@ async def _poll_tron(db: Session) -> dict[str, Any]:
             frozen_usd = frozen_amount
             block_num = entry.get("block_number", 0)
 
+            note = (
+                await _generate_intel_note(db, frozen_address, frozen_usd, "USDT", "tron")
+                if frozen_usd > LLM_NOTE_THRESHOLD_USD
+                else f"Tron USDT freeze {frozen_amount} USDT"
+            )
+
             db.add(BlacklistEvent(
                 asset_symbol="USDT",
                 chain="tron",
@@ -194,7 +265,7 @@ async def _poll_tron(db: Session) -> dict[str, Any]:
                 event_type="freeze",
                 tx_hash=tx_hash,
                 block_number=block_num,
-                intelligence_note=f"Tron USDT freeze {frozen_amount} USDT",
+                intelligence_note=note,
                 timestamp=now,
             ))
             events += 1

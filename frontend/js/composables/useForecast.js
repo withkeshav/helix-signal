@@ -1,4 +1,4 @@
-import { renderForecastCharts, destroyForecastCharts, _disposeChart, _renderForecastChartsImpl, _renderForecastCanvas } from '../charts.js';
+import { renderForecastCharts, destroyForecastCharts, _disposeChart, _renderForecastChartsImpl, _renderForecastCanvas, renderContagionGraph, resizeAllHelixCharts } from '../charts.js';
 
 export function useForecast() {
   return {
@@ -7,6 +7,8 @@ export function useForecast() {
     _disposeChart,
     _renderForecastChartsImpl,
     _renderForecastCanvas,
+    renderContagionGraph,
+    resizeAllHelixCharts,
 
     get forecastSignals() { return this.$store.forecast.forecastSignals; },
     get correlations() { return this.$store.forecast.correlations; },
@@ -74,6 +76,14 @@ export function useForecast() {
         this.$watch('$store.ui.tab', (newTab) => {
           if (newTab !== 'market') {
             this._destroyCharts();
+          } else {
+            const asset = this.$store.dashboard.asset || 'USDT';
+            this.loadForecastData(asset);
+            this.loadForecastAccuracy(asset);
+            this.$nextTick(() => {
+              this.renderContagionGraph(this.$store.dashboard.rotation);
+              this.resizeAllHelixCharts();
+            });
           }
         });
 
@@ -83,15 +93,6 @@ export function useForecast() {
           if (currentTab === 'market') {
             this.loadForecastData(newAsset);
             this.loadForecastAccuracy(newAsset);
-          }
-        });
-
-        // Load data when tab changes to market
-        this.$watch('$store.ui.tab', (newTab) => {
-          if (newTab === 'market') {
-            const asset = this.$store.dashboard.asset || 'USDT';
-            this.loadForecastData(asset);
-            this.loadForecastAccuracy(asset);
           }
         });
       });

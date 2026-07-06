@@ -124,7 +124,7 @@ def test_playbook_endpoint_returns_playbooks(client, admin_headers) -> None:
 
 def test_playbook_endpoint_requires_auth(client) -> None:
     resp = client.get("/api/ai/playbooks")
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 def test_apply_playbook_endpoint_success(client, admin_headers) -> None:
@@ -146,4 +146,4 @@ def test_apply_unknown_playbook_endpoint_404(client, admin_headers) -> None:
 
 def test_apply_playbook_endpoint_requires_auth(client) -> None:
     resp = client.post("/api/ai/playbook/max_free")
-    assert resp.status_code == 403
+    assert resp.status_code == 401

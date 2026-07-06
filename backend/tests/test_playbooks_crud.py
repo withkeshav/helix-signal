@@ -17,7 +17,7 @@ def test_list_playbooks_includes_builtin(client, admin_headers) -> None:
 
 def test_list_playbooks_requires_auth(client) -> None:
     resp = client.get("/api/playbooks")
-    assert resp.status_code == 403
+    assert resp.status_code == 401
 
 
 def test_create_custom_playbook(client, admin_headers) -> None:

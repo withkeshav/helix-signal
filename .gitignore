@@ -6,6 +6,9 @@
 !.env.example
 
 # --- Databases and Local Data ---
+/data/
+*.duckdb
+*.onnx
 *.sqlite
 *.sqlite3
 backend/helix.db
@@ -39,6 +42,7 @@ out/
 
 # --- Docker ---
 .docker/
+.docker-run/
 secrets/
 docker-compose.override.yml
 
@@ -61,6 +65,11 @@ Thumbs.db
 desktop.ini
 
 # --- Internal planning briefs (never commit) ---
+helix-*.md
+plan-*.md
+draft-*.md
+notes-*.md
+*.local.md
 initial_BRIEF.md
 helix_signal_strategy_playbook.md
 *internal_docs*
@@ -120,7 +129,6 @@ docs/grant-strategy.md
 helix_signal_strategic_report.md
 *.plan.md
 .cursor/
-.code-review-graph/
 
 # pytest coverage
 .coverage

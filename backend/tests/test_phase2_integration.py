@@ -355,12 +355,12 @@ class TestApiEndpoints:
     def test_api_ai_playbook_requires_admin(self, client):
         """POST /api/ai/playbook/max_free without admin token returns 403."""
         resp = client.post("/api/ai/playbook/max_free")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
     def test_api_ai_warnings_requires_auth(self, client):
         """GET /api/ai/warnings now requires admin token."""
         resp = client.get("/api/ai/warnings")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
 
 # ===================================================================

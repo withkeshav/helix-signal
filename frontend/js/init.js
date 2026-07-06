@@ -11,6 +11,8 @@ import { useMarket } from 'composables/useMarket.js';
 import { useQuality } from 'composables/useQuality.js';
 import { useHealth } from 'composables/useHealth.js';
 import { useSMIDGE } from 'composables/useSMIDGE.js';
+import { useOnchain } from 'composables/useOnchain.js';
+import { useForensics } from 'composables/useForensics.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -24,6 +26,8 @@ Alpine.data('market', useMarket);
 Alpine.data('qualityDashboard', useQuality);
 Alpine.data('healthDashboard', useHealth);
 Alpine.data('smidgePanel', useSMIDGE);
+Alpine.data('onchainPanel', useOnchain);
+Alpine.data('forensics', useForensics);
 
 // Minimal root application component
 Alpine.data('helixApp', () => ({
@@ -51,7 +55,12 @@ Alpine.data('helixApp', () => ({
   async init() {
     const root = document.documentElement;
     this.theme = root.getAttribute('data-theme') || 'light';
-    
+
+    const validTabs = ['signal', 'market', 'intel', 'forensics', 'system', 'settings'];
+    const hashTab = location.hash.slice(1);
+    this.tab = validTabs.includes(hashTab) ? hashTab : 'signal';
+    this.$store.ui.tab = this.tab;
+
     // Load version from API
     try {
       const r = await fetch('/api/version', { cache: 'no-store' });
@@ -73,7 +82,10 @@ Alpine.data('helixApp', () => ({
     }, 60000);
     
     // Watch for tab changes
-    this.$watch('tab', val => location.hash = val);
+    this.$watch('tab', val => {
+      location.hash = val;
+      this.$dispatch('tab-changed', { tab: val });
+    });
     
     // Sync asset changes to dashboard store
     this.$watch('asset', val => this.$store.dashboard.asset = val);

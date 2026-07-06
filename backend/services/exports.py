@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.responses import Response
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, SignalEvent
@@ -35,10 +35,13 @@ def fetch_trend_export_rows(db: Session, *, asset: str, window: str) -> list[Tre
     now = datetime.now(timezone.utc)
     cutoff = now - window_delta(w)
     rows = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
-        .order_by(AssetTrendSnapshot.timestamp.asc())
-        .limit(MAX_EXPORT_ROWS)
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
+            .order_by(AssetTrendSnapshot.timestamp.asc())
+            .limit(MAX_EXPORT_ROWS)
+        )
+        .scalars()
         .all()
     )
     return [
@@ -63,14 +66,14 @@ def fetch_event_export_rows(
     limit: int,
 ) -> list[SignalEventOut]:
     lim = min(max(1, limit), MAX_EXPORT_ROWS)
-    q = db.query(SignalEvent)
+    stmt = select(SignalEvent)
     if asset:
         sym = asset.strip().upper()
         selected = get_asset_by_symbol(sym)
         if selected is None or not bool(selected.get("enabled")):
             raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
-        q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
-    rows = q.order_by(desc(SignalEvent.timestamp)).limit(lim).all()
+        stmt = stmt.where(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
+    rows = db.execute(stmt.order_by(desc(SignalEvent.timestamp)).limit(lim)).scalars().all()
     return signal_event_rows_to_out(rows)
 
 

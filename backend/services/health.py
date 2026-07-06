@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from core.cache_manager import cache
@@ -34,7 +34,7 @@ def build_health_payload(
         except Exception:
             redis_connected = False
 
-    defillama = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
+    defillama = db.execute(select(SourceStatus).where(SourceStatus.source_name == "defillama")).scalars().first()
     last_fetch: str | None = None
     if defillama and defillama.last_successful_fetch:
         ts = defillama.last_successful_fetch
@@ -47,7 +47,7 @@ def build_health_payload(
     if defillama and defillama.status == "error":
         status = "degraded"
 
-    asset_freshness_rows = db.query(AssetFreshness).order_by(AssetFreshness.asset_symbol).all()
+    asset_freshness_rows = db.execute(select(AssetFreshness).order_by(AssetFreshness.asset_symbol)).scalars().all()
     asset_freshness = {}
     oldest = None
     for af in asset_freshness_rows:

@@ -8,7 +8,7 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "3.10.3"
+    assert body["version"] == "4.0.0"
     assert "db" in body
     assert body["db_connected"] is True
     assert body["redis_connected"] is False
@@ -55,21 +55,21 @@ def test_compare_two_assets(client):
 
 def test_backfill_disabled_by_default(client):
     response = client.post("/api/admin/backfill?asset=USDT&days=7")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_diagnostics_requires_auth(client):
     response = client.get("/api/admin/diagnostics")
-    assert response.status_code in (403, 503)
+    assert response.status_code in (401, 503)
     response_no_token = client.get("/api/admin/diagnostics", headers={"X-Admin-Token": ""})
-    assert response_no_token.status_code in (403, 503)
+    assert response_no_token.status_code in (401, 503)
 
 
 def test_settings_list_requires_auth(client):
     response = client.get("/api/settings")
-    assert response.status_code == 403
+    assert response.status_code == 401
     response_no_token = client.get("/api/settings", headers={"X-Admin-Token": ""})
-    assert response_no_token.status_code == 403
+    assert response_no_token.status_code == 401
 
 
 def test_settings_list_with_auth(client, admin_headers):
@@ -143,13 +143,13 @@ def test_analytics_endpoints_load(client):
 def test_ai_endpoints_load(client):
     # Test AI endpoints (may return 404 if AI disabled, 403 if token required)
     response = client.get("/api/ai/explain?asset=USDT")
-    assert response.status_code in [200, 403, 404, 501]
+    assert response.status_code in [200, 401, 403, 404, 501]
     
     response = client.get("/api/ai/narrative?asset=USDT")
-    assert response.status_code in [200, 403, 404, 501]
+    assert response.status_code in [200, 401, 403, 404, 501]
     
     response = client.get("/api/ai/insights?asset=USDT")
-    assert response.status_code in [200, 403, 404, 501]
+    assert response.status_code in [200, 401, 403, 404, 501]
     
     response = client.get("/api/ai/market-overview")
-    assert response.status_code in [200, 403, 404, 501]
+    assert response.status_code in [200, 401, 403, 404, 501]

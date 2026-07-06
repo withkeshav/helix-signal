@@ -176,6 +176,21 @@ export function _renderForecastCanvas(el, title, historical, forecast, baseConfi
   if (this._echarts?.has(el.id)) { this._disposeChart(this._echarts.get(el.id)); this._echarts?.delete(el.id); }
   const chart = echarts.init(el);
   if (this._echarts) this._echarts.set(el.id, chart);
+  const isPeg = /peg/i.test(title);
+  const muted = _cssVar('--muted', '#9aa8c4');
+  const yAxis = isPeg
+    ? {
+        type: 'value',
+        min: 0.85,
+        max: 1.15,
+        splitLine: { lineStyle: { color: lineColor, opacity: 0.2 } },
+        axisLabel: { color: muted, fontSize: 10, formatter: v => Number(v).toFixed(4) },
+      }
+    : {
+        type: 'value',
+        splitLine: { lineStyle: { color: lineColor, opacity: 0.2 } },
+        axisLabel: { color: muted, fontSize: 10, formatter: v => formatUsd(v) },
+      };
   const series = forecast && forecast.length
     ? [
         { name: 'q10 base', type: 'line', data: forecast.map(p => [p.timestamp, p.q10 ?? p.q50 * 0.997]), lineStyle: { opacity: 0 }, itemStyle: { opacity: 0 }, stack: 'confidence', areaStyle: { color: 'rgba(59,130,246,0.06)' }, symbol: 'none' },
@@ -184,7 +199,9 @@ export function _renderForecastCanvas(el, title, historical, forecast, baseConfi
         { name: 'Historical', type: 'line', data: historical.map(p => [p.timestamp, p.value]), lineStyle: { width: 1.5, color: textColor }, symbolSize: 2, z: 10 },
       ]
     : [{ name: 'No forecast data', type: 'line', data: historical.map(p => [p.timestamp, p.value]), lineStyle: { width: 1.5, color: textColor }, symbolSize: 2, z: 10 }];
-  chart.setOption({ ...baseConfig,
+  chart.setOption({
+    ...baseConfig,
+    yAxis,
     title: { text: title, left: 'center', top: 0, textStyle: { color: textColor, fontSize: 13, fontWeight: 500 } },
     grid: { left: 50, right: 16, top: 36, bottom: 40 },
     series,
@@ -210,6 +227,119 @@ export async function renderSupplyChart() {
     yAxis: { type: 'value', axisLabel: { color: muted, fontSize: 10, formatter: v => formatUsd(v) }, splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } } },
     series: [{ type: 'line', data: pts, smooth: true, symbol: 'none', lineStyle: { width: 2, color: primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.2)' }, { offset: 1, color: 'rgba(59,130,246,0.02)' }] } } }],
   });
+}
+
+export function resizeAllHelixCharts() {
+  requestAnimationFrame(() => {
+    try {
+      for (const id of document.querySelectorAll('[id^="chart-"]')) {
+        const inst = echarts.getInstanceByDom(id);
+        if (inst && !inst.isDisposed()) inst.resize();
+      }
+    } catch (e) { /* resize guard */ }
+  });
+}
+
+export function renderRiskTerminalChart(predictive) {
+  const el = document.getElementById('chart-risk-terminal');
+  if (!el || typeof echarts === 'undefined') return;
+  const probs = predictive?.depeg_probability || {};
+  const horizons = [
+    ['1h', probs.horizon_1h],
+    ['6h', probs.horizon_6h],
+    ['24h', probs.horizon_24h],
+  ].filter(([, v]) => v != null);
+  if (!horizons.length) return;
+  const muted = _cssVar('--muted', '#9aa8c4');
+  const primary = _cssVar('--spark', '#60a5fa');
+  const warn = _cssVar('--warn', '#f59e0b');
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  chart.setOption({
+    grid: { left: 36, right: 8, top: 8, bottom: 24 },
+    xAxis: {
+      type: 'category',
+      data: horizons.map(([h]) => h),
+      axisLabel: { color: muted, fontSize: 10 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      axisLabel: { color: muted, fontSize: 10, formatter: '{value}%' },
+      splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } },
+    },
+    series: [{
+      type: 'bar',
+      data: horizons.map(([, v]) => Math.min(100, Number(v) * 100)),
+      itemStyle: {
+        color: (p) => (p.value > 50 ? warn : primary),
+        borderRadius: [4, 4, 0, 0],
+      },
+      barMaxWidth: 28,
+    }],
+  }, true);
+}
+
+export function renderContagionGraph(rotation) {
+  const el = document.getElementById('chart-contagion');
+  if (!el || typeof echarts === 'undefined') return;
+  const pairs = rotation?.pairs || [];
+  if (!pairs.length) return;
+  const nodes = new Map();
+  const links = [];
+  const collateral = { 'DAI': 'USDC', 'FRAX': 'USDC', 'PYUSD': 'USDC' };
+  for (const p of pairs) {
+    nodes.set(p.asset_a, { name: p.asset_a, symbolSize: 36 });
+    nodes.set(p.asset_b, { name: p.asset_b, symbolSize: 36 });
+    links.push({
+      source: p.asset_a,
+      target: p.asset_b,
+      value: Math.abs(p.correlation_7d || 0),
+      lineStyle: {
+        width: 1 + Math.abs(p.correlation_7d || 0) * 4,
+        color: (p.correlation_7d || 0) > 0 ? '#22c55e' : '#ef4444',
+      },
+      label: { show: true, formatter: `r=${(p.correlation_7d || 0).toFixed(2)}` },
+    });
+    if (collateral[p.asset_a] === p.asset_b || collateral[p.asset_b] === p.asset_a) {
+      const a = collateral[p.asset_a] ? p.asset_a : p.asset_b;
+      const b = collateral[p.asset_a] ? p.asset_b : p.asset_a;
+      links.push({
+        source: a,
+        target: b,
+        value: 0.9,
+        lineStyle: { type: 'dashed', color: '#f59e0b', width: 2 },
+        label: { show: true, formatter: 'collateral' },
+      });
+    }
+  }
+  const textColor = _cssVar('--text', '#e8edf7');
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  chart.setOption({
+    tooltip: {},
+    series: [{
+      type: 'graph',
+      layout: 'circular',
+      roam: true,
+      label: { show: true, color: textColor, fontSize: 11 },
+      data: [...nodes.values()],
+      links,
+      lineStyle: { curveness: 0.2, opacity: 0.85 },
+    }],
+  }, true);
+}
+
+export function reserveGrade(att) {
+  if (!att) return { grade: 'N/A', score: 0 };
+  if (att.attestation_status === 'n/a') return { grade: 'C', score: 50, note: 'On-chain only' };
+  const age = att.attestation_age_days;
+  if (age == null) return { grade: 'D', score: 35, note: 'No report date' };
+  if (age < 45) return { grade: 'A', score: 95, note: 'Fresh attestation' };
+  if (age < 90) return { grade: 'B', score: 80, note: 'Recent report' };
+  if (age < 180) return { grade: 'C', score: 60, note: 'Aging report' };
+  return { grade: 'D', score: 35, note: 'Stale report' };
 }
 
 export function destroySmidgeChart() {

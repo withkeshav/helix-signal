@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from signal_engine import scoring
@@ -69,10 +70,13 @@ def compute_smidge(db: Session, *, asset_symbol: str) -> dict[str, Any]:
             from sqlalchemy import desc
 
             row = (
-                db.query(OsintArticle)
-                .join(OsintArticle.asset_links)
-                .filter(OsintArticleAsset.asset_symbol == sym, OsintArticle.sentiment_score.isnot(None))
-                .order_by(desc(OsintArticle.published_at))
+                db.execute(
+                    select(OsintArticle)
+                    .join(OsintArticle.asset_links)
+                    .where(OsintArticleAsset.asset_symbol == sym, OsintArticle.sentiment_score.isnot(None))
+                    .order_by(desc(OsintArticle.published_at))
+                )
+                .scalars()
                 .first()
             )
             if row:

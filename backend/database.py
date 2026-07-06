@@ -66,6 +66,8 @@ class AssetChainSnapshot(Base):
     top3_pool_share_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     pool_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     peg_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    stablecoin_type: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    stablecoin_sub_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_name: Mapped[str] = mapped_column(String(64), default="multi")
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

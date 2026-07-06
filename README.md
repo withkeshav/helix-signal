@@ -8,7 +8,24 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**354 regression tests pass (0 failed).** Zero paid API dependencies for core operation. (ONNX model training + direct notification adapters are future work; current dispatch is webhook-based.)
+**433+ regression tests pass (0 failed).**
+
+**Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. See [`.progress/transform.md`](.progress/transform.md) §3.2 for the execution log.
+
+## V4 Highlights
+
+- **24-coin stablecoin taxonomy** — 4 types (Fiat-backed, Crypto-backed, Yield-bearing, Algorithmic) across USDT, USDC, DAI, PYUSD, FDUSD, FRAX, LUSD, GHO, sDAI, USDe, and more
+- **Type-specific scoring** — Separate depeg model rules for Fiat (price_dev + coverage + attest_lag), Crypto (price_dev + coll_ratio + liq_queue), and Delta (price_dev + funding + insurance) with per-sub-type V4 weight matrices
+- **ONNX ML models** — 3 models built via `onnx.helper` (opset 9): depeg probability, funding regime detection, yield sustainability. Build with `scripts/build_v4_models.py`
+- **Investigation engine** — 8-step async pipeline (address clustering, bridge hop tracing, peel chain analysis, blacklist watch, on-chain token lookup, DEWS anomaly scoring, AI narrative generation, yield intelligence)
+- **Forensics tab** — New 6th dashboard tab with blacklist stats/events, wallet investigation form, and threat-level KPIs
+- **DEWS** — Distributed Early Warning System combining multi-source anomaly scores with circuit-breaker chain dispatch
+- **6 new ORM tables** — `FiatReserve`, `Collateral`, `YieldBearing`, `FundingRate`, `WhaleActivity`, `BlacklistEvent` + 3 DuckDB OLAP tables
+- **On-chain intelligence** — Alchemy RPC, Moralis, Flipside, The Graph, Chainlink Oracle feeds + address clustering + bridge hop tracking + peel chain detection
+- **4 new API endpoints** — `/api/v1/investigate`, `/api/v1/yield/intelligence`, `/api/v1/blacklist/events`, `/api/v1/yield/narrative`
+- **8 Alembic migrations** — Full schema evolution for V4 tables and column additions
+- **SA 2.0 style** — All 66 `db.query()` calls migrated to `select()` + `execute()` across 25 files
+- **433+ regression tests** — All existing tests pass, 32 new tests for DeFiLlama, signal engine, investigation/blacklist/yield/narrative
 
 ## V3 Highlights
 
@@ -19,10 +36,10 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + LLM-powered sentiment scoring (Ollama Cloud)
 - **Attestation & supply feed**: issuer report age (when parseable) plus DefiLlama on-chain supply feed freshness — no synthetic dates
 - **Governance monitoring**: contract upgrade tracking via Etherscan API
-- **AI anomaly detection** (gated): Z-score, Isolation Forest, StatsForecast forecast — enable via Settings UI. ONNX depeg model support present (velocity feature) but training not performed in this build (future).
+- **AI anomaly detection** (gated): Z-score, Isolation Forest (trained on startup when enough history), StatsForecast forecast. Train ONNX depeg model with `scripts/train_depeg_model.py` using labels from `data/depeg_events.json`.
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
-- **Alpine.js + Chart.js + ECharts frontend**: 5-tab layout (Signal, Market, Intel, System, Settings), no build step, CDN-loaded
+- **Alpine.js + ECharts frontend**: 6-tab layout (Signal, Market, Intel, Forensics, System, Settings), no build step, CDN-loaded
 
 ## Quick Start
 
@@ -36,8 +53,10 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 git clone https://github.com/withkeshav/helix-signal.git
 cd helix-signal
 cp .env.example .env
-# Set POSTGRES_PASSWORD in .env (required — docker will error if empty)
+# Required: POSTGRES_PASSWORD, SESSION_SIGNING_KEY (openssl rand -hex 32),
+#           HELIX_ADMIN_PASSWORD (for first admin seed)
 docker compose up --build -d
+# Sign in at Settings → admin / your HELIX_ADMIN_PASSWORD
 ./scripts/smoke-check.sh http://localhost:80
 ```
 
@@ -172,22 +191,39 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `POST /api/users` | Create user (admin token + multi-user enabled required) |
 | `GET /api/users` | List all users (admin token + multi-user enabled required) |
 | `POST /api/auth/login` | Authenticate user and return token (multi-user enabled required) |
+| `POST /api/v1/investigate` | Investigation pipeline (peel chain, address clustering, bridge hops, blacklist query, OSINT, timeline, risk, AI narrative) |
+| `GET /api/dews` | DEWS anomaly scoring and depeg probability per asset |
+| `GET /api/onchain/whale-flow` | On-chain whale flow analysis (net inflows/outflows by asset) |
+| `GET /api/onchain/holder-concentration` | Top-10 holder concentration percentage per asset |
+| `GET /api/v1/blacklist/events` | Query blacklist events with optional filters (admin token required) |
+| `GET /api/v1/blacklist/stats` | Blacklist aggregate statistics (total events, frozen USD, by asset/chain) |
+| `GET /api/v1/assets/{symbol}/narrative` | AI-generated narrative and market context for an asset |
+| `GET /api/v1/assets/{symbol}/yield` | Protocol yield analysis and scoring |
+| `GET /api/v1/assets/{symbol}/collateral` | Collateral composition breakdown |
+| `GET /api/v1/assets/{symbol}/reserve` | Reserve attestation data and timestamp |
 
 ## Project Structure
 
-- `backend/` — FastAPI app, multi-source ingestion, analytics engine, alerts, OSINT, ML models
+- `backend/` — FastAPI app, multi-source ingestion, analytics engine, alerts, OSINT, ONNX ML models
 - `backend/agents/` — event-driven agents (anomaly detection, forecast, alert dispatch)
-- `backend/chain/` — blockchain data retrieval layer
+- `backend/chain/` — blockchain data retrieval + intelligence (address clustering, bridge hop tracking, peel chain detection)
+- `backend/chain/intelligence/` — forensics modules (blacklist monitor, address clustering, bridge hop tracker, peel chain detector)
 - `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter)
 - `backend/middleware/` — security validation + observability middleware
-- `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, etc.)
-- `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener) with circuit breakers
-- `backend/signal_engine/` — V3 risk scoring (scoring, metrics, history, risk inputs)
-- `frontend/` — pure static HTML, Alpine.js 5-tab dashboard, Chart.js + ECharts, nginx API proxy
-- `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast) + 3 Web Components
+- `backend/ml_models/` — V4 ONNX models (depeg events, funding regime, yield sustainability)
+- `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, investigate, yield, blacklist, narrative, onchain, dews)
+- `backend/services/` — core services (cache, dashboard, anomaly, investigation engine, DEWS, onchain, walk-forward)
+- `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener, Ethena, Coinglass, Sky, Liquity, Aave, Ondo) with circuit breakers
+- `backend/signal_engine/` — V4 risk scoring (scoring, metrics, history, risk inputs, component scorers)
+- `backend/services/scheduler.py` — Scheduled job orchestrator (11 functions extracted from `main.py`)
+- `backend/services/attestation.py` — Reserve attestation parsing and freshness scoring
+- `backend/services/rss_feed.py` — OSINT RSS feed ingestion with sentiment scoring
+- `backend/data_quality/` — Data quality checks (freshness, cross-source validation, coverage) using SA 2.0 style
+- `frontend/` — pure static HTML, Alpine.js 6-tab dashboard, ECharts, nginx API proxy
+- `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast, forensics, onchain, taxonomy) + 3 Web Components
 - `config/` — chain, asset, and alert configuration
 - `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories
-- `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration
+- `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration, ONNX model builder, depeg training
 
 **SQLite → Postgres on a server:** run [`scripts/migrate_sqlite_to_postgres.py`](scripts/migrate_sqlite_to_postgres.py) with backups and `--verify-only` before cutover.
 

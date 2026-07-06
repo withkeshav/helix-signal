@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot
@@ -17,8 +18,8 @@ def build_stress_leaderboard(
     top_n: int = 10,
 ) -> dict[str, Any]:
     chains = (
-        db.query(AssetChainSnapshot)
-        .filter(AssetChainSnapshot.asset_symbol == asset_symbol)
+        db.execute(select(AssetChainSnapshot).where(AssetChainSnapshot.asset_symbol == asset_symbol))
+        .scalars()
         .all()
     )
     if not chains:

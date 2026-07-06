@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -16,22 +17,28 @@ def generate_summary_report(db: Session, *, asset_symbol: str, days: int = 7) ->
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     snapshots = (
-        db.query(AssetTrendSnapshot)
-        .filter(
-            AssetTrendSnapshot.asset_symbol == asset_key,
-            AssetTrendSnapshot.timestamp >= cutoff,
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(
+                AssetTrendSnapshot.asset_symbol == asset_key,
+                AssetTrendSnapshot.timestamp >= cutoff,
+            )
+            .order_by(AssetTrendSnapshot.timestamp.asc())
         )
-        .order_by(AssetTrendSnapshot.timestamp.asc())
+        .scalars()
         .all()
     )
 
     events = (
-        db.query(SignalEvent)
-        .filter(
-            SignalEvent.asset_symbol == asset_key,
-            SignalEvent.timestamp >= cutoff,
+        db.execute(
+            select(SignalEvent)
+            .where(
+                SignalEvent.asset_symbol == asset_key,
+                SignalEvent.timestamp >= cutoff,
+            )
+            .order_by(SignalEvent.timestamp.desc())
         )
-        .order_by(SignalEvent.timestamp.desc())
+        .scalars()
         .all()
     )
 

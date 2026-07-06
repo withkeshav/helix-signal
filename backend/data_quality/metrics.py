@@ -3,6 +3,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import (
@@ -20,7 +21,7 @@ class DataQualityMetrics:
     def get_source_quality_metrics(db: Session) -> Dict[str, Any]:
         """Get quality metrics for all data sources."""
         try:
-            sources = db.query(SourceStatus).all()
+            sources = db.execute(select(SourceStatus)).scalars().all()
             metrics = {
                 "total_sources": len(sources),
                 "healthy_sources": 0,
@@ -71,11 +72,11 @@ class DataQualityMetrics:
     def get_asset_data_quality(db: Session, asset_symbol: Optional[str] = None) -> Dict[str, Any]:
         """Get data quality metrics for asset data."""
         try:
-            query = db.query(AssetChainSnapshot)
+            stmt = select(AssetChainSnapshot)
             if asset_symbol:
-                query = query.filter(AssetChainSnapshot.asset_symbol == asset_symbol.upper())
+                stmt = stmt.where(AssetChainSnapshot.asset_symbol == asset_symbol.upper())
             
-            snapshots = query.all()
+            snapshots = db.execute(stmt).scalars().all()
             
             metrics = {
                 "total_snapshots": len(snapshots),
@@ -98,9 +99,9 @@ class DataQualityMetrics:
             asset_keys = list(asset_snapshots.keys())
             freshness_map = {
                 f.asset_symbol: f
-                for f in db.query(AssetFreshness).filter(
-                    AssetFreshness.asset_symbol.in_(asset_keys)
-                ).all()
+                for f in db.execute(
+                    select(AssetFreshness).where(AssetFreshness.asset_symbol.in_(asset_keys))
+                ).scalars().all()
             }
             for asset, snapshots_list in asset_snapshots.items():
                 if snapshots_list:
@@ -138,14 +139,14 @@ class DataQualityMetrics:
         try:
             # Get source usage for the last day
             yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
-            source_usage = db.query(SourceUsage).filter(
-                SourceUsage.usage_date == yesterday
-            ).all()
+            source_usage = db.execute(
+                select(SourceUsage).where(SourceUsage.usage_date == yesterday)
+            ).scalars().all()
             
             # Get AI usage for the last day
-            ai_usage = db.query(AiUsage).filter(
-                AiUsage.usage_date == yesterday
-            ).all()
+            ai_usage = db.execute(
+                select(AiUsage).where(AiUsage.usage_date == yesterday)
+            ).scalars().all()
             
             metrics = {
                 "source_usage": {},
@@ -196,9 +197,9 @@ class DataQualityMetrics:
             discrepancies = []
             
             # Get recent asset chain snapshots to check consistency
-            recent_snapshots = db.query(AssetChainSnapshot).order_by(
-                AssetChainSnapshot.fetched_at.desc()
-            ).limit(100).all()
+            recent_snapshots = db.execute(
+                select(AssetChainSnapshot).order_by(AssetChainSnapshot.fetched_at.desc()).limit(100)
+            ).scalars().all()
             
             # Group by asset and timestamp to check cross-source consistency
             asset_timestamp_data = {}
@@ -236,9 +237,9 @@ class DataQualityMetrics:
             }
             
             # Add audit trail health
-            recent_audits = db.query(SettingsAuditLog).order_by(
-                SettingsAuditLog.created_at.desc()
-            ).limit(50).all()
+            recent_audits = db.execute(
+                select(SettingsAuditLog).order_by(SettingsAuditLog.created_at.desc()).limit(50)
+            ).scalars().all()
             
             metrics["audit_trail"] = {
                 "total_changes": len(recent_audits),

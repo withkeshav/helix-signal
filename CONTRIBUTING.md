@@ -11,6 +11,10 @@ git clone https://github.com/withkeshav/helix-signal.git
 cd helix-signal
 ```
 
+### Demo / seed mode
+
+After `docker compose up`, sign in at **Settings** with `HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` from `.env`. The backend seeds a single admin on first boot (`scripts/seed_admin.py`). Tabs populate once the 300s refresh cycle runs (or trigger **Refresh** on Signal). For a quick local smoke test without secrets, copy `.env.example` and set only `POSTGRES_PASSWORD`, `SESSION_SIGNING_KEY`, and `HELIX_ADMIN_PASSWORD`.
+
 ### 2) Configure environment
 
 Create your local env file (or export equivalent vars):
@@ -140,7 +144,7 @@ Guidelines:
 - Keep changes focused and small
 - Prefer explicit, readable logic over clever abstractions
 - Preserve graceful error handling in source fetchers
-- Keep frontend dependency-light (Alpine.js + `app.js` + Chart.js; no build step)
+- Keep frontend dependency-light (Alpine.js + `app.js` + ECharts; no build step)
 - Follow existing naming patterns and file organization
 
 ## Local-only notes (do not commit)
@@ -148,6 +152,12 @@ Guidelines:
 - Handoff / phase status: `.progress/PHASE_LOG.md` (gitignored)
 - Planning, briefs, research: anything matching `.gitignore` internal patterns
 - **Core** features (scoring, ingest, trends, alerts) must work with AI disabled; LLM providers are optional add-ons only
+
+## API Versioning
+
+- All new endpoints go under `/api/v1/` with Pydantic response models
+- Existing `/api/` endpoints remain stable; deprecate via doc comment before removal
+- Legacy `db.query()` style is **being migrated** to SA 2.0 `select()` + `execute()` — new code must use SA 2.0 style
 
 ## Pull Request Expectations
 

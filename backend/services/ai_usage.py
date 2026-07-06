@@ -3,6 +3,7 @@
 from datetime import datetime, timezone, date
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AiUsage
@@ -19,11 +20,13 @@ def increment_ai_usage(
     today = date.today().isoformat()
     now = datetime.now(timezone.utc)
 
-    usage = db.query(AiUsage).filter(
-        AiUsage.provider == provider,
-        AiUsage.model == model,
-        AiUsage.usage_date == today,
-    ).first()
+    usage = db.execute(
+        select(AiUsage).where(
+            AiUsage.provider == provider,
+            AiUsage.model == model,
+            AiUsage.usage_date == today,
+        )
+    ).scalars().first()
 
     if usage:
         usage.calls += 1
@@ -47,12 +50,12 @@ def increment_ai_usage(
 def get_ai_usage(db: Session, provider: str | None = None) -> list[dict[str, Any]]:
     """Get today's AI usage per provider."""
     today = date.today().isoformat()
-    query = db.query(AiUsage).filter(AiUsage.usage_date == today)
+    stmt = select(AiUsage).where(AiUsage.usage_date == today)
 
     if provider:
-        query = query.filter(AiUsage.provider == provider)
+        stmt = stmt.where(AiUsage.provider == provider)
 
-    records = query.all()
+    records = db.execute(stmt).scalars().all()
     result = []
     for r in records:
         result.append({
@@ -69,7 +72,7 @@ def get_ai_usage(db: Session, provider: str | None = None) -> list[dict[str, Any
 def get_ai_usage_summary(db: Session) -> dict[str, Any]:
     """Get a summary of today's AI usage across all providers."""
     today = date.today().isoformat()
-    records = db.query(AiUsage).filter(AiUsage.usage_date == today).all()
+    records = db.execute(select(AiUsage).where(AiUsage.usage_date == today)).scalars().all()
 
     providers = {}
     total_calls = 0

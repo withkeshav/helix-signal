@@ -129,4 +129,4 @@ def test_ai_no_auth_when_token_not_configured(client, db_session, monkeypatch: p
     monkeypatch.setenv("AI_MODE", "ai_lite")
     monkeypatch.delenv("HELIX_ADMIN_TOKEN", raising=False)
     r = client.get("/api/ai/explain?asset=USDT")
-    assert r.status_code == 503
+    assert r.status_code == 401

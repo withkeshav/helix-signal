@@ -176,8 +176,8 @@
     <nav class="top-nav">
       <span class="nav-brand"><svg class="icon"><use href="#icon-refresh-cw"/></svg> Helix Signal</span>
       <div class="nav-search">
-        <input type="text" class="search-input" placeholder="Search assets..." x-model="searchQuery" @input.debounce.300ms="search" x-show="false">
-        <div class="search-results" x-show="searchResults.length > 0" @click.outside="searchResults=[]">
+        <input type="text" class="search-input" placeholder="Search assets..." x-model="searchQuery" @input.debounce.300ms="search" x-cloak x-show="false">
+        <div class="search-results" x-cloak x-show="searchResults.length > 0" @click.outside="searchResults=[]">
           <template x-for="r in searchResults" :key="r.id">
             <div class="search-item" @click="selectSearchResult(r)">
               <span x-text="r.label"></span>
@@ -190,8 +190,9 @@
         <button class="nav-link" role="tab" :class="tab==='signal'&&'active'" :aria-selected="tab==='signal'" @click="tab='signal';loadTab()" aria-controls="tab-signal">Signal</button>
         <button class="nav-link" role="tab" :class="tab==='market'&&'active'" :aria-selected="tab==='market'" @click="tab='market';loadTab()" aria-controls="tab-market">Market</button>
         <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()" aria-controls="tab-intel">Intel</button>
+        <button class="nav-link" role="tab" :class="tab==='forensics'&&'active'" :aria-selected="tab==='forensics'" @click="tab='forensics';loadTab()" aria-controls="tab-forensics">Forensics</button>
         <button class="nav-link" role="tab" :class="tab==='system'&&'active'" :aria-selected="tab==='system'" @click="tab='system';loadTab()" aria-controls="tab-system">System</button>
-        <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings"><svg class="icon"><use href="#icon-settings"/></svg></button>
+        <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings" aria-label="Settings"><svg class="icon"><use href="#icon-settings"/></svg></button>
       </div>
       <div class="nav-controls">
         <select class="asset-select" x-model="asset" @change="switchAsset">
@@ -199,10 +200,10 @@
             <option x-text="a" :value="a"></option>
           </template>
         </select>
-        <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" aria-label="Refresh now" x-text="refreshing?'...':'⟳'" x-show="false"></button>
+        <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" aria-label="Refresh now" x-text="refreshing?'...':'⟳'" x-cloak x-show="false"></button>
         <button class="btn btn-muted" @click="cycleTheme" aria-label="Toggle dark/light theme" title="Toggle theme">
-          <svg class="icon" x-show="theme==='light'"><use href="#icon-sun"/></svg>
-          <svg class="icon" x-show="theme!=='light'"><use href="#icon-moon"/></svg>
+          <svg class="icon" x-cloak x-show="theme==='light'"><use href="#icon-sun"/></svg>
+          <svg class="icon" x-cloak x-show="theme!=='light'"><use href="#icon-moon"/></svg>
         </button>
       </div>
     </nav>
@@ -257,7 +258,7 @@
           <div>
             <div class="kpi-value" x-text="`${($store.dashboard.sources||[]).filter(s=>s.status==='ok').length}/${($store.dashboard.sources||[]).length}`"></div>
             <div class="kpi-trend" :class="($store.dashboard.sources||[]).some(s=>s.status!=='ok')?'text-red':'text-green'" x-text="($store.dashboard.sources||[]).some(s=>s.status!=='ok')?'Degraded':'All OK'"></div>
-            <div x-show="$store.dashboard.crossSource.discrepancy_flag" class="kpi-sub" style="color:var(--down);font-size:10px">Cross-source: &Delta; <span x-text="$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)"></span>%</div>
+            <div x-cloak x-show="$store.dashboard.crossSource.discrepancy_flag" class="kpi-sub" style="color:var(--down);font-size:10px">Cross-source: &Delta; <span x-text="$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)"></span>%</div>
           </div>
         </div>
       </div>
@@ -271,12 +272,12 @@
 
 
     <!-- Tab: Signal -->
-    <div class="tab-content" x-show="$store.ui.tab === 'signal'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="market" role="tabpanel" id="tab-signal">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'signal'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="market" role="tabpanel" id="tab-signal">
       <!-- Error Banner -->
-      <div x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
+      <div x-cloak x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
 
       <!-- Skeleton loader shown during dashboard loading -->
-      <div x-show="$store.dashboard.loading">
+      <div x-cloak x-show="$store.dashboard.loading">
         <!-- Hero skeleton -->
         <div style="display:flex;gap:1.5rem;margin-bottom:1.5rem">
           <div class="skeleton skeleton-circle" style="width:180px;height:180px;flex-shrink:0"></div>
@@ -301,7 +302,7 @@
       </div>
 
       <!-- Main dashboard content (hidden while loading) -->
-      <div x-show="!$store.dashboard.loading">
+      <div x-cloak x-show="!$store.dashboard.loading">
       <!-- HERO ZONE: 2-col -- Gauge (left 1/3) + AI Summary with Time Range (right 2/3) -->
       <div class="insight-grid" style="margin-bottom:12px">
         <div class="insight-card glass" style="text-align:center">
@@ -337,17 +338,17 @@
             <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
             <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
           </div>
-          <div x-show="aiSubTab==='overview'">
-            <p x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
-            <p x-show="!marketOverview" class="kpi-sub" style="margin:0">No market overview yet</p>
+          <div x-cloak x-show="aiSubTab==='overview'">
+            <p x-cloak x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
+            <p x-cloak x-show="!marketOverview" class="kpi-sub" style="margin:0">No market overview yet</p>
           </div>
-          <div x-show="aiSubTab==='narrative'">
-            <p x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
-            <p x-show="!aiNarrative" class="kpi-sub" style="margin:0">No narrative yet</p>
+          <div x-cloak x-show="aiSubTab==='narrative'">
+            <p x-cloak x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
+            <p x-cloak x-show="!aiNarrative" class="kpi-sub" style="margin:0">No narrative yet</p>
           </div>
-          <div x-show="aiSubTab==='insights'">
-            <p x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
-            <p x-show="!aiInsights" class="kpi-sub" style="margin:0">No insights yet</p>
+          <div x-cloak x-show="aiSubTab==='insights'">
+            <p x-cloak x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
+            <p x-cloak x-show="!aiInsights" class="kpi-sub" style="margin:0">No insights yet</p>
           </div>
           <div class="time-range" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
             <span class="time-range-label">Range:</span>
@@ -364,13 +365,20 @@
       <div class="insight-grid" style="margin-bottom:12px">
         <div class="insight-card glass">
           <div class="risk-gauge-wrap">
-            <div>
-              <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
                 <h2 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;color:var(--muted)">Risk Terminal</h2>
+                <span x-cloak x-show="dews?.available" :class="`band-${(dews.band||'normal').toLowerCase()}`" style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px" x-text="`DEWS ${dews.dews_score ?? '--'} · ${(dews.band||'normal').toUpperCase()}`"></span>
                 <span class="kpi-sub" style="font-size:10px;white-space:nowrap" x-text="formatAiAge(aiGeneratedAt, aiExpiresAt)"></span>
               </div>
               <p style="margin:0;font-size:13px;line-height:1.5" x-text="predictive.regime ? `Regime: ${predictive.regime} \u00B7 Depeg 1h: ${(predictive.depeg_probability?.horizon_1h * 100 || 0).toFixed(1)}%` : 'Loading predictive layer...'"></p>
-              <p class="kpi-sub" style="margin-top:8px;white-space:pre-wrap" x-show="aiSummary" x-text="aiSummary"></p>
+              <div id="chart-risk-terminal" class="chart-wrap" style="height:100px;margin-top:8px"></div>
+              <div x-cloak x-show="dews?.tiers_fired?.length" style="margin-top:8px;font-size:11px;line-height:1.6">
+                <template x-for="t in (dews.tiers_fired || [])" :key="`${t.tier}-${t.name}`">
+                  <div><span class="kpi-label" x-text="`T${t.tier} ${t.name}`"></span> <span x-text="`${t.detail} (+${t.points})`"></span></div>
+                </template>
+              </div>
+              <p class="kpi-sub" style="margin-top:8px;white-space:pre-wrap" x-cloak x-show="aiSummary" x-text="aiSummary"></p>
               <span class="model-badge" x-text="`Model: ${predictive.model ?? 'heuristic_v1'} \u00B7 v${predictive.model_version ?? predictive.version ?? '1.0'}`"></span>
             </div>
           </div>
@@ -381,23 +389,23 @@
               <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Stress Leaderboard <span class="model-badge">&#916;</span></h2>
               <span class="kpi-sub" style="font-size:10px">Chains ranked by supply velocity</span>
             </div>
-            <div x-show="stressLeaderboard?.length" style="font-size:12px">
+            <div x-cloak x-show="stressLeaderboard?.length" style="font-size:12px">
               <template x-for="(row, i) in stressLeaderboard" :key="i">
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
                   <span>
                     <span style="font-weight:600" x-text="row.chain_name"></span>
                     <span :class="row.direction==='inflow'?'text-green':'text-red'">
-                      <svg class="icon" x-show="row.direction==='inflow'"><use href="#icon-arrow-up"/></svg>
-                      <svg class="icon" x-show="row.direction==='outflow'"><use href="#icon-arrow-down"/></svg>
+                      <svg class="icon" x-cloak x-show="row.direction==='inflow'"><use href="#icon-arrow-up"/></svg>
+                      <svg class="icon" x-cloak x-show="row.direction==='outflow'"><use href="#icon-arrow-down"/></svg>
                     </span>
                   </span>
                   <span>
-                    <span x-show="row.velocity_24h_pct != null" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="`${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}% 24h`"></span>
+                    <span x-cloak x-show="row.velocity_24h_pct != null" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="`${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}% 24h`"></span>
                   </span>
                 </div>
               </template>
             </div>
-            <div x-show="!stressLeaderboard?.length" class="empty-state">
+            <div x-cloak x-show="!stressLeaderboard?.length" class="empty-state">
               <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
               <span class="kpi-label">No chain velocity data yet</span>
               <span class="kpi-sub">Needs multiple 5-min snapshots to compute chain-level velocity</span>
@@ -408,18 +416,18 @@
               <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Rotation <span class="model-badge"><svg class="icon"><use href="#icon-refresh-cw"/></svg></span></h2>
               <span class="kpi-sub" style="font-size:10px">Cross-asset supply rotation</span>
             </div>
-            <div x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
+            <div x-cloak x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
               <template x-for="(p, i) in rotation.pairs" :key="i">
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
                   <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
                   <span>
                     <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
-                    <span x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="formatDisplayName(p.dominance_shift)"></span>
+                    <span x-cloak x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="formatDisplayName(p.dominance_shift)"></span>
                   </span>
                 </div>
               </template>
             </div>
-            <div x-show="!rotation?.available || !rotation?.pairs?.length" class="empty-state">
+            <div x-cloak x-show="!rotation?.available || !rotation?.pairs?.length" class="empty-state">
               <svg class="icon empty-state-icon"><use href="#icon-repeat"/></svg>
               <span class="kpi-label">No rotation data</span>
               <span class="kpi-sub">Needs 7 days of history on multiple assets. Enable more assets in Settings.</span>
@@ -452,7 +460,7 @@
                 <span class="token-stat-value" x-text="assetChains(a).length||'--'"></span>
               </div>
             </div>
-            <div class="token-bar" x-show="a===asset&&chains?.length">
+            <div class="token-bar" x-cloak x-show="a===asset&&chains?.length">
               <div class="token-bar-inner">
                 <template x-for="(c,i) in (chains||[]).slice(0,5)" :key="i">
                   <div :style="`flex:${c.chain_share_pct||0};background:var(--cat-${(i%5)+1});min-width:4px`" :title="`${c.chain_name}: ${(c.chain_share_pct||0).toFixed(1)}%`"></div>
@@ -469,7 +477,7 @@
           <h2>Risk Components</h2>
           <div style="display:flex;flex-direction:column;gap:10px">
             <template x-for="(c, name) in signal.components || {}" :key="name">
-              <div x-show="c.score != null && c.weight != null">
+              <div x-cloak x-show="c.score != null && c.weight != null">
                 <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
                   <span x-text="name.replace(/_/g,' ')"></span>
                   <span><strong x-text="c.score"></strong> <span class="kpi-sub" x-text="`(${Math.round((c.weight||0)*100)}%)`"></span></span>
@@ -490,29 +498,29 @@
                 <div>
                   <span class="kpi-label">Attestation:</span>
                   <span :class="`band-${attSignal.status === 'fresh' ? 'normal' : attSignal.status === 'aging' ? 'watch' : 'risk'}`" x-text="attSignal.label || 'Unknown'"></span>
-                  <span class="kpi-sub" x-show="attSignal?.age_days != null" x-text="` \u00B7 ${(attSignal?.age_days??0).toFixed(0)}d`"></span>
+                  <span class="kpi-sub" x-cloak x-show="attSignal?.age_days != null" x-text="` \u00B7 ${(attSignal?.age_days??0).toFixed(0)}d`"></span>
                 </div>
                 <div style="margin-top:4px">
                   <span class="kpi-label">Supply Feed:</span>
                   <span :class="`band-${supplyFeed.status === 'fresh' ? 'normal' : supplyFeed.status === 'aging' ? 'watch' : 'risk'}`" x-text="supplyFeed.label || 'Unknown'"></span>
-                  <span class="kpi-sub" x-show="supplyFeed?.age_minutes != null" x-text="` \u00B7 ${(supplyFeed?.age_minutes??0).toFixed(0)}m`"></span>
+                  <span class="kpi-sub" x-cloak x-show="supplyFeed?.age_minutes != null" x-text="` \u00B7 ${(supplyFeed?.age_minutes??0).toFixed(0)}m`"></span>
                 </div>
-                <div x-show="crossSource.discrepancy_flag" style="margin-top:4px">
+                <div x-cloak x-show="crossSource.discrepancy_flag" style="margin-top:4px">
                   <span class="kpi-label">Cross-Source:</span>
                   <span class="band-risk">&Delta; <span x-text="crossSource?.max_discrepancy_pct?.toFixed(3)"></span>%</span>
                   <span class="kpi-sub" x-text="crossSource ? `avg: $${(crossSource.avg_price??0).toFixed(6)}` : ''"></span>
                 </div>
-                <div x-show="!crossSource.discrepancy_flag" style="margin-top:4px">
+                <div x-cloak x-show="!crossSource.discrepancy_flag" style="margin-top:4px">
                   <span class="kpi-label">Cross-Source:</span>
                   <span class="text-green">Agreed</span>
-                  <span class="kpi-sub" x-show="crossSource?.avg_price != null" x-text="` \u00B7 avg: $${(crossSource?.avg_price??0).toFixed(6)}`"></span>
+                  <span class="kpi-sub" x-cloak x-show="crossSource?.avg_price != null" x-text="` \u00B7 avg: $${(crossSource?.avg_price??0).toFixed(6)}`"></span>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      <div x-show="!chains?.length && !errorOverview && !$store.dashboard.loading" class="empty-state" style="margin-top:12px">
+      <div x-cloak x-show="!chains?.length && !errorOverview && !$store.dashboard.loading" class="empty-state" style="margin-top:12px">
         <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
         <span class="kpi-label">No chain data available</span>
         <span class="kpi-sub">Chain metrics will appear once data is fetched</span>
@@ -521,15 +529,15 @@
       <!-- Anomaly Events -->
       <div class="insight-card">
         <h2>Recent Anomalies</h2>
-        <div x-show="anomalyEvents.anomalies && anomalyEvents.anomalies.length" style="max-height:120px;overflow-y:auto;font-size:12px;line-height:1.5">
+        <div x-cloak x-show="anomalyEvents.anomalies && anomalyEvents.anomalies.length" style="max-height:120px;overflow-y:auto;font-size:12px;line-height:1.5">
           <template x-for="a in (anomalyEvents.anomalies || []).slice(0, 8)" :key="`${a.metric}-${a.timestamp}`">
             <div style="padding:4px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between">
-              <span><span class="kpi-label" x-text="a.metric"></span> <span :class="a.direction === 'above' ? 'text-red' : 'text-green'"><svg class="icon" x-show="a.direction === 'above'"><use href="#icon-arrow-up"/></svg><svg class="icon" x-show="a.direction === 'below'"><use href="#icon-arrow-down"/></svg></span> <span x-text="a.z_score ? `z=${a.z_score.toFixed(2)}` : ''"></span></span>
+              <span><span class="kpi-label" x-text="a.metric"></span> <span :class="a.direction === 'above' ? 'text-red' : 'text-green'"><svg class="icon" x-cloak x-show="a.direction === 'above'"><use href="#icon-arrow-up"/></svg><svg class="icon" x-cloak x-show="a.direction === 'below'"><use href="#icon-arrow-down"/></svg></span> <span x-text="a.z_score ? `z=${a.z_score.toFixed(2)}` : ''"></span></span>
               <span class="kpi-sub" x-text="formatWhen(a.timestamp)"></span>
             </div>
           </template>
         </div>
-        <div x-show="!anomalyEvents.anomalies || !anomalyEvents.anomalies.length" class="empty-state">
+        <div x-cloak x-show="!anomalyEvents.anomalies || !anomalyEvents.anomalies.length" class="empty-state">
           <svg class="icon empty-state-icon"><use href="#icon-warning"/></svg>
           <span class="kpi-label">No anomalies detected</span>
           <span class="kpi-sub">All metrics are within normal range</span>
@@ -543,13 +551,13 @@
       </div>
 
       <!-- Chain Supply Distribution -->
-      <div class="chart-card" x-show="(chains || []).length > 0">
+      <div class="chart-card" x-cloak x-show="(chains || []).length > 0">
         <h2>Chain Supply Distribution</h2>
         <div class="chart-wrap tall"><canvas id="chart-distribution"></canvas></div>
       </div>
 
       <!-- Chain Cards Grid (collapsible) -->
-      <div x-show="(chains || []).length > 0">
+      <div x-cloak x-show="(chains || []).length > 0">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <h2 class="section-title" style="margin:0">Chain Details</h2>
           <button class="btn btn-muted" @click="showAllChains = !showAllChains" style="padding:6px 12px;font-size:12px" x-text="showAllChains ? 'Show Less' : 'Show All'"></button>
@@ -587,24 +595,30 @@
     </div>
 
     <!-- Tab: Market (Supply + Forecast) -->
-    <div class="tab-content" x-show="$store.ui.tab === 'market'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-market">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'market'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-market">
       <div x-data="forecast">
-        <div x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
+        <div x-cloak x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
         <div class="chart-card">
           <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
           <div class="chart-wrap xl" id="chart-peg-forecast" style="position:relative">
-            <div x-show="loadingForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
-            <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress. Enable in Settings or check back soon.</div>
-            <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data available yet</div>
+            <div x-cloak x-show="loadingForecast && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
+            <div x-cloak x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress. Enable in Settings or check back soon.</div>
+            <div x-cloak x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.peg_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No peg forecast data available yet</div>
           </div>
         </div>
         <div class="chart-card">
           <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
           <div class="chart-wrap xl" id="chart-supply-forecast" style="position:relative">
-            <div x-show="loadingForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
-            <div x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress.</div>
-            <div x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data available yet</div>
+            <div x-cloak x-show="loadingForecast && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
+            <div x-cloak x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress.</div>
+            <div x-cloak x-show="!loadingForecast && !errorForecast && $store.dashboard.predictive?.available && !_forecastData?.supply_forecast" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px">No supply forecast data available yet</div>
           </div>
+        </div>
+        <div class="chart-card">
+          <h2>Contagion Map <span class="model-badge">correlation</span></h2>
+          <p class="kpi-sub" style="margin:0 0 8px">Stablecoin supply rotation links; dashed = known collateral tie (e.g. DAI→USDC)</p>
+          <div id="chart-contagion" class="chart-wrap tall" style="min-height:220px"></div>
+          <div x-cloak x-show="!($store.dashboard.rotation?.pairs?.length)" class="kpi-sub" style="padding:8px 0">No rotation pairs yet — needs 7d history on multiple assets</div>
         </div>
         <div class="insight-grid">
           <div class="insight-card">
@@ -616,7 +630,7 @@
                   <span class="signal-meta" x-text="sig.new_value ? `value: ${sig.new_value}` : ''"></span>
                 </div>
               </template>
-              <div x-show="!forecastSignals.length" class="kpi-sub" style="padding:8px 0">No forecast risk signals</div>
+              <div x-cloak x-show="!forecastSignals.length" class="kpi-sub" style="padding:8px 0">No forecast risk signals</div>
             </div>
           </div>
           <div class="insight-card">
@@ -628,7 +642,7 @@
                   <span :class="pair.direction === 'positive' ? 'text-green' : 'text-red'" x-text="`${pair.coefficient > 0 ? '+' : ''}${pair.coefficient}`"></span>
                 </div>
               </template>
-              <div x-show="!correlations.length" class="kpi-sub" style="padding:8px 0">No data</div>
+              <div x-cloak x-show="!correlations.length" class="kpi-sub" style="padding:8px 0">No data</div>
             </div>
           </div>
           <div class="insight-card">
@@ -639,28 +653,28 @@
                   <template x-for="r in forecastAccuracy.results.slice(0, 5)" :key="r.run_id">
                     <div style="padding:6px 0;border-bottom:1px solid var(--line)">
                       <div><strong x-text="r.target_metric"></strong> <span class="kpi-sub" x-text="`${r.model} · ${r.horizon}h`"></span></div>
-                      <div><span class="kpi-label">MAE:</span> <span x-text="r.mae"></span> <span class="kpi-label" x-show="r.mape != null">MAPE:</span> <span x-show="r.mape != null" x-text="`${r.mape}%`"></span></div>
+                      <div><span class="kpi-label">MAE:</span> <span x-text="r.mae"></span> <span class="kpi-label" x-cloak x-show="r.mape != null">MAPE:</span> <span x-cloak x-show="r.mape != null" x-text="`${r.mape}%`"></span></div>
                       <div><span class="kpi-label">Bias:</span> <span :class="r.bias > 0 ? 'text-green' : 'text-red'" x-text="r.bias"></span> <span class="kpi-sub" x-text="`${r.matched_points} points`"></span></div>
                     </div>
                   </template>
                 </div>
               </template>
-              <div x-show="!forecastAccuracy.results || !forecastAccuracy.results.length" class="kpi-sub" style="padding:8px 0">No forecast runs with matching actuals</div>
+              <div x-cloak x-show="!forecastAccuracy.results || !forecastAccuracy.results.length" class="kpi-sub" style="padding:8px 0">No forecast runs with matching actuals</div>
             </div>
           </div>
         </div>
       </div>
       <div x-data="market">
-      <div x-show="!totalSupply && $store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
+      <div x-cloak x-show="!totalSupply && $store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
         <span class="loading-spinner" style="width:32px;height:32px;border-width:3px;margin-bottom:4px"></span>
         <span class="kpi-label">Loading supply data...</span>
       </div>
-      <div x-show="!totalSupply && !$store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
+      <div x-cloak x-show="!totalSupply && !$store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
         <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
         <span class="kpi-label">No supply data available</span>
         <span class="kpi-sub">Supply metrics will populate once chain data is fetched</span>
       </div>
-      <div x-show="totalSupply">
+      <div x-cloak x-show="totalSupply">
         <div class="kpi-grid">
           <div class="kpi-card"><div class="kpi-label">Total Supply</div><div class="kpi-value" x-text="formatUsd(totalSupply)"></div></div>
           <div class="kpi-card"><div class="kpi-label">24h Change</div><div class="kpi-value" x-text="supplyChange != null ? `${supplyChange >= 0 ? '+' : ''}${supplyChange.toFixed(3)}%` : 'N/A'"></div></div>
@@ -679,9 +693,9 @@
     </div>
 
     <!-- Tab: Intel (OSINT + SMIDGE) -->
-    <div class="tab-content" x-show="$store.ui.tab === 'intel'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-intel">
-      <div x-data="osint">
-        <div x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'intel'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-intel">
+      <div x-data="osint" x-init="init()">
+        <div x-cloak x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
         <div class="insight-grid">
           <div class="insight-card">
             <h2>Signal Events</h2>
@@ -693,28 +707,28 @@
                   <div class="event-summary" x-text="ev.summary"></div>
                 </div>
               </template>
-              <div x-show="!events.filter(e=>e.severity!=='debug').length && !loadingEvents && !errorEvents" class="kpi-sub" style="padding:12px">No events in window</div>
-              <div x-show="!events.filter(e=>e.severity!=='debug').length && loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
+              <div x-cloak x-show="!events.filter(e=>e.severity!=='debug').length && !loadingEvents && !errorEvents" class="kpi-sub" style="padding:12px">No events in window</div>
+              <div x-cloak x-show="!events.filter(e=>e.severity!=='debug').length && loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
             </div>
           </div>
           <div class="insight-card">
             <h2>OSINT Feed</h2>
             <div style="max-height:400px;overflow-y:auto">
-              <div x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)"><svg class="icon"><use href="#icon-warning"/></svg> Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
+              <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)"><svg class="icon"><use href="#icon-warning"/></svg> Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
               <template x-for="art in osintArticles" :key="art.id">
                 <div class="event-card" style="margin-bottom:8px">
                   <div class="event-title"><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
-                  <div class="event-summary" x-show="art.summary" x-text="art.summary"></div>
+                  <div class="event-summary" x-cloak x-show="art.summary" x-text="art.summary"></div>
                   <div class="event-meta" style="margin-top:6px">
                     <span x-text="art.source"></span>
-                    <span x-show="art.published_at"> · <span x-text="formatWhen(art.published_at)"></span></span>
+                    <span x-cloak x-show="art.published_at"> · <span x-text="formatWhen(art.published_at)"></span></span>
                     <span> · sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
                     <span> · <a :href="art.url" target="_blank" rel="noopener" style="color:var(--spark);text-decoration:none">Read →</a></span>
                   </div>
                 </div>
               </template>
-              <div x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
-              <div x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
+              <div x-cloak x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
+              <div x-cloak x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
             </div>
           </div>
         </div>
@@ -728,9 +742,9 @@
         <div class="insight-grid">
           <div class="insight-card" style="grid-column:1/-1">
             <h2>SMIDGE Score Card</h2>
-            <div x-show="loadingSmidge" class="kpi-sub"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading SMIDGE...</div>
-            <div x-show="errorSmidge" class="warning-banner visible" x-text="errorSmidge" style="margin-bottom:8px"></div>
-            <div x-show="!loadingSmidge && smidge?.available" style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:center">
+            <div x-cloak x-show="loadingSmidge" class="kpi-sub"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading SMIDGE...</div>
+            <div x-cloak x-show="errorSmidge" class="warning-banner visible" x-text="errorSmidge" style="margin-bottom:8px"></div>
+            <div x-cloak x-show="!loadingSmidge && smidge?.available" style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:center">
               <div id="chart-smidge-radar" class="chart-wrap" style="height:320px"></div>
               <div style="font-size:13px;line-height:1.8">
                 <template x-for="(label, key) in (smidge?.labels || {})" :key="key">
@@ -742,7 +756,24 @@
                 <div style="margin-top:8px;font-weight:600">Composite: <span x-text="smidge?.composite_score ?? '--'"></span>/100</div>
               </div>
             </div>
-            <div x-show="!loadingSmidge && !errorSmidge && !smidge?.available" class="kpi-sub">SMIDGE data unavailable for this asset</div>
+            <div x-cloak x-show="!loadingSmidge && !errorSmidge && !smidge?.available" class="kpi-sub">SMIDGE data unavailable for this asset</div>
+          </div>
+          <div class="insight-card">
+            <h2>Reserve Transparency</h2>
+            <p class="kpi-sub" style="margin:0 0 8px">Issuer attestation freshness grade (A best)</p>
+            <template x-for="(a, sym) in attestation" :key="`reserve-${sym}`">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px">
+                <div>
+                  <strong x-text="sym"></strong>
+                  <span class="kpi-sub" x-text="a.issuer ? ` · ${a.issuer}` : ''"></span>
+                </div>
+                <div style="text-align:right">
+                  <span :class="`band-${statusBand(a.attestation_status === 'n/a' ? 'watch' : a.attestation_status)}`" style="font-weight:700" x-text="reserveGrade(a).grade"></span>
+                  <div class="kpi-sub" x-text="reserveGrade(a).note"></div>
+                </div>
+              </div>
+            </template>
+            <div x-cloak x-show="!Object.keys(attestation || {}).length" class="kpi-sub" style="padding:8px 0">No attestation data</div>
           </div>
           <div class="insight-card">
             <h2>Attestation Reports</h2>
@@ -750,11 +781,11 @@
               <div style="margin-bottom:10px;padding:10px;background:var(--bg);border-radius:8px">
                 <strong x-text="sym"></strong>
                 <div style="font-size:13px;margin-top:4px">
-                  <div x-show="a.attestation_status !== 'n/a'">
+                  <div x-cloak x-show="a.attestation_status !== 'n/a'">
                     <span :class="`band-${statusBand(a.attestation_status)}`" x-text="a.attestation_status ?? 'unknown'"></span>
                     <span class="kpi-sub"> &middot; <span x-text="a.attestation_age_days != null ? `${a.attestation_age_days}d since report` : 'No report date'"></span></span>
                   </div>
-                  <div x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only</div>
+                  <div x-cloak x-show="a.attestation_status === 'n/a'" class="kpi-sub">On-chain only</div>
                   <div style="margin-top:4px">
                     <span :class="`band-${statusBand(a.supply_feed_status)}`" x-text="a.supply_feed_status ?? 'unknown'"></span>
                     <span class="kpi-sub"> &middot; DefiLlama &middot; <span x-text="formatFeedAge(a.supply_feed_age_minutes)"></span></span>
@@ -771,18 +802,144 @@
                 <span x-text="row.price != null ? `$${Number(row.price).toFixed(6)}` : 'N/A'" :class="row.price && Math.abs(row.price - 1) > 0.002 ? 'text-red' : 'text-green'"></span>
               </div>
             </template>
-            <div x-show="!($store.dashboard.crossSource.sources||[]).length" class="kpi-sub" style="padding:8px 0">No cross-source prices</div>
-            <div x-show="$store.dashboard.crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
+            <div x-cloak x-show="!($store.dashboard.crossSource.sources||[]).length" class="kpi-sub" style="padding:8px 0">No cross-source prices</div>
+            <div x-cloak x-show="$store.dashboard.crossSource.discrepancy_flag" style="margin-top:8px;padding:8px;background:var(--warn-bg);border-radius:6px;font-size:12px">
               Discrepancy: <strong x-text="`${$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)}%`"></strong> between sources
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div x-data="onchainPanel" x-init="init()">
+        <div class="insight-grid" style="margin-top:16px">
+          <div class="insight-card" style="grid-column:1/-1">
+            <h2>On-chain Signals</h2>
+            <p class="kpi-sub" style="margin:0 0 8px">Whale flow, mint/burn, and holder concentration (free-tier providers)</p>
+            <div x-cloak x-show="loadingOnchain" class="kpi-sub"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading on-chain data...</div>
+            <div x-cloak x-show="errorOnchain" class="warning-banner visible" x-text="errorOnchain" style="margin-bottom:8px"></div>
+            <div x-cloak x-show="!loadingOnchain && !onchainConfigured()" class="kpi-sub" style="padding:12px">
+              <span x-text="onchainEmptyMessage()"></span>
+              <div style="margin-top:6px;font-size:12px;color:var(--muted)">
+                Enable <strong>The Graph</strong> (no key) or set <strong>Moralis</strong> / <strong>Flipside</strong> / <strong>Alchemy</strong> keys in Settings → API Keys.
+              </div>
+            </div>
+            <div x-cloak x-show="!loadingOnchain && onchainConfigured()" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+              <div>
+                <h3 style="font-size:14px;margin:0 0 8px">Whale Flow</h3>
+                <div x-cloak x-show="whaleFlow?.available" style="font-size:13px;line-height:1.8">
+                  <div>Net mint/burn (24h): <strong x-text="whaleFlow?.net_mint_burn_usd_24h != null ? `$${Number(whaleFlow.net_mint_burn_usd_24h).toLocaleString()}` : '—'"></strong></div>
+                  <div>Whale outflow: <strong x-text="whaleFlow?.whale_net_outflow_usd != null ? `$${Number(whaleFlow.whale_net_outflow_usd).toLocaleString()}` : '—'"></strong></div>
+                  <div x-cloak x-show="whaleFlow?.whale_alert" class="text-red" style="margin-top:4px">Whale alert — multiple large transfers</div>
+                  <div class="kpi-sub" style="margin-top:4px" x-text="`Sources: ${(whaleFlow?.sources || []).join(', ') || 'none'}`"></div>
+                </div>
+                <div x-cloak x-show="!whaleFlow?.available && onchainConfigured()" class="kpi-sub">Whale flow unavailable for this asset</div>
+              </div>
+              <div>
+                <h3 style="font-size:14px;margin:0 0 8px">Holder Concentration</h3>
+                <div x-cloak x-show="holderConcentration?.available" style="font-size:13px;line-height:1.8">
+                  <div>Top-10 share: <strong x-text="holderConcentration?.top10_share_pct != null ? `${holderConcentration.top10_share_pct}%` : '—'"></strong></div>
+                  <div>Risk band: <strong x-text="holderConcentration?.concentration_risk || '—'"></strong></div>
+                  <template x-for="h in (holderConcentration?.holders || []).slice(0,5)" :key="h.address">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--line)">
+                      <span class="kpi-sub" x-text="h.address ? `${h.address.slice(0,6)}…${h.address.slice(-4)}` : '—'"></span>
+                      <span x-text="h.share_pct != null ? `${h.share_pct}%` : ''"></span>
+                    </div>
+                  </template>
+                </div>
+                <div x-cloak x-show="!holderConcentration?.available && onchainConfigured()" class="kpi-sub">Set Moralis API key for holder data</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Tab: Forensics (blacklist + investigation) -->
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'forensics'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="forensics" x-init="init()" role="tabpanel" id="tab-forensics">
+      <div x-cloak x-show="errorStats || errorEvents" class="warning-banner visible" x-text="errorStats || errorEvents" style="margin-bottom:8px"></div>
+      <div x-cloak x-show="loadingStats && !blacklistStats" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading forensics...</div>
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Blacklist Overview</h2>
+          <div x-cloak x-show="blacklistStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+            <div><div class="kpi-label">Total Events</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="blacklistStats.total_events?.toLocaleString() ?? '-'"></div></div>
+            <div><div class="kpi-label">Frozen (USD)</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="formatUsd(blacklistStats.total_frozen_usd)"></div></div>
+            <div><div class="kpi-label">Last 30 Days</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="blacklistStats.last_30d_count?.toLocaleString() ?? '-'"></div></div>
+            <div><div class="kpi-label">Assets Tracked</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="blacklistStats.by_asset ? Object.keys(blacklistStats.by_asset).join(', ') : '-'"></div></div>
+          </div>
+          <div x-cloak x-show="blacklistStats?.by_asset" style="margin-top:8px;padding:8px 10px;background:var(--bg-accent);border-radius:6px">
+            <span class="section-title" style="margin:0 0 4px">By Asset (frozen USD)</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px">
+              <template x-for="(val, key) in blacklistStats.by_asset" :key="key">
+                <span><strong x-text="key"></strong>: <span x-text="formatUsd(val)"></span></span>
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="insight-card">
+          <h2>Events</h2>
+          <div style="margin-bottom:8px;display:flex;gap:8px">
+            <input type="text" placeholder="Filter by asset (e.g. USDT)" x-model="eventsAssetFilter" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" @keyup.enter="filterEvents" />
+            <button class="btn btn-muted" @click="filterEvents" style="padding:6px 12px;font-size:13px">Filter</button>
+          </div>
+          <div style="max-height:360px;overflow-y:auto">
+            <template x-for="ev in blacklistEvents" :key="ev.id">
+              <div class="event-card" style="margin-bottom:6px">
+                <div class="event-title"><span x-text="ev.asset_symbol"></span> · <span x-text="ev.chain"></span></div>
+                <div class="event-meta">
+                  <span x-text="formatWhen(ev.timestamp)"></span>
+                  <span x-cloak x-show="ev.frozen_balance_usd"> · <span x-text="formatUsd(ev.frozen_balance_usd)"></span> frozen</span>
+                  <span x-cloak x-show="ev.event_type"> · <span x-text="ev.event_type"></span></span>
+                </div>
+                <div class="event-summary" x-cloak x-show="ev.intelligence_note" x-text="ev.intelligence_note"></div>
+              </div>
+            </template>
+            <div x-cloak x-show="!blacklistEvents.length && !loadingEvents" class="kpi-sub" style="padding:12px">No events found</div>
+            <div x-cloak x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="btn btn-muted" @click="prevEventsPage" x-cloak x-show="eventsOffset > 0" style="padding:4px 10px;font-size:12px">← Prev</button>
+            <button class="btn btn-muted" @click="nextEventsPage" x-cloak x-show="blacklistEvents.length >= eventsLimit" style="padding:4px 10px;font-size:12px">Next →</button>
+          </div>
+        </div>
+      </div>
+      <div class="insight-card" style="margin-top:10px">
+        <h2>Investigate Address</h2>
+        <div x-cloak x-show="investigateError" class="warning-banner visible" x-text="investigateError" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="text" placeholder="0x..." x-model="investigateAddress" style="border:1px solid var(--line);border-radius:6px;padding:8px 12px;background:var(--bg);color:var(--text);font-size:13px;flex:3;min-width:260px;font-family:monospace" />
+          <select x-model="investigateChain" style="border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--bg);color:var(--text);font-size:13px;flex:1">
+            <option value="ethereum">Ethereum</option>
+            <option value="bsc">BSC</option>
+            <option value="polygon">Polygon</option>
+            <option value="arbitrum">Arbitrum</option>
+            <option value="optimism">Optimism</option>
+            <option value="base">Base</option>
+            <option value="avalanche">Avalanche</option>
+            <option value="solana">Solana</option>
+            <option value="tron">Tron</option>
+          </select>
+          <select x-model="investigateAsset" style="border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--bg);color:var(--text);font-size:13px;flex:1">
+            <template x-for="s in taxonomySymbols" :key="s">
+              <option :value="s" x-text="s"></option>
+            </template>
+          </select>
+          <button class="btn btn-primary" @click="investigate" :disabled="investigating" style="padding:8px 18px">
+            <span x-cloak x-show="!investigating">Investigate</span>
+            <span x-cloak x-show="investigating">Running...</span>
+          </button>
+        </div>
+        <div x-cloak x-show="investigationResult" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:8px;font-size:13px;font-family:monospace;white-space:pre-wrap;max-height:400px;overflow-y:auto">
+          <pre x-text="JSON.stringify(investigationResult, null, 2)"></pre>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab: System (Health + Quality) -->
-    <div class="tab-content" x-show="$store.ui.tab === 'system'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-system">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'system'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-system">
       <div x-data="healthDashboard" x-init="init()">
+        <div x-cloak x-show="error" class="warning-banner visible" x-text="error" style="margin-bottom:8px"></div>
+        <div x-cloak x-show="loading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading health data...</div>
         <div class="insight-grid">
           <div class="insight-card">
             <h2>Source Health</h2>
@@ -792,23 +949,23 @@
                 <span style="font-weight:600;font-size:13px" x-text="s.source_name"></span>
                 <span :class="s.status === 'ok' ? 'text-green' : 'text-red'" x-text="s.status"></span>
               </div>
-              <div x-show="s.last_error" style="font-size:11px;color:var(--down);margin-top:2px" x-text="s.last_error"></div>
-              <div x-show="s.last_successful_fetch" style="font-size:11px;color:var(--muted);margin-top:2px">
+              <div x-cloak x-show="s.last_error" style="font-size:11px;color:var(--down);margin-top:2px" x-text="s.last_error"></div>
+              <div x-cloak x-show="s.last_successful_fetch" style="font-size:11px;color:var(--muted);margin-top:2px">
                 Last OK: <span x-text="formatWhen(s.last_successful_fetch)"></span>
               </div>
-              <div x-show="s.last_attempted_fetch" style="font-size:11px;color:var(--muted)">
+              <div x-cloak x-show="s.last_attempted_fetch" style="font-size:11px;color:var(--muted)">
                 Last attempt: <span x-text="formatWhen(s.last_attempted_fetch)"></span>
               </div>
-              <div x-show="s.previous_status && s.status !== s.previous_status" style="font-size:11px;color:var(--neutral);margin-top:2px">
+              <div x-cloak x-show="s.previous_status && s.status !== s.previous_status" style="font-size:11px;color:var(--neutral);margin-top:2px">
                 Previous: <span x-text="s.previous_status"></span>
               </div>
             </div>
           </template>
-          <div x-show="!sources.length" class="kpi-sub" style="padding:8px 0">No source data</div>
+          <div x-cloak x-show="!sources.length" class="kpi-sub" style="padding:8px 0">No source data</div>
         </div>
         <div class="insight-card">
           <h2>Source Usage (Today)</h2>
-          <div x-show="sourceUsage" style="font-size:13px;line-height:1.7">
+          <div x-cloak x-show="sourceUsage" style="font-size:13px;line-height:1.7">
             <div><span class="kpi-label">Total API calls:</span> <span x-text="sourceUsage?.total_calls || 0"></span></div>
             <div style="margin-top:8px">
               <template x-for="(data, source) in (sourceUsage?.sources || {})" :key="source">
@@ -819,7 +976,7 @@
               </template>
             </div>
           </div>
-          <div x-show="!sourceUsage" class="kpi-sub" style="padding:8px 0">No usage data</div>
+          <div x-cloak x-show="!sourceUsage" class="kpi-sub" style="padding:8px 0">No usage data</div>
         </div>
         <div class="insight-card">
           <h2>Data Freshness</h2>
@@ -848,16 +1005,16 @@
                 <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
               </div>
             </template>
-            <div x-show="!(events || []).filter(e=>e.severity!=='debug').length" class="kpi-sub" style="padding:8px 0">No recent events</div>
+            <div x-cloak x-show="!(events || []).filter(e=>e.severity!=='debug').length" class="kpi-sub" style="padding:8px 0">No recent events</div>
           </div>
         </div>
-        <div class="chart-card" x-show="dataQualityHistory.length">
+        <div class="chart-card" x-cloak x-show="dataQualityHistory.length">
         <h2>Data Quality</h2>
         <div style="font-size:13px">
           <template x-for="(dq, i) in dataQualityHistory" :key="i">
             <div class="signal-item" x-text="`${dq.label}: ${dq.value}`"></div>
           </template>
-          <div x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
+          <div x-cloak x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
         </div>
       </div>
     </div>
@@ -876,7 +1033,7 @@
             </div>
           </div>
           
-          <div x-show="lastUpdated" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
+          <div x-cloak x-show="lastUpdated" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
             Last updated: <strong x-text="lastUpdated"></strong>
           </div>
         </div>
@@ -921,7 +1078,7 @@
             <svg class="icon"><use href="#icon-satellite"/></svg> Data Sources Health
           </h2>
           
-          <div x-show="sourcesByStatus" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
+          <div x-cloak x-show="sourcesByStatus" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px">
             <template x-for="(count, status) in sourcesByStatus" :key="count?.[0] || status">
               <div style="text-align:center;padding:16px;background:var(--bg-accent);border-radius:8px">
                 <div style="font-size:24px;font-weight:700" x-text="count"></div>
@@ -932,7 +1089,7 @@
             </template>
           </div>
           
-          <div x-show="Object.keys(sourcesByStatus).length === 0" class="kpi-sub" style="padding:20px 0;text-align:center">
+          <div x-cloak x-show="Object.keys(sourcesByStatus).length === 0" class="kpi-sub" style="padding:20px 0;text-align:center">
             Loading source health data...
           </div>
         </div>
@@ -946,35 +1103,35 @@
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
             <div>
               <h3 style="margin:0 0 12px 0;font-size:16px">API Usage</h3>
-              <div x-show="totalApiCalls !== null">
+              <div x-cloak x-show="totalApiCalls !== null">
                 <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalApiCalls?.toLocaleString()"></div>
                 <div style="font-size:13px;color:var(--muted)">Total API calls today</div>
               </div>
-              <div x-show="totalApiCalls === null" class="kpi-sub">
+              <div x-cloak x-show="totalApiCalls === null" class="kpi-sub">
                 Loading...
               </div>
             </div>
             
             <div>
               <h3 style="margin:0 0 12px 0;font-size:16px">AI Usage</h3>
-              <div x-show="totalAiTokens !== null">
+              <div x-cloak x-show="totalAiTokens !== null">
                 <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" x-text="totalAiTokens?.toLocaleString()"></div>
                 <div style="font-size:13px;color:var(--muted)">AI tokens consumed today</div>
               </div>
-              <div x-show="totalAiTokens === null" class="kpi-sub">
+              <div x-cloak x-show="totalAiTokens === null" class="kpi-sub">
                 Loading...
               </div>
             </div>
             
             <div>
               <h3 style="margin:0 0 12px 0;font-size:16px">System Health</h3>
-              <div x-show="healthySources !== null">
+              <div x-cloak x-show="healthySources !== null">
                 <div style="font-size:24px;font-weight:600;margin:0 0 4px 0" 
                      :style="healthySources > (totalSources * 0.8) ? 'color:var(--spark)' : 'color:var(--down)'" 
                      x-text="healthySources + '/' + totalSources"></div>
                 <div style="font-size:13px;color:var(--muted)">Healthy data sources</div>
               </div>
-              <div x-show="healthySources === null" class="kpi-sub">
+              <div x-cloak x-show="healthySources === null" class="kpi-sub">
                 Loading...
               </div>
             </div>
@@ -986,24 +1143,37 @@
     </div>
 
     <!-- Tab: Settings -->
-    <div class="tab-content" x-show="$store.ui.tab === 'settings'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'settings'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
          x-init="filterSettings(); loadAiBudget();" role="tabpanel" id="tab-settings">
       <div class="insight-grid">
-        <!-- Admin Token Section (always visible — enter token first) -->
+        <!-- Admin Authentication (transform.md §2.3 Layer B) -->
         <div class="insight-card" style="grid-column:1/-1">
-          <div style="display:flex;align-items:flex-start;gap:16px">
-            <div style="flex:1">
-              <h2 style="margin:0 0 8px 0"><svg class="icon"><use href="#icon-lock"/></svg> Admin Authentication</h2>
-              <p class="kpi-sub" style="margin:0 0 16px 0">Required for refresh operations and settings changes when HELIX_ADMIN_TOKEN is configured on the server.</p>
-              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-                <input type="password" x-model="adminToken" placeholder="Enter admin token"
-                       style="flex:1;min-width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:monospace">
-                <button class="btn btn-primary" @click="saveAdminToken()" style="padding:10px 20px">Save Token</button>
+          <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+            <div style="flex:1;min-width:280px">
+              <h2 style="margin:0 0 8px 0"><svg class="icon"><use href="#icon-lock"/></svg> Admin Login</h2>
+              <p class="kpi-sub" style="margin:0 0 12px 0">Sign in with the seeded admin account (<code>HELIX_ADMIN_USERNAME</code> / <code>HELIX_ADMIN_PASSWORD</code> in <code>.env</code>). Uses <code>/auth/login</code> → signed session token.</p>
+              <div x-cloak x-show="$store.ui.authError" class="warning-banner visible" x-text="$store.ui.authError" style="margin-bottom:12px"></div>
+              <div x-cloak x-show="settingsError" class="warning-banner visible" x-text="settingsError" style="margin-bottom:12px"></div>
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+                <input type="text" x-model="$store.ui.loginUsername" placeholder="Username" autocomplete="username"
+                       style="flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px">
+                <input type="password" x-model="$store.ui.loginPassword" placeholder="Password" autocomplete="current-password"
+                       style="flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px">
+                <button class="btn btn-primary" type="button" @click="$store.ui.login().then(ok => ok && loadSettings())" style="padding:10px 20px">Sign in</button>
+                <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.adminToken" @click="$store.ui.logout(); settingsError=''; settingsList=[]" style="padding:10px 20px">Sign out</button>
               </div>
+              <details style="font-size:12px;color:var(--muted)">
+                <summary style="cursor:pointer">Legacy token (rollout only)</summary>
+                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                  <input type="password" x-model="adminToken" placeholder="Paste HELIX_ADMIN_TOKEN"
+                         style="flex:1;min-width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:monospace">
+                  <button class="btn btn-muted" type="button" @click="saveAdminToken(); loadSettings()" style="padding:10px 20px">Save Token</button>
+                </div>
+              </details>
             </div>
             <div style="background:var(--warn-bg);padding:16px;border-radius:8px;min-width:200px">
               <h3 style="margin:0 0 8px 0;color:var(--neutral)">Security Note</h3>
-              <p style="margin:0;font-size:12px;color:var(--neutral)">Tokens are stored in browser session storage and never sent to the server unless required for API requests.</p>
+              <p style="margin:0;font-size:12px;color:var(--neutral)">Session tokens are stored in browser session storage and sent as <code>X-Admin-Token</code> on admin API calls.</p>
             </div>
           </div>
         </div>
@@ -1044,7 +1214,7 @@
                   <button class="playbook-btn btn"
                           :style="playbookLoading===pb.name?'opacity:0.6':pb.is_builtin && pb.name==='max_free'?'background:#065f46;color:#fff;border-color:#065f46':pb.is_builtin && pb.name==='balanced'?'background:#1e40af;color:#fff;border-color:#1e40af':pb.is_builtin && pb.name==='quality'?'background:#7c3aed;color:#fff;border-color:#7c3aed':'background:var(--panel);color:var(--text);border-color:var(--line)'"
                           @click="applyCustomPlaybook(pb)" :disabled="playbookLoading !== null">
-                    <span x-show="playbookLoading===pb.name" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
+                    <span x-cloak x-show="playbookLoading===pb.name" class="loading-spinner" style="vertical-align:middle;margin-right:4px;width:12px;height:12px;border-width:2px"></span>
                     <span x-text="pb.label"></span>
                   </button>
                 </template>
@@ -1071,7 +1241,7 @@
           </div>
           
           <!-- A1: Create Playbook Modal -->
-          <div x-show="showCreatePlaybookModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showCreatePlaybookModal=false">
+          <div x-cloak x-show="showCreatePlaybookModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showCreatePlaybookModal=false" role="dialog" aria-modal="true" aria-label="Create playbook">
             <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
               <h3 style="margin:0 0 16px 0;font-size:16px">Create Custom Playbook</h3>
               <form @submit.prevent="createPlaybook">
@@ -1115,7 +1285,7 @@
           </div>
           
           <!-- A1: Edit Playbook Modal -->
-          <div x-show="showEditPlaybookModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showEditPlaybookModal=false">
+          <div x-cloak x-show="showEditPlaybookModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showEditPlaybookModal=false" role="dialog" aria-modal="true" aria-label="Edit playbook">
             <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto">
               <h3 style="margin:0 0 16px 0;font-size:16px">Edit Playbook: <span x-text="editPlaybookData.name" style="font-family:monospace"></span></h3>
               <form @submit.prevent="updatePlaybook">
@@ -1153,10 +1323,10 @@
             </div>
           </div>
           
-          <div x-show="settingsSearch || settingsGroupFilter" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
-            <span x-show="settingsSearch">Searching for: <strong x-text="settingsSearch"></strong></span>
-            <span x-show="settingsSearch && settingsGroupFilter"> • </span>
-            <span x-show="settingsGroupFilter">Category: <strong x-text="settingsGroupFilter"></strong></span>
+          <div x-cloak x-show="settingsSearch || settingsGroupFilter" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
+            <span x-cloak x-show="settingsSearch">Searching for: <strong x-text="settingsSearch"></strong></span>
+            <span x-cloak x-show="settingsSearch && settingsGroupFilter"> • </span>
+            <span x-cloak x-show="settingsGroupFilter">Category: <strong x-text="settingsGroupFilter"></strong></span>
             <span> • Showing <strong x-text="filteredSettings.length"></strong> of <strong x-text="settingsList.length"></strong> settings</span>
           </div>
         </div>
@@ -1171,20 +1341,20 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('secret_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                <div x-cloak x-show="s.key.startsWith('secret_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
                     <div style="display:flex;gap:4px;align-items:center">
-                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
-                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
-                      <span x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
-                      <span x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not set</span>
+                      <span x-cloak x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-cloak x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                      <span x-cloak x-show="s.value" class="pill source-ok" style="font-size:11px">Configured</span>
+                      <span x-cloak x-show="!s.value" class="pill" style="font-size:11px;background:var(--warn-bg);color:var(--neutral)">Not set</span>
                     </div>
                   </div>
                   
                   <div style="margin-bottom:12px">
                     <p style="margin:0 0 8px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
-                    <div x-show="s.key_env" style="font-size:11px;background:var(--bg-accent);padding:4px 8px;border-radius:4px;display:inline-block">
+                    <div x-cloak x-show="s.key_env" style="font-size:11px;background:var(--bg-accent);padding:4px 8px;border-radius:4px;display:inline-block">
                       Environment variable: <code x-text="s.key_env"></code>
                     </div>
                   </div>
@@ -1194,7 +1364,7 @@
                            style="flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:12px;font-family:monospace">
                     <button class="btn btn-muted" style="padding:8px 16px;font-size:12px" 
                             @click="saveSecret(s.key)" 
-                            x-show="secretValues[s.key] && secretValues[s.key].length > 0">Save</button>
+                            x-cloak x-show="secretValues[s.key] && secretValues[s.key].length > 0">Save</button>
                   </div>
                 </div>
               </template>
@@ -1211,18 +1381,18 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('provider_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
+                <div x-cloak x-show="s.key.startsWith('provider_')" style="padding:16px;border:1px solid var(--line);border-radius:8px">
                   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
                     <div>
                       <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600" x-text="s.label"></h3>
                   <div style="display:flex;align-items:center;gap:8px">
-                    <span x-show="s.always_active" class="pill source-ok" style="font-size:10px">always active</span>
-                    <span x-show="s.affects_rate_limits" class="pill" style="font-size:10px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate limited</span>
-                    <span x-show="s.requires_restart" class="pill" style="font-size:10px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb; restart</span>
+                    <span x-cloak x-show="s.always_active" class="pill source-ok" style="font-size:10px">always active</span>
+                    <span x-cloak x-show="s.affects_rate_limits" class="pill" style="font-size:10px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate limited</span>
+                    <span x-cloak x-show="s.requires_restart" class="pill" style="font-size:10px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb; restart</span>
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px">
-                  <label class="toggle" x-show="!s.always_active">
+                  <label class="toggle" x-cloak x-show="!s.always_active">
                     <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
                     <span class="toggle-slider"></span>
                   </label>
@@ -1231,9 +1401,9 @@
               </div>
                   
                   <p style="margin:0 0 12px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
-                  <p x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
+                  <p x-cloak x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                   
-                  <div x-show="s.rate_limit_rpm" style="font-size:11px;background:var(--bg-accent);padding:6px 10px;border-radius:4px;display:inline-block">
+                  <div x-cloak x-show="s.rate_limit_rpm" style="font-size:11px;background:var(--bg-accent);padding:6px 10px;border-radius:4px;display:inline-block">
                     Rate limit: <strong x-text="s.rate_limit_rpm"></strong> requests/minute
                   </div>
                 </div>
@@ -1251,13 +1421,13 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                <div x-cloak x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
                      :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
                     <div style="display:flex;align-items:center;gap:8px">
-                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
-                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                      <span x-cloak x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-cloak x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
                       <label class="toggle">
                         <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
                         <span class="toggle-slider"></span>
@@ -1267,7 +1437,7 @@
                   </div>
                   
                   <p style="margin:0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
-                  <p x-show="s.depends_on" style="margin:8px 0 0;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
+                  <p x-cloak x-show="s.depends_on" style="margin:8px 0 0;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                 </div>
               </template>
             </div>
@@ -1283,18 +1453,18 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('refresh_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                <div x-cloak x-show="s.key.startsWith('refresh_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
                      :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
                     <div style="display:flex;gap:4px">
-                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
-                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                      <span x-cloak x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-cloak x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
                     </div>
                   </div>
                   
                   <p style="margin:0 0 16px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
-                  <p x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
+                  <p x-cloak x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                   
                   <div style="display:flex;align-items:center;gap:12px">
                     <input type="number" :value="s.value" :min="s.min" :max="s.max" 
@@ -1321,7 +1491,7 @@
             <p class="kpi-sub" style="margin:0 0 16px 0">Configure AI-powered features and anomaly detection.</p>
             
             <!-- AI Budget Visualization -->
-            <div x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
+            <div x-cloak x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <h3 style="margin:0;font-size:14px;font-weight:600">Daily AI Token Budget</h3>
                 <span style="font-size:13px;font-weight:600;font-family:monospace" x-text="`${aiBudget.tokens_used_today} / ${aiBudget.daily_budget} used (${aiBudget.pct_used}%)`"></span>
@@ -1338,7 +1508,7 @@
             </div>
             
             <!-- A3: Per-Feature Budget Sliders + Stacked Visualization -->
-            <div x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
+            <div x-cloak x-show="aiBudgetLoaded" style="margin-bottom:16px;padding:16px;background:var(--bg-accent);border-radius:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <h3 style="margin:0;font-size:14px;font-weight:600">Per-Feature Budget Allocation</h3>
                 <div style="display:flex;gap:8px;align-items:center">
@@ -1401,24 +1571,24 @@
                     </div>
                     <span style="font-size:11px;color:var(--muted)" x-text="p.cost"></span>
                     <span style="font-size:11px;color:var(--muted)" x-text="`${p.rpm} rpm`"></span>
-                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--ok-bg);color:var(--up)" x-show="i===0">Primary</span>
-                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-accent);color:var(--muted)" x-show="i>0">Fallback</span>
+                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--ok-bg);color:var(--up)" x-cloak x-show="i===0">Primary</span>
+                    <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--bg-accent);color:var(--muted)" x-cloak x-show="i>0">Fallback</span>
                   </div>
                 </template>
               </div>
-              <div x-show="!providers.length" class="kpi-sub" style="padding:12px;text-align:center">Load settings to see provider priority</div>
+              <div x-cloak x-show="!providers.length" class="kpi-sub" style="padding:12px;text-align:center">Load settings to see provider priority</div>
             </div>
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                <div x-cloak x-show="s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection'" style="padding:16px;border:1px solid var(--line);border-radius:8px"
                      :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>
                     <div style="display:flex;align-items:center;gap:6px">
-                      <span x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
-                      <span x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
-                      <div x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
+                      <span x-cloak x-show="s.affects_rate_limits" class="pill" style="font-size:9px;background:var(--warn-bg);color:var(--neutral)" title="Affects API rate limits">rate</span>
+                      <span x-cloak x-show="s.requires_restart" class="pill" style="font-size:9px;background:var(--alert-bg);color:var(--down)" title="Requires restart to take effect">&#x21bb;</span>
+                      <div x-cloak x-show="s.type === 'bool'" style="display:flex;align-items:center;gap:8px">
                         <label class="toggle">
                           <input type="checkbox" :checked="s.value" @change="toggleSetting(s.key, $event.target.checked)">
                           <span class="toggle-slider"></span>
@@ -1429,16 +1599,16 @@
                   </div>
                   
                   <p style="margin:0 0 16px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
-                  <p x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
+                  <p x-cloak x-show="s.depends_on" style="margin:0 0 8px;font-size:10px;color:var(--muted)">Depends on: <code x-text="s.depends_on"></code></p>
                   
-                  <div x-show="s.type === 'int'" style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                  <div x-cloak x-show="s.type === 'int'" style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
                     <input type="number" :value="s.value" :min="s.min" :max="s.max" 
                            style="flex:1;max-width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px"
                            @change="toggleSetting(s.key, parseInt($event.target.value))">
                     <button class="btn btn-muted" style="padding:8px 16px;font-size:12px" @click="toggleSetting(s.key, s.default)">Reset</button>
                   </div>
                   
-                  <div x-show="s.type === 'str'" style="margin-bottom:16px">
+                  <div x-cloak x-show="s.type === 'str'" style="margin-bottom:16px">
                     <select :value="s.value" 
                             style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px"
                             @change="toggleSetting(s.key, $event.target.value)">
@@ -1479,10 +1649,10 @@
                     </select>
                   </div>
                   
-                  <div x-show="s.min !== undefined || s.max !== undefined" style="font-size:11px;color:var(--muted)">
-                    <span x-show="s.min !== undefined">Min: <span x-text="s.min"></span></span>
-                    <span x-show="s.min !== undefined && s.max !== undefined"> • </span>
-                    <span x-show="s.max !== undefined">Max: <span x-text="s.max"></span></span>
+                  <div x-cloak x-show="s.min !== undefined || s.max !== undefined" style="font-size:11px;color:var(--muted)">
+                    <span x-cloak x-show="s.min !== undefined">Min: <span x-text="s.min"></span></span>
+                    <span x-cloak x-show="s.min !== undefined && s.max !== undefined"> • </span>
+                    <span x-cloak x-show="s.max !== undefined">Max: <span x-text="s.max"></span></span>
                   </div>
                 </div>
               </template>
@@ -1506,25 +1676,25 @@
           <p class="kpi-sub" style="margin:0 0 12px 0">Auto-refreshes every 30s. Shows the last <strong>100</strong> changes.</p>
           
           <div style="overflow-x:auto;font-size:12px">
-            <table style="width:100%;border-collapse:collapse" x-show="auditLog.length">
+            <table style="width:100%;border-collapse:collapse" x-cloak x-show="auditLog.length">
               <thead>
                 <tr style="border-bottom:2px solid var(--line);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:0.5px">
                     <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('created_at')">
-                      Timestamp <span x-show="auditSortField==='created_at'" style="font-size:8px">
-                        <svg class="icon" style="width:10px;height:10px" x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
-                        <svg class="icon" style="width:10px;height:10px" x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
+                      Timestamp <span x-cloak x-show="auditSortField==='created_at'" style="font-size:8px">
+                        <svg class="icon" style="width:10px;height:10px" x-cloak x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
+                        <svg class="icon" style="width:10px;height:10px" x-cloak x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
                       </span>
                     </th>
                     <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('user_username')">
-                      User <span x-show="auditSortField==='user_username'" style="font-size:8px">
-                        <svg class="icon" style="width:10px;height:10px" x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
-                        <svg class="icon" style="width:10px;height:10px" x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
+                      User <span x-cloak x-show="auditSortField==='user_username'" style="font-size:8px">
+                        <svg class="icon" style="width:10px;height:10px" x-cloak x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
+                        <svg class="icon" style="width:10px;height:10px" x-cloak x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
                       </span>
                     </th>
                     <th style="padding:8px 8px;text-align:left;cursor:pointer;white-space:nowrap" @click="toggleAuditSort('setting_key')">
-                      Setting <span x-show="auditSortField==='setting_key'" style="font-size:8px">
-                        <svg class="icon" style="width:10px;height:10px" x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
-                        <svg class="icon" style="width:10px;height:10px" x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
+                      Setting <span x-cloak x-show="auditSortField==='setting_key'" style="font-size:8px">
+                        <svg class="icon" style="width:10px;height:10px" x-cloak x-show="auditSortAsc"><use href="#icon-chevron-up"/></svg>
+                        <svg class="icon" style="width:10px;height:10px" x-cloak x-show="!auditSortAsc"><use href="#icon-chevron-down"/></svg>
                       </span>
                     </th>
                   <th style="padding:8px 8px;text-align:left">Change</th>
@@ -1558,22 +1728,22 @@
                 </template>
               </tbody>
             </table>
-            <div x-show="!auditLog.length" class="kpi-sub" style="padding:24px;text-align:center;font-size:13px">No audit entries yet. Make changes to settings to see them here.</div>
+            <div x-cloak x-show="!auditLog.length" class="kpi-sub" style="padding:24px;text-align:center;font-size:13px">No audit entries yet. Make changes to settings to see them here.</div>
           </div>
         </div>
         
         <!-- A2: Audit History Modal -->
-        <div x-show="auditHistoryModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeAuditHistory()">
+        <div x-cloak x-show="auditHistoryModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeAuditHistory()" role="dialog" aria-modal="true" aria-label="Audit history">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:80vh;overflow-y:auto">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
               <h3 style="margin:0;font-size:15px">Change History: <code x-text="auditHistoryKey" style="font-size:13px"></code></h3>
               <button class="btn btn-muted" style="padding:4px 10px;font-size:11px" @click="closeAuditHistory()">Close</button>
             </div>
-            <div x-show="auditHistoryLoading" class="kpi-sub" style="padding:16px;text-align:center">
+            <div x-cloak x-show="auditHistoryLoading" class="kpi-sub" style="padding:16px;text-align:center">
               <span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span> Loading history...
             </div>
-            <div x-show="!auditHistoryLoading && !auditHistory.length" class="kpi-sub" style="padding:24px;text-align:center">No change history for this setting.</div>
-            <table x-show="!auditHistoryLoading && auditHistory.length" style="width:100%;border-collapse:collapse;font-size:12px">
+            <div x-cloak x-show="!auditHistoryLoading && !auditHistory.length" class="kpi-sub" style="padding:24px;text-align:center">No change history for this setting.</div>
+            <table x-cloak x-show="!auditHistoryLoading && auditHistory.length" style="width:100%;border-collapse:collapse;font-size:12px">
               <thead>
                 <tr style="border-bottom:2px solid var(--line);font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:0.5px">
                   <th style="padding:8px 8px;text-align:left">Timestamp</th>
@@ -1610,7 +1780,7 @@
         </div>
         
         <!-- A5: Safe Defaults Confirmation Modal -->
-        <div x-show="showConfirmDefaults" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeConfirmDefaults()">
+        <div x-cloak x-show="showConfirmDefaults" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="closeConfirmDefaults()" role="dialog" aria-modal="true" aria-label="Confirm reset">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:520px;width:100%">
             <h3 style="margin:0 0 12px 0;font-size:16px;color:var(--down)">Reset All Settings to Defaults?</h3>
             <p style="margin:0 0 12px 0;font-size:13px;line-height:1.5;color:var(--muted)">
@@ -1642,7 +1812,7 @@
         </div>
         
         <!-- Multi-User Management Section -->
-        <div class="insight-card" x-show="settingsList.find(s => s.key === 'feature_multi_user')?.value" style="grid-column:1/-1">
+        <div class="insight-card" x-cloak x-show="settingsList.find(s => s.key === 'feature_multi_user')?.value" style="grid-column:1/-1">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
             <div>
               <h2 style="margin:0 0 8px 0;display:flex;align-items:center;gap:8px">
@@ -1654,15 +1824,15 @@
           </div>
           
           <div>
-            <div x-show="usersLoading" class="kpi-sub" style="padding:20px;text-align:center">
+            <div x-cloak x-show="usersLoading" class="kpi-sub" style="padding:20px;text-align:center">
               <span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span> Loading users...
             </div>
             
-            <div x-show="usersError" class="kpi-sub" style="padding:20px;text-align:center;color:var(--down)">
+            <div x-cloak x-show="usersError" class="kpi-sub" style="padding:20px;text-align:center;color:var(--down)">
               Error loading users: <span x-text="usersError"></span>
             </div>
             
-            <table x-show="!usersLoading && !usersError && users.length" style="width:100%;border-collapse:collapse;font-size:13px">
+            <table x-cloak x-show="!usersLoading && !usersError && users.length" style="width:100%;border-collapse:collapse;font-size:13px">
               <thead>
                 <tr style="border-bottom:2px solid var(--line);text-align:left">
                   <th style="padding:12px 8px">Username</th>
@@ -1695,14 +1865,14 @@
               </tbody>
             </table>
             
-            <div x-show="!usersLoading && !usersError && !users.length" class="kpi-sub" style="padding:40px;text-align:center">
+            <div x-cloak x-show="!usersLoading && !usersError && !users.length" class="kpi-sub" style="padding:40px;text-align:center">
               No users found. Add your first user to get started.
             </div>
           </div>
         </div>
         
         <!-- Add User Modal -->
-        <div x-show="showAddUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showAddUserModal=false">
+        <div x-cloak x-show="showAddUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showAddUserModal=false" role="dialog" aria-modal="true" aria-label="Add user">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
             <h3 style="margin:0 0 16px 0;font-size:16px">Add New User</h3>
             <form @submit.prevent="addUser">
@@ -1746,7 +1916,7 @@
         </div>
         
         <!-- Edit User Modal -->
-        <div x-show="showEditUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showEditUserModal=false">
+        <div x-cloak x-show="showEditUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showEditUserModal=false" role="dialog" aria-modal="true" aria-label="Edit user">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
             <h3 style="margin:0 0 16px 0;font-size:16px">Edit User</h3>
             <form @submit.prevent="updateUser">
@@ -1792,7 +1962,7 @@
         </div>
         
         <!-- Delete User Confirmation Modal -->
-        <div x-show="showDeleteUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showDeleteUserModal=false">
+        <div x-cloak x-show="showDeleteUserModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px" @click.self="showDeleteUserModal=false" role="dialog" aria-modal="true" aria-label="Delete user">
           <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:480px;width:100%">
             <h3 style="margin:0 0 16px 0;font-size:16px;color:var(--down)">Delete User?</h3>
             <p style="margin:0 0 16px 0;font-size:13px;line-height:1.5;color:var(--muted)">
@@ -1842,20 +2012,45 @@
         </div>
 
         <!-- A7: Toast Notification -->
-        <div x-show="toastVisible" style="position:fixed;bottom:24px;right:24px;z-index:500;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;transition:opacity .3s"
+        <div x-cloak x-show="toastVisible" style="position:fixed;bottom:24px;right:24px;z-index:500;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px;transition:opacity .3s"
              :style="`background:${toastType === 'error' ? 'var(--alert-bg)' : 'var(--ok-bg)'};color:${toastType === 'error' ? 'var(--down)' : 'var(--up)'};border:1px solid ${toastType === 'error' ? 'var(--down)' : 'var(--up)'}`"
-             @click="hideToast()">
+             @click="hideToast()" role="status" aria-live="polite">
           <span x-text="toastMessage"></span>
+          <button style="margin-left:10px;background:none;border:none;color:inherit;font-weight:700;cursor:pointer" @click.stop="hideToast()" aria-label="Dismiss">×</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Toast Container (global) -->
+    <div class="toast-wrap" x-cloak x-show="$store.ui.toastVisible" role="status" aria-live="polite">
+      <div class="toast" :class="'toast-' + $store.ui.toastType">
+        <svg class="toast-icon" x-cloak x-show="$store.ui.toastType==='success'"><use href="#icon-arrow-up"/></svg>
+        <svg class="toast-icon" x-cloak x-show="$store.ui.toastType==='error'"><use href="#icon-warning"/></svg>
+        <svg class="toast-icon" x-cloak x-show="$store.ui.toastType==='info'"><use href="#icon-search"/></svg>
+        <div class="toast-body">
+          <div class="toast-desc" x-text="$store.ui.toastMessage"></div>
+        </div>
+        <button class="toast-close" @click="$store.ui.hideToast()" aria-label="Dismiss notification">&times;</button>
+      </div>
+    </div>
+
+    <!-- Modal Overlay (global) -->
+    <div class="modal-overlay" x-cloak x-show="$store.ui.modalVisible" role="dialog" aria-modal="true" :aria-label="$store.ui.modalTitle" @click.self="$store.ui.closeModal()">
+      <div class="modal-panel">
+        <div class="modal-header">
+          <div class="modal-title" x-text="$store.ui.modalTitle"></div>
+          <button class="modal-close" @click="$store.ui.closeModal()" aria-label="Close modal">&times;</button>
+        </div>
+        <div class="modal-body" x-html="$store.ui.modalBody"></div>
       </div>
     </div>
 
     <!-- Footer -->
     <footer class="footer">
       <span x-text="`Generated ${$store.dashboard.generatedAt}`"></span>
-      <span x-show="freshnessBandClass($store.dashboard.freshness.status)==='text-red'" class="pill source-down" x-text="formatFreshnessLabel($store.dashboard.freshness.status).toLowerCase()"></span>
-      <span x-show="freshnessBandClass($store.dashboard.freshness.status)==='text-green'" class="pill source-ok">fresh</span>
-      <span x-show="freshnessBandClass($store.dashboard.freshness.status)==='band-watch'" class="pill source-watch">aging</span>
+      <span x-cloak x-show="freshnessBandClass($store.dashboard.freshness.status)==='text-red'" class="pill source-down" x-text="formatFreshnessLabel($store.dashboard.freshness.status).toLowerCase()"></span>
+      <span x-cloak x-show="freshnessBandClass($store.dashboard.freshness.status)==='text-green'" class="pill source-ok">fresh</span>
+      <span x-cloak x-show="freshnessBandClass($store.dashboard.freshness.status)==='band-watch'" class="pill source-watch">aging</span>
       <template x-for="s in ($store.dashboard.sources||[])" :key="s.source_name">
         <span class="pill" :class="`source-${s.status}`" x-text="`${s.source_name}: ${s.status}`"></span>
       </template>

@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import ForecastPoint, ForecastRun, AssetTrendSnapshot
+from services.walk_forward import walk_forward_backtest
 
 log = get_logger(__name__)
 
@@ -16,18 +18,24 @@ def compute_forecast_accuracy(
 ) -> dict[str, Any]:
     asset_key = asset_symbol.upper()
     runs = (
-        db.query(ForecastRun)
-        .filter(ForecastRun.asset_symbol == asset_key)
-        .order_by(ForecastRun.generated_at.desc())
-        .limit(max_runs)
+        db.execute(
+            select(ForecastRun)
+            .where(ForecastRun.asset_symbol == asset_key)
+            .order_by(ForecastRun.generated_at.desc())
+            .limit(max_runs)
+        )
+        .scalars()
         .all()
     )
     results: list[dict[str, Any]] = []
     for run in runs:
         points = (
-            db.query(ForecastPoint)
-            .filter(ForecastPoint.run_id == run.id)
-            .order_by(ForecastPoint.horizon_step.asc())
+            db.execute(
+                select(ForecastPoint)
+                .where(ForecastPoint.run_id == run.id)
+                .order_by(ForecastPoint.horizon_step.asc())
+            )
+            .scalars()
             .all()
         )
         if not points:
@@ -37,13 +45,16 @@ def compute_forecast_accuracy(
         if not first_ts or not last_ts:
             continue
         actuals = (
-            db.query(AssetTrendSnapshot)
-            .filter(
-                AssetTrendSnapshot.asset_symbol == asset_key,
-                AssetTrendSnapshot.timestamp >= first_ts,
-                AssetTrendSnapshot.timestamp <= last_ts,
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(
+                    AssetTrendSnapshot.asset_symbol == asset_key,
+                    AssetTrendSnapshot.timestamp >= first_ts,
+                    AssetTrendSnapshot.timestamp <= last_ts,
+                )
+                .order_by(AssetTrendSnapshot.timestamp.asc())
             )
-            .order_by(AssetTrendSnapshot.timestamp.asc())
+            .scalars()
             .all()
         )
         if not actuals:
@@ -94,9 +105,27 @@ def compute_forecast_accuracy(
             "mape": round(mape, 2) if mape is not None else None,
             "bias": round(sum(errors) / matched, 4),
         })
+    walk_forward = walk_forward_backtest(db, asset_symbol=asset_key, metric="price")
+    wf_results = [
+        {
+            "run_id": f"wf-{f['fold']}",
+            "model": f["model"],
+            "target_metric": f["target_metric"],
+            "horizon": f["horizon"],
+            "generated_at": f.get("test_end"),
+            "matched_points": f["matched_points"],
+            "mae": f["mae"],
+            "mape": f["mape"],
+            "bias": 0.0,
+            "source": "walk_forward",
+        }
+        for f in walk_forward.get("folds", [])
+    ]
+    combined = results + wf_results
     return {
         "asset": asset_key,
-        "runs_evaluated": len(results),
-        "results": results,
+        "runs_evaluated": len(combined),
+        "results": combined,
+        "walk_forward": walk_forward,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }

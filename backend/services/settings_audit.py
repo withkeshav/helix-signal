@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import SettingsAuditLog, User
@@ -45,15 +46,15 @@ def get_settings_audit_logs(
     offset: int = 0,
 ) -> list[SettingsAuditLog]:
     """Get settings audit logs, optionally filtered by setting key or user."""
-    query = db.query(SettingsAuditLog)
+    stmt = select(SettingsAuditLog)
     
     if setting_key:
-        query = query.filter(SettingsAuditLog.setting_key == setting_key)
+        stmt = stmt.where(SettingsAuditLog.setting_key == setting_key)
     
     if user_id:
-        query = query.filter(SettingsAuditLog.user_id == user_id)
+        stmt = stmt.where(SettingsAuditLog.user_id == user_id)
     
-    return query.order_by(SettingsAuditLog.created_at.desc()).offset(offset).limit(limit).all()
+    return db.execute(stmt.order_by(SettingsAuditLog.created_at.desc()).offset(offset).limit(limit)).scalars().all()
 
 
 def get_settings_history(

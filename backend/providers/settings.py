@@ -249,7 +249,7 @@ def get_current_usage(key: str, db: Session) -> Any:
             status = get_budget_status()
             return status.get("tokens_used_today", 0)
         elif key in ("provider_dexscreener", "provider_coingecko", "provider_defillama", 
-                     "provider_coinmarketcap", "provider_moralis"):
+                     "provider_coinmarketcap", "provider_moralis", "provider_thegraph", "provider_flipside"):
             # Get source usage for data providers
             source_name = key.replace("provider_", "")
             usage_summary = get_source_usage_summary(db)

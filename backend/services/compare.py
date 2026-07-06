@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot
@@ -39,13 +40,16 @@ def build_compare_payload(db: Session, *, assets_csv: str, window: str) -> dict[
 
     for sym in symbols:
         rows = (
-            db.query(AssetTrendSnapshot)
-            .filter(
-                AssetTrendSnapshot.asset_symbol == sym,
-                AssetTrendSnapshot.timestamp >= cutoff,
-                AssetTrendSnapshot.source_status != "synthetic_backfill",
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(
+                    AssetTrendSnapshot.asset_symbol == sym,
+                    AssetTrendSnapshot.timestamp >= cutoff,
+                    AssetTrendSnapshot.source_status != "synthetic_backfill",
+                )
+                .order_by(AssetTrendSnapshot.timestamp.asc())
             )
-            .order_by(AssetTrendSnapshot.timestamp.asc())
+            .scalars()
             .all()
         )
         points: list[dict[str, Any]] = []

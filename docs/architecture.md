@@ -1,4 +1,4 @@
-# Architecture (V3)
+# Architecture (V4)
 
 Helix-Signal follows a backend-first architecture with a thin static frontend.
 
@@ -68,7 +68,12 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - **OSINT** (`services/osint.py`): RSS/CryptoPanic ingestion, sentiment, attestation report parsing, supply feed freshness from DefiLlama source status
 - **Retention**: daily cron job in `services/retention.py`
 - APScheduler: interval ingest + hourly OSINT + retention
-- Signal engine: ingest, V3 scoring via `risk_inputs.py`, 5-minute buckets, deduplicated events
+- Signal engine: ingest, V4 scoring via `risk_inputs.py`, 5-minute buckets, deduplicated events
+- **`osint.py` decomposed** → `attestation.py` (reserve parsing + freshness) + `rss_feed.py` (RSS sentiment) with backward-compatible re-exports
+- **`services/scheduler.py`** — 11 job functions extracted from `main.py` (409→190 lines) via `register_scheduler_jobs()`
+- **`services/dashboard.py`** — `build_dashboard_response` decomposed: 274→31 lines orchestration + 6 sub-functions
+- **`data_quality/`** — Freshness, cross-source validation, coverage checks using SA 2.0 style
+- **SA 2.0 migration** — All 66 `db.query()` calls converted to `select()` + `execute()`
 - **Predictive** (`services/predictive.py`): statistical/ML outputs — always available without LLM
 - **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `AI_REQUIRE_TOKEN` gate with per-IP lockout after 20 failed attempts; pre-flight budget deduct in `enrich_with_ai()`
 - **Celery** (`celery_app.py`, `worker_tasks.py`): background refresh and inference when Redis profile is enabled
@@ -87,7 +92,8 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - `js/charts.js` — Chart.js + ECharts rendering (extracted from init.js)
 - `js/utils.js` — Shared utility functions (formatUsd, formatWhen, etc.)
 - `styles.css` — Design system: tokens, glass, elevation, skeleton, icon utilities
-- 5-tab layout: Signal (hero gauge + AI summary + risk/charts) | Market (forecast + supply) | Intel (OSINT + SMIDGE) | System (health + quality) | Settings (governance)
+- 6-tab layout: Signal (hero gauge + AI summary + risk/charts) | Market (forecast + supply) | Intel (OSINT + SMIDGE) | Forensics (blacklist + investigate) | System (health + quality) | Settings (governance)
+- Frontend a11y: `@media (prefers-reduced-motion: reduce)`, `:focus-visible` outlines, `aria-label` on icon-only buttons, `role="dialog"` + `aria-modal` on all modals, global toast/modal composables in `stores/ui.js`
 - nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
 - Frontend container binds to host port 80 (mapped from container port 80)
 - Content-Security-Policy uses SHA-256 hashes to allow specific inline scripts (like importmap) without using 'unsafe-inline'

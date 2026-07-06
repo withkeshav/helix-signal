@@ -6,6 +6,7 @@ export function useGovernance() {
     settingsGroups: [],
     settingsSearch: '',
     settingsGroupFilter: '',
+    settingsError: '',
     aiBudget: { daily_budget: 0, tokens_used_today: 0, tokens_remaining: 0, pct_used: 0 },
     aiBudgetLoaded: false,
     secretValues: {},
@@ -526,6 +527,7 @@ export function useGovernance() {
     // ===================================================================
     async loadSettings() {
       try {
+        this.settingsError = '';
         const params = new URLSearchParams();
         if (this.settingsSearch) params.append('search', this.settingsSearch);
         if (this.settingsGroupFilter) params.append('group', this.settingsGroupFilter);
@@ -549,10 +551,14 @@ export function useGovernance() {
         }
         this.settingsList = [];
         this.filteredSettings = [];
+        this.settingsError = r.status === 401 || r.status === 403
+          ? 'Session expired — please sign in'
+          : `Settings failed (${r.status})`;
         return false;
       } catch (e) {
         this.settingsList = [];
         this.filteredSettings = [];
+        this.settingsError = `Settings failed: ${e.message}`;
         return false;
       }
     },

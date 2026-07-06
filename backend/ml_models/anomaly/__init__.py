@@ -4,6 +4,18 @@ from core.registry import register_model
 from core.plugin_base import AbstractModel
 
 
+_TRAINED_DETECTOR: "AnomalyDetector | None" = None
+
+
+def get_trained_detector() -> "AnomalyDetector | None":
+    return _TRAINED_DETECTOR
+
+
+def set_trained_detector(detector: "AnomalyDetector | None") -> None:
+    global _TRAINED_DETECTOR
+    _TRAINED_DETECTOR = detector
+
+
 @register_model("anomaly")
 class AnomalyDetector(AbstractModel):
     name = "anomaly"

@@ -1146,6 +1146,37 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
         "requires_restart": False,
         "affects_rate_limits": False,
     },
+    # --- V4 ONNX Model Paths ---
+    "onnx_depeg_model_path": {
+        "label": "ONNX Depeg Model Path",
+        "type": "str",
+        "default": "",
+        "key_env": "ONNX_DEPEG_MODEL_PATH",
+        "group": "V4 ML Models",
+        "description": "Path to V3/V4 depeg probability ONNX model (env fallback: ONNX_DEPEG_MODEL_PATH). V4 auto-resolves type-specific models from backend/ml_models/.",
+        "requires_restart": True,
+        "affects_rate_limits": False,
+    },
+    "onnx_funding_model_path": {
+        "label": "ONNX Funding Regime Model Path",
+        "type": "str",
+        "default": "",
+        "key_env": "ONNX_FUNDING_MODEL_PATH",
+        "group": "V4 ML Models",
+        "description": "Path to funding regime classifier ONNX model (env fallback: ONNX_FUNDING_MODEL_PATH).",
+        "requires_restart": True,
+        "affects_rate_limits": False,
+    },
+    "onnx_yield_model_path": {
+        "label": "ONNX Yield Sustainability Model Path",
+        "type": "str",
+        "default": "",
+        "key_env": "ONNX_YIELD_MODEL_PATH",
+        "group": "V4 ML Models",
+        "description": "Path to yield sustainability ONNX model (env fallback: ONNX_YIELD_MODEL_PATH).",
+        "requires_restart": True,
+        "affects_rate_limits": False,
+    },
 }
 
 # Export the settings registry

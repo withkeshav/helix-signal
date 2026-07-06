@@ -4,10 +4,12 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import AssetChainSnapshot, AssetTrendSnapshot, SignalEvent
+from services.onnx_inference import MODELS_DIR, MODEL_REGISTRY, predict_depeg_probability_v4
 
 log = get_logger(__name__)
 
@@ -17,10 +19,11 @@ ENABLED = os.getenv("ENABLE_ANOMALY_DETECTION", "true").strip().lower() in ("1",
 def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 30) -> dict[str, Any]:
     cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
     rows = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == asset_symbol, AssetTrendSnapshot.timestamp >= cutoff)
-        .order_by(AssetTrendSnapshot.timestamp.asc())
-        .all()
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == asset_symbol, AssetTrendSnapshot.timestamp >= cutoff)
+            .order_by(AssetTrendSnapshot.timestamp.asc())
+        ).scalars().all()
     )
     if len(rows) < 10:
         return {"prices": [], "supplies": [], "depeg_indices": [], "concentration_scores": [], "timestamps": []}
@@ -30,6 +33,7 @@ def _fetch_trend_history(db: Session, *, asset_symbol: str, window_days: int = 3
         "supplies": [float(r.total_supply) for r in valid],
         "depeg_indices": [r.depeg_index for r in valid],
         "concentration_scores": [r.concentration_score for r in valid],
+        "signal_scores": [r.signal_score for r in valid],
         "timestamps": [r.timestamp for r in valid],
     }
 
@@ -68,10 +72,11 @@ def _contamination_for_asset(db: Session, asset_symbol: str) -> float:
         return float(override)
     from database import AssetTrendSnapshot
     first = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == asset_symbol.upper())
-        .order_by(AssetTrendSnapshot.timestamp.asc())
-        .first()
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == asset_symbol.upper())
+            .order_by(AssetTrendSnapshot.timestamp.asc())
+        ).scalars().first()
     )
     if first is None:
         return 0.01
@@ -115,9 +120,10 @@ def isolation_forest_detect(points: list[list[float]], contamination: float = 0.
 
 def _check_bridge_flow(db: Session, *, asset_symbol: str, threshold_pct: float = 5.0) -> dict[str, Any]:
     rows = (
-        db.query(AssetChainSnapshot)
-        .filter(AssetChainSnapshot.asset_symbol == asset_symbol)
-        .all()
+        db.execute(
+            select(AssetChainSnapshot)
+            .where(AssetChainSnapshot.asset_symbol == asset_symbol)
+        ).scalars().all()
     )
     if len(rows) < 2:
         return {"active": False, "chains": 0}
@@ -197,7 +203,44 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
         ]
         features.append(row)
     if_anomalies = isolation_forest_detect(features, contamination=_contamination_for_asset(db, asset_symbol))
-    results["isolation_forest"] = {"anomaly_indices": if_anomalies, "point_count": len(features)}
+    ml_detector_note = None
+    try:
+        from ml_models.anomaly import get_trained_detector
+        trained = get_trained_detector()
+        signal_vals = [float(v) for v in history.get("signal_scores", []) if v is not None]
+        if trained and trained.trained and signal_vals:
+            ml_out = trained.predict({"values": signal_vals[-200:]})
+            ml_detector_note = ml_out
+    except Exception:
+        pass
+    results["isolation_forest"] = {
+        "anomaly_indices": if_anomalies,
+        "point_count": len(features),
+        "ml_detector": ml_detector_note,
+    }
+
+    # V4 ONNX depeg probability
+    v4_depeg_prob = None
+    try:
+        row = db.execute(
+            select(AssetChainSnapshot).where(
+                AssetChainSnapshot.asset_symbol == asset_symbol,
+                AssetChainSnapshot.stablecoin_type.isnot(None),
+            )
+        ).scalars().first()
+        if row and row.stablecoin_type:
+            v4_model = MODEL_REGISTRY.get(row.stablecoin_type)
+            if v4_model and (MODELS_DIR / v4_model).is_file():
+                prices = history.get("prices", [])
+                latest_price = prices[-1] if prices else 1.0
+                price_dev_bps = abs((latest_price or 1.0) - 1.0) * 10000
+                v4_features = {"price_deviation_bps": price_dev_bps}
+                v4_depeg_prob = predict_depeg_probability_v4(
+                    asset_symbol, v4_features, row.stablecoin_type
+                )
+    except Exception:
+        log.warning("anomaly.v4_onnx_failed", asset=asset_symbol)
+    results["v4_depeg_probability"] = v4_depeg_prob
 
     normalized: list[dict[str, Any]] = []
     for metric, items in (
@@ -331,14 +374,15 @@ def emit_cusum_regime_events(db: Session, *, asset_symbol: str) -> int:
         return 0
     cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
     existing = (
-        db.query(SignalEvent)
-        .filter(
-            SignalEvent.asset_symbol == asset_symbol.upper(),
-            SignalEvent.event_type == "regime_shift",
-            SignalEvent.timestamp >= cutoff,
-        )
-        .count()
-    )
+        db.execute(
+            select(func.count(SignalEvent.id))
+            .where(
+                SignalEvent.asset_symbol == asset_symbol.upper(),
+                SignalEvent.event_type == "regime_shift",
+                SignalEvent.timestamp >= cutoff,
+            )
+        ).scalar()
+    ) or 0
     if existing:
         return 0
     row = SignalEvent(
@@ -362,11 +406,12 @@ def emit_cusum_regime_events(db: Session, *, asset_symbol: str) -> int:
 def get_recent_anomaly_count(db: Session, *, asset_symbol: str, days: int = 7) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     return (
-        db.query(SignalEvent)
-        .filter(
-            SignalEvent.asset_symbol == asset_symbol,
-            SignalEvent.event_type.in_(["anomaly_detected", "ai_investigation"]),
-            SignalEvent.timestamp >= cutoff,
-        )
-        .count()
-    )
+        db.execute(
+            select(func.count(SignalEvent.id))
+            .where(
+                SignalEvent.asset_symbol == asset_symbol,
+                SignalEvent.event_type.in_(["anomaly_detected", "ai_investigation"]),
+                SignalEvent.timestamp >= cutoff,
+            )
+        ).scalar()
+    ) or 0

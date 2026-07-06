@@ -1,0 +1,77 @@
+{
+  "ethereum": [
+    ["USDT", "0xdAC17F958D2ee523a2206206994597C13D831ec7"],
+    ["USDC", "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"],
+    ["DAI", "0x6B175474E89094C44Da98b954EedeAC495271d0F"],
+    ["PYUSD", "0x6c3ea9036406852006290775BEdCAb4FFd71e55"]
+  ],
+  "solana": [
+    ["USDT", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"],
+    ["USDC", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"],
+    ["PYUSD", "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo"]
+  ],
+  "arbitrum": [
+    ["USDT", "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"],
+    ["USDC", "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"],
+    ["DAI", "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1"]
+  ],
+  "bsc": [
+    ["USDT", "0x55d398326f99059fF775485246999027B3197955"],
+    ["USDC", "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"],
+    ["DAI", "0x1AF3F329e8BE154074D8769D1FFA4e4CE5e97B66"]
+  ],
+  "polygon": [
+    ["USDT", "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"],
+    ["USDC", "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"],
+    ["DAI", "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063"]
+  ],
+  "base": [
+    ["USDC", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"],
+    ["DAI", "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb"]
+  ],
+  "optimism": [
+    ["USDT", "0x94b008aA0059c1e19cF14C1e5b0C62C4Edce5cb2"],
+    ["USDC", "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85"],
+    ["DAI", "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1"]
+  ],
+  "avalanche": [
+    ["USDT", "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7"],
+    ["USDC", "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"],
+    ["DAI", "0xd586E7F844cEa2F87f50152665BCbc2C279D8d70"]
+  ],
+  "tron": [
+    ["USDT", "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"]
+  ],
+  "fantom": [
+    ["USDT", "0x049d68029688eAbF473097a2fC226ef48B538696"],
+    ["USDC", "0x04068DA6C83AFC3790D31bba9a12701a2aF02B5c"],
+    ["DAI", "0x8D11eC02A352E1C7392A1e885E9e0d6Bf6F6e26"]
+  ],
+  "celo": [
+    ["USDT", "0x48065fbBE25f71C9282ddf5E1cC6ebE9746baAb7"],
+    ["USDC", "0xcebA9300f2b948710d2653dD7B07f33A8B32118C"]
+  ],
+  "gnosis": [
+    ["USDT", "0x4ECaBa5870353805a9F068101A40E0f3edbA8D6A"],
+    ["USDC", "0xDDAfbb505ad214D573b52e1F793cc0A6502f50C4"],
+    ["DAI", "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d"]
+  ],
+  "zksync": [
+    ["USDC", "0x1d17CBcF0D6D6a5203E67D2F90d6C2482A8AF492"],
+    ["USDT", "0x493257fD37EDB34451f62EDf8D2a0C418852bA4C"]
+  ],
+  "aptos": [
+    ["USDT", "0xf22bede237a07e121b56d6a27ed7f3f68cb0327a0a74b1be4f4501bd87e9c025"],
+    ["USDC", "0xbae207659db88bea0cbead6da0ed00aac12edcdda169e591cd41c94180b46c3b"]
+  ],
+  "ton": [
+    ["USDT", "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"]
+  ],
+  "near": [
+    ["USDT", "usdt.tether-token.near"],
+    ["USDC", "a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.factory.bridge.near"]
+  ],
+  "plasma": [
+    ["USDT", "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7"]
+  ]
+}

@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot
@@ -53,14 +54,15 @@ def run_backfill(db: Session, *, asset: str, days: int, _internal: bool = False)
         day = _day_start(ts)
 
         live_exists = (
-            db.query(AssetTrendSnapshot)
-            .filter(
-                AssetTrendSnapshot.asset_symbol == sym,
-                AssetTrendSnapshot.timestamp >= day,
-                AssetTrendSnapshot.timestamp < day + timedelta(days=1),
-                AssetTrendSnapshot.source_status != SYNTHETIC_SOURCE,
-            )
-            .first()
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(
+                    AssetTrendSnapshot.asset_symbol == sym,
+                    AssetTrendSnapshot.timestamp >= day,
+                    AssetTrendSnapshot.timestamp < day + timedelta(days=1),
+                    AssetTrendSnapshot.source_status != SYNTHETIC_SOURCE,
+                )
+            ).scalars().first()
         )
         if live_exists:
             skipped_live += 1
@@ -68,13 +70,14 @@ def run_backfill(db: Session, *, asset: str, days: int, _internal: bool = False)
 
         bucket_id = int(day.timestamp() // 86400)
         existing_synth = (
-            db.query(AssetTrendSnapshot)
-            .filter(
-                AssetTrendSnapshot.asset_symbol == sym,
-                AssetTrendSnapshot.bucket_id == bucket_id,
-                AssetTrendSnapshot.source_status == SYNTHETIC_SOURCE,
-            )
-            .first()
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(
+                    AssetTrendSnapshot.asset_symbol == sym,
+                    AssetTrendSnapshot.bucket_id == bucket_id,
+                    AssetTrendSnapshot.source_status == SYNTHETIC_SOURCE,
+                )
+            ).scalars().first()
         )
         if existing_synth:
             skipped_existing += 1

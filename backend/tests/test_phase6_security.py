@@ -108,7 +108,7 @@ class TestSettingsAuth:
 
     def test_get_settings_403_without_token(self, client):
         resp = client.get("/api/settings")
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
     def test_get_settings_200_with_token(self, client, admin_headers):
         resp = client.get("/api/settings", headers=admin_headers)
@@ -124,7 +124,7 @@ class TestSettingsAuth:
 
     def test_put_settings_403_without_token(self, client):
         resp = client.put("/api/settings", json={"key": "test", "value": True})
-        assert resp.status_code == 403
+        assert resp.status_code == 401
 
 
 class TestBruteforceLockout:

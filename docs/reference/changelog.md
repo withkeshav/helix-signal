@@ -1,20 +1,62 @@
 # Changelog
 
-## [Unreleased]
+## 4.0.0 (2026-07-05)
 
-### UX/UI Overhaul (Layers 0–8)
-- **6h window fix** — `VALID_WINDOWS` in security.py now includes "6h" (was missing, causing 400 errors on 6H pill clicks)
-- **Sparkline KPIs** — Three SVG sparklines (signal, peg, supply) extracted from `/api/trends` via `_computeSpark()` in `useMarket.js` and rendered as `<polyline>` elements in index.html KPI cards
-- **Tab restructure (5-tab)** — Old 6-tab layout (Overview, Supply, Forecast, Events, Health, Quality, Settings) merged to 5 tabs: Signal | Market | Intel | System | Settings. Content deduplicated, sibling x-data scopes preserved
-- **Signal tab hero layout** — 3-zone restructure: HERO (gauge + AI summary with in-card sub-tabs), CONTEXT (Risk Terminal + Stress/Rotation), DETAIL (charts + chain cards). Time Range selector moved inside AI Summary card
-- **Chain cards collapsible** — "Show All" / "Show Less" toggle on Chain Details grid via `showAllChains` flag
-- **Evidence Drawer removed** — Entire evidence drawer component (HTML/CSS/JS) deleted. `showEvidence`, `copyEvidence` methods and `evidenceOpen` store key removed
-- **Signal Score KPI removed** — Redundant KPI card removed from global kpi-row
-- **Diagnostics moved to System tab** — Diagnostics card relocated from Signal tab to System tab
-- **Card elevation CSS** — Added `.card-raised` and `.card-flat` classes for design hierarchy
-- **Micro-interactions** — `transform:scale(0.97)` on button presses, `transition` on interactive card elements
-- **Lucide SVG icon system** — `.icon`, `.icon-sm`, `.icon-lg`, `.icon-xl` CSS classes for Lucide-compatible SVG sprites
-- **Skeleton loading screens** — `.skeleton`, `.skeleton-text`, `.skeleton-title`, `.skeleton-card`, `.skeleton-circle` CSS classes with shimmer animation
+### Sprint 9 — Code Quality
+- **`build_dashboard_response` decomposed** — 274→31 lines orchestration with 6 sub-functions in `services/dashboard.py`
+- **`osint.py` split** — 701→167 lines orchestrator; `attestation.py` (385) + `rss_feed.py` (177) with backward-compatible re-exports
+- **`services/scheduler.py`** — 11 job functions from `main.py` (409→190 lines) via `register_scheduler_jobs()`
+- **SA 2.0 migration** — 66 `db.query()` → `select()` + `execute()` across 25 files in `services/` and `data_quality/`
+- **433 tests passing** — 9 new DeFiLlama mock tests, 6 new signal engine tests
+- **Frontend a11y** — `prefers-reduced-motion`, `:focus-visible`, `aria-label` on icon-only, `role="dialog"` on modals, global toast/modal composables in `stores/ui.js`
+
+### Sprint 8 — Frontend Forensics
+- **Forensics tab** — New 6th tab (Signal, Market, Intel, Forensics, System, Settings) with KPI cards, events table, and investigate form
+- **Stablecoin taxonomy** — `frontend/js/taxonomy.js` with 24-coin definitions (Fiat/Crypto/Yield/Algo types) + `getTypeBadge()` helper
+- **Type badge icons** — 6 new SVG icons (shield, search-addr, fingerprint, 4 type badges) in index.html sprite
+- **On-chain composable** — `useOnchain.js` for wallet/contract/transaction lookup
+- **Market tab badges** — Token cards show type badges and narrative card row
+- **CSS additions** — Badge colors, forensic table, investigate panel styles
+
+### Sprint 7 — API Routes & Testing
+- **4 new API routes** — Investigate, yield intelligence, blacklist events, narrative (all under `/api/v1`)
+- **401 tests passing** — 13 new Sprint 7 tests, SAWarning fix in investigation engine
+- **Pydantic response models** — Inline in each route file
+
+### Sprint 6 — DEWS & On-Chain
+- **DEWS** — Distributed Early Warning System with multi-source anomaly scoring
+- **On-chain sources** — Alchemy RPC, Moralis, Flipside, The Graph, Chainlink Oracle, on-chain tokens
+- **Address clustering** — Heuristic cluster detection from on-chain tx patterns
+- **Bridge hop tracker** — Cross-chain bridge routing (CCTP, Stargate, Across, LayerZero, Synapse, Tornado Cash, Railgun)
+- **Peel chain detector** — Fund movement tracing through intermediate addresses
+
+### Sprint 5 — ONNX ML Models
+- **3 ONNX models** — Depeg probability, funding regime, yield sustainability (opset 9, manual `onnx.helper`)
+- **Anomaly service** — ONNX inference + heuristic fallback + type-specific scoring
+- **Walk-forward validation** — Time-series-aware model evaluation
+
+### Sprint 4 — Evaluators & Rules
+- **9 evaluators** — Reserve, collateral, yield, funding, concentration, velocity, liquidity, attestation, governance
+- **Type-specific rules** — Fiat/Crypto/Delta scoring formulas with depeg model rules
+- **OSINT expansion** — Additional RSS sources, external intel webhook
+
+### Sprint 3 — V4 Scoring Engine
+- **4 component scorers** — Reserve, Collateral, Yield, Funding with type-dispatched weights
+- **V4 dispatch** — Updated signal_engine/core.py with V4 weight matrices
+- **Reserve scraper** — Automated reserve report fetching
+
+### Sprint 2 — Data Sources
+- **6 plugins** — Ethena, Coinglass, Sky (MakerDAO), Liquity, Aave, Ondo
+
+### Sprint 1 — Foundation
+- **24-coin taxonomy** — 4 types across 24 stablecoins
+- **6 ORM models** — `FiatReserve`, `Collateral`, `YieldBearing`, `FundingRate`, `WhaleActivity`, `BlacklistEvent`
+- **3 DuckDB OLAP tables** — Yield, whale, blacklist time-series
+- **16 new settings** — Provider API keys and endpoints
+- **8 Alembic migrations** — V4 schema evolution
+- **V4 weight matrices** — 6 sub-types with per-component weights
+- **Band unification** — Healthy/Normal/Warning/Distress/Critical
+- **CLI** — `add_stablecoin.py --type` argument
 
 ## 3.10.3 (2026-06-25)
 

@@ -9,14 +9,6 @@ from services.cache_service import cache_service
 
 _TTL_SECONDS = int(os.getenv("REDIS_CACHE_TTL_SECONDS", "45"))
 
-CACHE_TTL = {
-    "price": 30,
-    "supply": 300,
-    "trends": 600,
-    "events": 300,
-    "sources": 60,
-}
-
 
 def _cache_enabled() -> bool:
     from providers.settings import get_setting
@@ -61,21 +53,5 @@ def get_or_build_dashboard(
     cache_set(key, payload)
     payload["_cache"] = "miss"
     return payload
-
-
-def get_cache_stats() -> dict[str, Any]:
-    """Get cache service statistics."""
-    return cache_service.get_stats()
-
-
-def clear_cache_stats() -> None:
-    """Clear cache service statistics."""
-    cache_service.clear_stats()
-
-
-def cache_health_check() -> dict[str, Any]:
-    """Perform cache health check."""
-    return cache_service.health_check()
-
 
 

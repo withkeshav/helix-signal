@@ -15,6 +15,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
 os.environ["HELIX_SKIP_STARTUP_REFRESH"] = "1"
 os.environ["HELIX_ADMIN_TOKEN"] = "test-admin-token"
+os.environ["SESSION_SIGNING_KEY"] = "test-session-signing-key-for-pytest-only"
 os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 
 import providers.settings  # noqa: E402,F401 — registers Setting model with Base.metadata
@@ -36,6 +37,12 @@ _TABLES = [
     "signal_events",
     "forecast_points",
     "forecast_runs",
+    "blacklist_events",
+    "whale_activity_snapshots",
+    "fiat_reserve_snapshots",
+    "collateral_snapshots",
+    "yield_bearing_snapshots",
+    "funding_rate_snapshots",
 ]
 
 

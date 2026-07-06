@@ -1,5 +1,5 @@
 import { gaugeArc, gaugeColor, formatWhen, formatAiAge, formatUsd, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from '../utils.js';
-import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, _setupResizeHandler, _disposeAllCharts, _disposeChart } from '../charts.js';
+import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, _setupResizeHandler, _disposeAllCharts, _disposeChart, renderRiskTerminalChart, renderContagionGraph, resizeAllHelixCharts } from '../charts.js';
 
 export function useMarket() {
   return {
@@ -34,6 +34,7 @@ export function useMarket() {
     aiNarrative: '',
     aiInsights: '',
     predictive: {},
+    dews: {},
     stressLeaderboard: [],
     rotation: {},
     
@@ -120,7 +121,10 @@ export function useMarket() {
     },
     
     loadChartRange() {
-      this.$dispatch('chart-range-changed', { timeRange: this.timeRange });
+      this.$nextTick(() => {
+        this.loadTrendChart();
+        this.renderSupplyChart();
+      });
     },
     
     // Chart methods
@@ -132,6 +136,9 @@ export function useMarket() {
     _setupResizeHandler,
     _disposeAllCharts,
     _disposeChart,
+    renderRiskTerminalChart,
+    renderContagionGraph,
+    resizeAllHelixCharts,
     
     // Init — called automatically by Alpine when component mounts
     async init() {
@@ -143,6 +150,7 @@ export function useMarket() {
           await this.loadAllAssetSnapshots();
           await this.loadAnomalies();
           await this.loadPredictive();
+          await this.loadDews();
           await this.loadMarketOverview();
           await this.loadAiExplain();
           await this.loadNarrative();
@@ -170,6 +178,8 @@ export function useMarket() {
       this.$nextTick(() => {
         this.renderCharts({ chains: this.chains });
         this.renderSupplyChart();
+        this.renderRiskTerminalChart(this.predictive);
+        this.renderContagionGraph(this.rotation);
       });
       
       // Set up resize handler
@@ -179,6 +189,12 @@ export function useMarket() {
       this.$watch('$store.ui.tab', (newTab) => {
         if (newTab !== 'signal' && newTab !== 'market') {
           this._disposeAllCharts();
+        } else {
+          this.$nextTick(() => {
+            this.renderRiskTerminalChart(this.predictive);
+            if (newTab === 'market') this.renderContagionGraph(this.rotation);
+            this.resizeAllHelixCharts();
+          });
         }
       });
       
@@ -191,6 +207,7 @@ export function useMarket() {
             this.loadAllAssetSnapshots(),
             this.loadAnomalies(),
             this.loadPredictive(),
+            this.loadDews(),
             this.loadMarketOverview(),
             this.loadAiExplain(),
             this.loadNarrative(),
@@ -206,6 +223,8 @@ export function useMarket() {
         this.$nextTick(() => {
           this.renderCharts({ chains: this.chains });
           this.renderSupplyChart();
+          this.renderRiskTerminalChart(this.predictive);
+          this.renderContagionGraph(this.rotation);
         });
       });
     },
@@ -291,19 +310,23 @@ export function useMarket() {
           const j = await r.json(); 
           this.predictive = j;
           this.$store.dashboard.predictive = j;
+          this.$nextTick(() => this.renderRiskTerminalChart(j));
           return j; 
         } 
       } catch (e) {}
       return null;
     },
-    
-    async loadSupplyTrend() {
+
+    async loadDews() {
       try {
-        const r = await fetch(`/api/trends?asset=${this.asset}&window=30d`, { cache: 'no-store' });
-        if (!r.ok) return null;
-        const j = await r.json();
-        return j;
-      } catch (e) { return null; }
+        const r = await fetch(`/api/dews?asset=${this.asset}`, { cache: 'no-store' });
+        if (r.ok) {
+          this.dews = await r.json();
+          this.$store.dashboard.dews = this.dews;
+        }
+      } catch (e) {
+        this.dews = {};
+      }
     },
     
     // Additional loading methods needed for dashboard cards
@@ -382,6 +405,8 @@ export function useMarket() {
         if (!r.ok) { this.rotation = { available: false, pairs: [] }; return; }
         const d = await r.json();
         this.rotation = d;
+        this.$store.dashboard.rotation = d;
+        this.$nextTick(() => this.renderContagionGraph(d));
       } catch (e) {
         this.rotation = { available: false, pairs: [] };
       }

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot
@@ -39,9 +40,12 @@ def compute_cross_asset_matrix(
 
     for sym in assets:
         rows = (
-            db.query(AssetTrendSnapshot)
-            .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
-            .order_by(AssetTrendSnapshot.timestamp.asc())
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
+                .order_by(AssetTrendSnapshot.timestamp.asc())
+            )
+            .scalars()
             .all()
         )
         for r in rows:

@@ -38,6 +38,7 @@ _TABLES = [
     "forecast_points",
     "forecast_runs",
     "blacklist_events",
+    "address_tags",
     "whale_activity_snapshots",
     "fiat_reserve_snapshots",
     "collateral_snapshots",

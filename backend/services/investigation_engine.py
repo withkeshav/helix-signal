@@ -233,7 +233,7 @@ async def _run_pipeline(
         "risk_level": report.risk_level,
     }
     try:
-        from services.ai_router import _ollama_cloud
+        from services.components.ai.facade import ollama_cloud
         prompt = (
             f"You are a crypto forensics analyst. Summarize the following "
             f"investigation findings in 3 sentences for a compliance officer. "
@@ -244,7 +244,7 @@ async def _run_pipeline(
         api_key = get_setting("secret_ollama_api_key", db)
         import asyncio
         result = await asyncio.to_thread(
-            _ollama_cloud,
+            ollama_cloud,
             prompt=prompt,
             max_tokens=200,
             system="You are a compliance-focused blockchain forensics analyst. Be concise.",

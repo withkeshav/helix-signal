@@ -20,7 +20,6 @@ def register_routes(app):
     from routes.sources import router as sources_router
     from routes.trends import router as trends_router
     from routes.analytics import router as analytics_router
-    from routes.chain_detail import router as chain_detail_router
     from routes.settings_audit import router as settings_audit_router
     from routes.settings_import_export import router as settings_import_export_router
     from routes.users import router as users_router
@@ -30,7 +29,7 @@ def register_routes(app):
     from routes.investigate import router as investigate_router
     from routes.yield_intelligence import router as yield_intelligence_router
     from routes.blacklist import router as blacklist_router
-    from routes.narrative import router as narrative_router
+    from routes.tags import router as tags_router
 
     app.include_router(admin_router, prefix="/api", tags=["admin"])
     app.include_router(ai_router, prefix="/api", tags=["ai"])
@@ -50,7 +49,6 @@ def register_routes(app):
     app.include_router(sources_router, prefix="/api", tags=["sources"])
     app.include_router(trends_router, prefix="/api", tags=["trends"])
     app.include_router(analytics_router, prefix="/api", tags=["analytics"])
-    app.include_router(chain_detail_router, prefix="/api", tags=["chains"])
     app.include_router(settings_audit_router, prefix="/api", tags=["settings"])
     app.include_router(settings_import_export_router, prefix="/api", tags=["settings"])
     app.include_router(users_router, prefix="/api", tags=["users"])
@@ -60,4 +58,4 @@ def register_routes(app):
     app.include_router(investigate_router, prefix="/api/v1", tags=["investigate"])
     app.include_router(yield_intelligence_router, prefix="/api/v1", tags=["yield"])
     app.include_router(blacklist_router, prefix="/api/v1", tags=["blacklist"])
-    app.include_router(narrative_router, prefix="/api/v1", tags=["narrative"])
+    app.include_router(tags_router, prefix="/api", tags=["tags"])

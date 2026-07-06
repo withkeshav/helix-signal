@@ -47,11 +47,11 @@ def admin_diagnostics(
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ) -> dict[str, Any]:
-    return _build_diagnostics(db)
+    return _build_diagnostics(db, app=request.app)
 
 
-def _build_diagnostics(db: Session) -> dict[str, Any]:
-    health = _get_health(db)
+def _build_diagnostics(db: Session, app=None) -> dict[str, Any]:
+    health = _get_health(db, app=app)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "version": HELIX_VERSION,
@@ -72,7 +72,7 @@ def _build_diagnostics(db: Session) -> dict[str, Any]:
     }
 
 
-def _get_health(db: Session) -> dict[str, Any]:
+def _get_health(db: Session, app=None) -> dict[str, Any]:
     db_ok = False
     scheduler_running = False
     redis_connected = False
@@ -87,7 +87,12 @@ def _get_health(db: Session) -> dict[str, Any]:
             redis_connected = True
     except Exception:
         logger.debug("Redis health check failed", exc_info=True)
-    pass  # scheduler status unavailable — no standalone scheduler module
+    try:
+        if app is not None:
+            scheduler_running = bool(app.state.scheduler.running)
+    except AttributeError:
+        logger.debug("Scheduler state not available")
+        scheduler_running = False
     return {
         "db": db_ok,
         "redis_connected": redis_connected,

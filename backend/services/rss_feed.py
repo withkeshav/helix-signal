@@ -150,13 +150,30 @@ CLASSIFIER_SYSTEM_PROMPT = (
 )
 
 
+def _default_classification() -> dict[str, Any]:
+    return {
+        "event_type": "OTHER", "affected_assets": [], "severity": "info",
+        "driver_category": "economic", "extracted_numbers": [],
+        "is_leading_indicator": False, "confidence": 0.0, "source_authority": 0.0,
+    }
+
+
 def classify_article_structured(title: str, summary: str) -> dict[str, Any]:
     """Use Ollama Cloud to classify a stablecoin article into structured fields."""
     try:
-        from services.components.ai.providers._ollama_cloud import _ollama_cloud
+        from services.components.ai.facade import ollama_cloud
+        import os
         text = f"Title: {title}\nSummary: {summary}"
-        result = _ollama_cloud(system=CLASSIFIER_SYSTEM_PROMPT, user=text, json_mode=True)
-        raw = result.get("content", "{}") if isinstance(result, dict) else str(result)
+        api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+        result = ollama_cloud(
+            prompt=text,
+            max_tokens=300,
+            system=CLASSIFIER_SYSTEM_PROMPT,
+            _resolved_api_key=api_key,
+        )
+        if not result or not result.get("text"):
+            return _default_classification()
+        raw = result["text"]
         parsed = json.loads(raw)
         return {
             "event_type": parsed.get("event_type", "OTHER"),
@@ -170,8 +187,4 @@ def classify_article_structured(title: str, summary: str) -> dict[str, Any]:
         }
     except Exception:
         log.exception("classify_article_structured.failed")
-        return {
-            "event_type": "OTHER", "affected_assets": [], "severity": "info",
-            "driver_category": "economic", "extracted_numbers": [],
-            "is_leading_indicator": False, "confidence": 0.0, "source_authority": 0.0,
-        }
+        return _default_classification()

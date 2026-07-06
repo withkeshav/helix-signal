@@ -88,13 +88,6 @@ Each AI feature can be configured with granular settings for optimal performance
 | `ai_insights_max_assets` | Integer | 10 | Maximum assets to analyze |
 | `ai_insights_correlation_min` | Float | 0.3 | Minimum correlation coefficient (0.0-1.0) |
 
-### OSINT Settings
-
-| Setting Key | Type | Default | Description |
-|-------------|------|---------|-------------|
-| `osint_enable_sentiment` | Boolean | true | Enable sentiment analysis for articles |
-| `osint_enable_entity_extraction` | Boolean | true | Enable entity extraction from articles |
-
 ## Provider Configuration
 
 Helix-Signal supports multiple AI providers with automatic fallback:

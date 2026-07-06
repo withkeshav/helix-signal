@@ -9,7 +9,7 @@ from database import get_db
 from services.source_usage import get_source_usage_summary
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
-from core.registry import SOURCES_REGISTRY, get_source
+from core.registry import SOURCES_REGISTRY, SOURCE_INSTANCES, get_source
 
 router = APIRouter()
 
@@ -48,4 +48,12 @@ def get_sources_usage(request: Request, db: Session = Depends(get_db), _auth=Dep
 def get_source_config(request: Request, name: str, _auth=Depends(require_admin_token)):
     if name not in SOURCES_REGISTRY:
         raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
-    return {"name": name}
+    source = get_source(name)
+    return {
+        "name": name,
+        "registered": True,
+        "class": SOURCES_REGISTRY[name].__name__,
+        "module": SOURCES_REGISTRY[name].__module__,
+        "has_health_check": hasattr(source, "health_check") if source else False,
+        "instance_loaded": name in SOURCE_INSTANCES,
+    }

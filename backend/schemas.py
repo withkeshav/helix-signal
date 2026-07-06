@@ -282,3 +282,24 @@ class InvestigationReportOut(BaseModel):
     risk_level: str
     generated_at: str
     errors: list[str] = []
+
+
+class AddressTagOut(BaseModel):
+    id: int
+    address: str
+    chain: str | None = None
+    source: str
+    label: str
+    category: str
+    confidence: float
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AddressTagCreate(BaseModel):
+    address: str
+    chain: str | None = None
+    label: str
+    category: str
+    confidence: float = 1.0

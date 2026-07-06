@@ -91,6 +91,8 @@ def ingest_osint_feed(db: Session) -> int:
         )
         db.add(article)
         db.flush()
+        from services.tagging import auto_tag_from_osint
+        auto_tag_from_osint(db, article)
         for sym in (art["assets"] or []):
             db.add(OsintArticleAsset(article_id=article.id, asset_symbol=sym.upper()))
 

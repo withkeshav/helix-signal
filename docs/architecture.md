@@ -15,7 +15,7 @@ SQLite or PostgreSQL/Timescale (snapshots, trends, events, OSINT)
     |
     +--> /api/health, /api/assets, /api/dashboard
     +--> /api/trends (+ export), /api/events (+ export), /api/compare
-    +--> /api/chains/{chain_key}, /api/osint/*, /api/governance
+    +--> /api/osint/*, /api/governance
     +--> POST /api/refresh
             |
             +--> signal_engine (scoring, metrics, history)

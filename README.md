@@ -8,7 +8,7 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**433+ regression tests pass (0 failed).**
+**460 regression tests pass (0 failed).**
 
 **Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. See [`.progress/transform.md`](.progress/transform.md) §3.2 for the execution log.
 
@@ -18,14 +18,15 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **Type-specific scoring** — Separate depeg model rules for Fiat (price_dev + coverage + attest_lag), Crypto (price_dev + coll_ratio + liq_queue), and Delta (price_dev + funding + insurance) with per-sub-type V4 weight matrices
 - **ONNX ML models** — 3 models built via `onnx.helper` (opset 9): depeg probability, funding regime detection, yield sustainability. Build with `scripts/build_v4_models.py`
 - **Investigation engine** — 8-step async pipeline (address clustering, bridge hop tracing, peel chain analysis, blacklist watch, on-chain token lookup, DEWS anomaly scoring, AI narrative generation, yield intelligence)
-- **Forensics tab** — New 6th dashboard tab with blacklist stats/events, wallet investigation form, and threat-level KPIs
+- **Forensics tab** — Dashboard tab with blacklist stats/events, wallet investigation form, and threat-level KPIs
+- **Alerts inbox** — 7th dashboard tab showing fired `SignalEvent` rows with asset/severity filters plus active alert rule list. Backend: `GET /api/alerts` (admin-gated).
 - **DEWS** — Distributed Early Warning System combining multi-source anomaly scores with circuit-breaker chain dispatch
 - **6 new ORM tables** — `FiatReserve`, `Collateral`, `YieldBearing`, `FundingRate`, `WhaleActivity`, `BlacklistEvent` + 3 DuckDB OLAP tables
 - **On-chain intelligence** — Alchemy RPC, Moralis, Flipside, The Graph, Chainlink Oracle feeds + address clustering + bridge hop tracking + peel chain detection
-- **4 new API endpoints** — `/api/v1/investigate`, `/api/v1/yield/intelligence`, `/api/v1/blacklist/events`, `/api/v1/yield/narrative`
+- **3 new API endpoints** — `/api/v1/investigate`, `/api/v1/yield/intelligence`, `/api/v1/blacklist/events`
 - **8 Alembic migrations** — Full schema evolution for V4 tables and column additions
 - **SA 2.0 style** — All 66 `db.query()` calls migrated to `select()` + `execute()` across 25 files
-- **433+ regression tests** — All existing tests pass, 32 new tests for DeFiLlama, signal engine, investigation/blacklist/yield/narrative
+- **460 regression tests** — All tests pass, including 24 new tests for address tagging, clustering, and webhook dispatch
 
 ## V3 Highlights
 
@@ -39,7 +40,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **AI anomaly detection** (gated): Z-score, Isolation Forest (trained on startup when enough history), StatsForecast forecast. Train ONNX depeg model with `scripts/train_depeg_model.py` using labels from `data/depeg_events.json`.
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
-- **Alpine.js + ECharts frontend**: 6-tab layout (Signal, Market, Intel, Forensics, System, Settings), no build step, CDN-loaded
+- **Alpine.js + ECharts frontend**: 8-tab layout (Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings), lazy-mounted Settings tab, chart dispose-on-unmount, no build step, CDN-loaded
 
 ## Quick Start
 
@@ -159,7 +160,6 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/trends`, `/api/trends/chains` | Historical windows |
 | `GET /api/trends/export`, `/api/events/export` | CSV/JSON export |
 | `GET /api/compare` | Cross-asset aligned series |
-| `GET /api/chains/{chain_key}` | Chain drill-down |
 | `GET /api/events` | Signal feed |
 | `GET /api/forecasts` | Latest forecast runs |
 | `GET /api/predictive` | Predictive bundle (depeg probability, regime, forecast) |
@@ -170,6 +170,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/anomaly/forecast` | Supply forecast (StatsForecast/AutoARIMA) |
 | `POST /api/admin/backfill` | Optional synthetic history (env-gated; admin token required) |
 | `GET /api/alerts/config` | Alert rule definitions (admin token required) |
+| `GET /api/alerts` | Fired signal events with optional `?asset=`, `?severity=`, `?limit=` filters (admin token required) |
 | `GET /api/settings` | Feature flags and refresh intervals (admin token required) |
 | `PUT /api/settings` | Update settings (admin token required) |
 | `GET /api/governance` | Governance monitoring (admin token required) |
@@ -196,8 +197,11 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/onchain/whale-flow` | On-chain whale flow analysis (net inflows/outflows by asset) |
 | `GET /api/onchain/holder-concentration` | Top-10 holder concentration percentage per asset |
 | `GET /api/v1/blacklist/events` | Query blacklist events with optional filters (admin token required) |
+| `GET /api/v1/tags/{address}` | Tags for an address (optional `?chain=` filter) |
+| `POST /api/v1/tags` | Create an address tag (admin token required) |
+| `DELETE /api/v1/tags/{tag_id}` | Delete a tag by ID (admin token required) |
+| `GET /api/v1/tags/export` | CSV export of all address tags (admin token required) |
 | `GET /api/v1/blacklist/stats` | Blacklist aggregate statistics (total events, frozen USD, by asset/chain) |
-| `GET /api/v1/assets/{symbol}/narrative` | AI-generated narrative and market context for an asset |
 | `GET /api/v1/assets/{symbol}/yield` | Protocol yield analysis and scoring |
 | `GET /api/v1/assets/{symbol}/collateral` | Collateral composition breakdown |
 | `GET /api/v1/assets/{symbol}/reserve` | Reserve attestation data and timestamp |
@@ -211,7 +215,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/core/` — framework (registry, plugin base, circuit breaker, cache, config loader, DB manager, rate limiter)
 - `backend/middleware/` — security validation + observability middleware
 - `backend/ml_models/` — V4 ONNX models (depeg events, funding regime, yield sustainability)
-- `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, investigate, yield, blacklist, narrative, onchain, dews)
+- `backend/routes/` — modular route files (dashboard, trends, events, analytics, osint, sources, investigate, yield, blacklist, onchain, dews)
 - `backend/services/` — core services (cache, dashboard, anomaly, investigation engine, DEWS, onchain, walk-forward)
 - `backend/sources/plugins/` — source plugins (DeFiLlama, CoinGecko, DEX Screener, Ethena, Coinglass, Sky, Liquity, Aave, Ondo) with circuit breakers
 - `backend/signal_engine/` — V4 risk scoring (scoring, metrics, history, risk inputs, component scorers)
@@ -219,7 +223,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/services/attestation.py` — Reserve attestation parsing and freshness scoring
 - `backend/services/rss_feed.py` — OSINT RSS feed ingestion with sentiment scoring
 - `backend/data_quality/` — Data quality checks (freshness, cross-source validation, coverage) using SA 2.0 style
-- `frontend/` — pure static HTML, Alpine.js 6-tab dashboard, ECharts, nginx API proxy
+- `frontend/` — pure static HTML, Alpine.js 8-tab dashboard (lazy-mounted Settings), ECharts with dispose-on-unmount, nginx API proxy
 - `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast, forensics, onchain, taxonomy) + 3 Web Components
 - `config/` — chain, asset, and alert configuration
 - `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories
@@ -237,11 +241,10 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - Adding a stablecoin: [`docs/guides/adding-asset.md`](docs/guides/adding-asset.md)
 - Adding a chain: [`docs/guides/adding-chain.md`](docs/guides/adding-chain.md)
 - Plugin development: [`docs/guides/plugins.md`](docs/guides/plugins.md)
-- Code quality improvements: [`docs/reference/phase6_code_quality.md`](docs/reference/phase6_code_quality.md)
 - Scoring design: [`docs/scoring-design.md`](docs/scoring-design.md)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Security: [`SECURITY.md`](SECURITY.md)
-- Changelog: [`docs/reference/changelog.md`](docs/reference/changelog.md)
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - Backup script: [`scripts/backup.sh`](scripts/backup.sh)
 
 ## Not Investment Advice

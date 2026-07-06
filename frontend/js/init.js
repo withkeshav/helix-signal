@@ -13,6 +13,13 @@ import { useHealth } from 'composables/useHealth.js';
 import { useSMIDGE } from 'composables/useSMIDGE.js';
 import { useOnchain } from 'composables/useOnchain.js';
 import { useForensics } from 'composables/useForensics.js';
+import { useAlerts } from 'composables/useAlerts.js';
+import { useTags } from 'composables/useTags.js';
+import { useFundamentals } from 'composables/useFundamentals.js';
+import { useAnalytics } from 'composables/useAnalytics.js';
+import { useTrendsDeepDive } from 'composables/useTrendsDeepDive.js';
+import { useAdminOps } from 'composables/useAdminOps.js';
+import { setupVisibilityDispose, disposeAllChartInstances } from './charts.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -28,6 +35,12 @@ Alpine.data('healthDashboard', useHealth);
 Alpine.data('smidgePanel', useSMIDGE);
 Alpine.data('onchainPanel', useOnchain);
 Alpine.data('forensics', useForensics);
+Alpine.data('alertsPanel', useAlerts);
+Alpine.data('tagsPanel', useTags);
+Alpine.data('fundamentalsPanel', useFundamentals);
+Alpine.data('analyticsPanel', useAnalytics);
+Alpine.data('trendsDeepDive', useTrendsDeepDive);
+Alpine.data('adminOps', useAdminOps);
 
 // Minimal root application component
 Alpine.data('helixApp', () => ({
@@ -56,7 +69,7 @@ Alpine.data('helixApp', () => ({
     const root = document.documentElement;
     this.theme = root.getAttribute('data-theme') || 'light';
 
-    const validTabs = ['signal', 'market', 'intel', 'forensics', 'system', 'settings'];
+    const validTabs = ['signal', 'market', 'analytics', 'intel', 'forensics', 'alerts', 'system', 'settings'];
     const hashTab = location.hash.slice(1);
     this.tab = validTabs.includes(hashTab) ? hashTab : 'signal';
     this.$store.ui.tab = this.tab;
@@ -81,10 +94,28 @@ Alpine.data('helixApp', () => ({
       this._loadWarnings();
     }, 60000);
     
-    // Watch for tab changes
+    // Watch for tab changes — dispose charts on leave to prevent memory leaks
+    let prevTab = this.tab;
     this.$watch('tab', val => {
+      if (prevTab !== val) {
+        disposeAllChartInstances();
+        prevTab = val;
+      }
       location.hash = val;
       this.$dispatch('tab-changed', { tab: val });
+    });
+
+    // Dispose charts when page becomes hidden (Phase 3.3)
+    setupVisibilityDispose();
+
+    // Browser back/forward support — sync tab from URL hash (Phase 3.1)
+    window.addEventListener('popstate', () => {
+      const hashTab = location.hash.slice(1);
+      if (validTabs.includes(hashTab) && hashTab !== this.tab) {
+        this.tab = hashTab;
+        this.$store.ui.tab = hashTab;
+        this.$dispatch('tab-changed', { tab: hashTab });
+      }
     });
     
     // Sync asset changes to dashboard store

@@ -5,14 +5,17 @@ POST /api/v1/webhooks/intel
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
 import logging
+import os
+import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -91,11 +94,88 @@ def _lookup_authority(source_domain: str) -> float:
     return SOURCE_AUTHORITY["default"]
 
 
+async def _ai_enhance(
+    title: str,
+    summary: str,
+    db: Session,
+) -> dict[str, Any] | None:
+    """Use LLM to enrich incoming intel with entity extraction, classification, and sentiment.
+
+    Returns a dict with keys that can be merged into the article or None.
+    """
+    ai_mode = os.getenv("AI_MODE", "").strip()
+    if ai_mode == "ai_off":
+        return None
+
+    try:
+        from services.components.ai.facade import ollama_cloud
+
+        api_key = str(get_setting("secret_ollama_api_key", db) or os.getenv("OLLAMA_API_KEY", "")).strip()
+        if not api_key:
+            return None
+    except Exception:
+        return None
+
+    text = f"Title: {title}\n\nBody: {summary}" if summary else f"Title: {title}"
+    prompt = (
+        "Analyze this stablecoin intelligence. Return ONLY valid JSON with these keys:\n"
+        "- event_type: one of DEPEG_CONFIRMED, PROTOCOL_EXPLOIT, ISSUER_FREEZE, "
+        "SANCTIONS_ACTION, LAW_ENFORCEMENT, AML_CASE, REGULATORY_PRESSURE, FRAUD_SIGNAL, GEOPOLITICAL\n"
+        "- affected_coins: list of ticker symbols mentioned\n"
+        "- severity: critical, warning, or info\n"
+        "- narrative: one-sentence assessment\n"
+        "- sentiment: positive, negative, or neutral\n"
+        "- sentiment_score: float -1.0 to 1.0\n"
+        "- confidence: float 0.0 to 1.0\n\n"
+        f"Intel:\n{text[:2500]}"
+    )
+    try:
+        result = await asyncio.to_thread(
+            ollama_cloud,
+            prompt=prompt,
+            max_tokens=400,
+            system="You are a stablecoin intelligence analyst. Respond ONLY with valid JSON.",
+            _resolved_api_key=api_key,
+        )
+        if not result or not result.get("text"):
+            return None
+
+        raw = result["text"].strip()
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not match:
+            return None
+
+        parsed = json.loads(match.group())
+        out: dict[str, Any] = {}
+        if isinstance(parsed.get("affected_coins"), list):
+            coins = [s.upper().strip() for s in parsed["affected_coins"] if isinstance(s, str)]
+            if coins:
+                out["affected_assets"] = coins
+        if isinstance(parsed.get("event_type"), str) and parsed["event_type"] in {
+            "DEPEG_CONFIRMED", "PROTOCOL_EXPLOIT", "ISSUER_FREEZE",
+            "SANCTIONS_ACTION", "LAW_ENFORCEMENT", "AML_CASE",
+            "REGULATORY_PRESSURE", "FRAUD_SIGNAL", "GEOPOLITICAL",
+        }:
+            out["event_type"] = parsed["event_type"]
+        if isinstance(parsed.get("sentiment_score"), (int, float)):
+            out["sentiment_score"] = float(parsed["sentiment_score"])
+        if isinstance(parsed.get("sentiment"), str):
+            out["sentiment_label"] = parsed["sentiment"].lower()[:16]
+        if isinstance(parsed.get("narrative"), str):
+            out["narrative"] = parsed["narrative"]
+
+        return out
+    except Exception:
+        log.warning("intel_webhook.ai_enhance_failed", exc_info=True)
+
+    return None
+
+
 @router.post("/v1/webhooks/intel")
 async def receive_external_intel(request: Request, db: Session = Depends(get_db)):
     if not get_setting("external_intel_webhook_enabled", db):
         log.warning("intel_webhook.disabled")
-        return {"status": "error", "reason": "webhook_disabled"}
+        raise HTTPException(status_code=503, detail="webhook_disabled")
 
     auth_mode = get_setting("external_intel_auth_mode", db) or "secret_header"
     secret_header_name = get_setting("external_intel_secret_header_name", db) or "X-Intel-Secret"
@@ -106,17 +186,17 @@ async def receive_external_intel(request: Request, db: Session = Depends(get_db)
         payload = json.loads(body)
     except json.JSONDecodeError:
         log.warning("intel_webhook.invalid_json")
-        return {"status": "error", "reason": "invalid_json"}
+        raise HTTPException(status_code=400, detail="invalid_json")
 
     if auth_mode == "hmac_sha256":
         sig = request.headers.get("X-Intel-Signature", "")
         if not _verify_hmac(body, sig, webhook_secret):
             log.warning("intel_webhook.invalid_hmac")
-            return {"status": "error", "reason": "invalid_signature"}
+            raise HTTPException(status_code=401, detail="invalid_signature")
     elif auth_mode == "secret_header":
         if not _verify_secret_header(request, secret_header_name, webhook_secret):
             log.warning("intel_webhook.invalid_secret")
-            return {"status": "error", "reason": "invalid_secret"}
+            raise HTTPException(status_code=401, detail="invalid_secret")
 
     field_map_raw = get_setting("external_intel_field_map_json", db) or (
         '{"title":"title","signal":"signal","summary":"summary",'
@@ -165,6 +245,14 @@ async def receive_external_intel(request: Request, db: Session = Depends(get_db)
         log.info("intel_webhook.skipped_low_signal", signal=helix_event_type)
         return {"status": "ok", "processed": False, "reason": "low_signal_priority"}
 
+    ai_enhanced = await _ai_enhance(title, summary, db)
+    if ai_enhanced:
+        if "event_type" in ai_enhanced:
+            helix_event_type = ai_enhanced["event_type"]
+        if "affected_assets" in ai_enhanced:
+            extra = [s for s in ai_enhanced["affected_assets"] if s not in affected_assets]
+            affected_assets.extend(extra)
+
     article = OsintArticle(
         source=source_domain or "external_intel_webhook",
         title=title,
@@ -174,12 +262,17 @@ async def receive_external_intel(request: Request, db: Session = Depends(get_db)
         entities=json.dumps(affected_assets) if affected_assets else None,
         event_type=helix_event_type,
         source_authority=source_authority,
+        sentiment_score=ai_enhanced.get("sentiment_score") if ai_enhanced else None,
+        sentiment_label=ai_enhanced.get("sentiment_label") if ai_enhanced else None,
     )
     db.add(article)
     db.flush()
     for sym in affected_assets:
         db.add(OsintArticleAsset(article_id=article.id, asset_symbol=sym.upper()))
     db.commit()
+
+    if ai_enhanced and ai_enhanced.get("narrative"):
+        log.info("intel_webhook.ai_enhanced", narrative=ai_enhanced["narrative"][:120])
 
     log.info("intel_webhook.processed", title=title[:60], event_type=helix_event_type)
     return {"status": "ok", "processed": True}

@@ -141,7 +141,31 @@ async def lifespan(app: FastAPI):
             await asyncio.gather(*tasks_to_await, return_exceptions=True)
 
 
-app = FastAPI(title="Helix-Signal API", lifespan=lifespan)
+app = FastAPI(
+    title="Helix-Signal API",
+    description="Stablecoin intelligence platform — on-chain surveillance, anomaly detection, "
+                "and market-wide early warning for the stablecoin ecosystem. "
+                "Provides REST endpoints for alerts, forensics, OSINT, address tagging, "
+                "and real-time signal streaming.",
+    version="4.0.0",
+    contact={
+        "name": "Helix Signal Team",
+        "url": "https://github.com/anomalyco/Helix-Signal",
+    },
+    license_info={
+        "name": "MIT",
+        "identifier": "MIT",
+    },
+    lifespan=lifespan,
+    swagger_ui_parameters={
+        "syntaxHighlight.theme": "monokai",
+        "defaultModelsExpandDepth": 3,
+        "docExpansion": "list",
+        "filter": True,
+        "deepLinking": True,
+        "displayRequestDuration": True,
+    },
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)

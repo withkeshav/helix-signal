@@ -13,6 +13,10 @@
 *.sqlite3
 backend/helix.db
 backend/*.db
+*.db.bak
+backend/tests/*.db
+backend/test.db
+backend/test_persistent.db
 
 # --- Python Environment ---
 __pycache__/

@@ -198,7 +198,8 @@ def _fetch_pyusd_attestation_date_from_framer_index(page_html: str) -> datetime 
 
 
 def _extract_report_date_via_llm(raw_html: str) -> datetime | None:
-    from services.ai_router import ai_mode, _within_budget
+    from services.components.ai.facade import within_budget
+    from services.ai_router import ai_mode
 
     if ai_mode() == "ai_off":
         return None
@@ -217,7 +218,7 @@ def _extract_report_date_via_llm(raw_html: str) -> datetime | None:
     dense = _dense_text_from_html(raw_html)
 
     estimated_tokens = len(dense.split()) // 2 + 100
-    if not _within_budget(estimated_tokens):
+    if not within_budget(estimated_tokens):
         return None
 
     system_prompt = (

@@ -14,11 +14,7 @@
 ## Concepts
 - [Data Methodology](concepts/data-methodology.md) — Scoring, supply velocity, regime detection, anomaly detection
 
-## Reference
-- [Code Quality Improvements](reference/phase6_code_quality.md) — Phase 6 refactoring and modularization
-- [Funding & Support](reference/funding.md)
-
 ## External
 - [Contributing](../CONTRIBUTING.md)
 - [Security](../SECURITY.md)
-- [Changelog](reference/changelog.md)
+- [Changelog](../CHANGELOG.md)

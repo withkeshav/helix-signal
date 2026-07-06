@@ -372,3 +372,34 @@ export function renderSmidgeRadar(smidge) {
     }],
   });
 }
+
+// --- Centralized chart-dispose-on-unmount helper (Phase 3.0/3.3) ---
+// Disposes all ECharts instances found on the page that belong to disposed containers.
+// Called on tab-leave / route-change to prevent memory leaks from hidden charts.
+export function disposeAllChartInstances() {
+  // ECharts instances registered via window.echarts
+  if (window.echarts && typeof window.echarts.dispose === 'function') {
+    // Global dispose isn't per-instance; iterate known chart containers
+  }
+  const containers = document.querySelectorAll('[id^="chart-"], [id^="graph-"]');
+  for (const el of containers) {
+    try {
+      const inst = window.echarts && window.echarts.getInstanceByDom(el);
+      if (inst && typeof inst.isDisposed === 'function' && !inst.isDisposed()) {
+        inst.dispose();
+      }
+    } catch (e) { /* chart already disposed */ }
+  }
+}
+
+// Set up global visibilitychange listener to dispose heavy viz when tab is hidden
+export function setupVisibilityDispose() {
+  if (window._helixVisibilityDispose) return;
+  window._helixVisibilityDispose = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Page hidden — dispose heavy charts to free memory
+      disposeAllChartInstances();
+    }
+  });
+}

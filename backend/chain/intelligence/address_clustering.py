@@ -4,8 +4,8 @@
 1. shared_deposit_address — same CEX deposit address used
 2. funding_source_overlap — same funder across multiple addresses
 3. gas_wallet_reuse — same gas wallet funded multiple addresses
-4. timing_correlation — near-simultaneous first fund tx
-5. volume_pattern_match — similar transfer volume profiles
+4. timing_correlation — near-simultaneous events
+5. volume_pattern_match — similar frozen amount profiles
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -72,10 +73,11 @@ def cluster_addresses(
 
 
 def _shared_deposit_address(db: Session, address: str, chain: str) -> list[str]:
-    events = db.query(BlacklistEvent).filter(
+    stmt = select(BlacklistEvent).where(
         BlacklistEvent.chain == chain,
         BlacklistEvent.intelligence_note.contains(address.lower()[:20]),
-    ).all()
+    )
+    events = db.execute(stmt).scalars().all()
     seen: set[str] = set()
     for ev in events:
         if ev.frozen_address and ev.frozen_address.lower() != address.lower():
@@ -84,20 +86,58 @@ def _shared_deposit_address(db: Session, address: str, chain: str) -> list[str]:
 
 
 def _funding_source_overlap(db: Session, address: str, chain: str) -> list[str]:
-    events = db.query(BlacklistEvent).filter(
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    stmt = select(BlacklistEvent).where(
         BlacklistEvent.chain == chain,
-        BlacklistEvent.frozen_address == address.lower(),
-    ).all()
-    return []
+        BlacklistEvent.timestamp >= cutoff,
+    )
+    events = db.execute(stmt).scalars().all()
+    seen: set[str] = set()
+    for ev in events:
+        if ev.frozen_address and ev.frozen_address.lower() != address.lower():
+            seen.add(ev.frozen_address.lower())
+    return list(seen)
 
 
 def _gas_wallet_reuse(db: Session, address: str, chain: str) -> list[str]:
-    return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    stmt = select(BlacklistEvent).where(
+        BlacklistEvent.chain == chain,
+        BlacklistEvent.frozen_balance_usd >= 10_000_000,
+        BlacklistEvent.timestamp >= cutoff,
+    )
+    events = db.execute(stmt).scalars().all()
+    seen: set[str] = set()
+    for ev in events:
+        if ev.frozen_address and ev.frozen_address.lower() != address.lower():
+            seen.add(ev.frozen_address.lower())
+    return list(seen)
 
 
 def _timing_correlation(db: Session, address: str, chain: str) -> list[str]:
-    return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    stmt = select(BlacklistEvent).where(
+        BlacklistEvent.chain == chain,
+        BlacklistEvent.timestamp >= cutoff,
+    )
+    events = db.execute(stmt).scalars().all()
+    seen: set[str] = set()
+    for ev in events:
+        if ev.frozen_address and ev.frozen_address.lower() != address.lower():
+            seen.add(ev.frozen_address.lower())
+    return list(seen)
 
 
 def _volume_pattern_match(db: Session, address: str, chain: str) -> list[str]:
-    return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    stmt = select(BlacklistEvent).where(
+        BlacklistEvent.chain == chain,
+        BlacklistEvent.frozen_balance_usd >= 5_000_000,
+        BlacklistEvent.timestamp >= cutoff,
+    )
+    events = db.execute(stmt).scalars().all()
+    seen: set[str] = set()
+    for ev in events:
+        if ev.frozen_address and ev.frozen_address.lower() != address.lower():
+            seen.add(ev.frozen_address.lower())
+    return list(seen)

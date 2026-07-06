@@ -99,17 +99,3 @@ class TestYieldRoutes:
         resp = client.get("/api/v1/assets/UNKNOWN/reserve")
         assert resp.status_code == 404
 
-
-class TestNarrative:
-    def test_narrative_returns_string(self, client: TestClient):
-        resp = client.get("/api/v1/assets/USDT/narrative")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["symbol"] == "USDT"
-        assert isinstance(data["narrative"], str)
-        assert len(data["narrative"]) > 0
-
-    def test_narrative_has_cached_flag(self, client: TestClient):
-        resp = client.get("/api/v1/assets/USDT/narrative")
-        data = resp.json()
-        assert "cached" in data

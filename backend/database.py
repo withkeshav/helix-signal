@@ -559,6 +559,27 @@ class BlacklistEvent(Base):
     )
 
 
+class AddressTag(Base):
+    """Persisted address-level intelligence tags."""
+
+    __tablename__ = "address_tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    address: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    chain: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    source: Mapped[str] = mapped_column(String(50), nullable=False)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_addrtag_addr_chain", "address", "chain"),
+    )
+
+
 def get_db():
     db = SessionLocal()
     try:

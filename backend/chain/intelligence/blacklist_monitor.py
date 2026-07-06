@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from structlog import get_logger
 
-from database import BlacklistEvent, SignalEvent
+from database import AddressTag, BlacklistEvent, SignalEvent
 from providers.settings import get_setting
 
 log = get_logger(__name__)
@@ -98,10 +98,10 @@ async def _generate_intel_note(db: Session, address: str, amount: float, asset: 
         f"and whether this is related to sanctioned entities, exchange security, or regulatory action."
     )
     try:
-        from services.ai_router import _ollama_cloud
+        from services.components.ai.facade import ollama_cloud
         api_key = get_setting("secret_ollama_api_key", db)
         result = await asyncio.to_thread(
-            _ollama_cloud,
+            ollama_cloud,
             prompt=prompt,
             max_tokens=150,
             system="You are a blockchain intelligence analyst. Provide concise, factual assessments.",
@@ -190,6 +190,9 @@ async def _poll_ethereum(db: Session) -> dict[str, Any]:
                 db.add(event)
                 events += 1
 
+                from services.tagging import auto_tag_from_blacklist
+                auto_tag_from_blacklist(db, event)
+
                 if frozen_usd > ALERT_THRESHOLD_USD:
                     db.add(SignalEvent(
                         asset_symbol=sym,
@@ -257,7 +260,7 @@ async def _poll_tron(db: Session) -> dict[str, Any]:
                 else f"Tron USDT freeze {frozen_amount} USDT"
             )
 
-            db.add(BlacklistEvent(
+            tron_event = BlacklistEvent(
                 asset_symbol="USDT",
                 chain="tron",
                 frozen_address=frozen_address,
@@ -267,8 +270,12 @@ async def _poll_tron(db: Session) -> dict[str, Any]:
                 block_number=block_num,
                 intelligence_note=note,
                 timestamp=now,
-            ))
+            )
+            db.add(tron_event)
             events += 1
+
+            from services.tagging import auto_tag_from_blacklist
+            auto_tag_from_blacklist(db, tron_event)
 
             if frozen_usd > ALERT_THRESHOLD_USD:
                 db.add(SignalEvent(

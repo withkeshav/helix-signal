@@ -2,6 +2,48 @@
 
 ## v4.0.0 (2026-07-05)
 
+### Added
+- **Alerts inbox UI** — New "Alerts" tab showing fired `SignalEvent` rows with asset/severity filters, plus the active alert rule list. Backend: `GET /api/alerts` (admin-gated, supports `?asset=`, `?severity=`, `?limit=`). Composable: `frontend/js/composables/useAlerts.js`. *(Phase 2.1)*
+- **Address tagging manager UI** — Tags sub-panel in the Forensics tab: search-by-address lookup, create/delete tags (admin), CSV export. Wraps the existing `/api/v1/tags` CRUD API. Composable: `frontend/js/composables/useTags.js`. *(Phase 2.2)*
+- **Fundamentals panel UI** — Yield / Collateral / Reserve intelligence cards in the Market tab, driven by the active asset. Composable: `frontend/js/composables/useFundamentals.js`. *(Phase 2.3)*
+- **Analytics explorer UI** — New "Analytics" tab with regime detection (state/duration/transitions), change-point detection list, and cross-asset correlation matrix heatmap. Composable: `frontend/js/composables/useAnalytics.js`. *(Phase 2.4)*
+- **Trends deep-dive + export** — Deep-dive modal on the Signal tab with chain breakdown (`/api/trends/chains`) + CSV export button (`/api/trends/export`). Composable: `frontend/js/composables/useTrendsDeepDive.js`. *(Phase 2.5)*
+- **Admin operations drawer** — Slide-out drawer in the System tab with scheduler status (live from `/admin/diagnostics`), synthetic backfill trigger, diagnostics JSON download, and events CSV export. Composable: `frontend/js/composables/useAdminOps.js`. *(Phase 2.6)*
+- **Settings registry audit script** — Reusable `backend/scripts/audit_settings.py` to cross-reference registry keys against codebase usage. *(Phase 1.6)*
+- **AI facade** — Public `services/components/ai/facade.py` re-exporting `ollama_cloud`, `within_budget`, `get_budget_status` (no underscore). Updated 6 call sites to import from the facade instead of private `ai_router` symbols. Backward-compat aliases retained. Documented in `docs/api.md`. *(Phase 1.8)*
+- **`refresh_chain_data` integration tests** — Added `test_refresh_chain_data.py` with 2 tests: no-enabled-assets early-return path + success path with stubbed async source registry. Covers the previously untested core async refresh flow. *(Phase 1.10)*
+
+### Changed
+- **Settings tab lazy-mounted via `<template x-if>`** — Settings DOM subtree (~870 lines) now mounts only when the Settings tab is active and unmounts on tab switch. Reduces initial DOM size and prevents hidden watchers/computeds from running. `useGovernance` state persists across mount/unmount cycles. *(Phase 3.0)*
+- **Browser back/forward support** — Added `popstate` listener to sync tab state from URL hash when browser navigation buttons are used. Tab routing continues to use `location.hash` (no `@alpinejs/history` dependency — custom History API approach chosen after ESM compat review). *(Phase 3.1)*
+- **Yield/Collateral/Reserve schemas completed** — `*Out` pydantic models in `routes/yield_intelligence.py` now expose all DB columns (was missing: `apy_7d_avg`, `apy_7d_delta`, `yield_sustainability`, `funding_rate_*`, `insurance_fund_*`, `staking_ratio`, `lending_utilization_pct`, `collateral_assets`, `liquidation_threshold`, `liquidation_queue_usd`, `debt_ceiling_utilization_pct`, `largest_vault_usd`, `collateral_health_score`, `reserve_composition`, `attestation_url`, `attestation_source`, `attestation_lag_days`, `genius_act_compliant`, `mica_status`). Removed stale fields (`total_supply`, `total_collateral_usd`, `total_debt_usd`, `recovery_mode`) that did not exist on the DB models. *(Phase 2.3)*
+- **`/sources/{name}/config` now returns real metadata** — Class, module, health-check capability, and instance load state instead of empty `{"name": name}`. *(Phase 1.1)*
+
+### Fixed
+- **Chart-dispose-on-unmount** — Added centralized `disposeAllChartInstances()` and `setupVisibilityDispose()` helpers in `charts.js`. Charts are now disposed on tab-leave and when the page becomes hidden (`visibilitychange`), preventing memory leaks from accumulated ECharts instances. *(Phase 3.3)*
+- **`sources/moralis.py` — Missing `import time`** — Added `import time` to resolve `NameError` at runtime when retry logic fires. *(Phase 1.3)*
+- **`routes/admin.py` — Scheduler health check placeholder** — Replaced `pass` with live `app.state.scheduler.running` read, threaded `request.app` through `_build_diagnostics`/`_get_health`. Falls back to `False` on `AttributeError`. *(Phase 1.4)*
+- **Ruff lint fixes** — Ran `ruff check --fix backend/` (1 error auto-fixed). Ruff already runs in CI pipeline (ci.yml:42). *(Phase 1.5)*
+- **`services/rss_feed.py` — Broken import** — `classify_article_structured` imported from nonexistent `services.components.ai.providers._ollama_cloud` (latent crash). Fixed to use facade with correct signature; extracted `_default_classification()` helper. *(Phase 1.8)*
+
+### Removed
+- **Stub CRUD endpoints in `routes/alerts.py`** — Removed 5 placeholder routes (list/create/get/put/delete). Only `/alerts/config` retained. *(Phase 1.1)*
+- **Stub CRUD endpoints in `routes/reports.py`** — Removed 5 placeholder routes (list/create/get/put/delete). Only `/reports/summary` retained. *(Phase 1.1)*
+- **Dead endpoint `routes/narrative.py`** — Removed `/api/v1/assets/{symbol}/narrative` (no UI consumer, replaced by `/api/ai/narrative`). *(Phase 1.2)*
+- **Dead endpoint `routes/chain_detail.py`** — Removed `/api/chains/{chain_key}` (no UI consumer; service module retained for Phase 2 re-add). *(Phase 1.2)*
+- **Dead test `TestNarrative`** — Removed 2 tests for the deleted narrative endpoint. *(Phase 1.2)*
+- **Dormant OSINT settings** — `osint_enable_sentiment`, `osint_enable_entity_extraction`, `osint_min_sentiment_score` removed from `settings_registry.py` (never read; OSINT uses `feature_nlp_sentiment`). Removed stale entries from `docs/guides/ai-configuration.md`. *(Phase 1.6)*
+- **Duplicate SMTP settings** — `smtp_host`, `smtp_port`, `smtp_user` removed from `settings_registry.py` (duplicates of `alert_smtp_*` which is the namespace `services/alerts.py` actually reads). *(Phase 1.6)*
+- **`backend/helix.db.bak` untracked** — Removed from git tracking via `git rm --cached` (635 KB binary artifact). Strengthened `.gitignore` to cover `*.db.bak`, `backend/test.db`, `backend/test_persistent.db`, `backend/tests/*.db`. *(Phase 1.7)*
+
+### Security
+- **CORS default hardened** — `cors_origins` registry default changed from `"*"` to `http://localhost:3000,http://localhost`. Production deployments must set explicit origins. Warning for `"*"` already in place (`main.py:182`). *(Phase 3.4)*
+- **Webhook auth returns proper HTTP status codes** — `external_intel_webhook.py` now returns 401 (invalid signature/secret), 400 (invalid JSON), 503 (disabled) instead of 200 with `{status:"error"}` body. *(Phase 3.4)*
+- **Webhook dispatch moved to background thread** — `signal_engine/history.py:_flush_events` now dispatches webhooks via `threading.Thread(daemon=True)` instead of blocking the history refresh flow synchronously. *(Phase 3.4)*
+
+### Chores
+- **Clustering test assertions strengthened** — `test_clustering.py` "with_data" tests now assert non-empty results against seeded blacklist events (was `isinstance(result, list)` — passed on empty). Orchestrator test asserts ≥1 clustered address. *(Phase 1.10)*
+
 ### Code Quality — Sprint 9
 - **`build_dashboard_response` decomposed** — 274→31 lines orchestration with 6 sub-functions (`_aggregate_chain_data`, `_compute_signals`, `_compute_freshness`, `_build_sources_payload`, etc.) in `services/dashboard.py`
 - **`osint.py` split** — 701→167 lines thin orchestrator; `attestation.py` (385 lines) + `rss_feed.py` (177 lines) extracted with backward-compatible re-exports

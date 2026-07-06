@@ -90,6 +90,56 @@ def test_alerts_config_returns_rules(client, admin_headers):
     assert len(rules) > 0
 
 
+def test_alerts_inbox_requires_admin_token(client):
+    """Without admin token, /alerts returns 401/403."""
+    response = client.get("/api/alerts")
+    assert response.status_code in (401, 403)
+
+
+def test_alerts_inbox_returns_events(client, admin_headers, db_session):
+    """With seeded SignalEvents, /alerts returns them ordered by timestamp desc."""
+    from datetime import datetime, timezone
+    from database import SignalEvent
+    db_session.add(SignalEvent(
+        asset_symbol="USDT", event_type="test", severity="warning",
+        title="Test alert", summary="Seeded test event",
+        timestamp=datetime.now(timezone.utc),
+    ))
+    db_session.commit()
+
+    response = client.get("/api/alerts", headers=admin_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "events" in data
+    assert isinstance(data["events"], list)
+    assert len(data["events"]) >= 1
+    assert data["events"][0]["title"] == "Test alert"
+
+
+def test_alerts_inbox_filters_by_severity(client, admin_headers, db_session):
+    """Severity filter narrows the result set."""
+    from datetime import datetime, timezone
+    from database import SignalEvent
+    now = datetime.now(timezone.utc)
+    db_session.add(SignalEvent(
+        asset_symbol="USDT", event_type="test", severity="critical",
+        title="Critical alert", summary="Sev=critical",
+        timestamp=now,
+    ))
+    db_session.add(SignalEvent(
+        asset_symbol="USDT", event_type="test", severity="info",
+        title="Info alert", summary="Sev=info",
+        timestamp=now,
+    ))
+    db_session.commit()
+
+    response = client.get("/api/alerts?severity=critical", headers=admin_headers)
+    assert response.status_code == 200
+    titles = [e["title"] for e in response.json()["events"]]
+    assert "Critical alert" in titles
+    assert "Info alert" not in titles
+
+
 def test_governance_monitoring(client, admin_headers):
     response = client.get("/api/governance?asset=USDT", headers=admin_headers)
     assert response.status_code == 200

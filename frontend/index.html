@@ -189,8 +189,10 @@
       <div class="nav-links" role="tablist">
         <button class="nav-link" role="tab" :class="tab==='signal'&&'active'" :aria-selected="tab==='signal'" @click="tab='signal';loadTab()" aria-controls="tab-signal">Signal</button>
         <button class="nav-link" role="tab" :class="tab==='market'&&'active'" :aria-selected="tab==='market'" @click="tab='market';loadTab()" aria-controls="tab-market">Market</button>
+        <button class="nav-link" role="tab" :class="tab==='analytics'&&'active'" :aria-selected="tab==='analytics'" @click="tab='analytics';loadTab()" aria-controls="tab-analytics">Analytics</button>
         <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()" aria-controls="tab-intel">Intel</button>
         <button class="nav-link" role="tab" :class="tab==='forensics'&&'active'" :aria-selected="tab==='forensics'" @click="tab='forensics';loadTab()" aria-controls="tab-forensics">Forensics</button>
+        <button class="nav-link" role="tab" :class="tab==='alerts'&&'active'" :aria-selected="tab==='alerts'" @click="tab='alerts';loadTab()" aria-controls="tab-alerts">Alerts</button>
         <button class="nav-link" role="tab" :class="tab==='system'&&'active'" :aria-selected="tab==='system'" @click="tab='system';loadTab()" aria-controls="tab-system">System</button>
         <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings" aria-label="Settings"><svg class="icon"><use href="#icon-settings"/></svg></button>
       </div>
@@ -545,9 +547,39 @@
       </div>
 
       <!-- Signal Trend Chart -->
-      <div class="chart-card">
-        <h2>Signal Score Trend <span class="time-badge" x-text="timeRange.toUpperCase()"></span></h2>
+      <div class="chart-card" x-data="trendsDeepDive">
+        <h2>Signal Score Trend <span class="time-badge" x-text="timeRange.toUpperCase()"></span>
+          <button class="btn btn-muted" @click="openTrendsDeepDive()" style="float:right;padding:4px 10px;font-size:11px">Deep-dive</button>
+          <button class="btn btn-muted" @click="exportTrendsCsv()" style="float:right;margin-right:6px;padding:4px 10px;font-size:11px">Export CSV</button>
+        </h2>
         <div class="chart-wrap"><canvas id="chart-trend-signal"></canvas></div>
+
+        <!-- Trends deep-dive modal -->
+        <div x-cloak x-show="trendsDeepDiveVisible" @keydown.window.escape="trendsDeepDiveVisible=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center" @click.self="trendsDeepDiveVisible=false">
+          <div style="background:var(--panel);border-radius:12px;padding:20px;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+              <h2 style="margin:0">Chain Breakdown</h2>
+              <button class="btn btn-muted" @click="trendsDeepDiveVisible=false" style="padding:2px 8px">×</button>
+            </div>
+            <div x-cloak x-show="trendsError" class="warning-banner visible" x-text="trendsError" style="margin-bottom:8px"></div>
+            <div x-cloak x-show="trendsLoading" class="kpi-sub" style="padding:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
+            <div x-cloak x-show="!trendsLoading && (!chainTrends || !chainTrends.points || chainTrends.points.length === 0)" class="kpi-sub" style="padding:12px;text-align:center">No chain breakdown data available.</div>
+            <div x-cloak x-show="chainTrends && chainTrends.points && chainTrends.points.length">
+              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px"><span x-text="chainTrends.points.length"></span> chain series</div>
+              <div style="max-height:360px;overflow-y:auto">
+                <template x-for="(chain, idx) in (chainTrends.chains || [])" :key="'cb-' + idx">
+                  <div class="event-card" style="margin-bottom:6px;padding:8px 10px">
+                    <div class="event-title" style="font-size:13px"><strong x-text="chain.name || chain.chain || ('Chain ' + idx)"></strong></div>
+                    <div class="event-meta" style="font-size:12px;color:var(--text-muted)">
+                      <span x-show="chain.current_supply != null">supply: <span x-text="fmtUsd(chain.current_supply)"></span></span>
+                      <span x-show="chain.supply_share_pct != null" style="margin-left:10px">share: <span x-text="fmtPct(chain.supply_share_pct)"></span></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Chain Supply Distribution -->
@@ -688,6 +720,112 @@
         <div class="chart-card">
           <h2>Supply Trend (30d)</h2>
           <div class="chart-wrap tall"><canvas id="chart-supply-trend"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Fundamentals sub-panel (yield, collateral, reserve) -->
+      <div x-data="fundamentalsPanel" x-init="loadFundamentals($store.dashboard.asset)" @asset-changed.window="loadFundamentals($event.detail.asset)" style="margin-top:16px">
+        <div x-cloak x-show="fundamentalsError" class="warning-banner visible" x-text="fundamentalsError" style="margin-bottom:8px"></div>
+        <div x-cloak x-show="fundamentalsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading fundamentals for <span x-text="fundamentalsSymbol"></span>...</div>
+        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">No yield, collateral, or reserve data for <span x-text="fundamentalsSymbol"></span>.</div>
+        <div x-cloak x-show="hasAnyFundamentals()" class="insight-grid">
+          <div class="insight-card" x-cloak x-show="fundamentals.yield">
+            <h2>Yield</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Current APY</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.yield?.current_apy)"></div></div>
+              <div><div class="kpi-label">7d Avg APY</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.yield?.apy_7d_avg)"></div></div>
+              <div><div class="kpi-label">Yield Source</div><div style="font-size:var(--fs-base)" x-text="fundamentals.yield?.yield_source || '-'"></div></div>
+              <div><div class="kpi-label">Sustainability</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.yield?.yield_sustainability)"></div></div>
+              <div><div class="kpi-label">Funding Rate (current)</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.yield?.funding_rate_current)"></div></div>
+              <div><div class="kpi-label">Insurance Fund</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.yield?.insurance_fund_usd)"></div></div>
+            </div>
+          </div>
+          <div class="insight-card" x-cloak x-show="fundamentals.collateral">
+            <h2>Collateral</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Collateral Ratio</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.collateral?.collateral_ratio)"></div></div>
+              <div><div class="kpi-label">Liquidation Threshold</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.liquidation_threshold)"></div></div>
+              <div><div class="kpi-label">Liquidation Queue</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.collateral?.liquidation_queue_usd)"></div></div>
+              <div><div class="kpi-label">Largest Vault</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.collateral?.largest_vault_usd)"></div></div>
+              <div><div class="kpi-label">Debt Ceiling Util</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.debt_ceiling_utilization_pct)"></div></div>
+              <div><div class="kpi-label">Health Score</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.collateral_health_score)"></div></div>
+            </div>
+          </div>
+          <div class="insight-card" x-cloak x-show="fundamentals.reserve">
+            <h2>Reserve Attestation</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Reserve USD</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtUsd(fundamentals.reserve?.reserve_usd)"></div></div>
+              <div><div class="kpi-label">Coverage Ratio</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.reserve?.coverage_ratio)"></div></div>
+              <div><div class="kpi-label">Attestation Date</div><div style="font-size:var(--fs-base)" x-text="fmtDate(fundamentals.reserve?.attestation_date)"></div></div>
+              <div><div class="kpi-label">Lag (days)</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.attestation_lag_days ?? '-'"></div></div>
+              <div><div class="kpi-label">GENIUS Act</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.genius_act_compliant == null ? '-' : (fundamentals.reserve?.genius_act_compliant ? 'Compliant' : 'Non-compliant')"></div></div>
+              <div><div class="kpi-label">MiCA Status</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.mica_status || '-'"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Analytics (regime, change-points, cross-asset) -->
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'analytics'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="tabpanel" id="tab-analytics">
+      <div x-cloak x-show="analyticsError" class="warning-banner visible" x-text="analyticsError" style="margin-bottom:8px"></div>
+      <div x-cloak x-show="analyticsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading analytics for <span x-text="analyticsAsset"></span>...</div>
+
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h2>Regime Detection <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="analyticsAsset"></span> · <span x-text="regimeWindowHours"></span>h window)</span></h2>
+          <div x-cloak x-show="!regime && !analyticsLoading" class="kpi-sub" style="padding:12px">No regime data available.</div>
+          <div x-cloak x-show="regime" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+            <div><div class="kpi-label">Current State</div><div style="font-size:var(--fs-lg);font-weight:700"><span class="badge" :class="regimeColor(regime?.state)" x-text="regime?.state || '-'"></span></div></div>
+            <div><div class="kpi-label">Duration</div><div style="font-size:var(--fs-base)" x-text="regime?.duration_hours != null ? regime.duration_hours + 'h' : '-'"></div></div>
+            <div><div class="kpi-label">Transitions (window)</div><div style="font-size:var(--fs-base)" x-text="regime?.transitions ?? '-'"></div></div>
+            <div><div class="kpi-label">Confidence</div><div style="font-size:var(--fs-base)" x-text="fmtNum(regime?.confidence)"></div></div>
+          </div>
+        </div>
+        <div class="insight-card">
+          <h2>Change-Point Detection <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="analyticsAsset"></span> · <span x-text="cpWindowDays"></span>d)</span></h2>
+          <div x-cloak x-show="!changePoints && !analyticsLoading" class="kpi-sub" style="padding:12px">No change-point data available.</div>
+          <div x-cloak x-show="changePoints" style="max-height:280px;overflow-y:auto">
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px" x-show="changePoints?.change_points?.length">
+              <span x-text="changePoints?.change_points?.length || 0"></span> change points detected
+            </div>
+            <template x-for="cp in (changePoints?.change_points || []).slice(0, 20)" :key="cp.timestamp">
+              <div class="event-card" style="margin-bottom:4px;padding:6px 10px">
+                <div class="event-meta" style="font-size:12px">
+                  <strong x-text="cp.metric || 'metric'"></strong>
+                  <span style="color:var(--text-muted);margin-left:6px" x-text="cp.timestamp"></span>
+                  <span x-cloak x-show="cp.score" style="color:var(--text-muted);margin-left:6px">score: <span x-text="fmtNum(cp.score)"></span></span>
+                </div>
+              </div>
+            </template>
+            <div x-cloak x-show="changePoints && (changePoints?.change_points?.length || 0) === 0" class="kpi-sub" style="padding:8px;text-align:center">No significant change points in window.</div>
+          </div>
+        </div>
+        <div class="insight-card" style="grid-column:span 2">
+          <h2>Cross-Asset Correlation Matrix <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="matrixWindowDays"></span>d window)</span></h2>
+          <div x-cloak x-show="!crossAssetMatrix && !analyticsLoading" class="kpi-sub" style="padding:12px">No cross-asset data available.</div>
+          <div x-cloak x-show="crossAssetMatrix" style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)"></th>
+                  <template x-for="col in (crossAssetMatrix?.assets || [])" :key="'h-' + col">
+                    <th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--line)" x-text="col"></th>
+                  </template>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(row, ri) in (crossAssetMatrix?.matrix || [])" :key="'r-' + (crossAssetMatrix?.assets?.[ri] || ri)">
+                  <tr>
+                    <td style="font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line)" x-text="crossAssetMatrix?.assets?.[ri] || '-'"></td>
+                    <template x-for="(val, ci) in row" :key="'c-' + ri + '-' + ci">
+                      <td style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--line);font-family:monospace" :style="val != null && Math.abs(val) > 0.7 ? 'background:var(--alert-bg);color:var(--down)' : (val != null && Math.abs(val) > 0.4 ? 'background:var(--warn-bg);color:var(--neutral)' : '')" x-text="val != null ? val.toFixed(2) : '-'"></td>
+                    </template>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -929,14 +1067,212 @@
             <span x-cloak x-show="investigating">Running...</span>
           </button>
         </div>
-        <div x-cloak x-show="investigationResult" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:8px;font-size:13px;font-family:monospace;white-space:pre-wrap;max-height:400px;overflow-y:auto">
-          <pre x-text="JSON.stringify(investigationResult, null, 2)"></pre>
+        <div x-cloak x-show="investigationResult" style="margin-top:12px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+            <div style="display:flex;gap:2px;flex:1" class="viz-tabs">
+              <button class="viz-tab" :class="graphSubTab==='graph'&&'active'" @click="switchGraphSubTab('graph')">Graph</button>
+              <button class="viz-tab" :class="graphSubTab==='sankey'&&'active'" @click="switchGraphSubTab('sankey')">Flow</button>
+              <button class="viz-tab" :class="graphSubTab==='timeline'&&'active'" @click="switchGraphSubTab('timeline')">Timeline</button>
+              <button class="viz-tab" :class="graphSubTab==='cluster'&&'active'" @click="switchGraphSubTab('cluster')">Cluster</button>
+            </div>
+            <span class="pill source-ok" style="font-size:10px" x-text="`${(investigationResult.peel_hops||[]).length} hops · ${(investigationResult.cluster?.addresses||investigationResult.cluster?.members||[]).length} clustered · ${(investigationResult.blacklist_hits||[]).length} blacklist`"></span>
+            <button class="btn btn-muted" @click="exportGraph" style="padding:4px 10px;font-size:11px">
+              <span x-cloak x-show="!graphExporting">Export PNG</span>
+              <span x-cloak x-show="graphExporting">...</span>
+            </button>
+          </div>
+          <div class="graph-grid">
+            <div>
+              <div x-cloak x-show="graphSubTab==='graph'" id="graph-investigation" class="chart-wrap xl" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;min-height:360px"></div>
+              <div x-cloak x-show="graphSubTab==='sankey'" id="graph-sankey" class="chart-wrap xl" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;min-height:360px"></div>
+              <div x-cloak x-show="graphSubTab==='timeline'" id="graph-timeline" class="chart-wrap xl" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;min-height:360px"></div>
+              <div x-cloak x-show="graphSubTab==='cluster'" id="graph-cluster" class="chart-wrap xl" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;min-height:360px"></div>
+            </div>
+            <div x-cloak x-show="graphSubTab==='graph'">
+              <div x-cloak x-show="!showDetailPanel" style="padding:16px;background:var(--bg-accent);border:1px solid var(--line);border-radius:10px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px">
+                <svg class="icon" style="width:32px;height:32px;opacity:0.4"><use href="#icon-search"/></svg>
+                <span>Click a node in the graph to see details</span>
+                <span class="kpi-sub" style="margin-top:4px">Drag to rearrange · Scroll to zoom</span>
+              </div>
+              <div x-cloak x-show="showDetailPanel" class="graph-detail-panel" style="padding:14px;background:var(--bg);border:1px solid var(--line);border-radius:10px;font-size:13px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <div>
+                    <strong x-text="_shortAddr(selectedNode?.id)"></strong>
+                    <span class="pill" style="margin-left:6px;font-size:10px" x-text="selectedNodeCategoryName()"></span>
+                  </div>
+                  <button class="btn btn-muted" @click="closeDetail" style="padding:2px 8px;font-size:11px">✕</button>
+                </div>
+                <template x-for="row in selectedNodeDetails()" :key="row[0]">
+                  <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between">
+                    <span class="kpi-label" style="font-size:10px;margin:0" x-text="row[0]"></span>
+                    <span style="text-align:right;max-width:180px;word-break:break-all" x-text="row[1]"></span>
+                  </div>
+                </template>
+                <div x-cloak x-show="selectedNode?._raw?.article?.url" style="margin-top:10px">
+                  <a :href="selectedNode._raw.article.url" target="_blank" rel="noopener" class="btn btn-muted" style="display:block;text-align:center;padding:6px;font-size:12px;text-decoration:none">Read Article →</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Address Tagging sub-panel (nested in Forensics tab) -->
+      <div x-data="tagsPanel" x-init="init()" style="margin-top:16px">
+        <h2>Address Tags</h2>
+        <div x-cloak x-show="tagError" class="warning-banner visible" x-text="tagError" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+          <input type="text" placeholder="Lookup by address (0x...)" x-model="tagSearchAddress" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" @keyup.enter="lookupTags()" />
+          <button class="btn btn-muted" @click="lookupTags()" style="padding:6px 12px;font-size:13px">Lookup</button>
+          <button class="btn btn-muted" @click="tagFormVisible = !tagFormVisible" style="padding:6px 12px;font-size:13px" x-text="tagFormVisible ? 'Cancel' : 'New Tag'"></button>
+          <button class="btn btn-muted" @click="exportTagsCsv()" style="padding:6px 12px;font-size:13px">Export CSV</button>
+        </div>
+        <div x-cloak x-show="tagFormVisible" style="padding:12px;background:var(--bg-accent);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input type="text" placeholder="Address (0x...)" x-model="tagForm.address" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px" />
+          <input type="text" placeholder="Chain (ethereum, tron, ...)" x-model="tagForm.chain" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px" />
+          <input type="text" placeholder="Label" x-model="tagForm.label" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px" />
+          <select x-model="tagForm.category" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px">
+            <option value="suspicious">Suspicious</option>
+            <option value="sanctioned">Sanctioned</option>
+            <option value="exchange">Exchange</option>
+            <option value="defi">DeFi Protocol</option>
+            <option value="unknown">Unknown</option>
+          </select>
+          <label style="font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px">Confidence: <input type="range" min="0" max="1" step="0.05" x-model.number="tagForm.confidence" /> <span x-text="tagForm.confidence"></span></label>
+          <button class="btn" @click="createTag()" style="padding:6px 12px;font-size:13px">Save Tag</button>
+        </div>
+        <div x-cloak x-show="tagLoading" class="kpi-sub" style="padding:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading tags...</div>
+        <div x-cloak x-show="!tagLoading && tags.length === 0 && tagSearchAddress" class="kpi-sub" style="padding:12px;text-align:center">No tags found for this address.</div>
+        <template x-for="t in tags" :key="t.id">
+          <div class="event-card" style="margin-bottom:6px">
+            <div class="event-title">
+              <span class="badge badge-info" x-text="t.category"></span>
+              <strong x-text="t.label"></strong>
+              <span style="color:var(--text-muted);font-size:12px;margin-left:6px" x-text="t.address"></span>
+              <span x-cloak x-show="t.chain" style="color:var(--text-muted);font-size:12px">· <span x-text="t.chain"></span></span>
+            </div>
+            <div class="event-meta" style="font-size:12px;color:var(--text-muted)">
+              <span>source: <code x-text="t.source"></code></span>
+              <span style="margin-left:8px">confidence: <span x-text="(t.confidence * 100).toFixed(0) + '%'"></span></span>
+              <button class="btn btn-muted" @click="deleteTag(t.id)" style="margin-left:auto;padding:2px 8px;font-size:11px">Delete</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Tab: Alerts (fired-event inbox + rule config) -->
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'alerts'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="alertsPanel" x-init="init()" role="tabpanel" id="tab-alerts">
+      <div x-cloak x-show="error" class="warning-banner visible" x-text="error" style="margin-bottom:8px"></div>
+      <div x-cloak x-show="loading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading alerts...</div>
+
+      <div class="insight-grid">
+        <div class="insight-card" style="grid-column:span 2">
+          <h2>Fired Alerts</h2>
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <input type="text" placeholder="Filter by asset (e.g. USDT)" x-model="assetFilter" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" @keyup.enter="filterAlerts()" />
+            <select x-model="severityFilter" @change="filterAlerts()" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px">
+              <option value="">All severities</option>
+              <option value="critical">Critical</option>
+              <option value="warning">Warning</option>
+              <option value="info">Info</option>
+            </select>
+            <button class="btn btn-muted" @click="filterAlerts()" style="padding:6px 12px;font-size:13px">Filter</button>
+          </div>
+          <div x-cloak x-show="!loading && alerts.length === 0" class="kpi-sub" style="padding:16px;text-align:center">No fired alerts match the current filters.</div>
+          <div style="max-height:480px;overflow-y:auto">
+            <template x-for="ev in alerts" :key="ev.id">
+              <div class="event-card" style="margin-bottom:6px">
+                <div class="event-title">
+                  <span class="badge" :class="severityBadge(ev.severity)" x-text="ev.severity"></span>
+                  <span x-text="ev.asset_symbol"></span>
+                  <span x-cloak x-show="ev.chain_key" style="color:var(--text-muted);font-size:12px">· <span x-text="ev.chain_key"></span></span>
+                </div>
+                <div class="event-meta">
+                  <strong x-text="ev.title"></strong>
+                  <span style="color:var(--text-muted);font-size:12px;margin-left:8px" x-text="formatWhen(ev.timestamp)"></span>
+                </div>
+                <div class="event-summary" x-show="ev.summary" style="font-size:13px;color:var(--text-muted);margin-top:4px" x-text="ev.summary"></div>
+                <div x-cloak x-show="ev.old_value || ev.new_value" style="font-size:12px;color:var(--text-muted);margin-top:4px">
+                  <span x-show="ev.old_value"><span style="opacity:0.7">old:</span> <code x-text="ev.old_value"></code></span>
+                  <span x-show="ev.old_value && ev.new_value"> → </span>
+                  <span x-show="ev.new_value"><span style="opacity:0.7">new:</span> <code x-text="ev.new_value"></code></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="insight-card">
+          <h2>Alert Rules</h2>
+          <div x-cloak x-show="rules.length === 0 && !loading" class="kpi-sub" style="padding:12px">No rules configured.</div>
+          <template x-for="(rule, idx) in rules" :key="idx">
+            <div class="event-card" style="margin-bottom:6px">
+              <div class="event-title"><strong x-text="rule.name || rule.condition"></strong></div>
+              <div class="event-meta" style="font-size:12px;color:var(--text-muted)">
+                <span x-text="rule.condition"></span>
+                <span x-show="rule.threshold" style="margin-left:8px">threshold: <code x-text="rule.threshold"></code></span>
+              </div>
+              <div x-show="rule.description" style="font-size:12px;color:var(--text-muted);margin-top:4px" x-text="rule.description"></div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
 
     <!-- Tab: System (Health + Quality) -->
     <div class="tab-content" x-cloak x-show="$store.ui.tab === 'system'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-system">
+      <div x-data="adminOps" x-init="init()" style="margin-bottom:12px">
+        <button class="btn" @click="openAdminDrawer()" style="padding:6px 14px;font-size:13px">Admin Operations</button>
+        <div x-cloak x-show="adminDrawerVisible" @keydown.window.escape="adminDrawerVisible=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;justify-content:flex-end" @click.self="adminDrawerVisible=false">
+          <div style="background:var(--panel);border-radius:12px 0 0 12px;padding:20px;width:90%;max-width:480px;height:100vh;overflow-y:auto;box-shadow:var(--shadow-lg)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+              <h2 style="margin:0">Admin Operations</h2>
+              <button class="btn btn-muted" @click="adminDrawerVisible=false" style="padding:2px 8px">×</button>
+            </div>
+            <div x-cloak x-show="adminOpsError" class="warning-banner visible" x-text="adminOpsError" style="margin-bottom:10px"></div>
+
+            <div class="insight-card" style="margin-bottom:12px">
+              <h3 style="font-size:14px;margin:0 0 8px">Scheduler Status</h3>
+              <div style="font-size:13px">
+                <span class="badge" :class="schedulerRunning === true ? 'badge-info' : (schedulerRunning === false ? 'badge-critical' : 'badge-warning')" x-text="schedulerRunning === true ? 'Running' : (schedulerRunning === false ? 'Stopped' : 'Unknown')"></span>
+              </div>
+            </div>
+
+            <div class="insight-card" style="margin-bottom:12px">
+              <h3 style="font-size:14px;margin:0 0 8px">Synthetic Backfill</h3>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                <input type="text" placeholder="Asset (USDT)" x-model="backfillAsset" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" />
+                <input type="number" placeholder="days" x-model.number="backfillDays" min="1" max="90" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;width:70px" />
+                <button class="btn" @click="runBackfill()" :disabled="backfillLoading" style="padding:6px 12px;font-size:13px"><span x-cloak x-show="!backfillLoading">Run</span><span x-cloak x-show="backfillLoading">...</span></button>
+              </div>
+              <div x-cloak x-show="backfillResult" style="font-size:12px;color:var(--muted);padding:6px;background:var(--bg-accent);border-radius:6px" x-text="JSON.stringify(backfillResult)"></div>
+            </div>
+
+            <div class="insight-card" style="margin-bottom:12px">
+              <h3 style="font-size:14px;margin:0 0 8px">Diagnostics</h3>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button class="btn btn-muted" @click="loadDiagnostics()" style="padding:6px 12px;font-size:13px">Reload</button>
+                <button class="btn btn-muted" @click="downloadDiagnosticsJson()" style="padding:6px 12px;font-size:13px" :disabled="!diagnostics">Download JSON</button>
+              </div>
+              <div x-cloak x-show="diagnostics" style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+                <div>Version: <code x-text="diagnostics?.version"></code></div>
+                <div>DB: <span x-text="diagnostics?.health?.db ? 'OK' : 'FAIL'"></span> · Redis: <span x-text="diagnostics?.health?.redis_connected ? 'OK' : 'off'"></span></div>
+                <div x-cloak x-show="diagnostics?.database_tables" style="margin-top:6px">
+                  <strong>Tables:</strong>
+                  <template x-for="(count, table) in (diagnostics?.database_tables || {})" :key="table">
+                    <span style="margin-right:8px"><code x-text="table"></code>: <span x-text="count"></span></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <div class="insight-card">
+              <h3 style="font-size:14px;margin:0 0 8px">Exports</h3>
+              <button class="btn btn-muted" @click="exportEventsCsv()" style="padding:6px 12px;font-size:13px">Export Events CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div x-data="healthDashboard" x-init="init()">
         <div x-cloak x-show="error" class="warning-banner visible" x-text="error" style="margin-bottom:8px"></div>
         <div x-cloak x-show="loading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading health data...</div>
@@ -1142,9 +1478,10 @@
     </div>
     </div>
 
-    <!-- Tab: Settings -->
+    <!-- Tab: Settings (lazy-mounted via x-if — DOM unmounts on tab switch) -->
     <div class="tab-content" x-cloak x-show="$store.ui.tab === 'settings'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
          x-init="filterSettings(); loadAiBudget();" role="tabpanel" id="tab-settings">
+      <template x-if="$store.ui.tab === 'settings'">
       <div class="insight-grid">
         <!-- Admin Authentication (transform.md §2.3 Layer B) -->
         <div class="insight-card" style="grid-column:1/-1">
@@ -2016,9 +2353,10 @@
              :style="`background:${toastType === 'error' ? 'var(--alert-bg)' : 'var(--ok-bg)'};color:${toastType === 'error' ? 'var(--down)' : 'var(--up)'};border:1px solid ${toastType === 'error' ? 'var(--down)' : 'var(--up)'}`"
              @click="hideToast()" role="status" aria-live="polite">
           <span x-text="toastMessage"></span>
-          <button style="margin-left:10px;background:none;border:none;color:inherit;font-weight:700;cursor:pointer" @click.stop="hideToast()" aria-label="Dismiss">×</button>
+           <button style="margin-left:10px;background:none;border:none;color:inherit;font-weight:700;cursor:pointer" @click.stop="hideToast()" aria-label="Dismiss">×</button>
         </div>
       </div>
+      </template>
     </div>
 
     <!-- Toast Container (global) -->

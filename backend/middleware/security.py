@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any
@@ -12,6 +13,22 @@ from starlette.responses import JSONResponse, Response
 
 VALID_SYMBOL = re.compile(r"^[A-Z0-9]{2,16}$")
 VALID_WINDOWS = frozenset({"6h", "24h", "7d", "30d", "90d"})
+
+_HTML_TAG = re.compile(r"<[^>]*>")
+
+
+def strip_html(text: str) -> str:
+    return _HTML_TAG.sub("", text)
+
+
+def sanitize_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return strip_html(value)
+    if isinstance(value, dict):
+        return {k: sanitize_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [sanitize_value(v) for v in value]
+    return value
 
 _CSP = os.getenv(
     "CONTENT_SECURITY_POLICY",
@@ -88,6 +105,21 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
                             status_code=400,
                             content={"detail": e.detail},
                         )
+
+        body = await request.body()
+        if body and request.headers.get("content-type", "").startswith("application/json"):
+            try:
+                data = json.loads(body)
+                sanitized = sanitize_value(data)
+                if sanitized != data:
+                    sanitized_body = json.dumps(sanitized).encode()
+
+                    async def sanitized_receive():
+                        return {"type": "http.request", "body": sanitized_body, "more_body": False}
+
+                    request = Request(scope=request.scope, receive=sanitized_receive)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
 
         response = await call_next(request)
         if _CSP:

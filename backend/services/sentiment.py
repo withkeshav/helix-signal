@@ -35,8 +35,8 @@ def _sentiment_max_articles() -> int:
 
 
 def _within_sentiment_budget(estimated_tokens: int) -> bool:
-    from services.ai_router import _within_budget
-    return _within_budget(estimated_tokens)
+    from services.components.ai.facade import within_budget
+    return within_budget(estimated_tokens)
 
 
 def _parse_sentiment(item: dict) -> dict[str, Any]:

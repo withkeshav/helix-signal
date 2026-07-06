@@ -28,12 +28,6 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 `window` param: `24h`, `7d` (default), `30d`, `90d`
 
-## Chains
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/chains/{chain_key}` | Chain drill-down detail |
-
 ## Predictive & Analytics
 
 | Method | Endpoint | Description |
@@ -67,6 +61,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 | GET | `/api/sources/usage` | Per-source API call counts for current day (daily granularity) |
 | GET | `/api/sources/{name}/config` | Configuration schema for a source |
 | GET | `/api/alerts/config` | Active alert rule definitions |
+| GET | `/api/alerts?asset=USDT&severity=warning&limit=100` | Fired signal events (admin token) | 30/min |
 
 ## Admin (env-gated)
 
@@ -131,6 +126,22 @@ Lockout uses Redis when available, falling back to in-memory tracking.
 |--------|----------|-------------|------|
 | GET | `/api/admin/ai/providers` | List all available AI providers | Admin token |
 | GET | `/api/admin/ai/providers/{provider_id}/models` | List models available from a specific provider | Admin token |
+
+## AI Provider Facade (Internal)
+
+External modules (forensics, OSINT, webhooks) call the AI subsystem through the public facade at `services/components/ai/facade.py`:
+
+```python
+from services.components.ai.facade import ollama_cloud, within_budget, get_budget_status
+```
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `ollama_cloud` | `(prompt, max_tokens, system=None, model=None, **kwargs)` | Ollama Cloud chat completion; pass `_resolved_api_key` kwarg |
+| `within_budget` | `(count: int) -> bool` | Non-deducting check if `count` tokens fit in the daily budget |
+| `get_budget_status` | `() -> dict` | Current daily budget, tokens used, remaining, pct |
+
+The underscore-prefixed originals (`_ollama_cloud`, `_within_budget`) remain in `services/ai_router` and `services/components/ai/budget` for backward compatibility; new code should import from the facade.
 
 ## Common Parameters
 
@@ -202,8 +213,11 @@ Typed Pydantic response models in `backend/schemas.py`:
 | GET | `/api/onchain/holder-concentration?asset=USDT` | Top-10 holder share %, mint/burn velocity | Public |
 | GET | `/api/v1/blacklist/stats` | Blacklist aggregate stats (total events, frozen USD, by asset/chain, last 30d) | Public |
 | GET | `/api/v1/blacklist/events` | Blacklist event list with optional `?asset=`, `?chain=`, `?limit=`, `?offset=` | Admin token |
-| GET | `/api/v1/assets/{symbol}/narrative` | AI-generated market narrative, sentiment, and context | Public |
-| GET | `/api/v1/assets/{symbol}/yield` | Protocol yield analysis (APY, TVL, sustainability) | Public |
-| GET | `/api/v1/assets/{symbol}/collateral` | Collateral composition breakdown by chain/protocol | Public |
-| GET | `/api/v1/assets/{symbol}/reserve` | Reserve attestation data and timestamp verification | Public |
+| GET | `/api/v1/tags/{address}` | Tags for an address (optional `?chain=` filter) | Public |
+| POST | `/api/v1/tags` | Create an address tag (body: `address`, `chain?`, `label`, `category`, `confidence`) | Admin token |
+| DELETE | `/api/v1/tags/{tag_id}` | Delete a tag by ID | Admin token |
+| GET | `/api/v1/tags/export` | CSV export of all address tags | Admin token |
+| GET | `/api/v1/assets/{symbol}/yield` | Yield snapshot: `current_apy`, `apy_7d_avg`, `apy_7d_delta`, `yield_source`, `yield_sustainability`, `funding_rate_current/7d_avg`, `insurance_fund_usd/coverage`, `staking_ratio`, `lending_utilization_pct` | Public |
+| GET | `/api/v1/assets/{symbol}/collateral` | Collateral snapshot: `collateral_ratio`, `collateral_assets`, `liquidation_threshold`, `liquidation_queue_usd`, `debt_ceiling_utilization_pct`, `largest_vault_usd`, `collateral_health_score` | Public |
+| GET | `/api/v1/assets/{symbol}/reserve` | Reserve snapshot: `reserve_usd`, `circulating_supply`, `coverage_ratio`, `reserve_composition`, `attestation_date/source/url`, `attestation_lag_days`, `genius_act_compliant`, `mica_status` | Public |
 | POST | `/api/v1/investigate` | 8-step investigation pipeline — peel chain, bridge hops, clustering, blacklist, OSINT, timeline, risk, AI narrative | Admin token |

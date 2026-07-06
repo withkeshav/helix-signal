@@ -142,12 +142,16 @@ def _flush_events(db: Session, pending_events: list[SignalEvent], *, metrics_by_
     to_dispatch = list(pending_events)
     db.bulk_save_objects(pending_events)
     pending_events.clear()
-    try:
-        from services.webhook_dispatcher import dispatch_events
-        dispatch_events(db, to_dispatch, metrics_by_asset=metrics_by_asset)
-    except Exception as exc:
-        log = __import__("structlog").get_logger(__name__)
-        log.warning("webhook.dispatch_error", error=str(exc))
+    # Dispatch webhooks in a background thread to avoid blocking the history flow (Phase 3.4)
+    import threading
+    def _bg_dispatch():
+        try:
+            from services.webhook_dispatcher import dispatch_events
+            dispatch_events(db, to_dispatch, metrics_by_asset=metrics_by_asset)
+        except Exception as exc:
+            log = __import__("structlog").get_logger(__name__)
+            log.warning("webhook.dispatch_error", error=str(exc))
+    threading.Thread(target=_bg_dispatch, daemon=True, name="webhook-dispatch").start()
 
 
 def _emit_band_change(pending_events: list[SignalEvent], db: Session, *, sym: str, prev_band: str | None, new_band: str, ts: datetime) -> None:

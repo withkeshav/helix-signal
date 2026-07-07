@@ -149,9 +149,11 @@ Copy `.env.example` to `.env` and adjust:
   (generate via `openssl rand -hex 32`). Backend fails closed with 503 if missing.
 - `HELIX_ADMIN_TOKEN` — legacy admin token (retained for `X-Admin-Token` rollout safety;
   will be retired in a future release)
+- `TRUSTED_PROXY_CIDR` — Docker/internal network CIDR (e.g. `10.0.0.0/8`) so the rate limiter
+  trusts `X-Forwarded-For` only from nginx. If unset, any client can spoof their IP.
 - `RATE_LIMITER_STORAGE_URI` — Redis URL for multi-worker rate limiting (optional)
 
-All user-facing configuration (API keys, models, feature toggles, alert dispatch, refresh intervals, CORS origins) is managed from the Settings UI at `/settings` — no `.env` edits needed.
+All user-facing configuration (API keys, models, feature toggles, alert dispatch, refresh intervals, CORS origins) is managed from the Settings UI at `/settings` — no `.env` edits needed. CORS origins fall back to `CORS_ORIGINS` env var when the DB setting is unset; changes require restart.
 
 Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `config/alerts.json`.
 

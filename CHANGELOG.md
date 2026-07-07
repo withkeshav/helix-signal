@@ -7,6 +7,9 @@
 - **Admin token storage split** — Alerts, Tags, and AdminOps composables now read admin token from `$store.ui.adminHeaders()` (single source of truth in `sessionStorage`) instead of their own `localStorage` reads. Login in Settings now correctly authorizes all admin-gated panels. *(GLM-02)*
 - **AI warnings banner auth-gated** — `_loadWarnings()` now skips fetch when no admin token is present (avoids recurring 401 in network tab every 60s) and passes `X-Admin-Token` header when logged in, so warnings actually populate for admins. *(GLM-03)*
 - **CI artifact force-tracking** — Heuristic `.onnx` stubs and `data/depeg_events.json` force-tracked via `.gitignore` negations. `onnx>=1.16.0` added to `requirements-dev.txt`. Optional model-regeneration step added to CI workflow. The 4 previously-failing CI tests (`test_dews.py` + `test_ml_models.py`) now pass deterministically. *(GH-CI)*
+- **`TRUSTED_PROXY_CIDR` deploy config** — Startup WARNING log when unset. Default `10.0.0.0/8` in `.env.example`. Documented in README config, `docs/DEPLOYMENT.md`, and `SECURITY.md`. *(GLM-04)*
+- **CORS origins loaded in lifespan** — CORS middleware stays at module level with env fallback (safe before `init_db`). DB setting (`cors_origins`) loaded into `app.state.cors_origins` after DB init, ready for future live-refresh on Settings update. *(GLM-05 — Option A)*
+- **`/api/auth/me` hardcoded fallback removed** — Missing User record now returns 404 with `{"error": "user_record_not_found"}` instead of faking admin credentials. *(GLM-06)*
 - **`loop` variable shadow in lifespan** — Removed redundant `asyncio.get_running_loop()` call (reused existing `loop` variable). *(GLM-22)*
 
 ## v4.0.0 (2026-07-05)

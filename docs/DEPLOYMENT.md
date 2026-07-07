@@ -100,6 +100,12 @@ git check-ignore -v data/depeg_events.json              # should NOT be ignored
 git check-ignore -v backend/ml_models/*_heuristic.onnx   # should NOT be ignored
 ```
 
+### 9. Proxy-aware rate limiting
+
+The rate limiter reads `X-Forwarded-For` to identify clients behind nginx. By default, any client can set this header to bypass per-IP limits. Set `TRUSTED_PROXY_CIDR` in `.env` (e.g. `TRUSTED_PROXY_CIDR=10.0.0.0/8`) to restrict XFF trust to your Docker network. Clients outside this CIDR are identified by their direct connection IP.
+
+See `SECURITY.md` §X-Forwarded-For Trust for details.
+
 ---
 
 ## Incident Response

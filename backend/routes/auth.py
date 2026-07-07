@@ -50,7 +50,6 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get current user information."""
-    import logging
     token = request.headers.get("X-Admin-Token", "")
     payload = _verify_session_token(token)
     if payload is not None:
@@ -60,5 +59,7 @@ async def get_current_user(
     admin_user = db.query(User).filter(User.username == "admin").first()
     if admin_user:
         return {"username": admin_user.username, "role": admin_user.role}
-    logging.warning("No admin User record found — returning hardcoded fallback")
-    return {"username": "admin", "role": "administrator"}
+    raise HTTPException(
+        status_code=404,
+        detail={"error": "user_record_not_found", "message": "Token valid but user record missing — check DB migration."},
+    )

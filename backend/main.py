@@ -62,6 +62,13 @@ async def lifespan(app: FastAPI):
             "on every request. Generate one with: openssl rand -hex 32"
         )
 
+    _proxy = os.getenv("TRUSTED_PROXY_CIDR", "").strip()
+    if not _proxy:
+        log.warning(
+            "TRUSTED_PROXY_CIDR unset — rate limiter trusts X-Forwarded-For from "
+            "any client (spoofing risk). Set it to your Docker network CIDR, e.g. 10.0.0.0/8"
+        )
+
     try:
         init_db()
 
@@ -82,6 +89,15 @@ async def lifespan(app: FastAPI):
         discover_plugins()
 
         from providers.settings import get_setting
+
+        # CORS — load DB setting after init_db (stored in app.state for future live-refresh)
+        try:
+            _db_cors = get_setting("cors_origins")
+            if _db_cors:
+                app.state.cors_origins = [o.strip() for o in str(_db_cors).split(",") if o.strip()]
+                log.info("cors.loaded_from_db", origins=app.state.cors_origins)
+        except Exception:
+            pass
 
         scheduler = AsyncIOScheduler()
         disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
@@ -180,15 +196,11 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityValidationMiddleware)
 app.add_middleware(ObservabilityMiddleware)
-try:
-    from providers.settings import get_setting
-    _cors_raw = get_setting("cors_origins") or os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost")
-except Exception:
-    _cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost")
-_cors_origins = [o.strip() for o in str(_cors_raw).split(",") if o.strip()]
+# CORS — env-only at module level (safe before DB init). DB setting loaded into app.state in lifespan.
+_cors_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost")
+_cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
 if "*" in _cors_origins:
-    import logging
-    logging.warning("CORS_ORIGINS contains '*' — wide open. Set explicit origins in production.")
+    log.warning("CORS_ORIGINS contains '*' — wide open. Set explicit origins in production.")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -196,8 +208,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["Content-Type", "X-Admin-Token", "Authorization", "X-Request-ID"],
 )
-
-
 register_routes(app)
 
 

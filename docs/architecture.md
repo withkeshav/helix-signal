@@ -77,6 +77,7 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - **Predictive** (`services/predictive.py`): statistical/ML outputs — always available without LLM
 - **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `AI_REQUIRE_TOKEN` gate with per-IP lockout after 20 failed attempts; pre-flight budget deduct in `enrich_with_ai()`
 - **Celery** (`celery_app.py`, `worker_tasks.py`): background refresh and inference when Redis profile is enabled
+- **CORS origins** loaded from env at module level (safe before `init_db()`). DB setting (`cors_origins`) loaded into `app.state.cors_origins` after DB init for future live-refresh on Settings update.
 
 ### Data Store
 

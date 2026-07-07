@@ -89,7 +89,7 @@ def _get_signing_key() -> str:
     if not key:
         raise HTTPException(
             status_code=503,
-            detail="SESSION_SIGNING_KEY not configured in the environment.",
+            detail="SESSION_SIGNING_KEY not configured. Generate one with: openssl rand -hex 32",
         )
     return key
 

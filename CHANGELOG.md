@@ -1,5 +1,14 @@
 # Helix Signal Changelog
 
+## v4.0.1 (pending)
+
+### Fixed
+- **`SESSION_SIGNING_KEY` loud failure** — Startup log ERROR warning if key is blank + improved 503 detail message includes fix instruction. `docs/DEPLOYMENT.md` and `README.md` deploy checklists now explicitly flag this as REQUIRED before first deploy. *(GLM-01)*
+- **Admin token storage split** — Alerts, Tags, and AdminOps composables now read admin token from `$store.ui.adminHeaders()` (single source of truth in `sessionStorage`) instead of their own `localStorage` reads. Login in Settings now correctly authorizes all admin-gated panels. *(GLM-02)*
+- **AI warnings banner auth-gated** — `_loadWarnings()` now skips fetch when no admin token is present (avoids recurring 401 in network tab every 60s) and passes `X-Admin-Token` header when logged in, so warnings actually populate for admins. *(GLM-03)*
+- **CI artifact force-tracking** — Heuristic `.onnx` stubs and `data/depeg_events.json` force-tracked via `.gitignore` negations. `onnx>=1.16.0` added to `requirements-dev.txt`. Optional model-regeneration step added to CI workflow. The 4 previously-failing CI tests (`test_dews.py` + `test_ml_models.py`) now pass deterministically. *(GH-CI)*
+- **`loop` variable shadow in lifespan** — Removed redundant `asyncio.get_running_loop()` call (reused existing `loop` variable). *(GLM-22)*
+
 ## v4.0.0 (2026-07-05)
 
 ### Added

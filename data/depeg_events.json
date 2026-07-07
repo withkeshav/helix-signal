@@ -1,0 +1,7 @@
+[
+  {"asset": "UST", "start": "2022-05-07", "end": "2022-05-15", "trough": 0.0, "notes": "TerraUSD algorithmic collapse"},
+  {"asset": "USDC", "start": "2023-03-10", "end": "2023-03-13", "trough": 0.87, "notes": "SVB reserve exposure"},
+  {"asset": "DAI", "start": "2023-03-10", "end": "2023-03-13", "trough": 0.89, "notes": "USDC collateral contagion"},
+  {"asset": "FRAX", "start": "2023-03-10", "end": "2023-03-13", "trough": 0.88, "notes": "USDC contagion"},
+  {"asset": "USDR", "start": "2023-10-01", "end": "2023-10-20", "trough": 0.50, "notes": "Liquidity drain"}
+]

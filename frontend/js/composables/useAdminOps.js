@@ -7,11 +7,9 @@ export function useAdminOps() {
     backfillResult: null,
     backfillLoading: false,
     adminOpsError: '',
-    adminToken: '',
     schedulerRunning: null,
 
     init() {
-      try { this.adminToken = localStorage.getItem('helix_admin_token') || ''; } catch { /* ignore */ }
     },
 
     async openAdminDrawer() {
@@ -21,7 +19,7 @@ export function useAdminOps() {
 
     async loadDiagnostics() {
       this.adminOpsError = '';
-      const headers = this.adminToken ? { 'X-Admin-Token': this.adminToken } : {};
+      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
         const res = await fetch('/api/admin/diagnostics', { headers, cache: 'no-store' });
         if (res.ok) {
@@ -44,7 +42,7 @@ export function useAdminOps() {
       }
       this.backfillLoading = true;
       this.adminOpsError = '';
-      const headers = { 'X-Admin-Token': this.adminToken };
+      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
         const res = await fetch(`/api/admin/backfill?asset=${this.backfillAsset.toUpperCase()}&days=${this.backfillDays}`, { method: 'POST', headers });
         if (res.ok) {
@@ -73,7 +71,7 @@ export function useAdminOps() {
     },
 
     async exportEventsCsv() {
-      const headers = this.adminToken ? { 'X-Admin-Token': this.adminToken } : {};
+      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
         const res = await fetch('/api/events/export?limit=500&format=csv', { headers });
         if (res.ok) {

@@ -126,8 +126,14 @@ Alpine.data('helixApp', () => ({
   },
 
   async _loadWarnings() {
+    const headers = this.$store?.ui?.adminHeaders?.() || {};
+    if (!headers['X-Admin-Token']) {
+      this.warnings = [];
+      this.rateLimitWarning = '';
+      return;
+    }
     try {
-      const r = await fetch('/api/ai/warnings', { cache: 'no-store' });
+      const r = await fetch('/api/ai/warnings', { cache: 'no-store', headers });
       if (r.ok) {
         this.warnings = await r.json();
         this.rateLimitWarning = this._formatWarningBanner(this.warnings);

@@ -10,7 +10,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 
 **460 regression tests pass (0 failed).**
 
-**Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. See [`.progress/transform.md`](.progress/transform.md) §3.2 for the execution log.
+**Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. Heuristic `.onnx` stubs and `data/depeg_events.json` are now tracked in git so CI tests pass deterministically. See [`.progress/transform.md`](.progress/transform.md) §3.2 for the execution log.
 
 ## V4 Highlights
 
@@ -54,8 +54,9 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 git clone https://github.com/withkeshav/helix-signal.git
 cd helix-signal
 cp .env.example .env
-# Required: POSTGRES_PASSWORD, SESSION_SIGNING_KEY (openssl rand -hex 32),
-#           HELIX_ADMIN_PASSWORD (for first admin seed)
+# REQUIRED before first deploy: SESSION_SIGNING_KEY (openssl rand -hex 32),
+# POSTGRES_PASSWORD, HELIX_ADMIN_PASSWORD (for first admin seed)
+# If SESSION_SIGNING_KEY is blank, all admin logins will fail with 503.
 docker compose up --build -d
 # Sign in at Settings → admin / your HELIX_ADMIN_PASSWORD
 ./scripts/smoke-check.sh http://localhost:80
@@ -119,6 +120,9 @@ Post-deploy smoke test (checks frontend shell, API health, `/metrics` not public
 > **CI Setup:** The smoke job requires a `POSTGRES_PASSWORD` repository secret.
 > See [CONTRIBUTING.md](./CONTRIBUTING.md#ci--github-actions-requirements) for
 > the full list of required secrets and fork contributor notes.
+> **CI artifacts:** Heuristic `.onnx` stubs (`backend/ml_models/*_heuristic.onnx`) and
+> `data/depeg_events.json` are tracked in git (gitignore negations) so the `test` job
+> runs deterministically. No separate generation step is needed.
 
 ### Database migrations
 

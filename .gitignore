@@ -6,9 +6,13 @@
 !.env.example
 
 # --- Databases and Local Data ---
-/data/
+/data/*
+# keep curated depeg event labels (tiny, static, required by CI)
+!/data/depeg_events.json
 *.duckdb
 *.onnx
+# keep committed heuristic model stubs (small, deterministic, required by CI)
+!backend/ml_models/*.onnx
 *.sqlite
 *.sqlite3
 backend/helix.db

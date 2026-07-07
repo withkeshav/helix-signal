@@ -49,9 +49,19 @@ from routes import register_routes
 configure_logging()
 log = get_logger(__name__)
 
+_SIGNING_KEY_ENV = "SESSION_SIGNING_KEY"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail loud at startup if SESSION_SIGNING_KEY is blank — don't wait for first login
+    _sk = os.getenv(_SIGNING_KEY_ENV, "").strip()
+    if not _sk:
+        log.error(
+            "SESSION_SIGNING_KEY is empty — admin login will return 503 "
+            "on every request. Generate one with: openssl rand -hex 32"
+        )
+
     try:
         init_db()
 
@@ -120,7 +130,6 @@ async def lifespan(app: FastAPI):
 
             try:
                 from chain.fred_api import start_fred_poller
-                loop = asyncio.get_running_loop()
                 fred_task = loop.create_task(start_fred_poller())
             except Exception as exc:
                 log.warning("fred_poller.start_failed", error=str(exc))

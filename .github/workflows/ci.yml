@@ -35,6 +35,9 @@ jobs:
       - name: Alembic migration smoke test
         run: .venv/bin/python -m pytest tests/test_alembic.py -v -m "not slow"
 
+      - name: Generate V4 ONNX models (safety net)
+        run: .venv/bin/python ../scripts/build_v4_models.py
+
       - name: Pytest with coverage
         run: .venv/bin/pytest -v --cov=.. --cov-report=term --cov-fail-under=60 -m "not network" --timeout=120
 

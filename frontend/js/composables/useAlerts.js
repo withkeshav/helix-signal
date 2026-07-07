@@ -6,17 +6,15 @@ export function useAlerts() {
     error: '',
     assetFilter: '',
     severityFilter: '',
-    adminToken: '',
 
     async init() {
-      try { this.adminToken = localStorage.getItem('helix_admin_token') || ''; } catch { /* ignore */ }
       await this._loadAll();
     },
 
     async _loadAll() {
       this.loading = true;
       this.error = '';
-      const headers = this.adminToken ? { 'X-Admin-Token': this.adminToken } : {};
+      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       const failures = [];
       try {
         const params = new URLSearchParams({ limit: '100' });

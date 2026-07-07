@@ -6,7 +6,7 @@
 ## Prerequisites
 
 - Docker + Compose plugin
-- `.env` configured (copy from `.env.example`)
+- `.env` configured (copy from `.env.example`) — **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
 - Git checkout of target release
 
 ## Deploy
@@ -88,6 +88,17 @@ def _should_use_alembic() -> bool:
 This couples startup to migration availability (e.g. TimescaleDB extension). Set `DATABASE_URL` to a non-Postgres value if you need to bypass alembic with a Postgres backing store.
 
 **Fix-tracked:** Pre-existing, not introduced by any current fix. Flagged for follow-up.
+
+### 8. CI-tracked artifacts
+
+The heuristic `.onnx` model stubs (`backend/ml_models/*_heuristic.onnx`) and curated depeg event labels (`data/depeg_events.json`) are tracked in git via `.gitignore` negations so the CI `test` job runs deterministically without a generation step. These files are small (1–2 KB each) and updated only during model version bumps.
+
+If you see CI failures in `test_dews.py` or `test_ml_models.py`, verify these files exist and are not gitignored:
+
+```bash
+git check-ignore -v data/depeg_events.json              # should NOT be ignored
+git check-ignore -v backend/ml_models/*_heuristic.onnx   # should NOT be ignored
+```
 
 ---
 

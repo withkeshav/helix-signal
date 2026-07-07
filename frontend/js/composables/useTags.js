@@ -6,10 +6,8 @@ export function useTags() {
     tagFormVisible: false,
     tagError: '',
     tagLoading: false,
-    adminToken: '',
 
     init() {
-      try { this.adminToken = localStorage.getItem('helix_admin_token') || ''; } catch { /* ignore */ }
     },
 
     async lookupTags() {
@@ -40,8 +38,10 @@ export function useTags() {
         return;
       }
       this.tagError = '';
-      const headers = { 'Content-Type': 'application/json' };
-      if (this.adminToken) headers['X-Admin-Token'] = this.adminToken;
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(this.$store?.ui?.adminHeaders?.() || {}),
+      };
       try {
         const res = await fetch('/api/v1/tags', {
           method: 'POST',
@@ -64,8 +64,7 @@ export function useTags() {
 
     async deleteTag(tagId) {
       this.tagError = '';
-      const headers = {};
-      if (this.adminToken) headers['X-Admin-Token'] = this.adminToken;
+      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
         const res = await fetch(`/api/v1/tags/${tagId}`, { method: 'DELETE', headers });
         if (res.ok) {
@@ -81,8 +80,7 @@ export function useTags() {
     },
 
     async exportTagsCsv() {
-      const headers = {};
-      if (this.adminToken) headers['X-Admin-Token'] = this.adminToken;
+      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
         const res = await fetch('/api/v1/tags/export', { headers });
         if (res.ok) {

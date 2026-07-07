@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, ChainTrendSnapshot, get_db
@@ -98,10 +99,11 @@ def trends(request: Request, asset: str, window: str = Query("7d"), db: Session 
     now = datetime.now(timezone.utc)
     cutoff = now - window_delta(w)
     rows = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
-        .order_by(AssetTrendSnapshot.timestamp.asc())
-        .all()
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
+            .order_by(AssetTrendSnapshot.timestamp.asc())
+        ).scalars().all()
     )
     points = [
         TrendPointOut(
@@ -155,10 +157,11 @@ def trends_chains(request: Request, asset: str, window: str = Query("7d"), db: S
     now = datetime.now(timezone.utc)
     cutoff = now - window_delta(w)
     rows = (
-        db.query(ChainTrendSnapshot)
-        .filter(ChainTrendSnapshot.asset_symbol == sym, ChainTrendSnapshot.timestamp >= cutoff)
-        .order_by(ChainTrendSnapshot.timestamp.asc())
-        .all()
+        db.execute(
+            select(ChainTrendSnapshot)
+            .where(ChainTrendSnapshot.asset_symbol == sym, ChainTrendSnapshot.timestamp >= cutoff)
+            .order_by(ChainTrendSnapshot.timestamp.asc())
+        ).scalars().all()
     )
     grouped: dict[str, dict] = defaultdict(lambda: {"chain_name": "", "points": []})
     for r in rows:

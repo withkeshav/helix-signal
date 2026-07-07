@@ -22,22 +22,25 @@ def main() -> None:
     args = parser.parse_args()
 
     from database import init_db, SessionLocal, AssetTrendSnapshot, SignalEvent
+    from sqlalchemy import select
 
     init_db()
     db = SessionLocal()
     cutoff = datetime.now(timezone.utc) - timedelta(days=args.window_days)
     try:
         rows = (
-            db.query(AssetTrendSnapshot)
-            .filter(AssetTrendSnapshot.timestamp >= cutoff, AssetTrendSnapshot.price.isnot(None))
-            .order_by(AssetTrendSnapshot.timestamp.asc())
-            .all()
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(AssetTrendSnapshot.timestamp >= cutoff, AssetTrendSnapshot.price.isnot(None))
+                .order_by(AssetTrendSnapshot.timestamp.asc())
+            ).scalars().all()
         )
         anomaly_ts = {
             e.timestamp
-            for e in db.query(SignalEvent)
-            .filter(SignalEvent.event_type.in_(["anomaly_detected", "regime_shift"]))
-            .all()
+            for e in db.execute(
+                select(SignalEvent)
+                .where(SignalEvent.event_type.in_(["anomaly_detected", "regime_shift"]))
+            ).scalars().all()
         }
         with open(args.output, "w", newline="") as f:
             w = csv.writer(f)

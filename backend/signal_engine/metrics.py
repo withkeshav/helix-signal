@@ -6,6 +6,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, SourceStatus
@@ -71,12 +72,13 @@ def compute_asset_metric_bundle(
         return None
 
     chains_orm = (
-        db.query(AssetChainSnapshot)
-        .filter(AssetChainSnapshot.asset_symbol == sym)
-        .order_by(AssetChainSnapshot.supply_current.desc(), AssetChainSnapshot.chain_name.asc())
-        .all()
+        db.execute(
+            select(AssetChainSnapshot)
+            .where(AssetChainSnapshot.asset_symbol == sym)
+            .order_by(AssetChainSnapshot.supply_current.desc(), AssetChainSnapshot.chain_name.asc())
+        ).scalars().all()
     )
-    sources_orm = db.query(SourceStatus).order_by(SourceStatus.id.asc()).all()
+    sources_orm = db.execute(select(SourceStatus).order_by(SourceStatus.id.asc())).scalars().all()
     defillama = next((s for s in sources_orm if s.source_name == "defillama"), None)
     source_status = defillama.status if defillama else "unknown"
     source_ok = defillama is not None and defillama.status == "ok"

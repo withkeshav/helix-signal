@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, select
 from sqlalchemy.orm import Mapped, mapped_column, Session
 
 from database import Base
@@ -28,7 +28,7 @@ def get_setting(key: str, db: Session | None = None) -> Any:
 
     if meta.get("type") == "secret":
         if db:
-            row = db.query(Setting).filter(Setting.key == key).first()
+            row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
             if row and row.value:
                 return row.value
         env_key = meta.get("key_env", "")
@@ -47,7 +47,7 @@ def get_setting(key: str, db: Session | None = None) -> Any:
         return env_val
 
     if db:
-        row = db.query(Setting).filter(Setting.key == key).first()
+        row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
         if row:
             return _coerce(row.value, meta.get("type", "bool"))
 
@@ -74,7 +74,7 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
         value = int_val
     
     # Get the old value for audit logging
-    old_row = db.query(Setting).filter(Setting.key == key).first()
+    old_row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
     old_value = old_row.value if old_row else None
     
     # Update or create the setting
@@ -112,7 +112,7 @@ def mask_secret(value: str) -> str:
 
 
 def get_all_settings(db: Session) -> list[dict[str, Any]]:
-    rows = {r.key: r.value for r in db.query(Setting).all()}
+    rows = {r.key: r.value for r in db.execute(select(Setting)).scalars().all()}
     out: list[dict[str, Any]] = []
     for key, meta in _DEFAULT_SETTINGS.items():
         val = rows.get(key)

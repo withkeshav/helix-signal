@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 from database import SignalEvent, get_db
 from schemas import SignalEventsResponseOut
@@ -23,14 +23,14 @@ def events(
     db: Session = Depends(get_db),
 ) -> SignalEventsResponseOut:
     now = datetime.now(timezone.utc)
-    q = db.query(SignalEvent)
+    stmt = select(SignalEvent)
     if asset:
         sym = asset.strip().upper()
         selected = get_asset_by_symbol(sym)
         if selected is None or not bool(selected.get("enabled")):
             raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
-        q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
-    rows = q.order_by(desc(SignalEvent.timestamp)).limit(limit).all()
+        stmt = stmt.where(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
+    rows = db.execute(stmt.order_by(desc(SignalEvent.timestamp)).limit(limit)).scalars().all()
     return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
 
 

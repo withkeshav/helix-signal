@@ -1,10 +1,10 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from database import SignalEvent, get_db
-from sqlalchemy import desc
 from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
 from routes.playbooks import apply_playbook_by_name, get_all_playbooks, seed_builtin_playbooks
 from services.ai_usage import get_ai_usage_summary
@@ -131,11 +131,12 @@ def ai_narrative(
 
     try:
         events = (
-            db.query(SignalEvent)
-            .filter(SignalEvent.asset_symbol == asset.upper())
-            .order_by(desc(SignalEvent.timestamp))
-            .limit(5)
-            .all()
+            db.execute(
+                select(SignalEvent)
+                .where(SignalEvent.asset_symbol == asset.upper())
+                .order_by(desc(SignalEvent.timestamp))
+                .limit(5)
+            ).scalars().all()
         )
         ctx["recent_events"] = "; ".join(f"{e.title} ({e.severity})" for e in events) if events else "No recent events."
     except Exception:

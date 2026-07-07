@@ -12,6 +12,7 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -28,13 +29,14 @@ INVESTIGATION_COOLDOWN_MINUTES = int(os.getenv("ANOMALY_INVESTIGATION_COOLDOWN_M
 def _recent_ai_investigation(db: Session, *, asset_symbol: str) -> bool:
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=INVESTIGATION_COOLDOWN_MINUTES)
     count = (
-        db.query(SignalEvent)
-        .filter(
-            SignalEvent.asset_symbol == asset_symbol,
-            SignalEvent.event_type == "ai_investigation",
-            SignalEvent.timestamp >= cutoff,
-        )
-        .count()
+        db.execute(
+            select(func.count(SignalEvent.id))
+            .where(
+                SignalEvent.asset_symbol == asset_symbol,
+                SignalEvent.event_type == "ai_investigation",
+                SignalEvent.timestamp >= cutoff,
+            )
+        ).scalar() or 0
     )
     return count > 0
 

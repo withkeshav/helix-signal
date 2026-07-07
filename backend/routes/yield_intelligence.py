@@ -6,6 +6,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import CollateralSnapshot, FiatReserveSnapshot, YieldBearingSnapshot, get_db
@@ -67,9 +68,11 @@ def _iso(value: datetime | None) -> str | None:
 
 @router.get("/assets/{symbol}/yield", response_model=YieldBearingSnapshotOut)
 def yield_route(symbol: str, db: Session = Depends(get_db)):
-    row = db.query(YieldBearingSnapshot).filter(
-        YieldBearingSnapshot.asset_symbol == symbol.upper()
-    ).order_by(YieldBearingSnapshot.id.desc()).first()
+    row = db.execute(
+        select(YieldBearingSnapshot)
+        .where(YieldBearingSnapshot.asset_symbol == symbol.upper())
+        .order_by(YieldBearingSnapshot.id.desc())
+    ).scalars().first()
     if not row:
         raise HTTPException(status_code=404, detail=f"No yield data for {symbol}")
     return YieldBearingSnapshotOut(
@@ -89,9 +92,11 @@ def yield_route(symbol: str, db: Session = Depends(get_db)):
 
 @router.get("/assets/{symbol}/collateral", response_model=CollateralSnapshotOut)
 def collateral_route(symbol: str, db: Session = Depends(get_db)):
-    row = db.query(CollateralSnapshot).filter(
-        CollateralSnapshot.asset_symbol == symbol.upper()
-    ).order_by(CollateralSnapshot.id.desc()).first()
+    row = db.execute(
+        select(CollateralSnapshot)
+        .where(CollateralSnapshot.asset_symbol == symbol.upper())
+        .order_by(CollateralSnapshot.id.desc())
+    ).scalars().first()
     if not row:
         raise HTTPException(status_code=404, detail=f"No collateral data for {symbol}")
     return CollateralSnapshotOut(
@@ -109,9 +114,11 @@ def collateral_route(symbol: str, db: Session = Depends(get_db)):
 
 @router.get("/assets/{symbol}/reserve", response_model=FiatReserveSnapshotOut)
 def reserve_route(symbol: str, db: Session = Depends(get_db)):
-    row = db.query(FiatReserveSnapshot).filter(
-        FiatReserveSnapshot.asset_symbol == symbol.upper()
-    ).order_by(FiatReserveSnapshot.id.desc()).first()
+    row = db.execute(
+        select(FiatReserveSnapshot)
+        .where(FiatReserveSnapshot.asset_symbol == symbol.upper())
+        .order_by(FiatReserveSnapshot.id.desc())
+    ).scalars().first()
     if not row:
         raise HTTPException(status_code=404, detail=f"No reserve data for {symbol}")
     return FiatReserveSnapshotOut(

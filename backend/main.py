@@ -26,6 +26,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from structlog import get_logger
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, SessionLocal, get_db, init_db
@@ -38,6 +39,11 @@ from services.scheduler import (
     _osint_job,
     _osint_attestation_refresh,
     _refresh_job,
+    _ethena_job,
+    _sky_job,
+    _liquity_job,
+    _aave_job,
+    _ondo_job,
 )
 from signal_engine.core import load_enabled_assets, refresh_chain_data
 
@@ -114,6 +120,11 @@ async def lifespan(app: FastAPI):
         if not skip_refresh and not disable_bg:
             loop.create_task(asyncio.to_thread(_osint_job))
             loop.create_task(_osint_attestation_refresh())
+            loop.create_task(asyncio.to_thread(_ethena_job))
+            loop.create_task(asyncio.to_thread(_sky_job))
+            loop.create_task(asyncio.to_thread(_liquity_job))
+            loop.create_task(asyncio.to_thread(_aave_job))
+            loop.create_task(asyncio.to_thread(_ondo_job))
 
         if not skip_refresh:
             await _refresh_job()
@@ -121,7 +132,7 @@ async def lifespan(app: FastAPI):
         if not skip_refresh:
             db = SessionLocal()
             try:
-                row_count = db.query(AssetTrendSnapshot).count()
+                row_count = db.execute(select(func.count(AssetTrendSnapshot.id))).scalar() or 0
                 if row_count < 24:
                     log.info("auto_backfill.start", reason="fresh_db", current_rows=row_count)
                     enabled = load_enabled_assets()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -54,10 +55,12 @@ def _decode_transfer_log(log: dict[str, Any]) -> dict[str, Any] | None:
 
 def _store_chain_snapshot(db: Session, symbol: str, transfer: dict[str, Any]) -> None:
     chain_name = "Ethereum"
-    row = db.query(AssetChainSnapshot).filter(
-        AssetChainSnapshot.asset_symbol == symbol,
-        AssetChainSnapshot.chain_name == chain_name,
-    ).first()
+    row = db.execute(
+        select(AssetChainSnapshot).where(
+            AssetChainSnapshot.asset_symbol == symbol,
+            AssetChainSnapshot.chain_name == chain_name,
+        )
+    ).scalars().first()
     if row is not None and row.supply_current is not None:
         existing_supply = row.supply_current
         if transfer["to"] and not transfer["from"]:

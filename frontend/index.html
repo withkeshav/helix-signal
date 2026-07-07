@@ -727,7 +727,7 @@
       <div x-data="fundamentalsPanel" x-init="loadFundamentals($store.dashboard.asset)" @asset-changed.window="loadFundamentals($event.detail.asset)" style="margin-top:16px">
         <div x-cloak x-show="fundamentalsError" class="warning-banner visible" x-text="fundamentalsError" style="margin-bottom:8px"></div>
         <div x-cloak x-show="fundamentalsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading fundamentals for <span x-text="fundamentalsSymbol"></span>...</div>
-        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">No yield, collateral, or reserve data for <span x-text="fundamentalsSymbol"></span>.</div>
+        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">Data populating for <span x-text="fundamentalsSymbol"></span> — first readings arrive within 15 minutes of backend startup.</div>
         <div x-cloak x-show="hasAnyFundamentals()" class="insight-grid">
           <div class="insight-card" x-cloak x-show="fundamentals.yield">
             <h2>Yield</h2>

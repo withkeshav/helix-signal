@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.admin_auth import require_admin_token
@@ -44,7 +45,7 @@ def _serialize(pb: Playbook) -> dict[str, Any]:
 
 
 def seed_builtin_playbooks(db: Session) -> None:
-    existing = {p.name for p in db.query(Playbook).filter(Playbook.is_builtin).all()}
+    existing = {p.name for p in db.execute(select(Playbook).where(Playbook.is_builtin)).scalars().all()}
     now = datetime.now(timezone.utc)
     for name, data in BUILTIN_PLAYBOOKS.items():
         if name not in existing:
@@ -63,13 +64,13 @@ def seed_builtin_playbooks(db: Session) -> None:
 
 def get_all_playbooks(db: Session) -> list[dict[str, Any]]:
     """Return all playbooks (built-in + custom), with built-in first."""
-    rows = db.query(Playbook).order_by(Playbook.is_builtin.desc(), Playbook.label.asc()).all()
+    rows = db.execute(select(Playbook).order_by(Playbook.is_builtin.desc(), Playbook.label.asc())).scalars().all()
     return [_serialize(r) for r in rows]
 
 
 def apply_playbook_by_name(name: str, db: Session) -> list[dict[str, Any]]:
     """Apply a playbook by name (checks DB first, falls back to built-in)."""
-    pb = db.query(Playbook).filter(Playbook.name == name).first()
+    pb = db.execute(select(Playbook).where(Playbook.name == name)).scalars().first()
     if pb is None:
         return apply_builtin_playbook(name, db)
     changes: list[dict[str, Any]] = []
@@ -103,7 +104,7 @@ async def create_playbook(
     name = body.name.strip().lower().replace(" ", "_")
     if not name:
         raise HTTPException(status_code=400, detail="Name cannot be empty")
-    existing = db.query(Playbook).filter(Playbook.name == name).first()
+    existing = db.execute(select(Playbook).where(Playbook.name == name)).scalars().first()
     if existing:
         raise HTTPException(status_code=409, detail=f"Playbook '{name}' already exists")
     if name in BUILTIN_PLAYBOOKS:
@@ -137,9 +138,9 @@ async def get_playbook(
     """Get a specific playbook by id (int) or name (str)."""
     try:
         pb_id = int(playbook_id)
-        pb = db.query(Playbook).filter(Playbook.id == pb_id).first()
+        pb = db.execute(select(Playbook).where(Playbook.id == pb_id)).scalars().first()
     except ValueError:
-        pb = db.query(Playbook).filter(Playbook.name == playbook_id).first()
+        pb = db.execute(select(Playbook).where(Playbook.name == playbook_id)).scalars().first()
     if pb is None:
         raise HTTPException(status_code=404, detail="Playbook not found")
     return _serialize(pb)
@@ -159,7 +160,7 @@ async def update_playbook(
         pb_id = int(playbook_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Playbook ID must be an integer")
-    pb = db.query(Playbook).filter(Playbook.id == pb_id, Playbook.is_builtin.is_(False)).first()
+    pb = db.execute(select(Playbook).where(Playbook.id == pb_id, Playbook.is_builtin.is_(False))).scalars().first()
     if pb is None:
         raise HTTPException(status_code=404, detail="Custom playbook not found")
     if body.label is not None:
@@ -189,7 +190,7 @@ async def delete_playbook(
         pb_id = int(playbook_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Playbook ID must be an integer")
-    pb = db.query(Playbook).filter(Playbook.id == pb_id, Playbook.is_builtin.is_(False)).first()
+    pb = db.execute(select(Playbook).where(Playbook.id == pb_id, Playbook.is_builtin.is_(False))).scalars().first()
     if pb is None:
         raise HTTPException(status_code=404, detail="Custom playbook not found")
     db.delete(pb)

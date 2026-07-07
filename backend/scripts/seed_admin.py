@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from database import SessionLocal, User, init_db
 from services.user_service import create_user, get_user_by_username
+from sqlalchemy import select
 
 
 def ensure_admin_user() -> bool:
@@ -26,7 +27,7 @@ def ensure_admin_user() -> bool:
     init_db()
     db = SessionLocal()
     try:
-        if db.query(User).filter(User.role == "admin").first():
+        if db.execute(select(User).where(User.role == "admin")).scalars().first():
             return False
         if get_user_by_username(db, username):
             return False

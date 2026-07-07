@@ -54,10 +54,19 @@ def discover_plugins():
     """Auto-discover all plugins in sources/plugins/ and ml_models/."""
     try:
         import backend.sources.plugins
-        for importer, name, is_pkg in pkgutil.iter_modules(backend.sources.plugins.__path__):
-            importlib.import_module(f"backend.sources.plugins.{name}")
+        pkg_path = backend.sources.plugins.__path__
+        prefix = "backend.sources.plugins."
     except ModuleNotFoundError:
-        log.warning("plugins_module_not_found", module="sources.plugins")
+        try:
+            import sources.plugins
+            pkg_path = sources.plugins.__path__
+            prefix = "sources.plugins."
+        except ModuleNotFoundError:
+            log.warning("plugins_module_not_found", module="sources.plugins")
+            return
+
+    for importer, name, is_pkg in pkgutil.iter_modules(pkg_path):
+        importlib.import_module(f"{prefix}{name}")
 
     try:
         import backend.ml_models

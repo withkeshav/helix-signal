@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import desc, or_
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from core.admin_auth import require_admin_token
@@ -35,14 +35,14 @@ def list_fired_alerts(
     Ordered by timestamp desc.
     """
     now = datetime.now(timezone.utc)
-    q = db.query(SignalEvent)
+    stmt = select(SignalEvent)
     if asset:
         sym = asset.strip().upper()
-        q = q.filter(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
+        stmt = stmt.where(or_(SignalEvent.asset_symbol == sym, SignalEvent.asset_symbol == "ALL"))
     if severity:
         sev = severity.strip().lower()
-        q = q.filter(SignalEvent.severity == sev)
-    rows = q.order_by(desc(SignalEvent.timestamp)).limit(limit).all()
+        stmt = stmt.where(SignalEvent.severity == sev)
+    rows = db.execute(stmt.order_by(desc(SignalEvent.timestamp)).limit(limit)).scalars().all()
     return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
 
 

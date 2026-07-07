@@ -262,3 +262,63 @@ def test_persist_source_not_ok_does_nothing(_interval, compute_bundle, _flush, _
         compute_bundle.assert_not_called()
     finally:
         db.close()
+
+
+@patch("signal_engine.core.load_enabled_assets")
+@patch("signal_engine.core.build_default_registry")
+@patch("signal_engine.core.async_fetch_chain_tvl_by_defillama_name", return_value={"Ethereum": 500000000000.0})
+@patch("signal_engine.core._upsert_source_status")
+@patch("signal_engine.core.load_configured_chains")
+def test_refresh_concurrent_asset_freshness_no_duplicate(
+    load_chains, _upsert, _tvl_mock, build_reg, load_enabled
+):
+    """Two concurrent refresh_chain_data calls for the same asset must produce
+    exactly one AssetFreshness row (no IntegrityError from race)."""
+    from signal_engine.core import refresh_chain_data
+    from database import SessionLocal
+
+    dl_source = MagicMock()
+    dl_source.name = "defillama"
+    dl_source.async_fetch = AsyncMock(return_value={
+        "asset_symbol": "USDC",
+        "asset_name": "USD Coin",
+        "peg_type": "peggedUSD",
+        "fetched_at": datetime.now(timezone.utc),
+        "chain_data": {
+            "Ethereum": {
+                "supply_current": 30000000000.0,
+                "supply_prev_day": 29000000000.0,
+                "supply_prev_week": 27000000000.0,
+                "supply_prev_month": 24000000000.0,
+                "price": 1.0001,
+                "tvl": 250000000000.0,
+            },
+        },
+    })
+
+    cg_source = MagicMock()
+    cg_source.name = "coingecko"
+    cg_source.async_fetch = AsyncMock(return_value={})
+    cg_source.transform = MagicMock(return_value={})
+
+    dx_source = MagicMock()
+    dx_source.name = "dexscreener"
+    dx_source.async_fetch = AsyncMock(return_value=[])
+    dx_source.transform = MagicMock(return_value={})
+
+    registry = MagicMock()
+    registry.get.side_effect = lambda n: {"defillama": dl_source, "coingecko": cg_source, "dexscreener": dx_source}.get(n)
+
+    build_reg.return_value = registry
+    load_enabled.return_value = [{"symbol": "USDC", "defillama_symbol": "USDC", "peg_type": "peggedUSD", "enabled": True}]
+    load_chains.return_value = [{"name": "Ethereum", "defillama_id": "Ethereum"}]
+
+    db = SessionLocal()
+    async def _run():
+        await asyncio.gather(refresh_chain_data(db), refresh_chain_data(db))
+    try:
+        asyncio.run(_run())
+        rows = db.query(AssetFreshness).filter(AssetFreshness.asset_symbol == "USDC").all()
+        assert len(rows) == 1, f"Expected 1 freshness row, got {len(rows)}"
+    finally:
+        db.close()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from core.admin_auth import require_admin_token
@@ -43,12 +43,12 @@ def blacklist_events(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    q = db.query(BlacklistEvent)
+    stmt = select(BlacklistEvent)
     if asset:
-        q = q.filter(BlacklistEvent.asset_symbol == asset.upper())
+        stmt = stmt.where(BlacklistEvent.asset_symbol == asset.upper())
     if chain:
-        q = q.filter(BlacklistEvent.chain == chain.lower())
-    rows = q.order_by(BlacklistEvent.id.desc()).offset(offset).limit(limit).all()
+        stmt = stmt.where(BlacklistEvent.chain == chain.lower())
+    rows = db.execute(stmt.order_by(BlacklistEvent.id.desc()).offset(offset).limit(limit)).scalars().all()
     return [
         BlacklistEventOut(
             id=r.id, asset_symbol=r.asset_symbol, chain=r.chain,
@@ -65,28 +65,31 @@ def blacklist_events(
 
 @router.get("/blacklist/stats", response_model=BlacklistStatsOut)
 def blacklist_stats(db: Session = Depends(get_db)):
-    total = db.query(func.count(BlacklistEvent.id)).scalar() or 0
-    total_usd = db.query(func.sum(BlacklistEvent.frozen_balance_usd)).scalar() or 0.0
+    total = db.execute(select(func.count(BlacklistEvent.id))).scalar() or 0
+    total_usd = db.execute(select(func.sum(BlacklistEvent.frozen_balance_usd))).scalar() or 0.0
 
     by_asset_rows = (
-        db.query(BlacklistEvent.asset_symbol, func.sum(BlacklistEvent.frozen_balance_usd))
-        .group_by(BlacklistEvent.asset_symbol)
-        .all()
+        db.execute(
+            select(BlacklistEvent.asset_symbol, func.sum(BlacklistEvent.frozen_balance_usd))
+            .group_by(BlacklistEvent.asset_symbol)
+        ).all()
     )
     by_asset = {r[0]: float(r[1] or 0) for r in by_asset_rows}
 
     by_chain_rows = (
-        db.query(BlacklistEvent.chain, func.sum(BlacklistEvent.frozen_balance_usd))
-        .group_by(BlacklistEvent.chain)
-        .all()
+        db.execute(
+            select(BlacklistEvent.chain, func.sum(BlacklistEvent.frozen_balance_usd))
+            .group_by(BlacklistEvent.chain)
+        ).all()
     )
     by_chain = {r[0]: float(r[1] or 0) for r in by_chain_rows}
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     last_30d = (
-        db.query(func.count(BlacklistEvent.id))
-        .filter(BlacklistEvent.timestamp >= cutoff)
-        .scalar() or 0
+        db.execute(
+            select(func.count(BlacklistEvent.id))
+            .where(BlacklistEvent.timestamp >= cutoff)
+        ).scalar() or 0
     )
 
     return BlacklistStatsOut(

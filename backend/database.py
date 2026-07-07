@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, func, text, inspect
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, JSON, UniqueConstraint, create_engine, func, select, text, inspect
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -627,7 +627,9 @@ def _seed_builtin_playbooks() -> None:
     with SessionLocal() as session:
         existing = {
             pb.name
-            for pb in session.query(Playbook).filter(Playbook.is_builtin.is_(True)).all()
+            for pb in session.execute(
+                select(Playbook).where(Playbook.is_builtin.is_(True))
+            ).scalars().all()
         }
         now = datetime.now(timezone.utc)
         for name, data in PLAYBOOKS.items():

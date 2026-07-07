@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, FiatReserveSnapshot, CollateralSnapshot, YieldBearingSnapshot
@@ -206,9 +207,11 @@ def type_specific_inputs(
     v4_inputs: dict[str, Any] = {}
 
     try:
-        fiat = db.query(FiatReserveSnapshot).filter(
-            FiatReserveSnapshot.asset_symbol == asset_symbol.upper(),
-        ).order_by(FiatReserveSnapshot.created_at.desc()).first()
+        fiat = db.execute(
+            select(FiatReserveSnapshot)
+            .where(FiatReserveSnapshot.asset_symbol == asset_symbol.upper())
+            .order_by(FiatReserveSnapshot.created_at.desc())
+        ).scalars().first()
         if fiat:
             v4_inputs["coverage_ratio"] = fiat.coverage_ratio
             v4_inputs["reserve_composition"] = fiat.reserve_composition
@@ -216,18 +219,22 @@ def type_specific_inputs(
             v4_inputs["genius_act_compliant"] = fiat.genius_act_compliant
             v4_inputs["mica_status"] = fiat.mica_status
 
-        coll = db.query(CollateralSnapshot).filter(
-            CollateralSnapshot.asset_symbol == asset_symbol.upper(),
-        ).order_by(CollateralSnapshot.timestamp.desc()).first()
+        coll = db.execute(
+            select(CollateralSnapshot)
+            .where(CollateralSnapshot.asset_symbol == asset_symbol.upper())
+            .order_by(CollateralSnapshot.timestamp.desc())
+        ).scalars().first()
         if coll:
             v4_inputs["collateral_ratio"] = coll.collateral_ratio
             v4_inputs["liquidation_queue_usd"] = coll.liquidation_queue_usd
             v4_inputs["debt_ceiling_utilization_pct"] = coll.debt_ceiling_utilization_pct
             v4_inputs["recovery_mode"] = (coll.collateral_assets_json or {}).get("recovery_mode", False) if coll.collateral_assets_json else False
 
-        yb = db.query(YieldBearingSnapshot).filter(
-            YieldBearingSnapshot.asset_symbol == asset_symbol.upper(),
-        ).order_by(YieldBearingSnapshot.timestamp.desc()).first()
+        yb = db.execute(
+            select(YieldBearingSnapshot)
+            .where(YieldBearingSnapshot.asset_symbol == asset_symbol.upper())
+            .order_by(YieldBearingSnapshot.timestamp.desc())
+        ).scalars().first()
         if yb:
             v4_inputs["current_apy"] = yb.current_apy
             v4_inputs["yield_source"] = yb.yield_source

@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.limiter import limiter
@@ -18,20 +19,22 @@ def list_forecasts(
 ) -> dict[str, Any]:
     asset_key = asset.upper()
     runs = (
-        db.query(ForecastRun)
-        .filter(ForecastRun.asset_symbol == asset_key)
-        .order_by(ForecastRun.generated_at.desc())
-        .limit(5)
-        .all()
+        db.execute(
+            select(ForecastRun)
+            .where(ForecastRun.asset_symbol == asset_key)
+            .order_by(ForecastRun.generated_at.desc())
+            .limit(5)
+        ).scalars().all()
     )
     forecasts = []
     forecast_points = {}
     for run in runs:
         points = (
-            db.query(ForecastPoint)
-            .filter(ForecastPoint.run_id == run.id)
-            .order_by(ForecastPoint.horizon_step.asc())
-            .all()
+            db.execute(
+                select(ForecastPoint)
+                .where(ForecastPoint.run_id == run.id)
+                .order_by(ForecastPoint.horizon_step.asc())
+            ).scalars().all()
         )
         serialized = [
             {
@@ -61,11 +64,12 @@ def list_forecasts(
         forecast_points["supply"] = forecast_points["total_supply"]
 
     snapshots = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == asset_key)
-        .order_by(AssetTrendSnapshot.timestamp.desc())
-        .limit(288)
-        .all()
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == asset_key)
+            .order_by(AssetTrendSnapshot.timestamp.desc())
+            .limit(288)
+        ).scalars().all()
     )
     historical_by_metric: dict[str, list[dict]] = {}
     for snap in reversed(snapshots):

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import AssetChainSnapshot, AssetFreshness, SourceStatus
@@ -128,7 +129,7 @@ def _upsert_source_status(
     successful_at: datetime | None,
     last_error: str | None,
 ) -> None:
-    row = db.query(SourceStatus).filter(SourceStatus.source_name == source_name).first()
+    row = db.execute(select(SourceStatus).where(SourceStatus.source_name == source_name)).scalars().first()
     if row is None:
         row = SourceStatus(source_name=source_name)
         db.add(row)
@@ -146,7 +147,7 @@ def _upsert_source_status(
 
 async def refresh_chain_data(db: Session) -> None:
     attempted_at = datetime.now(timezone.utc)
-    prior_row = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
+    prior_row = db.execute(select(SourceStatus).where(SourceStatus.source_name == "defillama")).scalars().first()
     prior_source_status = prior_row.status if prior_row else None
     configured = load_configured_chains(db)
     chain_ids = [str(item["defillama_id"]) for item in configured]
@@ -236,18 +237,22 @@ async def refresh_chain_data(db: Session) -> None:
         chain_names = [str(chain["name"]) for chain in configured]
         
         # Query all existing snapshots for the assets and chains we're working with
-        existing_snapshots = db.query(AssetChainSnapshot).filter(
-            AssetChainSnapshot.asset_symbol.in_(asset_symbols),
-            AssetChainSnapshot.chain_name.in_(chain_names)
-        ).all()
+        existing_snapshots = db.execute(
+            select(AssetChainSnapshot).where(
+                AssetChainSnapshot.asset_symbol.in_(asset_symbols),
+                AssetChainSnapshot.chain_name.in_(chain_names)
+            )
+        ).scalars().all()
         
         # Create a lookup dict for existing snapshots
         snapshot_lookup = {(s.asset_symbol, s.chain_name): s for s in existing_snapshots}
         
         # Also get existing asset freshness records
-        existing_freshness = db.query(AssetFreshness).filter(
-            AssetFreshness.asset_symbol.in_(asset_symbols)
-        ).all()
+        existing_freshness = db.execute(
+            select(AssetFreshness).where(
+                AssetFreshness.asset_symbol.in_(asset_symbols)
+            )
+        ).scalars().all()
         
         freshness_lookup = {f.asset_symbol: f for f in existing_freshness}
 
@@ -349,11 +354,11 @@ async def refresh_chain_data(db: Session) -> None:
         # For updates, we need to merge since they're already attached to the session
         # The updates are already applied to the objects, so we just need to commit
         
-        # Also commit the freshness updates
+        # Merge freshness records — db.merge handles both INSERT and UPDATE
+        # atomically at the DB level, avoiding the race where two concurrent
+        # transactions both create new AssetFreshness rows for the same asset.
         for freshness_obj in asset_freshness_updates:
-            if freshness_obj.id is None:  # New object
-                db.add(freshness_obj)
-            # Existing objects are already updated in place
+            db.merge(freshness_obj)
 
         if success_count > 0:
             completed_at = datetime.now(timezone.utc)

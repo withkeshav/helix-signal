@@ -83,6 +83,7 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 
 - SQLite (`backend/helix.db` locally; `/data/helix.db` in Docker)
 - In-memory SQLite for pytest uses `StaticPool` so tables persist across connections
+- **AssetFreshness** has a `UNIQUE` constraint on `asset_symbol`; upserts use `db.merge()` for race-free concurrent refreshes
 
 ### Frontend (`frontend/`)
 
@@ -105,6 +106,8 @@ Python dependencies install only into `backend/.venv`:
 
 ```bash
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+export PYTHONPATH=..   # so backend.sources.plugins resolves from backend/
+.venv/bin/uvicorn main:app --reload
 ```
 
 CI mirrors this pattern (venv created in the workflow job).

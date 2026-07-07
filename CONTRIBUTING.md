@@ -37,12 +37,14 @@ docker compose up --build
 From `backend/`:
 
 ```bash
+export PYTHONPATH=..
 python main.py
 ```
 
 Or:
 
 ```bash
+export PYTHONPATH=..
 uvicorn main:app --reload
 ```
 
@@ -54,12 +56,14 @@ Install dependencies **only** into `backend/.venv`:
 cd backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
+export PYTHONPATH=..
 .venv/bin/python main.py
 ```
 
 Or:
 
 ```bash
+export PYTHONPATH=..
 .venv/bin/uvicorn main:app --reload
 ```
 

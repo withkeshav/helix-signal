@@ -7,6 +7,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import User, get_db
@@ -57,7 +58,7 @@ async def import_settings_endpoint(
         # Get user information for audit logging
         token = request.headers.get("X-Admin-Token", "")
         payload = _verify_session_token(token)
-        user = db.query(User).filter(User.id == payload["sub"]).first() if payload else None
+        user = db.execute(select(User).where(User.id == payload["sub"])).scalars().first() if payload else None
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
         
@@ -107,7 +108,7 @@ async def import_settings_json_endpoint(
         # Get user information for audit logging
         token = request.headers.get("X-Admin-Token", "")
         payload = _verify_session_token(token)
-        user = db.query(User).filter(User.id == payload["sub"]).first() if payload else None
+        user = db.execute(select(User).where(User.id == payload["sub"])).scalars().first() if payload else None
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
         

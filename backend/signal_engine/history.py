@@ -8,7 +8,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import desc
+from sqlalchemy import desc, select, delete
 from sqlalchemy.orm import Session
 
 from database import AssetTrendSnapshot, ChainTrendSnapshot, SignalEvent, SourceStatus
@@ -49,19 +49,24 @@ def _refresh_interval() -> int:
 
 def _previous_asset_snapshot(db: Session, *, asset_symbol: str, bucket_id: int) -> AssetTrendSnapshot | None:
     row = (
-        db.query(AssetTrendSnapshot)
-        .filter(AssetTrendSnapshot.asset_symbol == asset_symbol)
-        .order_by(desc(AssetTrendSnapshot.timestamp))
-        .first()
+        db.execute(
+            select(AssetTrendSnapshot)
+            .where(AssetTrendSnapshot.asset_symbol == asset_symbol)
+            .order_by(desc(AssetTrendSnapshot.timestamp))
+        ).scalars().first()
     )
     if row is None:
         return None
     if row.bucket_id == bucket_id:
         return (
-            db.query(AssetTrendSnapshot)
-            .filter(AssetTrendSnapshot.asset_symbol == asset_symbol, AssetTrendSnapshot.bucket_id != bucket_id)
-            .order_by(desc(AssetTrendSnapshot.timestamp))
-            .first()
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(
+                    AssetTrendSnapshot.asset_symbol == asset_symbol,
+                    AssetTrendSnapshot.bucket_id != bucket_id,
+                )
+                .order_by(desc(AssetTrendSnapshot.timestamp))
+            ).scalars().first()
         )
     return row
 
@@ -76,20 +81,17 @@ def _duplicate_event(
     new_value: str | None,
 ) -> bool:
     cutoff = utc_now() - timedelta(minutes=EVENT_DEDUP_MINUTES)
-    q = (
-        db.query(SignalEvent)
-        .filter(
-            SignalEvent.asset_symbol == asset_symbol,
-            SignalEvent.event_type == event_type,
-            SignalEvent.severity == severity,
-            SignalEvent.timestamp >= cutoff,
-        )
+    stmt = select(SignalEvent).where(
+        SignalEvent.asset_symbol == asset_symbol,
+        SignalEvent.event_type == event_type,
+        SignalEvent.severity == severity,
+        SignalEvent.timestamp >= cutoff,
     )
     if chain_key:
-        q = q.filter(SignalEvent.chain_key == chain_key)
+        stmt = stmt.where(SignalEvent.chain_key == chain_key)
     else:
-        q = q.filter(SignalEvent.chain_key.is_(None))
-    last = q.order_by(desc(SignalEvent.timestamp)).first()
+        stmt = stmt.where(SignalEvent.chain_key.is_(None))
+    last = db.execute(stmt.order_by(desc(SignalEvent.timestamp))).scalars().first()
     return last is not None and (new_value is None or last.new_value == new_value)
 
 
@@ -353,7 +355,7 @@ def persist_trends_and_events(
     """
     if not successful_asset_symbols:
         return
-    defillama = db.query(SourceStatus).filter(SourceStatus.source_name == "defillama").first()
+    defillama = db.execute(select(SourceStatus).where(SourceStatus.source_name == "defillama")).scalars().first()
     if defillama is None or defillama.status != "ok":
         return
 
@@ -374,14 +376,18 @@ def persist_trends_and_events(
         prev_row = _previous_asset_snapshot(db, asset_symbol=u, bucket_id=bucket_id)
 
         # Delete existing snapshots for this bucket using bulk operations
-        db.query(AssetTrendSnapshot).filter(
-            AssetTrendSnapshot.asset_symbol == u,
-            AssetTrendSnapshot.bucket_id == bucket_id,
-        ).delete(synchronize_session=False)
-        db.query(ChainTrendSnapshot).filter(
-            ChainTrendSnapshot.asset_symbol == u,
-            ChainTrendSnapshot.bucket_id == bucket_id,
-        ).delete(synchronize_session=False)
+        db.execute(
+            delete(AssetTrendSnapshot).where(
+                AssetTrendSnapshot.asset_symbol == u,
+                AssetTrendSnapshot.bucket_id == bucket_id,
+            )
+        )
+        db.execute(
+            delete(ChainTrendSnapshot).where(
+                ChainTrendSnapshot.asset_symbol == u,
+                ChainTrendSnapshot.bucket_id == bucket_id,
+            )
+        )
 
         bundle = compute_asset_metric_bundle(db, asset_symbol=u, refresh_interval_seconds=interval)
         if bundle is None:
@@ -449,13 +455,14 @@ def persist_trends_and_events(
         prev_top = None
         # Approximate prior top share from stored concentration alone is weak; use chain table if needed.
         prev_q = (
-            db.query(ChainTrendSnapshot)
-            .filter(
-                ChainTrendSnapshot.asset_symbol == u,
-                ChainTrendSnapshot.bucket_id == prev_row.bucket_id,
-            )
-            .order_by(desc(ChainTrendSnapshot.supply_share_pct))
-            .first()
+            db.execute(
+                select(ChainTrendSnapshot)
+                .where(
+                    ChainTrendSnapshot.asset_symbol == u,
+                    ChainTrendSnapshot.bucket_id == prev_row.bucket_id,
+                )
+                .order_by(desc(ChainTrendSnapshot.supply_share_pct))
+            ).scalars().first()
         )
         if prev_q and prev_q.supply_share_pct is not None:
             prev_top = float(prev_q.supply_share_pct)

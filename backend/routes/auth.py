@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, OAuth2PasswordRequestForm
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.admin_auth import _sign_session_token, _verify_session_token, require_admin_token
@@ -53,10 +54,10 @@ async def get_current_user(
     token = request.headers.get("X-Admin-Token", "")
     payload = _verify_session_token(token)
     if payload is not None:
-        user = db.query(User).filter(User.id == payload["sub"]).first()
+        user = db.execute(select(User).where(User.id == payload["sub"])).scalars().first()
         if user:
             return {"username": user.username, "role": user.role}
-    admin_user = db.query(User).filter(User.username == "admin").first()
+    admin_user = db.execute(select(User).where(User.username == "admin")).scalars().first()
     if admin_user:
         return {"username": admin_user.username, "role": admin_user.role}
     raise HTTPException(

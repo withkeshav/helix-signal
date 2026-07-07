@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 
@@ -22,13 +23,14 @@ class DatabaseManager:
         from database import AssetTrendSnapshot
 
         rows = (
-            db.query(AssetTrendSnapshot)
-            .filter(
-                AssetTrendSnapshot.asset_symbol == asset_symbol,
-                AssetTrendSnapshot.timestamp >= cutoff,
-            )
-            .order_by(AssetTrendSnapshot.timestamp.asc())
-            .all()
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(
+                    AssetTrendSnapshot.asset_symbol == asset_symbol,
+                    AssetTrendSnapshot.timestamp >= cutoff,
+                )
+                .order_by(AssetTrendSnapshot.timestamp.asc())
+            ).scalars().all()
         )
         return [
             {
@@ -53,13 +55,14 @@ class DatabaseManager:
         from database import ChainTrendSnapshot
 
         rows = (
-            db.query(ChainTrendSnapshot)
-            .filter(
-                ChainTrendSnapshot.asset_symbol == asset_symbol,
-                ChainTrendSnapshot.timestamp >= cutoff,
-            )
-            .order_by(ChainTrendSnapshot.timestamp.asc())
-            .all()
+            db.execute(
+                select(ChainTrendSnapshot)
+                .where(
+                    ChainTrendSnapshot.asset_symbol == asset_symbol,
+                    ChainTrendSnapshot.timestamp >= cutoff,
+                )
+                .order_by(ChainTrendSnapshot.timestamp.asc())
+            ).scalars().all()
         )
         return [
             {

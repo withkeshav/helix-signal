@@ -10,7 +10,13 @@
 - **`TRUSTED_PROXY_CIDR` deploy config** — Startup WARNING log when unset. Default `10.0.0.0/8` in `.env.example`. Documented in README config, `docs/DEPLOYMENT.md`, and `SECURITY.md`. *(GLM-04)*
 - **CORS origins loaded in lifespan** — CORS middleware stays at module level with env fallback (safe before `init_db`). DB setting (`cors_origins`) loaded into `app.state.cors_origins` after DB init, ready for future live-refresh on Settings update. *(GLM-05 — Option A)*
 - **`/api/auth/me` hardcoded fallback removed** — Missing User record now returns 404 with `{"error": "user_record_not_found"}` instead of faking admin credentials. *(GLM-06)*
+- **Frontend polling stampede fixed** — `setInterval` replaced with recursive `setTimeout` + `_inFlight` flag. No request pile-up when backend is slow. Cancelled on page unload. *(GLM-07)*
+- **Fundamentals empty state improved** — Shows "Data populating — first readings arrive within 15 minutes" instead of generic "No data" message. *(GLM-08)*
+- **Fire-once plugin jobs on startup** — Ethena, Sky, Liquity, Aave, Ondo each fetch once via `loop.create_task(asyncio.to_thread(...))` at startup, mirroring OSINT pattern. *(GLM-16)*
+- **AssetFreshness upsert race fixed** — Replaced fragile `id is None` guard with `db.merge()` for atomic INSERT-or-UPDATE at the DB level. Added concurrency test. *(GLM-09)*
+- **Plugin discovery PYTHONPATH fallback** — `registry.py` now tries `import sources.plugins` as fallback when `backend.sources.plugins` fails. README and CONTRIBUTING updated with `PYTHONPATH=..` for bare uvicorn dev. *(GLM-10)*
 - **`loop` variable shadow in lifespan** — Removed redundant `asyncio.get_running_loop()` call (reused existing `loop` variable). *(GLM-22)*
+- **SA 2.0 `db.query()` migration** — All 63 `db.query()` calls in production code converted to `db.execute(select(...))` style across `routes/`, `services/`, `signal_engine/`, `core/`, `agents/`, `chain/`, `scripts/`, `main.py`, and `database.py`. *(GLM-11)*
 
 ## v4.0.0 (2026-07-05)
 

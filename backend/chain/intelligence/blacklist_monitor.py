@@ -15,8 +15,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from structlog import get_logger
 
 from database import AddressTag, BlacklistEvent, SignalEvent
@@ -68,15 +68,16 @@ async def poll(db: Session) -> dict[str, Any]:
 def get_monthly_freeze_stats(db: Session) -> list[dict[str, Any]]:
     cutoff = datetime.now(timezone.utc) - timedelta(days=MONTHLY_STATS_DAYS)
     rows = (
-        db.query(
-            BlacklistEvent.asset_symbol,
-            BlacklistEvent.chain,
-            func.count(BlacklistEvent.id).label("event_count"),
-            func.sum(BlacklistEvent.frozen_balance_usd).label("total_frozen_usd"),
-        )
-        .filter(BlacklistEvent.timestamp >= cutoff)
-        .group_by(BlacklistEvent.asset_symbol, BlacklistEvent.chain)
-        .all()
+        db.execute(
+            select(
+                BlacklistEvent.asset_symbol,
+                BlacklistEvent.chain,
+                func.count(BlacklistEvent.id).label("event_count"),
+                func.sum(BlacklistEvent.frozen_balance_usd).label("total_frozen_usd"),
+            )
+            .where(BlacklistEvent.timestamp >= cutoff)
+            .group_by(BlacklistEvent.asset_symbol, BlacklistEvent.chain)
+        ).all()
     )
     return [
         {
@@ -159,10 +160,12 @@ async def _poll_ethereum(db: Session) -> dict[str, Any]:
                 frozen_amount = frozen_amount_wei / (10 ** cfg["decimals"])
                 frozen_usd = frozen_amount
 
-                existing = db.query(BlacklistEvent).filter(
-                    BlacklistEvent.tx_hash == tx_hash,
-                    BlacklistEvent.chain == "ethereum",
-                ).first()
+                existing = db.execute(
+                    select(BlacklistEvent).where(
+                        BlacklistEvent.tx_hash == tx_hash,
+                        BlacklistEvent.chain == "ethereum",
+                    )
+                ).scalars().first()
                 if existing:
                     continue
 
@@ -242,10 +245,12 @@ async def _poll_tron(db: Session) -> dict[str, Any]:
             tx_hash = entry.get("transaction_id", "")
             result = entry.get("result", {})
 
-            existing = db.query(BlacklistEvent).filter(
-                BlacklistEvent.tx_hash == tx_hash,
-                BlacklistEvent.chain == "tron",
-            ).first()
+            existing = db.execute(
+                select(BlacklistEvent).where(
+                    BlacklistEvent.tx_hash == tx_hash,
+                    BlacklistEvent.chain == "tron",
+                )
+            ).scalars().first()
             if existing:
                 continue
 

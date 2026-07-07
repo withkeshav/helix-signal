@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -219,7 +220,7 @@ async def receive_external_intel(request: Request, db: Session = Depends(get_db)
         return {"status": "ok", "processed": False, "reason": "missing_title_and_url"}
 
     if url:
-        existing = db.query(OsintArticle).filter(OsintArticle.url == url).first()
+        existing = db.execute(select(OsintArticle).where(OsintArticle.url == url)).scalars().first()
         if existing:
             return {"status": "ok", "processed": False, "reason": "duplicate"}
 

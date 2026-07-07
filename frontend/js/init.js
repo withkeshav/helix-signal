@@ -55,7 +55,8 @@ Alpine.data('helixApp', () => ({
   staleWarning: '',
   rateLimitWarning: '',
   warnings: [],
-  _timer: null,
+  _refreshTimer: null,
+  _inFlight: false,
   enabledAssets: ['USDT', 'USDC', 'DAI', 'PYUSD'],
 
   _refreshingStale: false,
@@ -87,13 +88,6 @@ Alpine.data('helixApp', () => ({
       this.version = '?';
     }
     
-    // Start global refresh timer
-    this._timer = setInterval(() => {
-      if (document.hidden) return;
-      this.$dispatch('global-refresh');
-      this._loadWarnings();
-    }, 60000);
-    
     // Watch for tab changes — dispose charts on leave to prevent memory leaks
     let prevTab = this.tab;
     this.$watch('tab', val => {
@@ -123,6 +117,8 @@ Alpine.data('helixApp', () => ({
     
     // Load warnings
     await this._loadWarnings();
+    // Start global refresh cycle with backpressure
+    this._scheduleNextRefresh();
   },
 
   async _loadWarnings() {
@@ -150,6 +146,23 @@ Alpine.data('helixApp', () => ({
     return parts.join(' | ') || '';
   },
 
+  _scheduleNextRefresh() {
+    this._refreshTimer = setTimeout(async () => {
+      if (document.hidden) return;
+      if (this._inFlight) return;
+      this._inFlight = true;
+      try {
+        this.$dispatch('global-refresh');
+        await this._loadWarnings();
+      } catch (e) {
+        console.warn('refresh cycle failed', e);
+      } finally {
+        this._inFlight = false;
+        this._scheduleNextRefresh();
+      }
+    }, 60000);
+  },
+
   // Essential coordination methods only
   async refresh() {
     this.refreshing = true;
@@ -171,7 +184,7 @@ Alpine.data('helixApp', () => ({
   },
 
   destroy() {
-    if (this._timer) clearInterval(this._timer);
+    if (this._refreshTimer) clearTimeout(this._refreshTimer);
   },
   
   switchTo(symbol) {

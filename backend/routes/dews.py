@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -39,7 +40,7 @@ def get_dews(
     if bundle is None:
         return {"asset": sym, "available": False, "dews_score": 0, "band": "normal", "tiers_fired": []}
 
-    chains = db.query(AssetChainSnapshot).filter(AssetChainSnapshot.asset_symbol == sym).all()
+    chains = db.execute(select(AssetChainSnapshot).where(AssetChainSnapshot.asset_symbol == sym)).scalars().all()
     refresh_interval = 300
     try:
         from providers.settings import get_setting

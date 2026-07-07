@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from database import AssetTrendSnapshot, SessionLocal, init_db
 from ml_models.anomaly import AnomalyDetector
+from sqlalchemy import select
 
 _MIN_SAMPLES = 50
 
@@ -18,13 +19,14 @@ def train_anomaly_detector() -> AnomalyDetector | None:
     db = SessionLocal()
     try:
         rows = (
-            db.query(AssetTrendSnapshot.signal_score)
-            .filter(AssetTrendSnapshot.signal_score.isnot(None))
-            .order_by(AssetTrendSnapshot.timestamp.desc())
-            .limit(2000)
-            .all()
+            db.execute(
+                select(AssetTrendSnapshot.signal_score)
+                .where(AssetTrendSnapshot.signal_score.isnot(None))
+                .order_by(AssetTrendSnapshot.timestamp.desc())
+                .limit(2000)
+            ).scalars().all()
         )
-        values = [float(r[0]) for r in rows]
+        values = [float(v) for v in rows]
         if len(values) < _MIN_SAMPLES:
             return None
         detector = AnomalyDetector()

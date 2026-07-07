@@ -2,6 +2,8 @@
 
 Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
+> **API Versioning Note:** Most routes live at `/api/*` with no version prefix. The V4 intelligence/forensics endpoints (`investigate`, `yield`, `collateral`, `reserve`, `blacklist`, `tags`) use `/api/v1/*`. A future dedicated versioning pass will standardize all routes under `/api/v1`. See `.opencode/AGENTS.md` decision history for context.
+
 ## Core
 
 | Method | Endpoint | Description | Rate Limit |

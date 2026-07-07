@@ -17,6 +17,12 @@
 - **Plugin discovery PYTHONPATH fallback** — `registry.py` now tries `import sources.plugins` as fallback when `backend.sources.plugins` fails. README and CONTRIBUTING updated with `PYTHONPATH=..` for bare uvicorn dev. *(GLM-10)*
 - **`loop` variable shadow in lifespan** — Removed redundant `asyncio.get_running_loop()` call (reused existing `loop` variable). *(GLM-22)*
 - **SA 2.0 `db.query()` migration** — All 63 `db.query()` calls in production code converted to `db.execute(select(...))` style across `routes/`, `services/`, `signal_engine/`, `core/`, `agents/`, `chain/`, `scripts/`, `main.py`, and `database.py`. *(GLM-11)*
+- **Architecture docs drift corrected** — Celery→APScheduler, Chart.js→ECharts, 6-tab→8-tab, SA 2.0 claim updated to 63, stale VPS profile diagram cleaned. *(GLM-12)*
+- **README SA 2.0 claim corrected** — Updated from "66 files" to "63 production calls". *(GLM-13)*
+- **HSTS removed from HTTP :80 nginx** — `Strict-Transport-Security` header removed from `frontend/snippets/security-headers.conf`. HSTS should be set at the upstream TLS terminator. *(GLM-14)*
+- **Mixed API prefix documented** — `docs/api.md` now notes that most routes are at `/api/*` while V4 endpoints use `/api/v1/*`, with standardization deferred. *(GLM-15)*
+- **`node_modules/` excluded from nginx image** — Added to `frontend/.dockerignore` along with `*.log` and `.git*`. *(GLM-17)*
+- **Orphaned `chain_detail.py` deleted** — Zero importers confirmed. *(GLM-18)*
 
 ## v4.0.0 (2026-07-05)
 

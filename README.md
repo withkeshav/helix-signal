@@ -8,7 +8,7 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**460 regression tests pass (0 failed).**
+**461 regression tests pass (0 failed).**
 
 **Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. Heuristic `.onnx` stubs and `data/depeg_events.json` are now tracked in git so CI tests pass deterministically. See [`.progress/transform.md`](.progress/transform.md) §3.2 for the execution log.
 
@@ -19,14 +19,14 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **ONNX ML models** — 3 models built via `onnx.helper` (opset 9): depeg probability, funding regime detection, yield sustainability. Build with `scripts/build_v4_models.py`
 - **Investigation engine** — 8-step async pipeline (address clustering, bridge hop tracing, peel chain analysis, blacklist watch, on-chain token lookup, DEWS anomaly scoring, AI narrative generation, yield intelligence)
 - **Forensics tab** — Dashboard tab with blacklist stats/events, wallet investigation form, and threat-level KPIs
-- **Alerts inbox** — 7th dashboard tab showing fired `SignalEvent` rows with asset/severity filters plus active alert rule list. Backend: `GET /api/alerts` (admin-gated).
+- **Alerts inbox** — Dashboard tab showing fired `SignalEvent` rows with asset/severity filters plus active alert rule list. Backend: `GET /api/alerts` (admin-gated).
 - **DEWS** — Distributed Early Warning System combining multi-source anomaly scores with circuit-breaker chain dispatch
 - **6 new ORM tables** — `FiatReserve`, `Collateral`, `YieldBearing`, `FundingRate`, `WhaleActivity`, `BlacklistEvent` + 3 DuckDB OLAP tables
 - **On-chain intelligence** — Alchemy RPC, Moralis, Flipside, The Graph, Chainlink Oracle feeds + address clustering + bridge hop tracking + peel chain detection
 - **3 new API endpoints** — `/api/v1/investigate`, `/api/v1/yield/intelligence`, `/api/v1/blacklist/events`
 - **8 Alembic migrations** — Full schema evolution for V4 tables and column additions
-- **SA 2.0 style** — All 66 `db.query()` calls migrated to `select()` + `execute()` across 25 files
-- **460 regression tests** — All tests pass, including 24 new tests for address tagging, clustering, and webhook dispatch
+- **SA 2.0 style** — All 63 `db.query()` calls in production code migrated to `select()` + `execute()`
+- **461 regression tests** — All tests pass, including 24 new tests for address tagging, clustering, and webhook dispatch
 
 ## V3 Highlights
 

@@ -3,3 +3,6 @@ e2e/
 playwright.config.ts
 package*.json
 *.md
+node_modules/
+*.log
+.git*

@@ -1,6 +1,6 @@
 # Helix Signal Changelog
 
-## v4.0.1 (pending)
+## v4.0.1 (2026-07-08)
 
 ### Fixed
 - **`SESSION_SIGNING_KEY` loud failure** — Startup log ERROR warning if key is blank + improved 503 detail message includes fix instruction. `docs/DEPLOYMENT.md` and `README.md` deploy checklists now explicitly flag this as REQUIRED before first deploy. *(GLM-01)*
@@ -23,6 +23,13 @@
 - **Mixed API prefix documented** — `docs/api.md` now notes that most routes are at `/api/*` while V4 endpoints use `/api/v1/*`, with standardization deferred. *(GLM-15)*
 - **`node_modules/` excluded from nginx image** — Added to `frontend/.dockerignore` along with `*.log` and `.git*`. *(GLM-17)*
 - **Orphaned `chain_detail.py` deleted** — Zero importers confirmed. *(GLM-18)*
+- **Frontend tab-panel HTML nesting fixed** — `tab-market` and `tab-system` now close correctly in `frontend/index.html`, making all 8 tab panels top-level siblings instead of nesting 6 panels inside Market/System. *(GLM-19 follow-up)*
+- **Playwright E2E coverage extended** — 3 new specs for Analytics, Forensics, and Alerts tabs (now covering 8/8 tabs), full-Chromium channel for import-map support, and `_x_dataStack` wait helper for Alpine ESM. *(GLM-19)*
+- **E2E port override** — Playwright runs against `FRONTEND_PORT=3080` (`baseURL=http://localhost:3080`) so tests do not conflict with a production frontend on port 80. Documented in README and `docs/architecture.md`. *(GLM-19 follow-up)*
+- **Alpine tab-panel visibility** — Removed `x-transition` from all 8 `.tab-content` panels to fix a transition wedge that left inactive tabs partially visible and broke Playwright visibility assertions. *(GLM-19 follow-up)*
+- **Settings section visibility** — Replaced `x-if` + inline `.filter()` guards on Settings category panels with reactive getters + `x-show`, so API Keys, Data Providers, and related sections render after async admin login. *(GLM-19 follow-up)*
+- **Settings tab lazy mount restored** — Settings panel uses `<template x-if>` again so governance Alpine handlers bind when the tab opens; added `submitAdminLogin()` and DOM credential fallback for reliable login. *(GLM-19 follow-up)*
+- **AI budget admin auth** — `loadAiBudget()` now sends `X-Admin-Token` so the budget panel becomes visible after login. *(GLM-19 follow-up)*
 
 ## v4.0.0 (2026-07-05)
 

@@ -142,7 +142,13 @@ export function useMarket() {
     
     // Init — called automatically by Alpine when component mounts
     async init() {
-      this.$store.dashboard.loading = true;
+      // NOTE: We intentionally do NOT flip `$store.dashboard.loading` to `true`
+      // here. Mutating a store flag synchronously inside x-data init() (before
+      // the child x-show effects are registered) races Alpine's reactivity and
+      // can leave the `x-show="!$store.dashboard.loading"` panel wedged at
+      // display:none even after loading settles to false. The dashboard cards
+      // already render graceful placeholders ("--"/"N/A") until data arrives,
+      // so the panel stays visible and simply fills in once fetches resolve.
       try {
         // Skip redundant API calls if dashboard already loaded (tabs share `$store.dashboard`)
         if (!this.$store.dashboard.chains?.length) {

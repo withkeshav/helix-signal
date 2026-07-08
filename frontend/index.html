@@ -20,6 +20,12 @@
   }
   </script>
   <script type="module" src="/js/init.js"></script>
+  <!-- Playwright / test helpers: disable Alpine transitions for deterministic visibility checks -->
+  <style id="test-disable-transitions">
+    @media (prefers-reduced-motion: reduce) {
+      .tab-content, .tab-content *, [x-transition] { transition: none !important; animation: none !important; }
+    }
+  </style>
   </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -274,7 +280,7 @@
 
 
     <!-- Tab: Signal -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'signal'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="market" role="tabpanel" id="tab-signal">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'signal'" x-data="market" role="tabpanel" id="tab-signal">
       <!-- Error Banner -->
       <div x-cloak x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
 
@@ -627,7 +633,7 @@
     </div>
 
     <!-- Tab: Market (Supply + Forecast) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'market'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-market">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'market'" role="tabpanel" id="tab-market">
       <div x-data="forecast">
         <div x-cloak x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
         <div class="chart-card">
@@ -765,9 +771,10 @@
         </div>
       </div>
     </div>
+    </div>
 
     <!-- Tab: Analytics (regime, change-points, cross-asset) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'analytics'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="tabpanel" id="tab-analytics">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'analytics'" x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="tabpanel" id="tab-analytics">
       <div x-cloak x-show="analyticsError" class="warning-banner visible" x-text="analyticsError" style="margin-bottom:8px"></div>
       <div x-cloak x-show="analyticsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading analytics for <span x-text="analyticsAsset"></span>...</div>
 
@@ -831,7 +838,7 @@
     </div>
 
     <!-- Tab: Intel (OSINT + SMIDGE) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'intel'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-intel">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'intel'" role="tabpanel" id="tab-intel">
       <div x-data="osint" x-init="init()">
         <div x-cloak x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
         <div class="insight-grid">
@@ -993,7 +1000,7 @@
     </div>
 
     <!-- Tab: Forensics (blacklist + investigation) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'forensics'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="forensics" x-init="init()" role="tabpanel" id="tab-forensics">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'forensics'" x-data="forensics" x-init="init()" role="tabpanel" id="tab-forensics">
       <div x-cloak x-show="errorStats || errorEvents" class="warning-banner visible" x-text="errorStats || errorEvents" style="margin-bottom:8px"></div>
       <div x-cloak x-show="loadingStats && !blacklistStats" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading forensics...</div>
       <div class="insight-grid">
@@ -1162,7 +1169,7 @@
     </div>
 
     <!-- Tab: Alerts (fired-event inbox + rule config) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'alerts'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="alertsPanel" x-init="init()" role="tabpanel" id="tab-alerts">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'alerts'" x-data="alertsPanel" x-init="init()" role="tabpanel" id="tab-alerts">
       <div x-cloak x-show="error" class="warning-banner visible" x-text="error" style="margin-bottom:8px"></div>
       <div x-cloak x-show="loading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading alerts...</div>
 
@@ -1220,7 +1227,7 @@
     </div>
 
     <!-- Tab: System (Health + Quality) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'system'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" role="tabpanel" id="tab-system">
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'system'" role="tabpanel" id="tab-system">
       <div x-data="adminOps" x-init="init()" style="margin-bottom:12px">
         <button class="btn" @click="openAdminDrawer()" style="padding:6px 14px;font-size:13px">Admin Operations</button>
         <div x-cloak x-show="adminDrawerVisible" @keydown.window.escape="adminDrawerVisible=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;justify-content:flex-end" @click.self="adminDrawerVisible=false">
@@ -1474,14 +1481,14 @@
           </div>
         </div>
       </div>
-
+    </div>
     </div>
     </div>
 
     <!-- Tab: Settings (lazy-mounted via x-if — DOM unmounts on tab switch) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'settings'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
-         x-init="filterSettings(); loadAiBudget();" role="tabpanel" id="tab-settings">
-      <template x-if="$store.ui.tab === 'settings'">
+    <template x-if="$store.ui.tab === 'settings'">
+    <div class="tab-content settings" x-cloak x-data="governance" @keydown.window.escape="auditHistoryModal=false;showConfirmDefaults=false"
+         x-init="filterSettings(); loadAiBudget(); _bindAdminLoginForm();" role="tabpanel" id="tab-settings">
       <div class="insight-grid">
         <!-- Admin Authentication (transform.md §2.3 Layer B) -->
         <div class="insight-card" style="grid-column:1/-1">
@@ -1491,14 +1498,14 @@
               <p class="kpi-sub" style="margin:0 0 12px 0">Sign in with the seeded admin account (<code>HELIX_ADMIN_USERNAME</code> / <code>HELIX_ADMIN_PASSWORD</code> in <code>.env</code>). Uses <code>/auth/login</code> → signed session token.</p>
               <div x-cloak x-show="$store.ui.authError" class="warning-banner visible" x-text="$store.ui.authError" style="margin-bottom:12px"></div>
               <div x-cloak x-show="settingsError" class="warning-banner visible" x-text="settingsError" style="margin-bottom:12px"></div>
-              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+              <form id="admin-login-form" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px" @submit.prevent="submitAdminLogin()">
                 <input type="text" x-model="$store.ui.loginUsername" placeholder="Username" autocomplete="username"
                        style="flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px">
                 <input type="password" x-model="$store.ui.loginPassword" placeholder="Password" autocomplete="current-password"
                        style="flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px">
-                <button class="btn btn-primary" type="button" @click="$store.ui.login().then(ok => ok && loadSettings())" style="padding:10px 20px">Sign in</button>
+                <button class="btn btn-primary" type="submit" style="padding:10px 20px">Sign in</button>
                 <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.adminToken" @click="$store.ui.logout(); settingsError=''; settingsList=[]" style="padding:10px 20px">Sign out</button>
-              </div>
+              </form>
               <details style="font-size:12px;color:var(--muted)">
                 <summary style="cursor:pointer">Legacy token (rollout only)</summary>
                 <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px">
@@ -1669,8 +1676,7 @@
         </div>
         
         <!-- Settings Sections -->
-        <template x-if="filteredSettings.filter(s => s.key.startsWith('secret_')).length">
-          <div class="insight-card" style="grid-column:1/-1">
+        <div class="insight-card" x-show="hasSecretSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-key"/></svg> API Keys & Secrets
             </h2>
@@ -1706,11 +1712,9 @@
                 </div>
               </template>
             </div>
-          </div>
-        </template>
+        </div>
         
-        <template x-if="filteredSettings.filter(s => s.key.startsWith('provider_')).length">
-          <div class="insight-card" style="grid-column:1/-1">
+        <div class="insight-card" x-show="hasProviderSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-globe"/></svg> Data Providers
             </h2>
@@ -1746,11 +1750,9 @@
                 </div>
               </template>
             </div>
-          </div>
-        </template>
+        </div>
         
-        <template x-if="filteredSettings.filter(s => s.key.startsWith('feature_')).length">
-          <div class="insight-card" style="grid-column:1/-1">
+        <div class="insight-card" x-show="hasFeatureSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-sliders"/></svg> Feature Toggles
             </h2>
@@ -1778,11 +1780,9 @@
                 </div>
               </template>
             </div>
-          </div>
-        </template>
+        </div>
         
-        <template x-if="filteredSettings.filter(s => s.key.startsWith('refresh_')).length">
-          <div class="insight-card" style="grid-column:1/-1">
+        <div class="insight-card" x-show="hasRefreshSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-repeat"/></svg> Refresh Intervals
             </h2>
@@ -1818,10 +1818,9 @@
               </template>
             </div>
           </div>
-        </template>
+        </div>
         
-        <template x-if="filteredSettings.filter(s => s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection').length">
-          <div class="insight-card" style="grid-column:1/-1">
+        <div class="insight-card" x-show="hasAiSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-bot"/></svg> AI & Intelligence
             </h2>
@@ -1994,8 +1993,7 @@
                 </div>
               </template>
             </div>
-          </div>
-        </template>
+        </div>
         
         <!-- A2: Audit Log Section -->
         <div class="insight-card" style="grid-column:1/-1">
@@ -2356,8 +2354,8 @@
            <button style="margin-left:10px;background:none;border:none;color:inherit;font-weight:700;cursor:pointer" @click.stop="hideToast()" aria-label="Dismiss">×</button>
         </div>
       </div>
-      </template>
     </div>
+    </template>
 
     <!-- Toast Container (global) -->
     <div class="toast-wrap" x-cloak x-show="$store.ui.toastVisible" role="status" aria-live="polite">

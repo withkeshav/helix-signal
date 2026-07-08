@@ -255,6 +255,22 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - Backup script: [`scripts/backup.sh`](scripts/backup.sh)
 
+## E2E tests (Playwright)
+
+The frontend ships a 28-test Playwright suite covering all 8 dashboard tabs. Tests run against the Docker frontend on port **3080** (override via `FRONTEND_PORT`).
+
+```bash
+cd /path/to/helix-signal
+docker rm -f helix-signal-frontend-1 2>/dev/null
+FRONTEND_PORT=3080 docker compose up -d --build frontend
+curl -sf http://localhost:3080/ | head -c 80
+cd frontend
+npx playwright install chromium   # first run only
+npx playwright test --project=chromium --timeout=120000 --retries=0
+```
+
+`frontend/playwright.config.ts` sets `baseURL` to `http://localhost:3080`. Governance tests read `HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` from the environment or repo-root `.env`.
+
 ## Not Investment Advice
 
 Helix-Signal is an informational monitoring tool. It is **not** investment advice, financial advice, trading advice, or risk guidance.

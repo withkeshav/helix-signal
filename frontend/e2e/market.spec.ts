@@ -4,17 +4,16 @@ test.describe('Market/Overview Tab', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     // Ensure we're on the Overview tab (should be default)
-    await expect(page.locator('.tab-content.overview')).toBeVisible();
+    await expect(page.locator('#tab-signal')).toBeVisible();
   });
 
   test('loads market overview with all dashboard cards', async ({ page }) => {
-    // Check that all main dashboard cards are visible
-    await expect(page.getByText('Market Overview')).toBeVisible();
-    await expect(page.getByText('Risk Terminal')).toBeVisible();
-    await expect(page.getByText('Stress Leaderboard')).toBeVisible();
-    await expect(page.getByText('Market Narrative')).toBeVisible();
-    await expect(page.getByText('Analytics Insight')).toBeVisible();
-    await expect(page.getByText('Rotation')).toBeVisible();
+    // Check that all main dashboard cards are visible (by their real headings)
+    await expect(page.getByRole('heading', { name: 'Risk Terminal' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Stress Leaderboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rotation' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Risk Components' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent Anomalies' })).toBeVisible();
     
     // Check that risk gauge loads with score
     const riskGauge = page.locator('.risk-gauge');
@@ -29,22 +28,16 @@ test.describe('Market/Overview Tab', () => {
   });
 
   test('asset switching works correctly', async ({ page }) => {
-    // Get initial asset
-    const initialAsset = await page.locator('.token-symbol').first().textContent();
-    
-    // Switch to a different asset if available
     const tokenCards = page.locator('.token-card');
     const tokenCount = await tokenCards.count();
-    
-    if (tokenCount > 1) {
-      // Click on second token card
-      const secondToken = tokenCards.nth(1);
-      await secondToken.click();
-      
-      // Verify asset changed in UI
-      const newAsset = await page.locator('.token-symbol').first().textContent();
-      expect(newAsset).not.toBe(initialAsset);
-    }
+    expect(tokenCount).toBeGreaterThan(1);
+
+    // Each card shows its symbol; active card gets .token-active
+    const secondSymbol = await tokenCards.nth(1).locator('.token-symbol').textContent();
+    await tokenCards.nth(1).click();
+
+    await expect(tokenCards.nth(1)).toHaveClass(/token-active/);
+    await expect(page.locator('.token-card.token-active .token-symbol')).toHaveText(secondSymbol!);
   });
 
   test('time range selection works', async ({ page }) => {
@@ -52,18 +45,18 @@ test.describe('Market/Overview Tab', () => {
     const timeRangeSelector = page.locator('.time-range');
     await expect(timeRangeSelector).toBeVisible();
     
-    // Check that time range pills exist
-    await expect(page.getByText('6H')).toBeVisible();
-    await expect(page.getByText('24H')).toBeVisible();
-    await expect(page.getByText('7D')).toBeVisible();
-    await expect(page.getByText('30D')).toBeVisible();
-    await expect(page.getByText('90D')).toBeVisible();
+    // Check that time range pills exist (scoped to the range selector)
+    await expect(timeRangeSelector.getByText('6H')).toBeVisible();
+    await expect(timeRangeSelector.getByText('24H')).toBeVisible();
+    await expect(timeRangeSelector.getByText('7D')).toBeVisible();
+    await expect(timeRangeSelector.getByText('30D')).toBeVisible();
+    await expect(timeRangeSelector.getByText('90D')).toBeVisible();
     
     // Click on 24H range
-    await page.getByText('24H').click();
+    await timeRangeSelector.getByText('24H').click();
     
-    // Verify the active state changed (this would require checking the class)
-    const activePill = page.locator('.time-pill.active');
+    // Verify the active state changed
+    const activePill = timeRangeSelector.locator('.time-pill.active');
     await expect(activePill).toHaveText('24H');
   });
 
@@ -72,31 +65,31 @@ test.describe('Market/Overview Tab', () => {
     const initialTheme = await page.locator('html').getAttribute('data-theme');
     
     // Click theme toggle button
-    await page.locator('button[aria-label="Toggle theme"]').click();
+    await page.locator('button[aria-label="Toggle dark/light theme"]').click();
     
     // Verify theme changed
     const newTheme = await page.locator('html').getAttribute('data-theme');
     expect(newTheme).not.toBe(initialTheme);
     
     // Switch back
-    await page.locator('button[aria-label="Toggle theme"]').click();
+    await page.locator('button[aria-label="Toggle dark/light theme"]').click();
   });
 
   test('AI content cards load properly', async ({ page }) => {
-    // Check that AI content sections exist
-    await expect(page.getByText('Market Overview')).toBeVisible();
-    await expect(page.getByText('Risk Terminal')).toBeVisible();
-    await expect(page.getByText('Market Narrative')).toBeVisible();
-    await expect(page.getByText('Analytics Insight')).toBeVisible();
+    // Check that AI content sub-tabs and the risk terminal card exist
+    await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Narrative' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Insights' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Risk Terminal' })).toBeVisible();
     
-    // Verify AI badges are present
-    const aiBadges = page.locator('.model-badge:has-text("AI")');
-    expect(await aiBadges.count()).toBeGreaterThanOrEqual(3);
+    // Verify model provenance badges are present
+    const modelBadges = page.locator('#tab-signal .model-badge');
+    expect(await modelBadges.count()).toBeGreaterThanOrEqual(3);
   });
 
   test('stress leaderboard displays chain data', async ({ page }) => {
     // Check stress leaderboard section
-    await expect(page.getByText('Stress Leaderboard')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Stress Leaderboard' })).toBeVisible();
     
     // Check for chain velocity indicator
     await expect(page.getByText('Chains ranked by supply velocity')).toBeVisible();
@@ -104,7 +97,7 @@ test.describe('Market/Overview Tab', () => {
 
   test('rotation data displays cross-asset correlations', async ({ page }) => {
     // Check rotation section
-    await expect(page.getByText('Rotation')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rotation' })).toBeVisible();
     
     // Check for correlation indicator
     await expect(page.getByText('Cross-asset supply rotation')).toBeVisible();

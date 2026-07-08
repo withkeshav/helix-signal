@@ -63,10 +63,14 @@ export function registerUiStore(Alpine) {
 
     async login() {
       this.authError = '';
-      const body = new URLSearchParams({
-        username: this.loginUsername,
-        password: this.loginPassword,
-      });
+      let username = this.loginUsername;
+      let password = this.loginPassword;
+      if (!username || !password) {
+        const root = document.getElementById('tab-settings');
+        username = username || root?.querySelector('input[placeholder="Username"]')?.value || '';
+        password = password || root?.querySelector('input[placeholder="Password"]')?.value || '';
+      }
+      const body = new URLSearchParams({ username, password });
       try {
         const r = await fetch('/api/auth/login', {
           method: 'POST',

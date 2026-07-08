@@ -149,3 +149,6 @@ helix_signal_strategic_report.md
 .progress/NEXT_STEPS.md
 .progress/NEXT_SESSION_PROMPT.md
 .progress/README.md
+
+# Playwright test artifacts
+frontend/test-results/

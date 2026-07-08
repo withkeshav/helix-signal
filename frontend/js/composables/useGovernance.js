@@ -70,6 +70,30 @@ export function useGovernance() {
       return this.$store.ui.adminToken;
     },
 
+    get hasSecretSettings() {
+      return this.filteredSettings.some(s => s.key.startsWith('secret_'));
+    },
+    get hasProviderSettings() {
+      return this.filteredSettings.some(s => s.key.startsWith('provider_'));
+    },
+    get hasFeatureSettings() {
+      return this.filteredSettings.some(s => s.key.startsWith('feature_'));
+    },
+    get hasRefreshSettings() {
+      return this.filteredSettings.some(s => s.key.startsWith('refresh_'));
+    },
+    get hasAiSettings() {
+      return this.filteredSettings.some(s => s.key.startsWith('ai_') || s.key === 'enable_anomaly_detection');
+    },
+
+    async submitAdminLogin() {
+      const ok = await this.$store.ui.login();
+      if (ok) {
+        await this.loadSettings();
+        await this.loadAiBudget();
+      }
+    },
+
     saveAdminToken() {
       this.$store.ui.saveAdminToken();
     },
@@ -81,6 +105,10 @@ export function useGovernance() {
     // --- Init: keyboard shortcuts + polling ---
     init() {
       this._bindKeyboard();
+      this._bindAdminLoginForm();
+      this.$watch('$store.ui.tab', tab => {
+        if (tab === 'settings') this.$nextTick(() => this._bindAdminLoginForm());
+      });
       if (this.adminToken) this.startAuditPolling();
       this.initProviders();
       // Load available models
@@ -91,10 +119,11 @@ export function useGovernance() {
       }
       // Load playbooks
       this.loadPlaybooks();
-      // Auto-reload settings when admin token is saved
-      this.$watch('$store.ui.adminToken', val => { if (val) this.loadSettings(); });
+      // Auto-reload settings + AI budget when admin token is saved (e.g. after login)
+      this.$watch('$store.ui.adminToken', val => { if (val) { this.loadSettings(); this.loadAiBudget(); } });
       if (this.adminToken) {
         this.loadSettings();
+        this.loadAiBudget();
       }
     },
 
@@ -118,6 +147,18 @@ export function useGovernance() {
     },
 
     // --- A7: Keyboard shortcuts ---
+    _bindAdminLoginForm() {
+      this.$nextTick(() => {
+        const form = this.$root.querySelector('#admin-login-form');
+        if (!form || form.dataset.loginBound) return;
+        form.dataset.loginBound = '1';
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          this.submitAdminLogin();
+        });
+      });
+    },
+
     _bindKeyboard() {
       document.addEventListener('keydown', (e) => {
         if (this.$root && this.$root.style.display === 'none') return;
@@ -654,7 +695,7 @@ export function useGovernance() {
 
     async loadAiBudget() {
       try {
-        const r = await fetch('/api/ai/budget', { cache: 'no-store' });
+        const r = await fetch('/api/ai/budget', { cache: 'no-store', headers: this._adminHeaders() });
         if (r.ok) {
           this.aiBudget = await r.json();
           this.aiBudgetLoaded = true;

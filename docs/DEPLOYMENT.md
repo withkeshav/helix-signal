@@ -138,7 +138,8 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
-| v4.0.0 | `HEAD` | 2026-07-05 | Current prod HEAD — 24-coin taxonomy, ONNX models, forensics, investigation |
+| v4.0.1 | `HEAD` | 2026-07-08 | Audit rectification — auth, hardening, reliability, SA 2.0, docs, tests |
+| v4.0.0 | `cabb85a` | 2026-07-05 | Current prod HEAD — 24-coin taxonomy, ONNX models, forensics, investigation |
 | v3.10.3 | `0496bea` | 2026-06-25 | Bugfix audit completed |
 | v3.10.2 | `c56df3b` | 2026-06-24 | UI/UX redesign rollout |
 | v3.10.1 | `6757a71` | 2026-06-24 | Bugfix audit pass (auth, security, perf) |

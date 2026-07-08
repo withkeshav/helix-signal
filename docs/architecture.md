@@ -117,6 +117,11 @@ Post-deploy validation:
 ./scripts/smoke-check.sh https://your-host.example
 ```
 
+## Test coverage
+
+- **Backend:** 461 pytest regression tests (`cd backend && .venv/bin/pytest`)
+- **Frontend E2E:** 28 Playwright tests in `frontend/e2e/` covering all 8 tabs — Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings (Governance). Run with `FRONTEND_PORT=3080 docker compose up -d --build frontend` then `cd frontend && npx playwright test --project=chromium`. See [README E2E section](../README.md#e2e-tests-playwright).
+
 ## Design Intent
 
 - Keep frontend thin; centralize logic on the backend

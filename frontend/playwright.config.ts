@@ -1,27 +1,43 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3080';
+
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30000,
+  timeout: 20000,
   expect: { timeout: 10000 },
   fullyParallel: false,
   retries: 1,
   workers: 1,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
+    actionTimeout: 10000,
+    launchOptions: {
+      // Full Chromium supports import maps; the headless shell does not.
+      args: ['--no-sandbox'],
+    },
+    // NOTE: Tab panels no longer rely on CSS x-transition for visibility
+    // (x-show alone toggles display), so we deliberately do NOT force
+    // reducedMotion: 'reduce' here. Forcing reduced motion suppressed the
+    // browser transitions Alpine's x-transition machinery waits on, wedging
+    // panels in the leave-end (opacity-0/hidden) state.
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      // Force the downloaded full Chromium instead of the headless shell.
+      use: { ...devices['Desktop Chrome'], channel: 'chromium' },
     },
   ],
-  webServer: {
-    command: 'cd .. && docker compose up -d --wait backend frontend && sleep 3 && curl -sf http://localhost:3000/api/health > /dev/null',
-    port: 3000,
-    timeout: 120000,
-    reuseExistingServer: true,
-  },
+  webServer: process.env.CI
+    ? {
+        command:
+          'cd .. && FRONTEND_PORT=3080 docker compose up -d --wait backend frontend && sleep 3 && curl -sf http://localhost:3080/ > /dev/null',
+        url: BASE_URL,
+        timeout: 180000,
+        reuseExistingServer: true,
+      }
+    : undefined,
 });

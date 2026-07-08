@@ -4,7 +4,7 @@
   "description": "CDN dependency tracking only — not a build artifact",
   "dependencies": {
     "alpinejs": "3.14.9",
-    "echarts": "5.5.0"
+    "echarts": "6.1.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0"

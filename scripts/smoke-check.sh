@@ -48,21 +48,21 @@ fi
 echo "OK: /api/sources/usage requires auth (${usage_code})"
 
 settings_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/settings")"
-if [[ "${settings_code}" != "403" && "${settings_code}" != "503" ]]; then
+if [[ "${settings_code}" != "401" && "${settings_code}" != "403" && "${settings_code}" != "503" ]]; then
   echo "FAILED: /api/settings should require admin token (got ${settings_code})"
   exit 1
 fi
 echo "OK: /api/settings requires auth (${settings_code})"
 
 governance_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/governance?asset=USDT")"
-if [[ "${governance_code}" != "403" && "${governance_code}" != "503" ]]; then
+if [[ "${governance_code}" != "401" && "${governance_code}" != "403" && "${governance_code}" != "503" ]]; then
   echo "FAILED: /api/governance should require admin token (got ${governance_code})"
   exit 1
 fi
 echo "OK: /api/governance requires auth (${governance_code})"
 
 diagnostics_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/admin/diagnostics")"
-if [[ "${diagnostics_code}" != "403" && "${diagnostics_code}" != "503" ]]; then
+if [[ "${diagnostics_code}" != "401" && "${diagnostics_code}" != "403" && "${diagnostics_code}" != "503" ]]; then
   echo "FAILED: /api/admin/diagnostics should require admin token (got ${diagnostics_code})"
   exit 1
 fi

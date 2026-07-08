@@ -41,13 +41,11 @@ fi
 echo "OK: /api/dashboard reachable"
 
 usage_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/sources/usage")"
-if [[ "${usage_code}" != "200" ]]; then
-  echo "FAILED: /api/sources/usage returned ${usage_code}"
+if [[ "${usage_code}" != "401" && "${usage_code}" != "403" && "${usage_code}" != "503" ]]; then
+  echo "FAILED: /api/sources/usage should require admin token (got ${usage_code})"
   exit 1
 fi
-usage_json="$(curl -fsSL "${BASE_URL}/api/sources/usage")"
-python3 -c 'import json,sys; d=json.load(sys.stdin); assert "total_calls" in d; print("OK: /api/sources/usage -> total_calls={}".format(d.get("total_calls")))' <<< "${usage_json}"
-echo "OK: /api/sources/usage reachable"
+echo "OK: /api/sources/usage requires auth (${usage_code})"
 
 settings_code="$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/settings")"
 if [[ "${settings_code}" != "403" && "${settings_code}" != "503" ]]; then

@@ -204,6 +204,10 @@ export function useMarket() {
         }
       });
       
+      // Reload AI panels when admin session changes
+      this.$watch('$store.ui.adminToken', () => this._reloadAiPanels());
+      window.addEventListener('auth-changed', () => this._reloadAiPanels());
+
       // Reload data and charts when asset changes
       this.$watch('$store.dashboard.asset', async (newAsset) => {
         if (this.chains.length === 0) this.$store.dashboard.loading = true;
@@ -285,6 +289,7 @@ export function useMarket() {
         this.$store.dashboard.totalSupply = d.total_supply_current;
         this.$store.dashboard.supplyChange = d.total_supply_change_24h_pct;
         this.$store.dashboard.freshness = d.freshness || {};
+        this.$store.ui.dataHealthLabel = formatFreshnessLabel(d.freshness?.status) || '—';
         this.$store.dashboard.sources = d.sources || [];
         this.$store.dashboard.generatedAt = d.generated_at || '';
         this.$store.dashboard.nlpAvailable = !!(d.data_quality?.nlp_available);
@@ -336,9 +341,18 @@ export function useMarket() {
     },
     
     // Additional loading methods needed for dashboard cards
+    async _reloadAiPanels() {
+      await Promise.all([
+        this.loadMarketOverview(),
+        this.loadAiExplain(),
+        this.loadNarrative(),
+        this.loadInsights(),
+      ]);
+    },
+
     async loadMarketOverview() {
       try {
-        const r = await fetch('/api/ai/market-overview', { cache: 'no-store' });
+        const r = await this.$store.ui.adminFetch('/api/ai/market-overview', { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           this.marketOverview = j.available ? j.summary : (j.reason || '');
@@ -352,7 +366,7 @@ export function useMarket() {
     
     async loadAiExplain() {
       try {
-        const r = await fetch(`/api/ai/explain?asset=${this.asset}`, { cache: 'no-store' });
+        const r = await this.$store.ui.adminFetch(`/api/ai/explain?asset=${this.asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           this.aiSummary = j.available ? j.summary : (j.reason || '');
@@ -366,7 +380,7 @@ export function useMarket() {
     
     async loadNarrative() {
       try {
-        const r = await fetch(`/api/ai/narrative?asset=${this.asset}`, { cache: 'no-store' });
+        const r = await this.$store.ui.adminFetch(`/api/ai/narrative?asset=${this.asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           this.aiNarrative = j.available ? j.summary : (j.reason || '');
@@ -380,7 +394,7 @@ export function useMarket() {
     
     async loadInsights() {
       try {
-        const r = await fetch(`/api/ai/insights?asset=${this.asset}`, { cache: 'no-store' });
+        const r = await this.$store.ui.adminFetch(`/api/ai/insights?asset=${this.asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           this.aiInsights = j.available ? j.summary : (j.reason || '');

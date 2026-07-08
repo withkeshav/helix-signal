@@ -44,7 +44,7 @@ def ingest_osint_feed(db: Session) -> int:
     from providers.settings import get_setting
     from services.sentiment import clear_cache as _clear_sentiment_cache
     nlp_from_settings = get_setting("feature_nlp_sentiment", db)
-    nlp_active = nlp_from_settings if isinstance(nlp_from_settings, bool) else ENABLE_NLP
+    nlp_active = bool(nlp_from_settings) if nlp_from_settings is not None else False
     _clear_sentiment_cache()
 
     all_articles: list[dict[str, Any]] = []

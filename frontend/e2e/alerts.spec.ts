@@ -29,4 +29,14 @@ test.describe('Alerts tab', () => {
     await expect(severitySelect).toBeVisible();
     await expect(severitySelect).toContainText('All severities');
   });
+
+  test('loads alert history section', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: /Alert History/ })).toBeVisible();
+  });
+
+  test('asset filter input accepts text', async ({ page }) => {
+    const input = page.locator('#tab-alerts').getByPlaceholder('Filter by asset (e.g. USDT)');
+    await input.fill('USDT');
+    await expect(input).toHaveValue('USDT');
+  });
 });

@@ -9,7 +9,12 @@ import json
 import os
 import time
 
+import os
+from pathlib import Path
+
 from fastapi import Header, HTTPException, Request
+
+SESSION_COOKIE_NAME = "helix_session"
 
 _FAILED_ATTEMPTS: dict[str, list[float]] = {}
 _LOCKOUT_THRESHOLD = 20
@@ -136,6 +141,15 @@ def _verify_session_token(token: str) -> dict | None:
         return None
 
 
+def _extract_admin_token(request: Request, header_token: str | None) -> str | None:
+    if header_token:
+        return header_token
+    cookie_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if cookie_token:
+        return cookie_token
+    return None
+
+
 def require_admin_token(
     request: Request,
     token: str | None = Header(None, alias="X-Admin-Token"),
@@ -149,6 +163,8 @@ def require_admin_token(
     4. Otherwise → record failure + 403.
     """
     _check_lockout(request)
+
+    token = _extract_admin_token(request, token)
 
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")

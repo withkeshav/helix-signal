@@ -1,14 +1,46 @@
+const ADMIN_TOKEN_KEY = 'helix_admin_token';
+
+function _loadStoredAdminToken() {
+  try {
+    return localStorage.getItem(ADMIN_TOKEN_KEY) || sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  } catch {
+    return sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  }
+}
+
+function _persistAdminToken(token) {
+  const value = token || '';
+  try {
+    if (value) {
+      localStorage.setItem(ADMIN_TOKEN_KEY, value);
+      sessionStorage.setItem(ADMIN_TOKEN_KEY, value);
+    } else {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+    }
+  } catch {
+    if (value) sessionStorage.setItem(ADMIN_TOKEN_KEY, value);
+    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  }
+}
+
+function _dispatchAuthChanged(authenticated) {
+  window.dispatchEvent(new CustomEvent('auth-changed', { detail: { authenticated: !!authenticated } }));
+}
+
 export function registerUiStore(Alpine) {
   Alpine.store('ui', {
     tab: 'signal',
     theme: 'light',
     searchQuery: '',
     searchResults: [],
-    adminToken: sessionStorage.getItem('helix_admin_token') || '',
+    adminToken: _loadStoredAdminToken(),
     loginUsername: '',
     loginPassword: '',
     authError: '',
     enabledAssets: [],
+    aiModeLabel: 'Off',
+    dataHealthLabel: '—',
     refreshing: false,
     toastMessage: '',
     toastType: 'info',
@@ -53,12 +85,51 @@ export function registerUiStore(Alpine) {
       location.hash = t;
     },
 
-    saveAdminToken() {
-      sessionStorage.setItem('helix_admin_token', this.adminToken || '');
-    },
-
     adminHeaders() {
       return this.adminToken ? { 'X-Admin-Token': this.adminToken } : {};
+    },
+
+    async adminFetch(url, opts = {}) {
+      const token = this.adminToken;
+      const headers = { ...(opts.headers || {}), ...this.adminHeaders() };
+      const sentToken = !!token;  // capture at request time, not response time
+      const response = await fetch(url, { ...opts, headers, credentials: 'include' });
+      // Only clear the token if this request included it (token was invalid/expired).
+      // Don't clear on 401 from requests that had no token (e.g. pre-login composable fetches
+      // whose 401 response arrives after login sets the token — race condition).
+      if ((response.status === 401 || response.status === 403) && sentToken) {
+        this.adminToken = '';
+        _persistAdminToken('');
+        this.authError = 'Session expired — sign in via Settings';
+        _dispatchAuthChanged(false);
+        this.showToast(this.authError, 'warning', 6000);
+      }
+      return response;
+    },
+
+    _onStorageAuthSync(e) {
+      if (e.key !== ADMIN_TOKEN_KEY) return;
+      const next = e.newValue || '';
+      if (next === this.adminToken) return;
+      this.adminToken = next;
+      this.authError = '';
+      _dispatchAuthChanged(!!next);
+    },
+
+    initAuthSync() {
+      window.addEventListener('storage', (e) => this._onStorageAuthSync(e));
+    },
+
+    async restoreSession() {
+      try {
+        const r = await fetch('/api/auth/me', { credentials: 'include', headers: this.adminHeaders(), cache: 'no-store' });
+        if (r.ok) {
+          this.authError = '';
+          _dispatchAuthChanged(true);
+          return true;
+        }
+      } catch {}
+      return false;
     },
 
     async login() {
@@ -76,6 +147,7 @@ export function registerUiStore(Alpine) {
           method: 'POST',
           body,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          credentials: 'include',
         });
         if (!r.ok) {
           this.authError = 'Invalid credentials';
@@ -83,8 +155,10 @@ export function registerUiStore(Alpine) {
         }
         const data = await r.json();
         this.adminToken = data.access_token || '';
-        sessionStorage.setItem('helix_admin_token', this.adminToken);
+        _persistAdminToken(this.adminToken);
         this.loginPassword = '';
+        this.authError = '';
+        _dispatchAuthChanged(true);
         return true;
       } catch {
         this.authError = 'Login failed — check network';
@@ -92,12 +166,20 @@ export function registerUiStore(Alpine) {
       }
     },
 
-    logout() {
+    async logout() {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: this.adminHeaders(),
+        });
+      } catch {}
       this.adminToken = '';
       this.loginUsername = '';
       this.loginPassword = '';
       this.authError = '';
-      sessionStorage.removeItem('helix_admin_token');
+      _persistAdminToken('');
+      _dispatchAuthChanged(false);
     },
   });
 }

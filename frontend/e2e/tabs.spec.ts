@@ -12,6 +12,7 @@ const TABS = [
   { name: 'Signal', id: 'tab-signal', heading: 'Risk Terminal' },
   { name: 'Market', id: 'tab-market', heading: 'Peg Forecast' },
   { name: 'Intel', id: 'tab-intel', heading: 'Signal Events' },
+  { name: 'Alerts', id: 'tab-alerts', heading: 'Fired Alerts' },
   { name: 'System', id: 'tab-system', heading: 'Source Health' },
 ];
 

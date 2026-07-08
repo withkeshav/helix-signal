@@ -9,7 +9,10 @@ export function useAdminOps() {
     adminOpsError: '',
     schedulerRunning: null,
 
-    init() {
+    init() {},
+
+    _adminFetch(url, opts = {}) {
+      return this.$store.ui.adminFetch(url, opts);
     },
 
     async openAdminDrawer() {
@@ -19,14 +22,13 @@ export function useAdminOps() {
 
     async loadDiagnostics() {
       this.adminOpsError = '';
-      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
-        const res = await fetch('/api/admin/diagnostics', { headers, cache: 'no-store' });
+        const res = await this._adminFetch('/api/admin/diagnostics', { cache: 'no-store' });
         if (res.ok) {
           this.diagnostics = await res.json();
           this.schedulerRunning = this.diagnostics?.health?.scheduler_running ?? null;
         } else if (res.status === 401 || res.status === 403) {
-          this.adminOpsError = 'Admin token required for diagnostics.';
+          this.adminOpsError = 'Sign in via Settings to view diagnostics.';
         } else {
           this.adminOpsError = `Diagnostics failed (${res.status})`;
         }
@@ -42,13 +44,15 @@ export function useAdminOps() {
       }
       this.backfillLoading = true;
       this.adminOpsError = '';
-      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
-        const res = await fetch(`/api/admin/backfill?asset=${this.backfillAsset.toUpperCase()}&days=${this.backfillDays}`, { method: 'POST', headers });
+        const res = await this._adminFetch(
+          `/api/admin/backfill?asset=${this.backfillAsset.toUpperCase()}&days=${this.backfillDays}`,
+          { method: 'POST' }
+        );
         if (res.ok) {
           this.backfillResult = await res.json();
         } else if (res.status === 401 || res.status === 403) {
-          this.adminOpsError = 'Admin token required for backfill.';
+          this.adminOpsError = 'Sign in via Settings to run seed demo backfill.';
         } else {
           this.adminOpsError = `Backfill failed (${res.status})`;
         }
@@ -71,9 +75,8 @@ export function useAdminOps() {
     },
 
     async exportEventsCsv() {
-      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
-        const res = await fetch('/api/events/export?limit=500&format=csv', { headers });
+        const res = await this._adminFetch('/api/events/export?limit=500&format=csv');
         if (res.ok) {
           const blob = await res.blob();
           const url = URL.createObjectURL(blob);

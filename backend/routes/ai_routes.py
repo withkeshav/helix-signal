@@ -1,10 +1,11 @@
 from typing import Any
 
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from database import SignalEvent, get_db
+from database import AiNarrativeHistory, SignalEvent, get_db
 from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
 from routes.playbooks import apply_playbook_by_name, get_all_playbooks, seed_builtin_playbooks
 from services.ai_usage import get_ai_usage_summary
@@ -22,7 +23,7 @@ def _require_ai_auth(request: Request, db: Session | None = None) -> None:
     from providers.settings import get_setting
     require = get_setting("ai_require_token", db)
     if require is None:
-        require = True
+        require = False
     if require:
         token = request.headers.get("X-Admin-Token")
         require_admin_token(request, token=token)
@@ -154,7 +155,21 @@ def ai_narrative(
         ctx["depeg_1h"] = "?"
         ctx["depeg_24h"] = "?"
 
-    return enrich_with_ai(feature="market_narrative", context=ctx, db=db)
+    result = enrich_with_ai(feature="market_narrative", context=ctx, db=db)
+    if result.get("available") and result.get("summary") and db is not None:
+        try:
+            db.add(AiNarrativeHistory(
+                asset_symbol=asset.upper(),
+                feature="market_narrative",
+                narrative_text=str(result.get("summary", ""))[:8000],
+                provider=result.get("provider"),
+                model=result.get("model"),
+                mode=result.get("mode"),
+            ))
+            db.commit()
+        except Exception:
+            db.rollback()
+    return result
 
 
 @router.get("/ai/insights")
@@ -258,3 +273,47 @@ def ai_apply_playbook(
         return {"ok": True, "playbook": name, "changes": changes}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+class AiTestBody(BaseModel):
+    provider: str | None = None
+
+
+@router.post("/ai/test")
+@limiter.limit("10/minute")
+def ai_test_connection(
+    request: Request,
+    body: AiTestBody | None = None,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Lightweight provider connectivity check (admin)."""
+    import time
+    from services.ai_router import enrich_with_ai
+
+    t0 = time.perf_counter()
+    result = enrich_with_ai(
+        feature="risk_explain",
+        context={
+            "asset_symbol": "USDT",
+            "signal_score": 10,
+            "signal_band": "Normal",
+            "regime": "stable",
+            "web_search_results": "none",
+        },
+        db=db,
+    )
+    latency_ms = int((time.perf_counter() - t0) * 1000)
+    if result.get("available"):
+        return {
+            "ok": True,
+            "provider": result.get("provider"),
+            "model": result.get("model"),
+            "latency_ms": latency_ms,
+            "preview": (result.get("summary") or "")[:120],
+        }
+    return {
+        "ok": False,
+        "latency_ms": latency_ms,
+        "reason": result.get("reason", "unavailable"),
+    }

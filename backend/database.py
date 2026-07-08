@@ -328,6 +328,29 @@ class SourceUsage(Base):
     )
 
 
+class AiNarrativeHistory(Base):
+    """Persisted AI narrative generations for audit and replay."""
+
+    __tablename__ = "ai_narrative_history"
+    __table_args__ = (
+        Index("ix_ai_narrative_asset", "asset_symbol"),
+        Index("ix_ai_narrative_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    asset_symbol: Mapped[str] = mapped_column(String(16), index=True)
+    feature: Mapped[str] = mapped_column(String(48), default="market_narrative")
+    narrative_text: Mapped[str] = mapped_column(Text)
+    provider: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+
 class AiUsage(Base):
     """Per-AI-provider daily usage tracking: calls, tokens, cost."""
 

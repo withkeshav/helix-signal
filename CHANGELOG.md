@@ -1,5 +1,24 @@
 # Helix Signal Changelog
 
+## v4.0.2 (2026-07-08)
+
+### Added
+- **Cookie session auth** — `helix_session` httpOnly cookie on login; `require_admin_token` accepts cookie or `X-Admin-Token`; `credentials: include` on frontend admin fetches.
+- **Alert rule editor** — `PUT /api/alerts/config`, editor UI on Alerts tab (enable/disable + threshold edits).
+- **Asset enable overrides** — `asset_enable_overrides` setting, `/api/assets/catalog`, `PUT /api/assets/{symbol}/enabled`.
+- **Provider test** — `POST /api/ai/test` + Settings “Test provider chain” button.
+- **CI Postgres path** — service container + `test_postgres_integration.py` + `validate_assets.py` in CI.
+- **E2E expansion** — settings assets, alerts editor, wizard, nav status; `market.spec.ts` merged into `signal-tab.spec.ts`.
+
+### Changed
+- Settings Simple/Advanced gating; status bar shows auth + AI + data health.
+- NLP sentiment controlled from Settings only in dashboard/OSINT paths (no env fallback in UI flags).
+- `useAdminOps` / `useTags` migrated to `adminFetch` with human sign-in copy.
+- Narrative history **recorded in DB only** — no history browser UI (live narrative shows as-of / last updated).
+
+### Deferred (still P3 optional)
+- Analytics ECharts heatmap, per-block narrative tone UI, refresh token / Remember me.
+
 ## v4.0.1 (2026-07-08)
 
 ### Fixed

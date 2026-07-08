@@ -11,7 +11,7 @@ _repo_root = str(Path(__file__).resolve().parent.parent.parent)
 if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ["REFRESH_INTERVAL_SECONDS"] = "300"
 os.environ["HELIX_SKIP_STARTUP_REFRESH"] = "1"
 os.environ["HELIX_ADMIN_TOKEN"] = "test-admin-token"

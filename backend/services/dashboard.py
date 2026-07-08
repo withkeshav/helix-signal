@@ -325,15 +325,17 @@ def _compute_attestation_and_nlp(db: Session, selected_symbol: str) -> tuple[Att
         logging.getLogger(__name__).debug("Attestation lookup failed", exc_info=True)
     from providers.settings import get_setting
     nlp_from_settings = get_setting("feature_nlp_sentiment", db)
-    nlp_from_env = os.getenv("ENABLE_NLP", "").strip().lower() in ("1", "true", "yes")
-    nlp_enabled = nlp_from_settings if isinstance(nlp_from_settings, bool) else nlp_from_env
+    nlp_enabled = bool(nlp_from_settings) if nlp_from_settings is not None else False
     return attestation_signal, nlp_enabled
 
 
 def build_dashboard_response(db: Session, asset: str | None = None) -> DashboardResponse:
+    from services.asset_overlay import effective_asset_enabled, get_asset_overrides
+
     selected_symbol = (asset or get_default_asset_symbol()).upper()
     selected_asset = get_asset_by_symbol(selected_symbol)
-    if selected_asset is None or not bool(selected_asset.get("enabled")):
+    overrides = get_asset_overrides(db)
+    if selected_asset is None or not effective_asset_enabled(selected_asset, overrides):
         raise HTTPException(status_code=404, detail=f"Asset '{selected_symbol}' is not enabled")
 
     from providers.settings import get_setting

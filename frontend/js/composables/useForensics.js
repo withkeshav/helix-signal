@@ -47,6 +47,10 @@ export function useForensics() {
     getTypeBadge,
     _shortAddr,
 
+    _adminFetch(url, opts = {}) {
+      return this.$store.ui.adminFetch(url, opts);
+    },
+
     _onGraphNodeClick(e) {
       const detail = e.detail;
       if (detail && detail.node) {
@@ -203,12 +207,9 @@ export function useForensics() {
       this.selectedNode = null;
       this.graphSubTab = 'graph';
       try {
-        const r = await fetch('/api/v1/investigate', {
+        const r = await this._adminFetch('/api/v1/investigate', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            ...(this.$store?.ui?.adminHeaders?.() || {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             address: this.investigateAddress,
             chain: this.investigateChain,

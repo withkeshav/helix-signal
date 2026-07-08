@@ -14,6 +14,20 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: helix
+          POSTGRES_PASSWORD: helix
+          POSTGRES_DB: helix_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helix -d helix_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -38,6 +52,18 @@ jobs:
       - name: Generate V4 ONNX models (safety net)
         run: .venv/bin/python ../scripts/build_v4_models.py
 
+      - name: Validate assets config
+        run: python3 ../scripts/validate_assets.py
+
+      - name: Postgres integration tests
+        env:
+          DATABASE_URL: postgresql://helix:helix@localhost:5432/helix_test
+          SESSION_SIGNING_KEY: test-session-signing-key-for-pytest-only
+          HELIX_SKIP_STARTUP_REFRESH: "1"
+        run: |
+          .venv/bin/alembic upgrade head
+          .venv/bin/pytest tests/test_postgres_integration.py -v --timeout=120
+
       - name: Pytest with coverage
         run: .venv/bin/pytest -v --cov=.. --cov-report=term --cov-fail-under=60 -m "not network" --timeout=120
 
@@ -45,7 +71,7 @@ jobs:
         run: .venv/bin/ruff check --output-format=github .
 
       - name: Bandit security scan
-        run: .venv/bin/bandit -r . -x ".venv,tests,__pycache__" --skip B101 -ll
+        run: .venv/bin/bandit -r routes services signal_engine core providers database models scripts -x tests,__pycache__ --skip B101 -ll
 
       - name: pip-audit
         run: .venv/bin/pip-audit --requirement requirements.txt

@@ -7,7 +7,10 @@ export function useTags() {
     tagError: '',
     tagLoading: false,
 
-    init() {
+    init() {},
+
+    _adminFetch(url, opts = {}) {
+      return this.$store.ui.adminFetch(url, opts);
     },
 
     async lookupTags() {
@@ -38,14 +41,10 @@ export function useTags() {
         return;
       }
       this.tagError = '';
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(this.$store?.ui?.adminHeaders?.() || {}),
-      };
       try {
-        const res = await fetch('/api/v1/tags', {
+        const res = await this._adminFetch('/api/v1/tags', {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(this.tagForm),
         });
         if (res.ok) {
@@ -53,7 +52,7 @@ export function useTags() {
           this.tagFormVisible = false;
           if (this.tagSearchAddress) await this.lookupTags();
         } else if (res.status === 401 || res.status === 403) {
-          this.tagError = 'Admin token required to create tags.';
+          this.tagError = 'Sign in via Settings to create tags.';
         } else {
           this.tagError = `Create failed (${res.status})`;
         }
@@ -64,13 +63,12 @@ export function useTags() {
 
     async deleteTag(tagId) {
       this.tagError = '';
-      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
-        const res = await fetch(`/api/v1/tags/${tagId}`, { method: 'DELETE', headers });
+        const res = await this._adminFetch(`/api/v1/tags/${tagId}`, { method: 'DELETE' });
         if (res.ok) {
           this.tags = this.tags.filter(t => t.id !== tagId);
         } else if (res.status === 401 || res.status === 403) {
-          this.tagError = 'Admin token required to delete tags.';
+          this.tagError = 'Sign in via Settings to delete tags.';
         } else {
           this.tagError = `Delete failed (${res.status})`;
         }
@@ -80,9 +78,8 @@ export function useTags() {
     },
 
     async exportTagsCsv() {
-      const headers = { ...(this.$store?.ui?.adminHeaders?.() || {}) };
       try {
-        const res = await fetch('/api/v1/tags/export', { headers });
+        const res = await this._adminFetch('/api/v1/tags/export');
         if (res.ok) {
           const blob = await res.blob();
           const url = URL.createObjectURL(blob);
@@ -92,7 +89,7 @@ export function useTags() {
           a.click();
           URL.revokeObjectURL(url);
         } else if (res.status === 401 || res.status === 403) {
-          this.tagError = 'Admin token required to export tags.';
+          this.tagError = 'Sign in via Settings to export tags.';
         } else {
           this.tagError = `Export failed (${res.status})`;
         }

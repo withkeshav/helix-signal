@@ -24,27 +24,28 @@ export function useQuality() {
     error: null,
     
     async init() {
+      this._bindAuth();
       await this.loadQualityData();
+    },
+
+    _bindAuth() {
+      this.$watch('$store.ui.adminToken', () => this.loadQualityData());
+      window.addEventListener('auth-changed', () => this.loadQualityData());
     },
 
     get adminToken() {
       return this.$store.ui.adminToken;
     },
-    
-    _adminHeaders() {
-      return this.$store.ui.adminHeaders();
-    },
-    
+
     async loadQualityData() {
       try {
         this.loading = true;
         this.error = null;
-        
-        // Fetch data quality overview
-        const response = await fetch('/api/data-quality/overview', {
-          headers: this._adminHeaders()
+
+        const response = await this.$store.ui.adminFetch('/api/data-quality/overview', {
+          cache: 'no-store',
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           
@@ -74,7 +75,11 @@ export function useQuality() {
           
           this.lastUpdated = new Date().toLocaleTimeString();
         } else {
-          this.error = `Failed to load data quality metrics: ${response.status}`;
+          if (response.status === 401 || response.status === 403) {
+            this.error = 'Sign in via Settings to view data quality metrics.';
+          } else {
+            this.error = `Failed to load data quality metrics: ${response.status}`;
+          }
         }
       } catch (e) {
         this.error = `Error loading data quality metrics: ${e.message}`;
@@ -90,8 +95,8 @@ export function useQuality() {
     
     async loadSourceQuality() {
       try {
-        const response = await fetch('/api/data-quality/sources', {
-          headers: this._adminHeaders()
+        const response = await this.$store.ui.adminFetch('/api/data-quality/sources', {
+          cache: 'no-store',
         });
         
         if (response.ok) {
@@ -111,9 +116,7 @@ export function useQuality() {
           ? `/api/data-quality/assets?asset=${encodeURIComponent(asset)}`
           : `/api/data-quality/assets`;
           
-        const response = await fetch(url, {
-          headers: this._adminHeaders()
-        });
+        const response = await this.$store.ui.adminFetch(url, { cache: 'no-store' });
         
         if (response.ok) {
           const data = await response.json();

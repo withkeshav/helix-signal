@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Callable
@@ -19,7 +20,12 @@ from structlog import get_logger
 
 log = get_logger(__name__)
 
-ALERTS_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "alerts.json"
+ALERTS_CONFIG_PATH = Path(
+    os.getenv(
+        "HELIX_ALERTS_CONFIG",
+        str(Path(__file__).resolve().parents[2] / "config" / "alerts.json"),
+    )
+)
 
 # In-memory condition-first-seen tracker for persistence_minutes enforcement
 _CONDTION_PERSISTENCE: dict[str, datetime] = {}
@@ -241,10 +247,30 @@ def _match_condition(condition: str) -> Callable | None:
     return matched[1] if matched else None
 
 
-def load_alert_rules() -> list[dict]:
+def load_all_alert_rules() -> list[dict]:
     with ALERTS_CONFIG_PATH.open("r", encoding="utf-8") as f:
         rules = json.load(f)
-    return [r for r in rules if isinstance(r, dict) and r.get("enabled", False)]
+    return [r for r in rules if isinstance(r, dict)]
+
+
+def load_alert_rules() -> list[dict]:
+    return [r for r in load_all_alert_rules() if r.get("enabled", False)]
+
+
+def save_alert_rules(rules: list[dict]) -> None:
+    if not isinstance(rules, list):
+        raise ValueError("rules must be a list")
+    cleaned: list[dict] = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            raise ValueError("each rule must be an object")
+        if "condition" not in rule or "type" not in rule:
+            raise ValueError("each rule requires type and condition")
+        cleaned.append(rule)
+    ALERTS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with ALERTS_CONFIG_PATH.open("w", encoding="utf-8") as f:
+        json.dump(cleaned, f, indent=2)
+        f.write("\n")
 
 
 def evaluate_alerts(db: Session, *, bundle: dict[str, Any], asset_symbol: str, now: datetime) -> list[dict[str, Any]]:

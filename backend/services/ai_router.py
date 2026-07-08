@@ -538,6 +538,32 @@ def get_provider_stats() -> dict[str, Any]:
 # Feature prompts
 # ---------------------------------------------------------------------------
 
+_FEATURE_TOGGLE_KEYS: dict[str, str] = {
+    "risk_explain": "feature_ai_explain",
+    "market_overview": "feature_ai_summary",
+    "market_narrative": "feature_ai_narrative",
+    "insight_summary": "feature_ai_insights",
+}
+
+
+def _setting_bool(val: Any, default: bool = True) -> bool:
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _feature_enabled(feature: str, db: Any) -> bool:
+    key = _FEATURE_TOGGLE_KEYS.get(feature)
+    if not key:
+        return True
+    if db is None:
+        return True
+    from providers.settings import get_setting
+    return _setting_bool(get_setting(key, db), default=True)
+
+
 _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
     "risk_explain": {
         "system": (
@@ -642,7 +668,7 @@ _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
 }
 
 
-def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | None, int]:
+def _build_prompt(feature: str, context: dict[str, Any], db: Any = None) -> tuple[str, str | None, int]:
     config = _FEATURE_PROMPTS.get(feature)
     if not config:
         config = {
@@ -660,6 +686,20 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
             "max_tokens_full": 256,
         }
     template = config["user"]
+    system = config["system"]
+    if db is not None:
+        try:
+            from providers.settings import get_setting
+            user_key = f"ai_prompt_{feature}_user"
+            sys_key = f"ai_prompt_{feature}_system"
+            custom_user = get_setting(user_key, db)
+            custom_sys = get_setting(sys_key, db)
+            if custom_user and str(custom_user).strip():
+                template = str(custom_user)
+            if custom_sys and str(custom_sys).strip():
+                system = str(custom_sys)
+        except Exception:
+            pass
     available = {k: v for k, v in context.items() if f"{{{k}}}" in template}
     for k in ("feature", "asset_symbol", "signal_score", "signal_band", "regime",
               "web_search_results", "depeg_1h", "depeg_24h",
@@ -668,9 +708,9 @@ def _build_prompt(feature: str, context: dict[str, Any]) -> tuple[str, str | Non
     if "feature" in template:
         available.setdefault("feature", feature)
     prompt = template.format(**available)
-    mode = ai_mode()
+    mode = ai_mode(db)
     max_tokens = config["max_tokens_lite"] if mode == "ai_lite" else config["max_tokens_full"]
-    return prompt, config["system"], max_tokens
+    return prompt, system, max_tokens
 
 
 # ---------------------------------------------------------------------------
@@ -726,9 +766,16 @@ def enrich_with_ai(
         Optional DB session for reading provider priority from Settings.
         When ``None`` the function falls back to env vars.
     """
-    mode = ai_mode()
+    mode = ai_mode(db)
     if mode == "ai_off":
         return {"available": False, "mode": mode, "reason": "AI disabled; core metrics unchanged."}
+
+    if not _feature_enabled(feature, db):
+        return {
+            "available": False,
+            "mode": mode,
+            "reason": f"Feature '{feature}' is disabled in Settings.",
+        }
 
     global _CACHE_HITS, _CACHE_MISSES, _CACHE_TOKENS_SAVED
 
@@ -744,7 +791,7 @@ def enrich_with_ai(
         _CACHE_TOKENS_SAVED += cached.get("tokens", 0)
         return {**cached, "cached": True}
 
-    prompt, system, max_tokens = _build_prompt(feature, context)
+    prompt, system, max_tokens = _build_prompt(feature, context, db)
 
     # 2. Semantic cache (trigram similarity)
     cached = _semantic_cache_lookup(cache_key, prompt)

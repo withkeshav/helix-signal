@@ -21,14 +21,18 @@ async function fillAlpineInput(page: Page, placeholder: string, value: string) {
 async function signInAsAdmin(page: Page, username: string, password: string) {
   await fillAlpineInput(page, 'Username', username);
   await fillAlpineInput(page, 'Password', password);
-  await page.evaluate(async () => {
+  await page.evaluate(async ([u, p]) => {
+    const root = document.documentElement as any;
+    const ui = root._x_dataStack?.[0]?.$store?.ui;
+    if (ui) {
+      ui.loginUsername = u;
+      ui.loginPassword = p;
+    }
     const gov = (document.querySelector('#tab-settings') as any)?._x_dataStack?.[0];
     if (!gov?.submitAdminLogin) throw new Error('governance component not ready');
     await gov.submitAdminLogin();
-  });
-  await expect(
-    page.locator('#tab-settings').getByRole('heading', { name: 'API Keys & Secrets' })
-  ).toBeVisible({ timeout: 120000 });
+  }, [username, password]);
+  await expect(page.getByRole('button', { name: 'Simple' })).toBeVisible({ timeout: 120000 });
 }
 
 /**
@@ -88,6 +92,7 @@ test.describe('Governance Tab (Settings)', () => {
   });
 
   test('loads settings list and API keys section', async ({ page }) => {
+    await page.getByRole('button', { name: 'Advanced' }).click();
     const panel = page.locator('#tab-settings');
     await expect(panel.getByRole('heading', { name: 'API Keys & Secrets' })).toBeVisible();
     await expect(panel.getByRole('heading', { name: 'Data Providers' })).toBeVisible();
@@ -96,7 +101,13 @@ test.describe('Governance Tab (Settings)', () => {
     await expect(panel.getByRole('heading', { name: 'AI & Intelligence' })).toBeVisible();
   });
 
+  test('Simple mode shows AI mapping table', async ({ page }) => {
+    await page.getByRole('button', { name: 'Simple' }).click();
+    await expect(page.getByText('AI Feature Mapping')).toBeVisible();
+  });
+
   test('loads AI budget display', async ({ page }) => {
+    await page.getByRole('button', { name: 'Advanced' }).click();
     await expect(
       page.locator('#tab-settings').getByText('Daily AI Token Budget')
     ).toBeVisible({ timeout: 120000 });

@@ -1,4 +1,6 @@
-# Data Methodology (V3)
+# Data Methodology (V4)
+
+Helix V4 merges **Analytics** into the **Signal** tab, loads enabled assets from `/api/assets`, and persists AI narratives to `ai_narrative_history` when generation succeeds.
 
 This document explains how Helix-Signal computes and presents asset-chain stablecoin metrics, the **V3 Risk Score**, historical trends, predictive outputs, and the local signal feed.
 

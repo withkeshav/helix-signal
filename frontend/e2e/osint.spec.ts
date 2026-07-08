@@ -5,8 +5,8 @@ test.describe('Intel tab', () => {
     await page.goto('/');
     await page.getByRole('tab', { name: 'Intel' }).click();
     await expect(page.locator('#tab-intel')).toBeVisible();
-    await expect(page.getByText('Signal Events')).toBeVisible();
-    await expect(page.getByText('OSINT Feed')).toBeVisible();
-    await expect(page.getByText('Attestation Reports')).toBeVisible();
+    await expect(page.locator('#tab-intel').getByText('Signal Events')).toBeVisible();
+    await expect(page.locator('#tab-intel').getByText('OSINT Feed')).toBeVisible();
+    await expect(page.locator('#tab-intel').getByText('Attestation Reports')).toBeVisible();
   });
 });

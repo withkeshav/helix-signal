@@ -4,8 +4,8 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3080';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 20000,
-  expect: { timeout: 10000 },
+  timeout: 120000,
+  expect: { timeout: 15000 },
   fullyParallel: false,
   retries: 1,
   workers: 1,

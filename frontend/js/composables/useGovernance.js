@@ -66,8 +66,154 @@ export function useGovernance() {
     newUser: { username: '', email: '', password: '', is_admin: false, role: 'user' },
     editUserForm: { username: '', email: '', is_active: true, is_admin: false, role: 'user' },
 
+    settingsView: (typeof localStorage !== 'undefined' && localStorage.getItem('helix_settings_view')) || 'simple',
+    setupDone: typeof localStorage !== 'undefined' && localStorage.getItem('helix_setup_done') === '1',
+    wizardStep: 1,
+    wizardAiMode: 'ai_lite',
+    wizardPlaybook: 'balanced',
+    wizardFeatures: {
+      feature_ai_summary: true,
+      feature_ai_explain: true,
+      feature_ai_insights: true,
+      feature_ai_narrative: true,
+      feature_nlp_sentiment: false,
+      feature_osint_feed: true,
+    },
+    testAiLoading: false,
+    testAiResult: '',
+    aiFeatureMap: [
+      { ui: 'Risk explanation', tab: 'Signal → Risk Terminal', endpoint: 'GET /api/ai/explain', toggle: 'feature_ai_explain', kind: 'LLM' },
+      { ui: 'Market overview', tab: 'Signal → Overview', endpoint: 'GET /api/ai/market-overview', toggle: 'feature_ai_summary', kind: 'LLM' },
+      { ui: 'Market narrative', tab: 'Signal → Narrative', endpoint: 'GET /api/ai/narrative', toggle: 'feature_ai_narrative', kind: 'LLM' },
+      { ui: 'Insights', tab: 'Signal → Insights', endpoint: 'GET /api/ai/insights', toggle: 'feature_ai_insights', kind: 'LLM' },
+      { ui: 'OSINT sentiment', tab: 'Intel', endpoint: 'background', toggle: 'feature_nlp_sentiment', kind: 'LLM' },
+      { ui: 'Predictive regime', tab: 'Signal → Risk Terminal', endpoint: 'GET /api/predictive', toggle: '—', kind: 'Statistical' },
+      { ui: 'DEWS score', tab: 'Signal', endpoint: 'GET /api/dews', toggle: '—', kind: 'Statistical' },
+    ],
+
+    get aiModeLabel() {
+      const s = this.settingsList.find(x => x.key === 'ai_mode');
+      const mode = s?.value || 'ai_off';
+      if (mode === 'ai_full') return 'Full';
+      if (mode === 'ai_lite') return 'Lite';
+      return 'Off';
+    },
+
+    setSettingsView(view) {
+      this.settingsView = view;
+      try { localStorage.setItem('helix_settings_view', view); } catch {}
+    },
+
+    async runTestAi() {
+      this.testAiLoading = true;
+      this.testAiResult = '';
+      try {
+        const r = await this.$store.ui.adminFetch('/api/ai/narrative?asset=USDT', { cache: 'no-store' });
+        const j = await r.json();
+        if (r.ok && j.available) {
+          this.testAiResult = `OK: ${(j.summary || '').slice(0, 120)}...`;
+        } else {
+          this.testAiResult = j.reason || j.detail || `HTTP ${r.status}`;
+        }
+      } catch (e) {
+        this.testAiResult = e.message;
+      } finally {
+        this.testAiLoading = false;
+      }
+    },
+
+    async wizardApplyAiMode() {
+      const pb = this.wizardPlaybook || (this.wizardAiMode === 'ai_full' ? 'quality' : this.wizardAiMode === 'ai_lite' ? 'balanced' : 'max_free');
+      await this.applyPlaybook(pb);
+      this.wizardStep = 2;
+    },
+
+    async wizardApplyFeatures() {
+      if (!this.adminToken) {
+        this.settingsError = 'Sign in to save feature toggles';
+        return;
+      }
+      for (const [key, val] of Object.entries(this.wizardFeatures)) {
+        const s = this.settingsList.find(x => x.key === key);
+        if (s) await this.toggleSetting(key, val);
+      }
+      try { localStorage.setItem('helix_setup_done', '1'); } catch {}
+      this.setupDone = true;
+      this.wizardStep = 3;
+      this.showToast('Quick Setup complete', 'success');
+    },
+
+    goToSettingsSection() {
+      this.$store.ui.setTab('settings');
+    },
+
     get adminToken() {
       return this.$store.ui.adminToken;
+    },
+
+    assetCatalog: [],
+    assetCatalogLoading: false,
+    providerTestLoading: false,
+    providerTestResult: '',
+
+    async loadAssetCatalog() {
+      if (!this.adminToken) return;
+      this.assetCatalogLoading = true;
+      try {
+        const r = await this._adminFetch('/api/assets/catalog', { cache: 'no-store' });
+        if (r.ok) this.assetCatalog = await r.json();
+      } catch {
+        this.assetCatalog = [];
+      } finally {
+        this.assetCatalogLoading = false;
+      }
+    },
+
+    async toggleAssetEnabled(row) {
+      if (!row?.symbol) return;
+      const next = !row.enabled;
+      try {
+        const r = await this._adminFetch(`/api/assets/${row.symbol}/enabled`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: next }),
+        });
+        if (r.ok) {
+          await this.loadAssetCatalog();
+          const ar = await fetch('/api/assets', { cache: 'no-store' });
+          if (ar.ok) {
+            const list = await ar.json();
+            const symbols = (list || []).map(a => a.symbol).filter(Boolean);
+            if (symbols.length) {
+              this.$root.enabledAssets = symbols;
+              this.$store.ui.enabledAssets = symbols;
+            }
+          }
+          this.showToast(`Asset ${row.symbol} ${next ? 'enabled' : 'disabled'}`, 'success');
+        } else {
+          this.showToast('Failed to update asset', 'error');
+        }
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async runProviderTest() {
+      this.providerTestLoading = true;
+      this.providerTestResult = '';
+      try {
+        const r = await this._adminFetch('/api/ai/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const j = await r.json();
+        if (j.ok) {
+          this.providerTestResult = `OK ${j.provider}/${j.model} (${j.latency_ms}ms)`;
+        } else {
+          this.providerTestResult = j.reason || 'Test failed';
+        }
+      } catch (e) {
+        this.providerTestResult = e.message;
+      } finally {
+        this.providerTestLoading = false;
+      }
     },
 
     get hasSecretSettings() {
@@ -94,12 +240,12 @@ export function useGovernance() {
       }
     },
 
-    saveAdminToken() {
-      this.$store.ui.saveAdminToken();
-    },
-
     _adminHeaders() {
       return this.$store.ui.adminHeaders();
+    },
+
+    _adminFetch(url, opts = {}) {
+      return this.$store.ui.adminFetch(url, opts);
     },
 
     // --- Init: keyboard shortcuts + polling ---
@@ -120,10 +266,17 @@ export function useGovernance() {
       // Load playbooks
       this.loadPlaybooks();
       // Auto-reload settings + AI budget when admin token is saved (e.g. after login)
-      this.$watch('$store.ui.adminToken', val => { if (val) { this.loadSettings(); this.loadAiBudget(); } });
+      this.$watch('$store.ui.adminToken', val => { if (val) { this.loadSettings(); this.loadAiBudget(); this.loadAssetCatalog(); } });
+      window.addEventListener('auth-changed', () => {
+        if (this.$store.ui.adminToken) {
+          this.loadSettings();
+          this.loadAiBudget();
+        }
+      });
       if (this.adminToken) {
         this.loadSettings();
         this.loadAiBudget();
+        this.loadAssetCatalog();
       }
     },
 
@@ -187,7 +340,7 @@ export function useGovernance() {
     async applyPlaybook(name) {
       this.playbookLoading = name;
       try {
-        const r = await fetch(`/api/ai/playbook/${name}`, {
+        const r = await this._adminFetch(`/api/ai/playbook/${name}`, {
           method: 'POST',
           headers: this._adminHeaders(),
         });
@@ -211,7 +364,7 @@ export function useGovernance() {
 
     async loadPlaybooks() {
       try {
-        const r = await fetch('/api/playbooks', { headers: this._adminHeaders() });
+        const r = await this._adminFetch('/api/playbooks', { headers: this._adminHeaders() });
         if (r.ok) {
           this.playbooks = await r.json();
         }
@@ -231,7 +384,7 @@ export function useGovernance() {
       }
       if (!Object.keys(settings).length) { this.showToast('Select at least one setting', 'error'); return; }
       try {
-        const r = await fetch('/api/playbooks', {
+        const r = await this._adminFetch('/api/playbooks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
           body: JSON.stringify({
@@ -282,7 +435,7 @@ export function useGovernance() {
       }
       if (!Object.keys(settings).length) { this.showToast('Select at least one setting', 'error'); return; }
       try {
-        const r = await fetch(`/api/playbooks/${this.editPlaybookData.id}`, {
+        const r = await this._adminFetch(`/api/playbooks/${this.editPlaybookData.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
           body: JSON.stringify({
@@ -311,7 +464,7 @@ export function useGovernance() {
 
     async deletePlaybook(id) {
       try {
-        const r = await fetch(`/api/playbooks/${id}`, {
+        const r = await this._adminFetch(`/api/playbooks/${id}`, {
           method: 'DELETE',
           headers: this._adminHeaders(),
         });
@@ -357,7 +510,7 @@ export function useGovernance() {
         const params = new URLSearchParams();
         params.set('limit', '100');
         if (this.auditFilter) params.set('setting_key', this.auditFilter);
-        const r = await fetch(`/api/settings/audit?${params.toString()}`, {
+        const r = await this._adminFetch(`/api/settings/audit?${params.toString()}`, {
           headers: this._adminHeaders(),
         });
         if (r.ok) {
@@ -395,7 +548,7 @@ export function useGovernance() {
       this.auditHistoryLoading = true;
       this.auditHistoryModal = true;
       try {
-        const r = await fetch(`/api/settings/audit/history/${encodeURIComponent(key)}`, {
+        const r = await this._adminFetch(`/api/settings/audit/history/${encodeURIComponent(key)}`, {
           headers: this._adminHeaders(),
         });
         if (r.ok) this.auditHistory = await r.json();
@@ -497,7 +650,7 @@ export function useGovernance() {
     async saveProviderPriority() {
       const names = this.providers.map(p => p.name);
       try {
-        const r = await fetch('/api/settings', {
+        const r = await this._adminFetch('/api/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
           body: JSON.stringify({ key: 'ai_provider_priority', value: JSON.stringify(names) }),
@@ -532,7 +685,7 @@ export function useGovernance() {
         if (s.key === 'ai_daily_token_budget') continue;
         if (s.default === undefined) continue;
         try {
-          const r = await fetch('/api/settings', {
+          const r = await this._adminFetch('/api/settings', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
             body: JSON.stringify({ key: s.key, value: s.default }),
@@ -572,12 +725,15 @@ export function useGovernance() {
         const params = new URLSearchParams();
         if (this.settingsSearch) params.append('search', this.settingsSearch);
         if (this.settingsGroupFilter) params.append('group', this.settingsGroupFilter);
-        const r = await fetch(`/api/settings?${params.toString()}`, { cache: 'no-store', headers: this._adminHeaders() });
+        const r = await this._adminFetch(`/api/settings?${params.toString()}`, { cache: 'no-store', headers: this._adminHeaders() });
         if (r.ok) {
           const data = await r.json();
           this.settingsList = data;
           this.filteredSettings = data;
           this.settingsGroups = [...new Set(data.map(s => s.group).filter(Boolean))].sort();
+          const modeRow = data.find(s => s.key === 'ai_mode');
+          const mode = modeRow?.value || 'ai_off';
+          this.$store.ui.aiModeLabel = mode === 'ai_full' ? 'Full' : mode === 'ai_lite' ? 'Lite' : 'Off';
           this.loadFeatureBudgets();
           this.initProviders();
           // Load available models for model settings
@@ -610,14 +766,14 @@ export function useGovernance() {
         this.availableModels = {};
         
         // Fetch available providers
-        const providersResponse = await fetch('/api/ai/providers', { headers: this._adminHeaders() });
+        const providersResponse = await this._adminFetch('/api/ai/providers', { headers: this._adminHeaders() });
         if (providersResponse.ok) {
           const providers = await providersResponse.json();
           
           // Fetch models for each provider
           for (const provider of providers) {
             try {
-              const modelsResponse = await fetch(`/api/ai/providers/${provider.id}/models`, { headers: this._adminHeaders() });
+              const modelsResponse = await this._adminFetch(`/api/ai/providers/${provider.id}/models`, { headers: this._adminHeaders() });
               if (modelsResponse.ok) {
                 const models = await modelsResponse.json();
                 // Store models by provider ID
@@ -646,7 +802,7 @@ export function useGovernance() {
 
     async exportSettings() {
       try {
-        const r = await fetch('/api/settings/export/json', { headers: this._adminHeaders() });
+        const r = await this._adminFetch('/api/settings/export/json', { headers: this._adminHeaders() });
         if (r.ok) {
           const data = await r.json();
           const blob = new Blob([data.content], { type: 'application/json' });
@@ -672,7 +828,7 @@ export function useGovernance() {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const r = await fetch('/api/settings/import/json', {
+        const r = await this._adminFetch('/api/settings/import/json', {
           method: 'POST',
           headers: this._adminHeaders(),
           body: formData,
@@ -695,7 +851,7 @@ export function useGovernance() {
 
     async loadAiBudget() {
       try {
-        const r = await fetch('/api/ai/budget', { cache: 'no-store', headers: this._adminHeaders() });
+        const r = await this._adminFetch('/api/ai/budget', { cache: 'no-store', headers: this._adminHeaders() });
         if (r.ok) {
           this.aiBudget = await r.json();
           this.aiBudgetLoaded = true;
@@ -706,7 +862,7 @@ export function useGovernance() {
 
     async toggleSetting(key, value) {
       try {
-        const r = await fetch('/api/settings', {
+        const r = await this._adminFetch('/api/settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
           body: JSON.stringify({ key, value }),
@@ -739,7 +895,7 @@ export function useGovernance() {
       this.usersLoading = true;
       this.usersError = null;
       try {
-        const r = await fetch('/api/users', { headers: this._adminHeaders() });
+        const r = await this._adminFetch('/api/users', { headers: this._adminHeaders() });
         if (r.ok) {
           this.users = await r.json();
         } else {
@@ -754,7 +910,7 @@ export function useGovernance() {
     
     async addUser() {
       try {
-        const r = await fetch('/api/users', {
+        const r = await this._adminFetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
           body: JSON.stringify(this.newUser)
@@ -787,7 +943,7 @@ export function useGovernance() {
     
     async updateUser() {
       try {
-        const r = await fetch(`/api/users/${this.selectedUserId}`, {
+        const r = await this._adminFetch(`/api/users/${this.selectedUserId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...this._adminHeaders() },
           body: JSON.stringify(this.editUserForm)
@@ -811,7 +967,7 @@ export function useGovernance() {
       }
       
       try {
-        const r = await fetch(`/api/users/${userId}`, {
+        const r = await this._adminFetch(`/api/users/${userId}`, {
           method: 'DELETE',
           headers: this._adminHeaders()
         });

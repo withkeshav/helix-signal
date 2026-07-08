@@ -97,8 +97,9 @@ def load_configured_assets() -> list[dict]:
     return [item for item in assets if isinstance(item, dict) and item.get("symbol")]
 
 
-def load_enabled_assets() -> list[dict]:
-    return [asset for asset in load_configured_assets() if bool(asset.get("enabled"))]
+def load_enabled_assets(db: Any | None = None) -> list[dict]:
+    from services.asset_overlay import load_enabled_assets_with_overrides
+    return load_enabled_assets_with_overrides(db)
 
 
 def get_default_asset_symbol() -> str:

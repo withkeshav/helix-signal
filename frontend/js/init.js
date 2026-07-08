@@ -87,10 +87,36 @@ Alpine.data('helixApp', () => ({
     } catch (e) {
       this.version = '?';
     }
+
+    try {
+      const ar = await fetch('/api/assets', { cache: 'no-store' });
+      if (ar.ok) {
+        const list = await ar.json();
+        const symbols = (list || []).map(a => a.symbol).filter(Boolean);
+        if (symbols.length) {
+          this.enabledAssets = symbols;
+          this.$store.ui.enabledAssets = symbols;
+        }
+      }
+    } catch {}
+
+    // Analytics tab merged into Signal — redirect hash for one release
+    if (this.tab === 'analytics') {
+      this.tab = 'signal';
+      this.$store.ui.tab = 'signal';
+      location.hash = 'signal';
+    }
     
     // Watch for tab changes — dispose charts on leave to prevent memory leaks
     let prevTab = this.tab;
     this.$watch('tab', val => {
+      if (val === 'analytics') {
+        this.tab = 'signal';
+        this.$store.ui.tab = 'signal';
+        location.hash = 'signal';
+        this.$nextTick(() => document.getElementById('signal-analytics-section')?.scrollIntoView({ behavior: 'smooth' }));
+        val = 'signal';
+      }
       if (prevTab !== val) {
         disposeAllChartInstances();
         prevTab = val;
@@ -236,3 +262,5 @@ Alpine.data('helixApp', () => ({
 }));
 
 Alpine.start();
+Alpine.store('ui').initAuthSync();
+Alpine.store('ui').restoreSession();

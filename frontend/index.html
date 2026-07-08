@@ -195,7 +195,6 @@
       <div class="nav-links" role="tablist">
         <button class="nav-link" role="tab" :class="tab==='signal'&&'active'" :aria-selected="tab==='signal'" @click="tab='signal';loadTab()" aria-controls="tab-signal">Signal</button>
         <button class="nav-link" role="tab" :class="tab==='market'&&'active'" :aria-selected="tab==='market'" @click="tab='market';loadTab()" aria-controls="tab-market">Market</button>
-        <button class="nav-link" role="tab" :class="tab==='analytics'&&'active'" :aria-selected="tab==='analytics'" @click="tab='analytics';loadTab()" aria-controls="tab-analytics">Analytics</button>
         <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()" aria-controls="tab-intel">Intel</button>
         <button class="nav-link" role="tab" :class="tab==='forensics'&&'active'" :aria-selected="tab==='forensics'" @click="tab='forensics';loadTab()" aria-controls="tab-forensics">Forensics</button>
         <button class="nav-link" role="tab" :class="tab==='alerts'&&'active'" :aria-selected="tab==='alerts'" @click="tab='alerts';loadTab()" aria-controls="tab-alerts">Alerts</button>
@@ -204,10 +203,13 @@
       </div>
       <div class="nav-controls">
         <select class="asset-select" x-model="asset" @change="switchAsset">
-          <template x-for="a in enabledAssets" :key="a">
+          <template x-for="a in ($store.ui.enabledAssets.length ? $store.ui.enabledAssets : enabledAssets)" :key="a">
             <option x-text="a" :value="a"></option>
           </template>
         </select>
+        <span class="badge badge-info" style="font-size:11px;margin-right:6px" x-text="$store.ui.adminToken ? 'Signed in' : 'View only'"></span>
+        <span class="badge" style="font-size:11px;margin-right:6px" x-text="'AI: ' + ($store.ui.aiModeLabel || 'Off')"></span>
+        <span class="badge" style="font-size:11px;margin-right:6px" x-text="'Data: ' + ($store.ui.dataHealthLabel || '—')"></span>
         <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" aria-label="Refresh now" x-text="refreshing?'...':'⟳'" x-cloak x-show="false"></button>
         <button class="btn btn-muted" @click="cycleTheme" aria-label="Toggle dark/light theme" title="Toggle theme">
           <svg class="icon" x-cloak x-show="theme==='light'"><use href="#icon-sun"/></svg>
@@ -530,8 +532,9 @@
       </div>
       <div x-cloak x-show="!chains?.length && !errorOverview && !$store.dashboard.loading" class="empty-state" style="margin-top:12px">
         <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
-        <span class="kpi-label">No chain data available</span>
-        <span class="kpi-sub">Chain metrics will appear once data is fetched</span>
+        <div class="kpi-label">No chain data</div>
+        <p class="kpi-sub">Scheduler may be idle or ingest pending.</p>
+        <button type="button" class="btn btn-muted" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
       </div>
 
       <!-- Anomaly Events -->
@@ -773,8 +776,10 @@
     </div>
     </div>
 
-    <!-- Tab: Analytics (regime, change-points, cross-asset) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'analytics'" x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="tabpanel" id="tab-analytics">
+    <!-- Analytics (merged into Signal tab) -->
+    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'signal'" x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="region" id="signal-analytics-section">
+      <h2 style="margin:16px 0 8px 0;font-size:16px">Advanced Analytics</h2>
+      <p class="kpi-sub" style="margin:0 0 12px 0">Regime, change-points, and cross-asset correlation (formerly Analytics tab).</p>
       <div x-cloak x-show="analyticsError" class="warning-banner visible" x-text="analyticsError" style="margin-bottom:8px"></div>
       <div x-cloak x-show="analyticsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading analytics for <span x-text="analyticsAsset"></span>...</div>
 
@@ -859,7 +864,7 @@
           <div class="insight-card">
             <h2>OSINT Feed</h2>
             <div style="max-height:400px;overflow-y:auto">
-              <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)"><svg class="icon"><use href="#icon-warning"/></svg> Sentiment analysis disabled (ENABLE_NLP=false) — all scores are placeholder</div>
+              <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)"><svg class="icon"><use href="#icon-warning"/></svg> Sentiment analysis disabled — enable <code>feature_nlp_sentiment</code> in Settings</div>
               <template x-for="art in osintArticles" :key="art.id">
                 <div class="event-card" style="margin-bottom:8px">
                   <div class="event-title"><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
@@ -1186,7 +1191,10 @@
             </select>
             <button class="btn btn-muted" @click="filterAlerts()" style="padding:6px 12px;font-size:13px">Filter</button>
           </div>
-          <div x-cloak x-show="!loading && alerts.length === 0" class="kpi-sub" style="padding:16px;text-align:center">No fired alerts match the current filters.</div>
+          <div x-cloak x-show="!loading && alerts.length === 0" class="kpi-sub" style="padding:16px;text-align:center">
+            No fired alerts match the current filters.
+            <button type="button" class="btn btn-muted" style="margin-left:8px;padding:4px 10px;font-size:12px" @click="goSettings()">Settings</button>
+          </div>
           <div style="max-height:480px;overflow-y:auto">
             <template x-for="ev in alerts" :key="ev.id">
               <div class="event-card" style="margin-bottom:6px">
@@ -1211,6 +1219,27 @@
         </div>
         <div class="insight-card">
           <h2>Alert Rules</h2>
+          <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-muted" type="button" style="padding:6px 12px;font-size:13px" @click="openRuleEditor()" x-show="$store.ui.adminToken">Edit rules</button>
+            <span class="kpi-sub" x-show="saveMessage" x-text="saveMessage"></span>
+          </div>
+          <div x-cloak x-show="editorOpen" style="margin-bottom:12px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg-accent)">
+            <p class="kpi-sub" style="margin:0 0 8px 0">Toggle rules and adjust numeric thresholds (e.g. depeg bps).</p>
+            <template x-for="(rule, idx) in allRules" :key="idx">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;font-size:12px">
+                <label style="display:flex;align-items:center;gap:4px">
+                  <input type="checkbox" :checked="rule.enabled" @change="toggleRuleEnabled(idx)">
+                  <span x-text="rule.type"></span>
+                </label>
+                <code style="flex:1;min-width:120px" x-text="rule.condition"></code>
+                <input x-show="rule.condition && rule.condition.includes('>')" type="number" step="any" :value="ruleThreshold(rule)" @input="setRuleThreshold(rule, $event.target.value)" style="width:72px;padding:4px 6px;font-size:12px">
+              </div>
+            </template>
+            <div style="margin-top:8px;display:flex;gap:8px">
+              <button class="btn btn-primary" type="button" :disabled="savingRules" @click="saveRules()">Save rules</button>
+              <button class="btn btn-muted" type="button" @click="editorOpen=false">Cancel</button>
+            </div>
+          </div>
           <div x-cloak x-show="rules.length === 0 && !loading" class="kpi-sub" style="padding:12px">No rules configured.</div>
           <template x-for="(rule, idx) in rules" :key="idx">
             <div class="event-card" style="margin-bottom:6px">
@@ -1222,6 +1251,21 @@
               <div x-show="rule.description" style="font-size:12px;color:var(--text-muted);margin-top:4px" x-text="rule.description"></div>
             </div>
           </template>
+        </div>
+        <div class="insight-card" style="grid-column:span 2">
+          <h2>Alert History <span class="kpi-sub">recent signal events</span></h2>
+          <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.5">
+            <template x-for="(ev, i) in historyEvents" :key="ev.id || i">
+              <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px">
+                <div>
+                  <span :class="`sev-${ev.severity}`" x-text="(ev.severity||'').toUpperCase()"></span>
+                  <span x-text="ev.title"></span>
+                </div>
+                <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
+              </div>
+            </template>
+            <div x-cloak x-show="!historyEvents.length && !loading" class="kpi-sub" style="padding:8px 0">No recent events</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1246,11 +1290,12 @@
             </div>
 
             <div class="insight-card" style="margin-bottom:12px">
-              <h3 style="font-size:14px;margin:0 0 8px">Synthetic Backfill</h3>
+              <h3 style="font-size:14px;margin:0 0 8px">Seed Demo History</h3>
+              <p class="kpi-sub" style="margin:0 0 8px 0;font-size:12px">Populate trend snapshots for charts (synthetic backfill).</p>
               <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
                 <input type="text" placeholder="Asset (USDT)" x-model="backfillAsset" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" />
                 <input type="number" placeholder="days" x-model.number="backfillDays" min="1" max="90" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;width:70px" />
-                <button class="btn" @click="runBackfill()" :disabled="backfillLoading" style="padding:6px 12px;font-size:13px"><span x-cloak x-show="!backfillLoading">Run</span><span x-cloak x-show="backfillLoading">...</span></button>
+                <button class="btn" @click="runBackfill()" :disabled="backfillLoading" style="padding:6px 12px;font-size:13px"><span x-cloak x-show="!backfillLoading">Seed demo</span><span x-cloak x-show="backfillLoading">...</span></button>
               </div>
               <div x-cloak x-show="backfillResult" style="font-size:12px;color:var(--muted);padding:6px;background:var(--bg-accent);border-radius:6px" x-text="JSON.stringify(backfillResult)"></div>
             </div>
@@ -1264,6 +1309,7 @@
               <div x-cloak x-show="diagnostics" style="margin-top:8px;font-size:12px;color:var(--text-muted)">
                 <div>Version: <code x-text="diagnostics?.version"></code></div>
                 <div>DB: <span x-text="diagnostics?.health?.db ? 'OK' : 'FAIL'"></span> · Redis: <span x-text="diagnostics?.health?.redis_connected ? 'OK' : 'off'"></span></div>
+                <p class="kpi-sub" style="margin:8px 0 0 0;font-size:11px">If DB is FAIL, check <code>DATABASE_URL</code> in <code>.env</code> and run migrations.</p>
                 <div x-cloak x-show="diagnostics?.database_tables" style="margin-top:6px">
                   <strong>Tables:</strong>
                   <template x-for="(count, table) in (diagnostics?.database_tables || {})" :key="table">
@@ -1336,21 +1382,6 @@
         </div>
       </div>
       <div class="insight-grid">
-        <div class="insight-card">
-          <h2>Alert History <span class="kpi-sub" x-text="`events`"></span></h2>
-          <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.5">
-            <template x-for="(ev, i) in (events || []).filter(e=>e.severity!=='debug').slice(0, 20)" :key="ev.id">
-              <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px">
-                <div>
-                  <span :class="`sev-${ev.severity}`" x-text="ev.severity.toUpperCase()"></span>
-                  <span x-text="ev.title"></span>
-                </div>
-                <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
-              </div>
-            </template>
-            <div x-cloak x-show="!(events || []).filter(e=>e.severity!=='debug').length" class="kpi-sub" style="padding:8px 0">No recent events</div>
-          </div>
-        </div>
         <div class="chart-card" x-cloak x-show="dataQualityHistory.length">
         <h2>Data Quality</h2>
         <div style="font-size:13px">
@@ -1506,24 +1537,100 @@
                 <button class="btn btn-primary" type="submit" style="padding:10px 20px">Sign in</button>
                 <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.adminToken" @click="$store.ui.logout(); settingsError=''; settingsList=[]" style="padding:10px 20px">Sign out</button>
               </form>
-              <details style="font-size:12px;color:var(--muted)">
-                <summary style="cursor:pointer">Legacy token (rollout only)</summary>
-                <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px">
-                  <input type="password" x-model="adminToken" placeholder="Paste HELIX_ADMIN_TOKEN"
-                         style="flex:1;min-width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:monospace">
-                  <button class="btn btn-muted" type="button" @click="saveAdminToken(); loadSettings()" style="padding:10px 20px">Save Token</button>
-                </div>
-              </details>
             </div>
             <div style="background:var(--warn-bg);padding:16px;border-radius:8px;min-width:200px">
               <h3 style="margin:0 0 8px 0;color:var(--neutral)">Security Note</h3>
-              <p style="margin:0;font-size:12px;color:var(--neutral)">Session tokens are stored in browser session storage and sent as <code>X-Admin-Token</code> on admin API calls.</p>
+              <p style="margin:0;font-size:12px;color:var(--neutral)">Signed-in sessions are stored in the browser and sent on admin API calls. Sign in once — Alerts, System, and admin settings use the same session.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="insight-card" style="grid-column:1/-1" x-show="!$store.ui.adminToken">
+          <p class="kpi-sub" style="margin:0">Sign in above to use Quick Setup, Test AI, and Advanced configuration panels.</p>
+        </div>
+
+        <!-- Simple / Advanced toggle + Quick Setup (Simple mode) -->
+        <div class="insight-card" style="grid-column:1/-1" x-show="$store.ui.adminToken">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+            <button class="btn" :class="settingsView==='simple' && 'btn-primary'" type="button" @click="setSettingsView('simple')">Simple</button>
+            <button class="btn" :class="settingsView==='advanced' && 'btn-primary'" type="button" @click="setSettingsView('advanced')">Advanced</button>
+          </div>
+          <div x-show="settingsView==='simple'">
+            <div x-show="!setupDone" style="padding:16px;border:1px solid var(--line);border-radius:8px;margin-bottom:16px;background:var(--bg-accent)">
+              <h3 style="margin:0 0 8px 0;font-size:15px">Quick Setup — Step <span x-text="wizardStep"></span> of 3</h3>
+              <div x-show="wizardStep===1">
+                <p class="kpi-sub" style="margin:0 0 12px 0">Choose an AI preset (sets mode, providers, budget).</p>
+                <select x-model="wizardPlaybook" style="padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);margin-right:8px">
+                  <option value="max_free">Off / Minimal (max_free)</option>
+                  <option value="balanced">Lite (balanced)</option>
+                  <option value="quality">Full (quality)</option>
+                </select>
+                <button class="btn btn-primary" type="button" @click="wizardApplyAiMode()">Apply &amp; Continue</button>
+              </div>
+              <div x-show="wizardStep===2">
+                <p class="kpi-sub" style="margin:0 0 12px 0">Add an API key under API Keys below, then enable features.</p>
+                <template x-for="(on, key) in wizardFeatures" :key="key">
+                  <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px">
+                    <input type="checkbox" :checked="wizardFeatures[key]" @change="wizardFeatures[key] = $event.target.checked">
+                    <span x-text="key"></span>
+                  </label>
+                </template>
+                <button class="btn btn-primary" type="button" style="margin-top:8px" @click="wizardApplyFeatures()">Save features &amp; finish</button>
+              </div>
+              <div x-show="wizardStep>=3">
+                <p class="kpi-sub" style="margin:0">Setup complete. Use Test AI below to verify narrative generation.</p>
+              </div>
+            </div>
+            <div style="margin-bottom:16px">
+              <h3 style="margin:0 0 8px 0;font-size:14px">AI Status</h3>
+              <p class="kpi-sub" style="margin:0 0 8px 0">Mode: <strong x-text="aiModeLabel"></strong> · Budget: <span x-text="aiBudgetLoaded ? Math.round(aiBudget.pct_used||0)+'%' : '—'"></span></p>
+              <button class="btn btn-muted" type="button" :disabled="testAiLoading" @click="runTestAi()">
+                <span x-show="testAiLoading">Testing...</span>
+                <span x-show="!testAiLoading">Test AI (USDT narrative)</span>
+              </button>
+              <button class="btn btn-muted" type="button" style="margin-left:8px" :disabled="providerTestLoading" @click="runProviderTest()">
+                <span x-show="providerTestLoading">Testing provider...</span>
+                <span x-show="!providerTestLoading">Test provider chain</span>
+              </button>
+              <p class="kpi-sub" x-show="testAiResult" style="margin-top:8px" x-text="testAiResult"></p>
+              <p class="kpi-sub" x-show="providerTestResult" style="margin-top:4px" x-text="providerTestResult"></p>
+            </div>
+            <div>
+              <h3 style="margin:0 0 8px 0;font-size:14px">AI Feature Mapping</h3>
+              <table style="width:100%;font-size:12px;border-collapse:collapse">
+                <thead><tr style="text-align:left;border-bottom:1px solid var(--line)"><th>UI</th><th>Tab</th><th>Kind</th><th>Toggle</th></tr></thead>
+                <tbody>
+                  <template x-for="row in aiFeatureMap" :key="row.endpoint">
+                    <tr style="border-bottom:1px solid var(--line)">
+                      <td x-text="row.ui"></td>
+                      <td x-text="row.tab"></td>
+                      <td x-text="row.kind"></td>
+                      <td><code x-text="row.toggle"></code></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <p class="kpi-sub" style="margin-top:12px;font-size:11px">Per-feature budget sliders in Advanced are display-only until server allocation is implemented.</p>
+            <div style="margin-top:16px">
+              <h3 style="margin:0 0 8px 0;font-size:14px">Enabled Assets</h3>
+              <p class="kpi-sub" style="margin:0 0 8px 0">Toggle assets without editing <code>config/assets.json</code>. Overrides persist in Settings.</p>
+              <button class="btn btn-muted" type="button" style="margin-bottom:8px;padding:6px 12px;font-size:12px" @click="loadAssetCatalog()">Refresh catalog</button>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow-y:auto">
+                <template x-for="row in assetCatalog" :key="row.symbol">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:6px">
+                    <input type="checkbox" :checked="row.enabled" @change="toggleAssetEnabled(row)">
+                    <span x-text="row.symbol"></span>
+                  </label>
+                </template>
+                <span x-show="!assetCatalog.length && !assetCatalogLoading" class="kpi-sub">Load catalog after sign-in</span>
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Settings Header with Search and Filters -->
-        <div class="insight-card" style="grid-column:1/-1">
+        <div class="insight-card" style="grid-column:1/-1" x-show="settingsView==='advanced'">
           <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
             <div>
               <h1 style="margin:0 0 8px 0">System Settings</h1>
@@ -1547,7 +1654,7 @@
           </div>
           
           <!-- A1: Playbook Presets Banner -->
-          <div style="padding:16px;background:var(--bg-accent);border-radius:8px;margin-bottom:16px">
+          <div x-show="settingsView==='advanced'" style="padding:16px;background:var(--bg-accent);border-radius:8px;margin-bottom:16px">
             <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
               <div>
                 <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600">AI Playbook Presets</h3>
@@ -1675,7 +1782,8 @@
           </div>
         </div>
         
-        <!-- Settings Sections -->
+        <!-- Settings Sections (Advanced only) -->
+        <div x-show="settingsView==='advanced'">
         <div class="insight-card" x-show="hasSecretSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-key"/></svg> API Keys & Secrets
@@ -2353,6 +2461,7 @@
           <span x-text="toastMessage"></span>
            <button style="margin-left:10px;background:none;border:none;color:inherit;font-weight:700;cursor:pointer" @click.stop="hideToast()" aria-label="Dismiss">×</button>
         </div>
+        </div><!-- /settingsView advanced -->
       </div>
     </div>
     </template>

@@ -33,6 +33,13 @@ class ProviderInfo(BaseModel):
     models: List[ModelInfo] = []
 
 
+_PROVIDER_ALIASES: dict[str, str] = {
+    "ollama_cloud": "ollama",
+    "openrouter_free": "openrouter",
+    "openrouter_paid": "openrouter",
+}
+
+
 @router.get("/ai/providers")
 @limiter.limit("30/minute")
 async def list_providers(
@@ -47,6 +54,11 @@ async def list_providers(
             "description": "Local and cloud AI models"
         },
         {
+            "id": "ollama_cloud",
+            "name": "Ollama Cloud",
+            "description": "Cloud-hosted Ollama models"
+        },
+        {
             "id": "groq",
             "name": "Groq",
             "description": "Fast inference with Llama models"
@@ -55,6 +67,16 @@ async def list_providers(
             "id": "openrouter",
             "name": "OpenRouter",
             "description": "Access to multiple AI models"
+        },
+        {
+            "id": "openrouter_free",
+            "name": "OpenRouter Free",
+            "description": "OpenRouter free-tier models"
+        },
+        {
+            "id": "openrouter_paid",
+            "name": "OpenRouter Paid",
+            "description": "OpenRouter paid-tier models"
         },
         {
             "id": "cloudflare",
@@ -73,15 +95,16 @@ async def list_models(
     _auth=Depends(require_admin_token),
 ) -> List[Dict[str, Any]]:
     """List models available from a specific provider."""
-    
+    resolved_id = _PROVIDER_ALIASES.get(provider_id, provider_id)
+
     try:
-        if provider_id == "ollama":
+        if resolved_id == "ollama":
             return await _get_ollama_models()
-        elif provider_id == "groq":
+        elif resolved_id == "groq":
             return await _get_groq_models()
-        elif provider_id == "openrouter":
+        elif resolved_id == "openrouter":
             return await _get_openrouter_models()
-        elif provider_id == "cloudflare":
+        elif resolved_id == "cloudflare":
             return await _get_cloudflare_models()
         else:
             raise HTTPException(status_code=404, detail=f"Provider {provider_id} not found")

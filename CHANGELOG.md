@@ -6,6 +6,7 @@
 - **Settings DB priority** — `get_setting()` and `ai_mode()` now read database values before environment variables, fixing split-brain where UI showed saved settings but runtime ignored them (AP-1, P1).
 - **`mask_secret()`** — Unset API keys return `null` (JSON) so the Configured/Not set pill works correctly (P2).
 - **Audit log redaction** — Secret settings changes are logged as `[REDACTED]` instead of plaintext (AP-S1).
+- **Backend callers** — AI routes, model discovery, provider stats, and external intel webhook now resolve API keys and AI mode from DB settings (AP-2, AP-3, AP-4, AP-7).
 
 ### Changed
 - **`ai_mode` validation** — Only `ai_off`, `ai_lite`, and `ai_full` accepted via Settings API (AP-6).

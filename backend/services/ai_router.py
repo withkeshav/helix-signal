@@ -514,7 +514,7 @@ def _providers_for_mode(mode: str, *, priority: bool = False, feature: str | Non
 # Provider stats & observability
 # ---------------------------------------------------------------------------
 
-def get_provider_stats() -> dict[str, Any]:
+def get_provider_stats(db: Any = None) -> dict[str, Any]:
     """Return per-provider usage statistics for observability.
 
     Includes call counts, fallback frequency, and current rate-limit state.
@@ -531,7 +531,7 @@ def get_provider_stats() -> dict[str, Any]:
             "calls_last_minute": len(recent),
             "total_calls_today": len(timestamps),
             "fallback_count": _PROVIDER_FALLBACK_COUNTS.get(name, 0),
-            "api_key_configured": bool(os.getenv(meta["env_key"], "").strip()),
+            "api_key_configured": bool(_resolve_api_key(meta["env_key"], db)),
         }
     return stats
 

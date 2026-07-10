@@ -65,7 +65,7 @@ def ai_usage_endpoint(
 ) -> dict[str, Any]:
     _require_admin_token(request)
     per_provider = get_ai_usage_summary(db)
-    provider_stats = get_provider_stats()
+    provider_stats = get_provider_stats(db)
     budget = get_budget_status()
     return {
         **per_provider,
@@ -92,7 +92,7 @@ def ai_explain(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     _require_ai_auth(request, db)
-    mode = ai_mode()
+    mode = ai_mode(db)
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
     ctx = _build_context(asset, db)
@@ -109,7 +109,7 @@ def ai_narrative(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     _require_ai_auth(request, db)
-    mode = ai_mode()
+    mode = ai_mode(db)
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
     ctx = _build_context(asset, db)
@@ -180,7 +180,7 @@ def ai_insights(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     _require_ai_auth(request, db)
-    mode = ai_mode()
+    mode = ai_mode(db)
     if mode == "ai_off":
         return {"available": False, "reason": "AI disabled"}
     ctx = _build_context(asset, db)
@@ -239,7 +239,7 @@ def ai_market_overview(
     context = _build_market_context(db)
     if context is None:
         return {"available": False, "reason": "no_assets"}
-    mode = ai_mode()
+    mode = ai_mode(db)
     if mode == "ai_off":
         return {"available": True, "generated_by": "engine", **context}
 

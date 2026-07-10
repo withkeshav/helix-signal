@@ -104,8 +104,8 @@ async def _ai_enhance(
 
     Returns a dict with keys that can be merged into the article or None.
     """
-    ai_mode = os.getenv("AI_MODE", "").strip()
-    if ai_mode == "ai_off":
+    from services.ai_router import ai_mode as get_ai_mode
+    if get_ai_mode(db) == "ai_off":
         return None
 
     try:

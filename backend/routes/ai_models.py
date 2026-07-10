@@ -11,6 +11,8 @@ from pydantic import BaseModel
 
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
+from database import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -92,6 +94,7 @@ async def list_providers(
 async def list_models(
     request: Request,
     provider_id: str,
+    db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
 ) -> List[Dict[str, Any]]:
     """List models available from a specific provider."""
@@ -99,22 +102,27 @@ async def list_models(
 
     try:
         if resolved_id == "ollama":
-            return await _get_ollama_models()
+            return await _get_ollama_models(db)
         elif resolved_id == "groq":
-            return await _get_groq_models()
+            return await _get_groq_models(db)
         elif resolved_id == "openrouter":
-            return await _get_openrouter_models()
+            return await _get_openrouter_models(db)
         elif resolved_id == "cloudflare":
-            return await _get_cloudflare_models()
+            return await _get_cloudflare_models(db)
         else:
             raise HTTPException(status_code=404, detail=f"Provider {provider_id} not found")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
 
 
-async def _get_ollama_models() -> List[Dict[str, Any]]:
+def _resolve_api_key_from_settings(db: Session | None, secret_key: str, env_key: str) -> str:
+    from providers.settings import get_setting
+    return str(get_setting(secret_key, db) or os.getenv(env_key, "")).strip()
+
+
+async def _get_ollama_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from Ollama."""
-    api_key = os.getenv("OLLAMA_API_KEY")
+    api_key = _resolve_api_key_from_settings(db, "secret_ollama_api_key", "OLLAMA_API_KEY")
     if not api_key:
         # Fallback to local Ollama
         try:
@@ -155,9 +163,9 @@ async def _get_ollama_models() -> List[Dict[str, Any]]:
         return []
 
 
-async def _get_groq_models() -> List[Dict[str, Any]]:
+async def _get_groq_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from Groq."""
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = _resolve_api_key_from_settings(db, "secret_groq_api_key", "GROQ_API_KEY")
     if not api_key:
         return []
     
@@ -183,9 +191,9 @@ async def _get_groq_models() -> List[Dict[str, Any]]:
         return []
 
 
-async def _get_openrouter_models() -> List[Dict[str, Any]]:
+async def _get_openrouter_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from OpenRouter."""
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = _resolve_api_key_from_settings(db, "secret_openrouter_api_key", "OPENROUTER_API_KEY")
     if not api_key:
         return []
     
@@ -211,10 +219,11 @@ async def _get_openrouter_models() -> List[Dict[str, Any]]:
         return []
 
 
-async def _get_cloudflare_models() -> List[Dict[str, Any]]:
+async def _get_cloudflare_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from Cloudflare."""
-    api_token = os.getenv("CLOUDFLARE_API_TOKEN")
-    account_id = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+    from providers.settings import get_setting
+    api_token = _resolve_api_key_from_settings(db, "secret_cloudflare_api_token", "CLOUDFLARE_API_TOKEN")
+    account_id = str(get_setting("cloudflare_account_id", db) or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")).strip()
     
     if not api_token or not account_id:
         return []

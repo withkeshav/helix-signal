@@ -99,7 +99,7 @@ Helix-Signal supports multiple AI providers with automatic fallback:
 
 ### API Keys
 
-To use each provider, you need to configure the corresponding API key in the Settings UI:
+To use each provider, you need to configure the corresponding API key in the Settings UI. Keys saved in Settings are read at runtime before environment variables — model discovery (`GET /api/ai/providers/{id}/models`) uses the same DB-backed resolution.
 
 | Provider | Setting Key | Environment Variable |
 |----------|-------------|---------------------|

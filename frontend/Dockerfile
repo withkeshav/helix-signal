@@ -1,4 +1,4 @@
-FROM nginx:1.30.3-alpine
+FROM nginx:1.31.2-alpine
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY snippets/ /etc/nginx/snippets/

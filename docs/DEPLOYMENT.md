@@ -138,6 +138,7 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
+| v4.0.4 | `HEAD` | 2026-07-10 | Settings wiring fix — DB priority over env, audit redaction, mask_secret, unified Settings UI, Signal refresh |
 | v4.0.3 | `HEAD` | 2026-07-08 | FE lifecycle refactor — x-if tabs, single Market, auth dedupe, chart lifecycle, Settings wizard + AI mapping, bounded empty states |
 | v4.0.2 | `c5427f5` | 2026-07-08 | Cookie session auth, alert rule editor, asset enable overrides, provider test, CI Postgres path, E2E expansion |
 | v4.0.1 | `cabb85a` | 2026-07-08 | Audit rectification — auth, hardening, reliability, SA 2.0, docs, tests |

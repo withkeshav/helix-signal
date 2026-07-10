@@ -188,6 +188,9 @@ this.$watch('$store.ui.tab', (newTab) => {
 });
 
 // Cross-component communication
+window.addEventListener('settings-changed', () => {
+  this._reloadAiPanels();
+});
 window.addEventListener('theme-changed', (e) => {
   this.reRenderWithTheme(e.detail.theme);
 });

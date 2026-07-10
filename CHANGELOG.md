@@ -13,6 +13,12 @@
 - **`ai_mode` validation** — Only `ai_off`, `ai_lite`, and `ai_full` accepted via Settings API (AP-6).
 - **Unified Settings page** — Removed Simple/Advanced toggle; API keys and all settings visible when signed in (P4, P5, AP-S2).
 - **Warning banners** — Critical warnings separate from operational metrics (source rate limits, AI budget) (P6, AP-5).
+- **Restart toasts** — Settings that require restart show a warning toast on save (AP-8).
+- **API key UI** — Removed broken `key_env` hint; honest storage copy (stored in DB, not encrypted at rest).
+
+### Deployment
+- Remove stale `AI_MODE` from server `.env` on deploy if present — DB settings now take precedence but env cleanup avoids confusion.
+- `AI_MODE` in `.env.example` is commented as fallback-only.
 
 ## v4.0.3 (2026-07-08) — FE lifecycle refactor
 

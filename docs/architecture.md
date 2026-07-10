@@ -77,6 +77,7 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `AI_REQUIRE_TOKEN` gate with per-IP lockout after 20 failed attempts; pre-flight budget deduct in `enrich_with_ai()`
 - **APScheduler** runs all periodic jobs in-process (ingest, OSINT, retention, quality checks) — no separate worker needed
 - **CORS origins** loaded from env at module level (safe before `init_db()`). DB setting (`cors_origins`) loaded into `app.state.cors_origins` after DB init for future live-refresh on Settings update.
+- **Settings priority** (`providers/settings.py`): runtime reads use **DB → env → default**. The Settings UI (`GET /api/settings`) and `get_setting()` both prefer database values when a row exists; environment variables act as fallbacks for unset keys. Secrets are never returned via API — only `"configured"` or `null`.
 
 ### Data Store
 

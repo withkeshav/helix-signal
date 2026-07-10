@@ -137,11 +137,13 @@ def _trigram_similarity(a: str, b: str) -> float:
 
 
 def ai_mode(db=None) -> str:
-    """Get current AI mode from environment or settings."""
-    mode = os.getenv("AI_MODE", "").strip()
-    if not mode and db is not None:
+    """Get current AI mode from DB settings, falling back to env then default."""
+    if db is not None:
         from providers.settings import get_setting
         mode = get_setting("ai_mode", db)
+        if mode:
+            return str(mode)
+    mode = os.getenv("AI_MODE", "").strip()
     return mode or "balanced"
 
 

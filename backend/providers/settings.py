@@ -38,18 +38,23 @@ def get_setting(key: str, db: Session | None = None) -> Any:
                 return val
         return meta.get("default", "")
 
-    env_val = os.getenv(meta.get("key_env", ""), "").strip() if meta.get("key_env") else None
-    if env_val and env_val.lower() in ("1", "true", "yes"):
-        return True
-    if env_val and env_val.lower() in ("0", "false", "no"):
-        return False
-    if env_val is not None and env_val:
-        return env_val
-
+    # Non-secret path — DB first, env fallback, default last
     if db:
         row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
-        if row:
+        if row and row.value is not None:
             return _coerce(row.value, meta.get("type", "bool"))
+
+    env_key = meta.get("key_env")
+    if env_key:
+        env_val = os.getenv(env_key, "").strip()
+        if env_val:
+            if env_val.lower() in ("1", "true", "yes"):
+                return True
+            if env_val.lower() in ("0", "false", "no"):
+                return False
+            if meta.get("type") == "str":
+                return env_val
+            return _coerce(env_val, meta.get("type", "bool"))
 
     return meta.get("default")
 
@@ -72,6 +77,9 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
         if max_val is not None and int_val > max_val:
             raise ValueError(f"Setting '{key}' must be <= {max_val}")
         value = int_val
+    if meta.get("type") == "str" and "choices" in meta:
+        if str(value) not in meta["choices"]:
+            raise ValueError(f"Setting '{key}' must be one of: {', '.join(meta['choices'])}")
     
     # Get the old value for audit logging
     old_row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
@@ -89,11 +97,16 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
     # Log the change to the audit log
     try:
         from services.settings_audit import log_settings_change
+        audit_old = old_value
+        audit_new = str(value)
+        if meta.get("type") == "secret":
+            audit_old = "[REDACTED]" if old_value else None
+            audit_new = "[REDACTED]"
         log_settings_change(
             db=db,
             setting_key=key,
-            old_value=old_value,
-            new_value=str(value),
+            old_value=audit_old,
+            new_value=audit_new,
             user=user,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -103,12 +116,12 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
         pass
 
 
-def mask_secret(value: str) -> str:
+def mask_secret(value: str) -> str | None:
     """Return a display-safe value for secret-type settings.
 
     Never returns the actual secret — only indicates whether it is configured.
     """
-    return "configured" if value else "not_set"
+    return "configured" if value else None
 
 
 def get_all_settings(db: Session) -> list[dict[str, Any]]:

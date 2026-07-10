@@ -292,6 +292,7 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
         "type": "str",
         "default": "ai_off",
         "key_env": "AI_MODE",
+        "choices": ["ai_off", "ai_lite", "ai_full"],
         "group": "AI & Intelligence",
         "description": "AI mode: ai_off, ai_lite, or ai_full",
         "requires_restart": False,

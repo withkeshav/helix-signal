@@ -1,5 +1,15 @@
 # Helix Signal Changelog
 
+## v4.0.4 (2026-07-10) — Settings wiring fix
+
+### Fixed
+- **Settings DB priority** — `get_setting()` and `ai_mode()` now read database values before environment variables, fixing split-brain where UI showed saved settings but runtime ignored them (AP-1, P1).
+- **`mask_secret()`** — Unset API keys return `null` (JSON) so the Configured/Not set pill works correctly (P2).
+- **Audit log redaction** — Secret settings changes are logged as `[REDACTED]` instead of plaintext (AP-S1).
+
+### Changed
+- **`ai_mode` validation** — Only `ai_off`, `ai_lite`, and `ai_full` accepted via Settings API (AP-6).
+
 ## v4.0.3 (2026-07-08) — FE lifecycle refactor
 
 ### Changed

@@ -49,3 +49,9 @@ are identified by their direct connection IP and their XFF header is ignored.
 
 A `Content-Security-Policy` header is applied to all backend responses and nginx static assets. Configure via `CONTENT_SECURITY_POLICY` env var. The default policy restricts scripts to `'self'` + CDN, blocks `frame-ancestors`, and restricts `form-action` and `base-uri`.
 For inline scripts, the policy uses SHA-256 hashes to allow specific scripts while maintaining security. This approach avoids using 'unsafe-inline' which would weaken the policy. The importmap script in the frontend is specifically allowed through its SHA-256 hash.
+
+### Settings and API keys
+
+- API keys saved via the Settings UI are stored in the `settings` database table as **plaintext** (not encrypted at rest). Protection relies on admin authentication and server/database access control.
+- `GET /api/settings` never returns raw secret values — only `"configured"` or `null`.
+- Settings audit log entries for secret-type keys store `[REDACTED]` instead of the actual value (v4.0.4+).

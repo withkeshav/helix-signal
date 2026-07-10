@@ -280,6 +280,9 @@
     <!-- Rate Limit Warning -->
     <div class="warning-banner" :class="rateLimitWarning ? 'visible' : ''" x-text="rateLimitWarning"></div>
 
+    <!-- Operational metrics (rate limits, budget) -->
+    <div class="warning-banner" :class="operationalWarning ? 'visible' : ''" x-text="operationalWarning" style="opacity:0.65;font-size:11px"></div>
+
 
     <!-- Tab: Signal -->
     <template x-if="$store.ui.tab === 'signal'"><div class="tab-content" x-cloak x-data="market" role="tabpanel" id="tab-signal">
@@ -1819,9 +1822,6 @@
                   
                   <div style="margin-bottom:12px">
                     <p style="margin:0 0 8px 0;font-size:12px;color:var(--muted)" x-text="s.description"></p>
-                    <div x-cloak x-show="s.key_env" style="font-size:11px;background:var(--bg-accent);padding:4px 8px;border-radius:4px;display:inline-block">
-                      Environment variable: <code x-text="s.key_env"></code>
-                    </div>
                   </div>
                   
                   <div style="display:flex;gap:8px;align-items:center">

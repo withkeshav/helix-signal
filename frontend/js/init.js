@@ -56,6 +56,7 @@ Alpine.data('helixApp', () => ({
   refreshing: false, // Needed by refresh button
   staleWarning: '',
   rateLimitWarning: '',
+  operationalWarning: '',
   warnings: [],
   _refreshTimer: null,
   _inFlight: false,
@@ -153,6 +154,7 @@ Alpine.data('helixApp', () => ({
     if (!headers['X-Admin-Token']) {
       this.warnings = [];
       this.rateLimitWarning = '';
+      this.operationalWarning = '';
       return;
     }
     try {
@@ -160,17 +162,30 @@ Alpine.data('helixApp', () => ({
       if (r.ok) {
         this.warnings = await r.json();
         this.rateLimitWarning = this._formatWarningBanner(this.warnings);
+        this.operationalWarning = this._formatOperationalBanner(this.warnings);
       }
     } catch (e) {}
   },
 
   _formatWarningBanner(warnings) {
-    const critical = warnings.filter(w => w.severity === 'critical');
-    const normal = warnings.filter(w => w.severity === 'warning');
+    const actionable = warnings.filter(w =>
+      w.severity === 'critical' && w.type !== 'source_rate_limit' && w.type !== 'ai_budget'
+    );
+    const normal = warnings.filter(w =>
+      w.severity === 'warning' && w.type !== 'source_rate_limit' && w.type !== 'ai_budget'
+    );
     const parts = [];
-    for (const w of critical) parts.push(`[CRITICAL] ${w.message}`);
+    for (const w of actionable) parts.push(`[CRITICAL] ${w.message}`);
     for (const w of normal) parts.push(`[WARN] ${w.message}`);
     return parts.join(' | ') || '';
+  },
+
+  _formatOperationalBanner(warnings) {
+    const operational = warnings.filter(w =>
+      w.type === 'source_rate_limit' || w.type === 'ai_budget'
+    );
+    if (operational.length === 0) return '';
+    return operational.map(w => w.message).join(' | ');
   },
 
   _scheduleNextRefresh() {

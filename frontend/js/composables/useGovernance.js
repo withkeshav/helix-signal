@@ -66,7 +66,6 @@ export function useGovernance() {
     newUser: { username: '', email: '', password: '', is_admin: false, role: 'user' },
     editUserForm: { username: '', email: '', is_active: true, is_admin: false, role: 'user' },
 
-    settingsView: (typeof localStorage !== 'undefined' && localStorage.getItem('helix_settings_view')) || 'simple',
     setupDone: typeof localStorage !== 'undefined' && localStorage.getItem('helix_setup_done') === '1',
     wizardStep: 1,
     wizardAiMode: 'ai_lite',
@@ -199,7 +198,6 @@ export function useGovernance() {
     async navigateAiConfigure(row) {
       if (!row?.configureSelector) return;
       if (this.$store.ui.tab !== 'settings') this.$store.ui.setTab('settings');
-      this.settingsView = 'advanced';
       await this._scrollToSelector(row.configureSelector);
     },
 
@@ -217,11 +215,6 @@ export function useGovernance() {
       if (mode === 'ai_full') return 'Full';
       if (mode === 'ai_lite') return 'Lite';
       return 'Off';
-    },
-
-    setSettingsView(view) {
-      this.settingsView = view;
-      try { localStorage.setItem('helix_settings_view', view); } catch {}
     },
 
     async runTestAi() {

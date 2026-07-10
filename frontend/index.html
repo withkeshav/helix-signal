@@ -1559,16 +1559,11 @@
         </div>
 
         <div class="insight-card" style="grid-column:1/-1" x-show="!$store.ui.adminToken">
-          <p class="kpi-sub" style="margin:0">Sign in above to use Quick Setup, Test AI, and Advanced configuration panels.</p>
+          <p class="kpi-sub" style="margin:0">Sign in above to configure AI, API keys, and system settings.</p>
         </div>
 
-        <!-- Simple / Advanced toggle + Quick Setup (Simple mode) -->
+        <!-- Quick Setup + AI overview -->
         <div class="insight-card" style="grid-column:1/-1" x-show="$store.ui.adminToken">
-          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
-            <button class="btn" :class="settingsView==='simple' && 'btn-primary'" type="button" @click="setSettingsView('simple')">Simple</button>
-            <button class="btn" :class="settingsView==='advanced' && 'btn-primary'" type="button" @click="setSettingsView('advanced')">Advanced</button>
-          </div>
-          <div x-show="settingsView==='simple'">
             <div x-show="!setupDone" style="padding:16px;border:1px solid var(--line);border-radius:8px;margin-bottom:16px;background:var(--bg-accent)">
               <h3 style="margin:0 0 8px 0;font-size:15px">Quick Setup — Step <span x-text="wizardStep"></span> of 3</h3>
               <div x-show="wizardStep===1">
@@ -1646,11 +1641,10 @@
                 <span x-show="!assetCatalog.length && !assetCatalogLoading" class="kpi-sub">Load catalog after sign-in</span>
               </div>
             </div>
-          </div>
         </div>
 
         <!-- Settings Header with Search and Filters -->
-        <div class="insight-card" style="grid-column:1/-1" x-show="settingsView==='advanced'">
+        <div class="insight-card" style="grid-column:1/-1" x-show="$store.ui.adminToken">
           <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
             <div>
               <h1 style="margin:0 0 8px 0">System Settings</h1>
@@ -1674,7 +1668,7 @@
           </div>
           
           <!-- A1: Playbook Presets Banner -->
-          <div x-show="settingsView==='advanced'" style="padding:16px;background:var(--bg-accent);border-radius:8px;margin-bottom:16px">
+          <div x-show="$store.ui.adminToken" style="padding:16px;background:var(--bg-accent);border-radius:8px;margin-bottom:16px">
             <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
               <div>
                 <h3 style="margin:0 0 4px 0;font-size:14px;font-weight:600">AI Playbook Presets</h3>
@@ -1802,13 +1796,13 @@
           </div>
         </div>
         
-        <!-- Settings Sections (Advanced only) -->
-        <div x-show="settingsView==='advanced'">
+        <!-- Settings Sections -->
+        <div x-show="$store.ui.adminToken">
         <div class="insight-card" x-show="hasSecretSettings" style="grid-column:1/-1">
             <h2 style="margin:0 0 16px 0;display:flex;align-items:center;gap:8px">
               <svg class="icon"><use href="#icon-key"/></svg> API Keys & Secrets
             </h2>
-            <p class="kpi-sub" style="margin:0 0 16px 0">Configure API keys for external services. Values are encrypted at rest and never exposed via API.</p>
+            <p class="kpi-sub" style="margin:0 0 16px 0">Configure API keys for external services. Values are stored in the database and never shown again after save. Admin access required.</p>
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
@@ -2481,7 +2475,7 @@
           <span x-text="toastMessage"></span>
            <button style="margin-left:10px;background:none;border:none;color:inherit;font-weight:700;cursor:pointer" @click.stop="hideToast()" aria-label="Dismiss">×</button>
         </div>
-        </div><!-- /settingsView advanced -->
+        </div><!-- /settings sections -->
       </div>
     </div>
     </template>

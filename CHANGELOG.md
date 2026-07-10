@@ -11,6 +11,7 @@
 
 ### Changed
 - **`ai_mode` validation** — Only `ai_off`, `ai_lite`, and `ai_full` accepted via Settings API (AP-6).
+- **Unified Settings page** — Removed Simple/Advanced toggle; API keys and all settings visible when signed in (P4, P5, AP-S2).
 
 ## v4.0.3 (2026-07-08) — FE lifecycle refactor
 

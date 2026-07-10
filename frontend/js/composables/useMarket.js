@@ -211,6 +211,10 @@ export function useMarket() {
       // Reload AI panels when admin session changes
       this.$watch('$store.ui.adminToken', () => this._reloadAiPanels());
 
+      // Reload AI panels when settings change (cross-tab)
+      this._settingsChangedHandler = () => this._reloadAiPanels();
+      window.addEventListener('settings-changed', this._settingsChangedHandler);
+
       // Reload data and charts when asset changes
       this.$watch('$store.dashboard.asset', async (newAsset) => {
         if (this.chains.length === 0) this.$store.dashboard.loading = true;
@@ -253,6 +257,8 @@ export function useMarket() {
       // Alpine x-if unmount: ensure we dispose chart instances we own.
       if (this._aiSubtabSetHandler) window.removeEventListener('ai-subtab-set', this._aiSubtabSetHandler);
       this._aiSubtabSetHandler = null;
+      if (this._settingsChangedHandler) window.removeEventListener('settings-changed', this._settingsChangedHandler);
+      this._settingsChangedHandler = null;
       this._disposeAllCharts();
     },
 

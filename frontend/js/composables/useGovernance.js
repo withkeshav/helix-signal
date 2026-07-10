@@ -773,6 +773,9 @@ export function useGovernance() {
         });
         if (r.ok) {
           this.showToast('Provider priority updated', 'success');
+          await this.loadSettings();
+          this.initProviders();
+          window.dispatchEvent(new CustomEvent('settings-changed'));
         } else {
           this.showToast('Failed to save priority', 'error');
         }
@@ -986,7 +989,17 @@ export function useGovernance() {
         if (r.ok) {
           const item = this.settingsList.find(s => s.key === key);
           if (item) item.value = item.type === 'secret' ? true : value;
-          this.showToast(`Setting "${key}" updated`, 'success');
+          const label = item?.label || key;
+          if (item?.type === 'secret') {
+            this.showToast(`${label} saved`, 'success');
+          } else if (item?.requires_restart) {
+            this.showToast(`Setting "${label}" updated — restart required to take effect`, 'warning');
+          } else {
+            this.showToast(`Setting "${label}" updated`, 'success');
+          }
+          await this.loadSettings();
+          if (key === 'ai_daily_token_budget') await this.loadAiBudget();
+          window.dispatchEvent(new CustomEvent('settings-changed'));
         } else {
           const err = await r.text();
           this.showToast(`Update failed: ${err}`, 'error');

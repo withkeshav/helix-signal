@@ -19,7 +19,6 @@ export function useAlerts() {
 
     _bindAuth() {
       this.$watch('$store.ui.adminToken', () => this._loadAll());
-      window.addEventListener('auth-changed', () => this._loadAll());
     },
 
     _adminFetch(url, opts = {}) {
@@ -62,7 +61,10 @@ export function useAlerts() {
           this.historyEvents = (ej.events || []).filter(e => e.severity !== 'debug').slice(0, 20);
         }
         if (failures.length && !this.error) {
-          this.error = `Failed to load: ${failures.join(', ')}`;
+          const hasServer = failures.some(f => /\b5\d\d\b/.test(f));
+          this.error = hasServer
+            ? `Server error loading alerts data — retry later. (${failures.join(', ')})`
+            : `Failed to load: ${failures.join(', ')}`;
         }
       } catch (e) {
         this.error = `Failed to load alerts data: ${e.message}`;

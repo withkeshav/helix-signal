@@ -29,6 +29,10 @@ export function useMarket() {
     // Additional data needed for dashboard cards
     errorOverview: '',
 
+    aiOverviewError: '',
+    aiNarrativeError: '',
+    aiInsightsError: '',
+
     marketOverview: '',
     aiSummary: '',
     aiNarrative: '',
@@ -206,7 +210,6 @@ export function useMarket() {
       
       // Reload AI panels when admin session changes
       this.$watch('$store.ui.adminToken', () => this._reloadAiPanels());
-      window.addEventListener('auth-changed', () => this._reloadAiPanels());
 
       // Reload data and charts when asset changes
       this.$watch('$store.dashboard.asset', async (newAsset) => {
@@ -237,6 +240,20 @@ export function useMarket() {
           this.renderContagionGraph(this.rotation);
         });
       });
+
+      // Cross-component navigation (Settings -> Signal AI sub-tabs)
+      this._aiSubtabSetHandler = (e) => {
+        const sub = e?.detail?.subtab;
+        if (sub === 'overview' || sub === 'narrative' || sub === 'insights') this.aiSubTab = sub;
+      };
+      window.addEventListener('ai-subtab-set', this._aiSubtabSetHandler);
+    },
+
+    destroy() {
+      // Alpine x-if unmount: ensure we dispose chart instances we own.
+      if (this._aiSubtabSetHandler) window.removeEventListener('ai-subtab-set', this._aiSubtabSetHandler);
+      this._aiSubtabSetHandler = null;
+      this._disposeAllCharts();
     },
 
     async loadAllAssetSnapshots() {
@@ -350,17 +367,35 @@ export function useMarket() {
       ]);
     },
 
+    _formatAiFetchError(r, label) {
+      if (!r) return `Network error loading ${label}.`;
+      if (r.status === 401 || r.status === 403) return `Sign in via Settings to load ${label}.`;
+      if (r.status >= 500) return `Server error loading ${label} — retry later.`;
+      return `${label} unavailable (HTTP ${r.status}). Check AI toggles in Settings.`;
+    },
+
     async loadMarketOverview() {
+      this.aiOverviewError = '';
       try {
         const r = await this.$store.ui.adminFetch('/api/ai/market-overview', { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
-          this.marketOverview = j.available ? j.summary : (j.reason || '');
+          if (j.available) {
+            this.marketOverview = j.summary || '';
+          } else {
+            this.marketOverview = '';
+            this.aiOverviewError = j.reason || 'AI overview disabled — enable feature_ai_summary in Settings.';
+          }
           this.marketOverviewGeneratedAt = j.generated_at || '';
           this.marketOverviewExpiresAt = j.expires_at || '';
           return { summary: this.marketOverview, generatedAt: this.marketOverviewGeneratedAt, expiresAt: this.marketOverviewExpiresAt };
         }
-      } catch (e) {}
+        this.marketOverview = '';
+        this.aiOverviewError = this._formatAiFetchError(r, 'market overview');
+      } catch (e) {
+        this.marketOverview = '';
+        this.aiOverviewError = `Network error: ${e.message}`;
+      }
       return { summary: '', generatedAt: '', expiresAt: '' };
     },
     
@@ -379,30 +414,52 @@ export function useMarket() {
     },
     
     async loadNarrative() {
+      this.aiNarrativeError = '';
       try {
         const r = await this.$store.ui.adminFetch(`/api/ai/narrative?asset=${this.asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
-          this.aiNarrative = j.available ? j.summary : (j.reason || '');
+          if (j.available) {
+            this.aiNarrative = j.summary || '';
+          } else {
+            this.aiNarrative = '';
+            this.aiNarrativeError = j.reason || 'Narrative disabled — enable feature_ai_narrative in Settings.';
+          }
           this.aiNarrativeGeneratedAt = j.generated_at || '';
           this.aiNarrativeExpiresAt = j.expires_at || '';
           return { summary: this.aiNarrative, generatedAt: this.aiNarrativeGeneratedAt, expiresAt: this.aiNarrativeExpiresAt };
         }
-      } catch (e) {}
+        this.aiNarrative = '';
+        this.aiNarrativeError = this._formatAiFetchError(r, 'narrative');
+      } catch (e) {
+        this.aiNarrative = '';
+        this.aiNarrativeError = `Network error: ${e.message}`;
+      }
       return { summary: '', generatedAt: '', expiresAt: '' };
     },
     
     async loadInsights() {
+      this.aiInsightsError = '';
       try {
         const r = await this.$store.ui.adminFetch(`/api/ai/insights?asset=${this.asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
-          this.aiInsights = j.available ? j.summary : (j.reason || '');
+          if (j.available) {
+            this.aiInsights = j.summary || '';
+          } else {
+            this.aiInsights = '';
+            this.aiInsightsError = j.reason || 'Insights disabled — enable feature_ai_insights in Settings.';
+          }
           this.aiInsightsGeneratedAt = j.generated_at || '';
           this.aiInsightsExpiresAt = j.expires_at || '';
           return { summary: this.aiInsights, generatedAt: this.aiInsightsGeneratedAt, expiresAt: this.aiInsightsExpiresAt };
         }
-      } catch (e) {}
+        this.aiInsights = '';
+        this.aiInsightsError = this._formatAiFetchError(r, 'insights');
+      } catch (e) {
+        this.aiInsights = '';
+        this.aiInsightsError = `Network error: ${e.message}`;
+      }
       return { summary: '', generatedAt: '', expiresAt: '' };
     },
     

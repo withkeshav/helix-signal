@@ -5,6 +5,7 @@ export function useOSINT() {
   return {
     _charts: new Map(),
     _echarts: new Map(),
+    _resizeHandler: null,
     _disposeChart,
     formatWhen,
     statusBand,
@@ -70,7 +71,7 @@ export function useOSINT() {
         });
 
         // Handle window resize + tab-switch cleanup
-        const resizeHandler = () => {
+      this._resizeHandler = () => {
           if (this._sentimentSeries.length) {
             this._renderSentiment();
           }
@@ -86,9 +87,9 @@ export function useOSINT() {
           
           if (newTab !== 'intel') {
             this._destroyCharts();
-            window.removeEventListener('resize', resizeHandler);
+            if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
           } else {
-            window.addEventListener('resize', resizeHandler);
+            window.addEventListener('resize', this._resizeHandler);
           }
         });
 
@@ -101,6 +102,12 @@ export function useOSINT() {
           }
         });
       });
+    },
+
+    destroy() {
+      this._destroyCharts();
+      if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
+      this._resizeHandler = null;
     },
   };
 }

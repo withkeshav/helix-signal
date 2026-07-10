@@ -282,7 +282,7 @@
 
 
     <!-- Tab: Signal -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'signal'" x-data="market" role="tabpanel" id="tab-signal">
+    <template x-if="$store.ui.tab === 'signal'"><div class="tab-content" x-cloak x-data="market" role="tabpanel" id="tab-signal">
       <!-- Error Banner -->
       <div x-cloak x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
 
@@ -348,17 +348,23 @@
             <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
             <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
           </div>
-          <div x-cloak x-show="aiSubTab==='overview'">
+          <div id="signal-ai-overview" x-cloak x-show="aiSubTab==='overview'">
             <p x-cloak x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
-            <p x-cloak x-show="!marketOverview" class="kpi-sub" style="margin:0">No market overview yet</p>
+            <p x-cloak x-show="aiOverviewError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiOverviewError"></p>
+            <p x-cloak x-show="!marketOverview && !aiOverviewError" class="kpi-sub" style="margin:0">No market overview yet — enable AI summary in Settings or wait for the next refresh.</p>
+            <button type="button" class="btn btn-muted" x-cloak x-show="aiOverviewError && aiOverviewError.includes('Sign in')" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
           </div>
-          <div x-cloak x-show="aiSubTab==='narrative'">
+          <div id="signal-ai-narrative" x-cloak x-show="aiSubTab==='narrative'">
             <p x-cloak x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
-            <p x-cloak x-show="!aiNarrative" class="kpi-sub" style="margin:0">No narrative yet</p>
+            <p x-cloak x-show="aiNarrativeError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiNarrativeError"></p>
+            <p x-cloak x-show="!aiNarrative && !aiNarrativeError" class="kpi-sub" style="margin:0">No narrative yet — enable feature_ai_narrative in Settings.</p>
+            <button type="button" class="btn btn-muted" x-cloak x-show="aiNarrativeError && aiNarrativeError.includes('Sign in')" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
           </div>
-          <div x-cloak x-show="aiSubTab==='insights'">
+          <div id="signal-ai-insights" x-cloak x-show="aiSubTab==='insights'">
             <p x-cloak x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
-            <p x-cloak x-show="!aiInsights" class="kpi-sub" style="margin:0">No insights yet</p>
+            <p x-cloak x-show="aiInsightsError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiInsightsError"></p>
+            <p x-cloak x-show="!aiInsights && !aiInsightsError" class="kpi-sub" style="margin:0">No insights yet — enable feature_ai_insights in Settings.</p>
+            <button type="button" class="btn btn-muted" x-cloak x-show="aiInsightsError && aiInsightsError.includes('Sign in')" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
           </div>
           <div class="time-range" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
             <span class="time-range-label">Range:</span>
@@ -636,7 +642,7 @@
     </div>
 
     <!-- Tab: Market (Supply + Forecast) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'market'" role="tabpanel" id="tab-market">
+    <template x-if="$store.ui.tab === 'market'"><div class="tab-content" x-cloak role="tabpanel" id="tab-market">
       <div x-data="forecast">
         <div x-cloak x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
         <div class="chart-card">
@@ -705,7 +711,7 @@
           </div>
         </div>
       </div>
-      <div x-data="market">
+      <div x-data="marketSupplyCharts">
       <div x-cloak x-show="!totalSupply && $store.dashboard.loading" class="empty-state" style="margin-bottom:12px">
         <span class="loading-spinner" style="width:32px;height:32px;border-width:3px;margin-bottom:4px"></span>
         <span class="kpi-label">Loading supply data...</span>
@@ -775,9 +781,10 @@
       </div>
     </div>
     </div>
+    </template>
 
     <!-- Analytics (merged into Signal tab) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'signal'" x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="region" id="signal-analytics-section">
+    <div class="tab-content" x-cloak x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="region" id="signal-analytics-section">
       <h2 style="margin:16px 0 8px 0;font-size:16px">Advanced Analytics</h2>
       <p class="kpi-sub" style="margin:0 0 12px 0">Regime, change-points, and cross-asset correlation (formerly Analytics tab).</p>
       <div x-cloak x-show="analyticsError" class="warning-banner visible" x-text="analyticsError" style="margin-bottom:8px"></div>
@@ -841,9 +848,10 @@
         </div>
       </div>
     </div>
+    </template>
 
     <!-- Tab: Intel (OSINT + SMIDGE) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'intel'" role="tabpanel" id="tab-intel">
+    <template x-if="$store.ui.tab === 'intel'"><div class="tab-content" x-cloak role="tabpanel" id="tab-intel">
       <div x-data="osint" x-init="init()">
         <div x-cloak x-show="errorEvents" class="warning-banner visible" x-text="errorEvents" style="margin-bottom:8px"></div>
         <div class="insight-grid">
@@ -1003,9 +1011,10 @@
         </div>
       </div>
     </div>
+    </template>
 
     <!-- Tab: Forensics (blacklist + investigation) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'forensics'" x-data="forensics" x-init="init()" role="tabpanel" id="tab-forensics">
+    <template x-if="$store.ui.tab === 'forensics'"><div class="tab-content" x-cloak x-data="forensics" x-init="init()" role="tabpanel" id="tab-forensics">
       <div x-cloak x-show="errorStats || errorEvents" class="warning-banner visible" x-text="errorStats || errorEvents" style="margin-bottom:8px"></div>
       <div x-cloak x-show="loadingStats && !blacklistStats" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading forensics...</div>
       <div class="insight-grid">
@@ -1172,9 +1181,10 @@
         </template>
       </div>
     </div>
+    </template>
 
     <!-- Tab: Alerts (fired-event inbox + rule config) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'alerts'" x-data="alertsPanel" x-init="init()" role="tabpanel" id="tab-alerts">
+    <template x-if="$store.ui.tab === 'alerts'"><div class="tab-content" x-cloak x-data="alertsPanel" x-init="init()" role="tabpanel" id="tab-alerts">
       <div x-cloak x-show="error" class="warning-banner visible" x-text="error" style="margin-bottom:8px"></div>
       <div x-cloak x-show="loading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading alerts...</div>
 
@@ -1269,9 +1279,10 @@
         </div>
       </div>
     </div>
+    </template>
 
     <!-- Tab: System (Health + Quality) -->
-    <div class="tab-content" x-cloak x-show="$store.ui.tab === 'system'" role="tabpanel" id="tab-system">
+    <template x-if="$store.ui.tab === 'system'"><div class="tab-content" x-cloak role="tabpanel" id="tab-system">
       <div x-data="adminOps" x-init="init()" style="margin-bottom:12px">
         <button class="btn" @click="openAdminDrawer()" style="padding:6px 14px;font-size:13px">Admin Operations</button>
         <div x-cloak x-show="adminDrawerVisible" @keydown.window.escape="adminDrawerVisible=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;justify-content:flex-end" @click.self="adminDrawerVisible=false">
@@ -1393,7 +1404,8 @@
       </div>
     </div>
     <!-- Quality (sibling inside System) -->
-    <div x-data="qualityDashboard" x-init="loadQualityData()">
+    <div x-data="qualityDashboard" x-init="init()">
+      <div x-cloak x-show="error" class="warning-banner visible" x-text="error" style="margin-bottom:8px"></div>
       <div class="insight-grid">
         <!-- Quality Dashboard Header -->
         <div class="insight-card" style="grid-column:1/-1">
@@ -1515,6 +1527,7 @@
     </div>
     </div>
     </div>
+    </template>
 
     <!-- Tab: Settings (lazy-mounted via x-if — DOM unmounts on tab switch) -->
     <template x-if="$store.ui.tab === 'settings'">
@@ -1598,14 +1611,21 @@
             <div>
               <h3 style="margin:0 0 8px 0;font-size:14px">AI Feature Mapping</h3>
               <table style="width:100%;font-size:12px;border-collapse:collapse">
-                <thead><tr style="text-align:left;border-bottom:1px solid var(--line)"><th>UI</th><th>Tab</th><th>Kind</th><th>Toggle</th></tr></thead>
+                <thead><tr style="text-align:left;border-bottom:1px solid var(--line)"><th>UI</th><th>Tab</th><th>Kind</th><th>Toggle</th><th>Enabled</th><th>Configure</th></tr></thead>
                 <tbody>
                   <template x-for="row in aiFeatureMap" :key="row.endpoint">
-                    <tr style="border-bottom:1px solid var(--line)">
+                    <tr style="border-bottom:1px solid var(--line);cursor:pointer" @click="navigateAiEffect(row)">
                       <td x-text="row.ui"></td>
                       <td x-text="row.tab"></td>
                       <td x-text="row.kind"></td>
                       <td><code x-text="row.toggle"></code></td>
+                      <td x-text="row.toggle && row.toggle !== '—' ? (isFeatureEnabled(row.toggle) === true ? 'ON' : (isFeatureEnabled(row.toggle) === false ? 'OFF' : '--')) : '--'"></td>
+                      <td>
+                        <button type="button" class="btn btn-muted" style="padding:4px 10px;font-size:12px" @click.stop="navigateAiConfigure(row)" x-show="row.configureSelector">
+                          Configure
+                        </button>
+                        <span x-show="!row.configureSelector" style="color:var(--muted)">—</span>
+                      </td>
                     </tr>
                   </template>
                 </tbody>
@@ -1868,7 +1888,7 @@
             
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px">
               <template x-for="s in filteredSettings" :key="s.key">
-                <div x-cloak x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
+                <div :id="`settings-${s.key}`" x-cloak x-show="s.key.startsWith('feature_')" style="padding:16px;border:1px solid var(--line);border-radius:8px"
                      :style="isGrayedOut(s) ? 'opacity:0.5;pointer-events:none' : ''">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                     <h3 style="margin:0;font-size:14px;font-weight:600" x-text="s.label"></h3>

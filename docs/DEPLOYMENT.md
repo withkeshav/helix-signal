@@ -138,7 +138,9 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
-| v4.0.1 | `HEAD` | 2026-07-08 | Audit rectification — auth, hardening, reliability, SA 2.0, docs, tests |
+| v4.0.3 | `HEAD` | 2026-07-08 | FE lifecycle refactor — x-if tabs, single Market, auth dedupe, chart lifecycle, Settings wizard + AI mapping, bounded empty states |
+| v4.0.2 | `c5427f5` | 2026-07-08 | Cookie session auth, alert rule editor, asset enable overrides, provider test, CI Postgres path, E2E expansion |
+| v4.0.1 | `cabb85a` | 2026-07-08 | Audit rectification — auth, hardening, reliability, SA 2.0, docs, tests |
 | v4.0.0 | `cabb85a` | 2026-07-05 | Current prod HEAD — 24-coin taxonomy, ONNX models, forensics, investigation |
 | v3.10.3 | `0496bea` | 2026-06-25 | Bugfix audit completed |
 | v3.10.2 | `c56df3b` | 2026-06-24 | UI/UX redesign rollout |

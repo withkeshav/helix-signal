@@ -1,5 +1,19 @@
 # Helix Signal Changelog
 
+## v4.0.3 (2026-07-08) — FE lifecycle refactor
+
+### Changed
+- **Tab lazy mounting** — Signal, Market, Intel, Forensics, Alerts, and System tabs now use Alpine `x-if` (Settings already did). Hidden tabs no longer mount composables or fire API calls.
+- **Single `useMarket` instance** — Removed duplicate Market-tab `x-data="market"`; supply charts use `marketSupplyCharts` composable reading `$store.dashboard`.
+- **Auth reload dedupe** — Removed duplicate `auth-changed` listeners from Market, Alerts, Quality, and Governance composables; Quality uses `init()` for auth watchers.
+- **Chart lifecycle** — Removed global `disposeAllChartInstances()` on tab change; composables own `destroy()` cleanup on x-if unmount.
+- **Settings AI mapping** — Enabled column, Configure navigation, wizard checkbox sync after playbook apply.
+- **Bounded empty states** — Signal AI, Alerts, Intel, and System Quality differentiate 401/403 (sign-in CTA) from 5xx (retry/server error).
+
+### Fixed
+- Market cold-load (`/#market`) renders supply charts when dashboard store is empty.
+- Chart double-init race between Signal and Market supply canvases.
+
 ## v4.0.2 (2026-07-08)
 
 ### Added
@@ -15,6 +29,9 @@
 - NLP sentiment controlled from Settings only in dashboard/OSINT paths (no env fallback in UI flags).
 - `useAdminOps` / `useTags` migrated to `adminFetch` with human sign-in copy.
 - Narrative history **recorded in DB only** — no history browser UI (live narrative shows as-of / last updated).
+
+### Fixed
+- **nginx base image** — Updated from `1.30.1-alpine` to `1.30.3-alpine` to resolve Trivy HIGH/CRITICAL CVEs in CI `docker` job.
 
 ### Deferred (still P3 optional)
 - Analytics ECharts heatmap, per-block narrative tone UI, refresh token / Remember me.

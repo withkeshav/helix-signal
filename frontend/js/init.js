@@ -8,6 +8,7 @@ import { useGovernance } from 'composables/useGovernance.js';
 import { useOSINT } from 'composables/useOSINT.js';
 import { useForecast } from 'composables/useForecast.js';
 import { useMarket } from 'composables/useMarket.js';
+import { useMarketSupplyCharts } from 'composables/useMarketSupplyCharts.js';
 import { useQuality } from 'composables/useQuality.js';
 import { useHealth } from 'composables/useHealth.js';
 import { useSMIDGE } from 'composables/useSMIDGE.js';
@@ -19,7 +20,7 @@ import { useFundamentals } from 'composables/useFundamentals.js';
 import { useAnalytics } from 'composables/useAnalytics.js';
 import { useTrendsDeepDive } from 'composables/useTrendsDeepDive.js';
 import { useAdminOps } from 'composables/useAdminOps.js';
-import { setupVisibilityDispose, disposeAllChartInstances } from './charts.js';
+import { setupVisibilityDispose } from './charts.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -30,6 +31,7 @@ Alpine.data('governance', useGovernance);
 Alpine.data('osint', useOSINT);
 Alpine.data('forecast', useForecast);
 Alpine.data('market', useMarket);
+Alpine.data('marketSupplyCharts', useMarketSupplyCharts);
 Alpine.data('qualityDashboard', useQuality);
 Alpine.data('healthDashboard', useHealth);
 Alpine.data('smidgePanel', useSMIDGE);
@@ -118,7 +120,6 @@ Alpine.data('helixApp', () => ({
         val = 'signal';
       }
       if (prevTab !== val) {
-        disposeAllChartInstances();
         prevTab = val;
       }
       location.hash = val;

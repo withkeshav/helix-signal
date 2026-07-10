@@ -183,7 +183,7 @@ app = FastAPI(
                 "and market-wide early warning for the stablecoin ecosystem. "
                 "Provides REST endpoints for alerts, forensics, OSINT, address tagging, "
                 "and real-time signal streaming.",
-    version="4.0.1",
+    version="4.0.3",
     contact={
         "name": "Helix Signal Team",
         "url": "https://github.com/anomalyco/Helix-Signal",

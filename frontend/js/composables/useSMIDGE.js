@@ -42,5 +42,10 @@ export function useSMIDGE() {
         else if (this.smidge) this.$nextTick(() => renderSmidgeRadar.call(this, this.smidge));
       });
     },
+
+    destroy() {
+      // Alpine x-if unmount: make sure radar chart is disposed.
+      destroySmidgeChart.call(this);
+    },
   };
 }

@@ -30,7 +30,6 @@ export function useQuality() {
 
     _bindAuth() {
       this.$watch('$store.ui.adminToken', () => this.loadQualityData());
-      window.addEventListener('auth-changed', () => this.loadQualityData());
     },
 
     get adminToken() {
@@ -77,8 +76,10 @@ export function useQuality() {
         } else {
           if (response.status === 401 || response.status === 403) {
             this.error = 'Sign in via Settings to view data quality metrics.';
+          } else if (response.status >= 500) {
+            this.error = 'Server error loading data quality — retry or check backend logs.';
           } else {
-            this.error = `Failed to load data quality metrics: ${response.status}`;
+            this.error = `Failed to load data quality metrics (HTTP ${response.status}).`;
           }
         }
       } catch (e) {

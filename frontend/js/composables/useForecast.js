@@ -97,5 +97,10 @@ export function useForecast() {
         });
       });
     },
+
+    destroy() {
+      // Alpine x-if unmount: clean up ECharts instances created here.
+      this._destroyCharts();
+    },
   };
 }

@@ -82,14 +82,134 @@ export function useGovernance() {
     testAiLoading: false,
     testAiResult: '',
     aiFeatureMap: [
-      { ui: 'Risk explanation', tab: 'Signal → Risk Terminal', endpoint: 'GET /api/ai/explain', toggle: 'feature_ai_explain', kind: 'LLM' },
-      { ui: 'Market overview', tab: 'Signal → Overview', endpoint: 'GET /api/ai/market-overview', toggle: 'feature_ai_summary', kind: 'LLM' },
-      { ui: 'Market narrative', tab: 'Signal → Narrative', endpoint: 'GET /api/ai/narrative', toggle: 'feature_ai_narrative', kind: 'LLM' },
-      { ui: 'Insights', tab: 'Signal → Insights', endpoint: 'GET /api/ai/insights', toggle: 'feature_ai_insights', kind: 'LLM' },
-      { ui: 'OSINT sentiment', tab: 'Intel', endpoint: 'background', toggle: 'feature_nlp_sentiment', kind: 'LLM' },
-      { ui: 'Predictive regime', tab: 'Signal → Risk Terminal', endpoint: 'GET /api/predictive', toggle: '—', kind: 'Statistical' },
-      { ui: 'DEWS score', tab: 'Signal', endpoint: 'GET /api/dews', toggle: '—', kind: 'Statistical' },
+      {
+        ui: 'Risk explanation',
+        tab: 'Signal → Risk Terminal',
+        endpoint: 'GET /api/ai/explain',
+        toggle: 'feature_ai_explain',
+        kind: 'LLM',
+        effectTab: 'signal',
+        effectSelector: '#chart-risk-terminal',
+        configureSelector: '#settings-feature_ai_explain',
+      },
+      {
+        ui: 'Market overview',
+        tab: 'Signal → Overview',
+        endpoint: 'GET /api/ai/market-overview',
+        toggle: 'feature_ai_summary',
+        kind: 'LLM',
+        effectTab: 'signal',
+        effectAiSubTab: 'overview',
+        effectSelector: '#signal-ai-overview',
+        configureSelector: '#settings-feature_ai_summary',
+      },
+      {
+        ui: 'Market narrative',
+        tab: 'Signal → Narrative',
+        endpoint: 'GET /api/ai/narrative',
+        toggle: 'feature_ai_narrative',
+        kind: 'LLM',
+        effectTab: 'signal',
+        effectAiSubTab: 'narrative',
+        effectSelector: '#signal-ai-narrative',
+        configureSelector: '#settings-feature_ai_narrative',
+      },
+      {
+        ui: 'Insights',
+        tab: 'Signal → Insights',
+        endpoint: 'GET /api/ai/insights',
+        toggle: 'feature_ai_insights',
+        kind: 'LLM',
+        effectTab: 'signal',
+        effectAiSubTab: 'insights',
+        effectSelector: '#signal-ai-insights',
+        configureSelector: '#settings-feature_ai_insights',
+      },
+      {
+        ui: 'OSINT sentiment',
+        tab: 'Intel',
+        endpoint: 'background',
+        toggle: 'feature_nlp_sentiment',
+        kind: 'LLM',
+        effectTab: 'intel',
+        effectSelector: '#chart-sentiment',
+        configureSelector: '#settings-feature_nlp_sentiment',
+      },
+      {
+        ui: 'Predictive regime',
+        tab: 'Signal → Risk Terminal',
+        endpoint: 'GET /api/predictive',
+        toggle: '—',
+        kind: 'Statistical',
+        effectTab: 'signal',
+        effectSelector: '#chart-risk-terminal',
+      },
+      {
+        ui: 'DEWS score',
+        tab: 'Signal',
+        endpoint: 'GET /api/dews',
+        toggle: '—',
+        kind: 'Statistical',
+        effectTab: 'signal',
+        effectSelector: '#chart-risk-terminal',
+      },
     ],
+
+    _toBool(v) {
+      return v === true || v === 'true' || v === 1 || v === '1';
+    },
+
+    isFeatureEnabled(toggleKey) {
+      if (!toggleKey || toggleKey === '—') return null;
+      const s = this.settingsList?.find(x => x.key === toggleKey);
+      if (!s) return null;
+      return this._toBool(s.value);
+    },
+
+    async _scrollToSelector(selector, { timeoutMs = 2500 } = {}) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const el = document.querySelector(selector);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return true;
+        }
+        await new Promise(r => setTimeout(r, 50));
+      }
+      return false;
+    },
+
+    async navigateAiEffect(row) {
+      if (!row?.effectSelector) return;
+
+      const destTab = row.effectTab;
+      if (destTab && destTab !== this.$store.ui.tab) {
+        this.$store.ui.setTab(destTab);
+      }
+
+      if (row.effectAiSubTab && destTab === 'signal') {
+        // Wait for `useMarket` x-if mount so it can update aiSubTab.
+        await new Promise(r => setTimeout(r, 60));
+        window.dispatchEvent(new CustomEvent('ai-subtab-set', { detail: { subtab: row.effectAiSubTab } }));
+      }
+
+      await this._scrollToSelector(row.effectSelector);
+    },
+
+    async navigateAiConfigure(row) {
+      if (!row?.configureSelector) return;
+      if (this.$store.ui.tab !== 'settings') this.$store.ui.setTab('settings');
+      this.settingsView = 'advanced';
+      await this._scrollToSelector(row.configureSelector);
+    },
+
+    _syncWizardFeaturesFromSettings() {
+      if (!this.settingsList) return;
+      for (const key of Object.keys(this.wizardFeatures || {})) {
+        const s = this.settingsList.find(x => x.key === key);
+        if (s) this.wizardFeatures[key] = this._toBool(s.value);
+      }
+    },
 
     get aiModeLabel() {
       const s = this.settingsList.find(x => x.key === 'ai_mode');
@@ -125,6 +245,8 @@ export function useGovernance() {
     async wizardApplyAiMode() {
       const pb = this.wizardPlaybook || (this.wizardAiMode === 'ai_full' ? 'quality' : this.wizardAiMode === 'ai_lite' ? 'balanced' : 'max_free');
       await this.applyPlaybook(pb);
+      // Determinism: checkbox state should reflect server state after playbook apply.
+      this._syncWizardFeaturesFromSettings();
       this.wizardStep = 2;
     },
 
@@ -267,12 +389,6 @@ export function useGovernance() {
       this.loadPlaybooks();
       // Auto-reload settings + AI budget when admin token is saved (e.g. after login)
       this.$watch('$store.ui.adminToken', val => { if (val) { this.loadSettings(); this.loadAiBudget(); this.loadAssetCatalog(); } });
-      window.addEventListener('auth-changed', () => {
-        if (this.$store.ui.adminToken) {
-          this.loadSettings();
-          this.loadAiBudget();
-        }
-      });
       if (this.adminToken) {
         this.loadSettings();
         this.loadAiBudget();

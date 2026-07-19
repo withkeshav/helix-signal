@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
@@ -63,6 +64,18 @@ def test_disabled_webhook_noop():
     assert result["dispatched"] is False
 
 
+def _webhook_patches(fake_setting):
+    def fake_secret(key, db=None):
+        if key == "webhook_signing_secret":
+            return str(fake_setting(key, db) or "")
+        return ""
+
+    return (
+        patch("providers.settings.get_setting", side_effect=fake_setting),
+        patch("providers.settings.get_secret", side_effect=fake_secret),
+    )
+
+
 def test_min_severity_filter():
     db = MagicMock()
 
@@ -75,7 +88,9 @@ def test_min_severity_filter():
             "webhook_timeout_seconds": 10,
         }.get(key)
 
-    with patch("providers.settings.get_setting", side_effect=fake_setting):
+    with ExitStack() as stack:
+        for p in _webhook_patches(fake_setting):
+            stack.enter_context(p)
         dispatcher = WebhookDispatcher(db)
         assert dispatcher.should_dispatch(_event("info")) is False
         assert dispatcher.should_dispatch(_event("warning")) is True
@@ -115,7 +130,9 @@ def test_delivery_success_with_retry(monkeypatch):
         }.get(key)
 
     monkeypatch.setattr("services.webhook_dispatcher.time.sleep", lambda _s: None)
-    with patch("providers.settings.get_setting", side_effect=fake_setting):
+    with ExitStack() as stack:
+        for p in _webhook_patches(fake_setting):
+            stack.enter_context(p)
         with patch("services.webhook_dispatcher.httpx.Client", FakeClient):
             dispatcher = WebhookDispatcher(db)
             result = dispatcher.deliver_event(_event("critical"))

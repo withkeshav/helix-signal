@@ -100,7 +100,8 @@ async def _generate_intel_note(db: Session, address: str, amount: float, asset: 
     )
     try:
         from services.components.ai.facade import ollama_cloud
-        api_key = get_setting("secret_ollama_api_key", db)
+        from providers.settings import get_secret
+        api_key = get_secret("secret_ollama_api_key", db)
         result = await asyncio.to_thread(
             ollama_cloud,
             prompt=prompt,

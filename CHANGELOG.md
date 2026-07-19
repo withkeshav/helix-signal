@@ -1,5 +1,24 @@
 # Helix Signal Changelog
 
+## v4.0.7 (2026-07-19) — Visual hierarchy + safe security
+
+### Added
+- **Global operational strip** — Risk, DEWS, Anomalies, Peg, Supply, Fresh, Sources on every tab.
+- **Signal hero rebuild** — 56px mono risk score, band rail, regime line, DEWS tier chips, peg chart with markLines; AI insight card moved below hero with deterministic L4 fallback.
+- **`.data-table` pattern** — Recent Anomalies, Stress Leaderboard, Rotation, Fired Alerts, Blacklist Events, Alert History, OSINT feed, Chain Details.
+- **`SETTINGS_ENCRYPTION_KEY`** — Fernet encryption for secret-typed settings at rest; lazy plaintext migration (`fernet:v1:` prefix); `get_secret()` for provider callables.
+- **Security headers** — HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` (backend middleware + nginx).
+- **Redis rate limiter** — `RATE_LIMITER_STORAGE_URI` default in compose.
+
+### Changed
+- **XFF trust fix** — `X-Forwarded-For` honored only when direct peer ∈ `TRUSTED_PROXY_CIDR`.
+- **Data-quality errors** — stable `code` fields instead of raw exception strings.
+- **OLAP amputate (WO-BE-7a)** — removed 7 unused DuckDB mirror schemas; `fred_yields` remains the only live DuckDB consumer.
+
+### Docs
+- `docs/DEPLOYMENT.md` — `SETTINGS_ENCRYPTION_KEY`, Redis limiter note.
+- `docs/architecture.md` — OLAP note (fred_yields only).
+
 ## v4.0.6 (2026-07-19) — Liveness + retention
 
 ### Added

@@ -56,11 +56,14 @@ class TestSecurityMiddleware:
 
 
 class TestObservabilityMiddleware:
-    def test_middleware_adds_metrics_to_response(self):
+    def test_security_headers_on_api(self):
         import main
         with TestClient(main.app) as client:
             resp = client.get("/api/health")
             assert resp.status_code == 200
+            assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+            assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+            assert "camera=()" in resp.headers.get("Permissions-Policy", "")
 
     def test_root_still_works_with_middleware(self):
         import main
@@ -214,18 +217,35 @@ class TestRateLimiting:
 class TestXForwardedFor:
     """PR3: Rate limiter reads X-Forwarded-For."""
 
-    def test_get_remote_address_uses_forwarded(self):
+    def test_get_remote_address_uses_forwarded_with_trusted_proxy(self, monkeypatch):
         from core.limiter import _get_remote_address
         from fastapi import Request
 
+        monkeypatch.setenv("TRUSTED_PROXY_CIDR", "10.0.0.0/8")
         scope = {
             "type": "http",
+            "client": ("10.0.0.5", 443),
             "headers": [
                 (b"x-forwarded-for", b"203.0.113.42, 10.0.0.1"),
             ],
         }
         req = Request(scope)
         assert _get_remote_address(req) == "203.0.113.42"
+
+    def test_get_remote_address_ignores_forwarded_without_trusted_proxy(self, monkeypatch):
+        from core.limiter import _get_remote_address
+        from fastapi import Request
+
+        monkeypatch.delenv("TRUSTED_PROXY_CIDR", raising=False)
+        scope = {
+            "type": "http",
+            "client": ("192.168.1.1", 54321),
+            "headers": [
+                (b"x-forwarded-for", b"203.0.113.42, 10.0.0.1"),
+            ],
+        }
+        req = Request(scope)
+        assert _get_remote_address(req) == "192.168.1.1"
 
     def test_get_remote_address_fallback_to_client(self):
         from core.limiter import _get_remote_address

@@ -240,8 +240,8 @@ async def _run_pipeline(
             f"Focus on risk level, fund flow pattern, and recommended action. "
             f"Data: {json.dumps(summary_dict)}"
         )
-        from providers.settings import get_setting
-        api_key = get_setting("secret_ollama_api_key", db)
+        from providers.settings import get_secret
+        api_key = get_secret("secret_ollama_api_key", db)
         import asyncio
         result = await asyncio.to_thread(
             ollama_cloud,

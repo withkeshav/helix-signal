@@ -17,6 +17,8 @@ export function registerDashboardStore(Alpine) {
     staleWarning: '',
     errorOverview: '',
     predictive: {},
+    dews: {},
+    anomalyCount: 0,
     marketOverview: '',
     aiNarrative: '',
     aiInsights: '',

@@ -115,11 +115,11 @@ class WebhookDispatcher:
 
     def __init__(self, db: Any) -> None:
         self.db = db
-        from providers.settings import get_setting
+        from providers.settings import get_setting, get_secret
 
         self.enabled = _coerce_bool(get_setting("webhook_enabled", db))
         self.url = str(get_setting("webhook_url", db) or "").strip()
-        self.secret = str(get_setting("webhook_signing_secret", db) or "").strip()
+        self.secret = str(get_secret("webhook_signing_secret", db) or "").strip()
         self.min_severity = str(get_setting("webhook_min_severity", db) or "warning")
         timeout = get_setting("webhook_timeout_seconds", db)
         try:

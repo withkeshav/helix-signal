@@ -1,5 +1,5 @@
 import { gaugeArc, gaugeColor, formatWhen, formatAiAge, formatUsd, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from '../utils.js';
-import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, _setupResizeHandler, _disposeAllCharts, _disposeChart, renderRiskTerminalChart, renderContagionGraph, resizeAllHelixCharts } from '../charts.js';
+import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, renderHeroPegChart, _setupResizeHandler, _disposeAllCharts, _disposeChart, renderRiskTerminalChart, renderContagionGraph, resizeAllHelixCharts } from '../charts.js';
 
 export function useMarket() {
   return {
@@ -141,6 +141,7 @@ export function useMarket() {
       this.$nextTick(() => {
         this.loadTrendChart();
         this.renderSupplyChart();
+        this.renderHeroPegChart();
       });
     },
     
@@ -150,6 +151,7 @@ export function useMarket() {
     _makeBar,
     loadTrendChart,
     renderSupplyChart,
+    renderHeroPegChart,
     _setupResizeHandler,
     _disposeAllCharts,
     _disposeChart,
@@ -201,6 +203,7 @@ export function useMarket() {
       this.$nextTick(() => {
         this.renderCharts({ chains: this.chains });
         this.renderSupplyChart();
+        this.renderHeroPegChart();
         this.renderRiskTerminalChart(this.predictive);
         this.renderContagionGraph(this.rotation);
       });
@@ -289,6 +292,7 @@ export function useMarket() {
       this.$nextTick(() => {
         this.renderCharts({ chains: this.chains });
         this.renderSupplyChart();
+        this.renderHeroPegChart();
         this.renderRiskTerminalChart(this.predictive);
         this.renderContagionGraph(this.rotation);
         this.resizeAllHelixCharts();
@@ -368,9 +372,14 @@ export function useMarket() {
     async loadAnomalies() {
       try { 
         const r = await fetch(`/api/anomaly/detect?asset=${this.asset}`, { cache: 'no-store' }); 
-        if (r.ok) this.anomalyEvents = await r.json(); 
+        if (r.ok) {
+          this.anomalyEvents = await r.json();
+          const count = (this.anomalyEvents.anomalies || []).length;
+          this.$store.dashboard.anomalyCount = count;
+        }
       } catch (e) { 
-        this.anomalyEvents = {}; 
+        this.anomalyEvents = {};
+        this.$store.dashboard.anomalyCount = 0;
       }
     },
     
@@ -536,6 +545,70 @@ export function useMarket() {
     aiStillFresh(expiresAt) {
       if (!expiresAt) return false;
       return Date.now() < new Date(expiresAt).getTime();
+    },
+
+    anomalyCount() {
+      return (this.anomalyEvents?.anomalies || []).length;
+    },
+
+    deterministicOverviewText() {
+      const parts = [];
+      if (this.signal?.score != null) {
+        parts.push(`Risk ${this.signal.score}/100 (${(this.signal.band || 'normal').toUpperCase()})`);
+      }
+      if (this.predictive?.regime) {
+        const depeg1h = this.predictive.depeg_probability?.horizon_1h;
+        const depegPct = depeg1h != null ? `${(depeg1h * 100).toFixed(1)}%` : '—';
+        parts.push(`Regime: ${this.predictive.regime} · Depeg 1h: ${depegPct}`);
+      }
+      if (this.dews?.available) {
+        parts.push(`DEWS ${this.dews.dews_score ?? '—'} (${(this.dews.band || 'normal').toUpperCase()})`);
+      }
+      if (this.depeg?.current_price != null) {
+        parts.push(`Peg ${this.depeg.current_price.toFixed(4)}`);
+      }
+      if (this.supplyChange != null) {
+        parts.push(`Supply ${this.supplyChange >= 0 ? '+' : ''}${this.supplyChange.toFixed(2)}% 24h`);
+      }
+      const comps = this.signal?.components || {};
+      for (const [name, c] of Object.entries(comps)) {
+        if (c?.score != null && c.score >= 60) {
+          parts.push(`${name.replace(/_/g, ' ')} elevated (z=${c.score})`);
+        }
+      }
+      return parts.join(' · ') || 'Machine signals loading — deterministic risk layer active without AI.';
+    },
+
+    deterministicNarrativeText() {
+      if (this.dews?.tiers_fired?.length) {
+        return (this.dews.tiers_fired || [])
+          .map(t => `T${t.tier} ${t.name}: ${t.detail} (+${t.points})`)
+          .join('\n');
+      }
+      if (this.predictive?.regime) {
+        return `Predictive layer: ${this.predictive.regime} regime · model ${this.predictive.model || 'heuristic_v1'}`;
+      }
+      return this.deterministicOverviewText();
+    },
+
+    deterministicInsightsText() {
+      const lines = [];
+      if (this.stressLeaderboard?.length) {
+        const top = this.stressLeaderboard[0];
+        lines.push(`Highest chain velocity: ${top.chain_name} ${top.velocity_24h_pct > 0 ? '+' : ''}${top.velocity_24h_pct?.toFixed(2)}% 24h`);
+      }
+      if (this.rotation?.pairs?.length) {
+        const p = this.rotation.pairs[0];
+        lines.push(`Rotation watch: ${p.asset_a} vs ${p.asset_b} r=${p.correlation_7d?.toFixed(3)}`);
+      }
+      if (this.anomalyCount() > 0) {
+        lines.push(`${this.anomalyCount()} active anomaly flags on ${this.asset}`);
+      }
+      return lines.join('\n') || 'No cross-signal correlations flagged — monitoring continues.';
+    },
+
+    scrollToSection(id) {
+      this.$nextTick(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     },
   };
 }

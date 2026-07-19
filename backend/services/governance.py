@@ -23,8 +23,8 @@ def build_governance_payload(db: Session, *, asset: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
     api_key = ""
     try:
-        from providers.settings import get_setting
-        api_key = get_setting("secret_etherscan_api_key") or ""
+        from providers.settings import get_secret
+        api_key = get_secret("secret_etherscan_api_key", db) or ""
     except Exception:
         api_key = os.getenv("ETHERSCAN_API_KEY", "")
     result: dict[str, Any] = {

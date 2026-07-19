@@ -195,11 +195,11 @@ def _resolve_api_key(provider: str, db: Any = None) -> str:
     meta = PROVIDER_METADATA.get(provider, {})
     if db is not None:
         try:
-            from providers.settings import get_setting
+            from providers.settings import get_secret
 
             secret_key = meta.get("secret_setting", "")
             if secret_key:
-                val = get_setting(secret_key, db)
+                val = get_secret(secret_key, db)
                 if val:
                     return str(val).strip()
         except Exception:

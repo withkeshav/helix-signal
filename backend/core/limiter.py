@@ -10,14 +10,17 @@ _storage_opts = {"storage_uri": _storage_uri} if _storage_uri else {}
 
 
 def _get_remote_address(request: Request) -> str:
-    cidr = os.getenv("TRUSTED_PROXY_CIDR", "").strip()
-    if cidr and request.client:
-        from ipaddress import ip_address, ip_network
-        if ip_address(request.client.host) not in ip_network(cidr, strict=False):
-            return request.client.host
+    """Honor X-Forwarded-For only when the direct peer is a trusted proxy."""
     forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    cidr = os.getenv("TRUSTED_PROXY_CIDR", "").strip()
+    if cidr and request.client and forwarded:
+        from ipaddress import ip_address, ip_network
+
+        try:
+            if ip_address(request.client.host) in ip_network(cidr, strict=False):
+                return forwarded.split(",")[0].strip()
+        except ValueError:
+            pass
     if request.client:
         return request.client.host
     return "unknown"

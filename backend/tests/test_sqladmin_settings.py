@@ -6,7 +6,8 @@ import pytest
 from sqlalchemy import select
 
 from database import SettingsAuditLog
-from providers.settings import Setting, get_setting, set_setting
+from providers.settings import Setting, get_secret, get_setting, set_setting
+from providers.settings_crypto import decrypt_secret
 from sqladmin_setup import is_secret_skip_value
 
 
@@ -32,7 +33,8 @@ def test_is_secret_skip_value(value, expected) -> None:
 def test_secret_masked_skip_does_not_overwrite(db_session) -> None:
     """Submitting a mask/empty sentinel must leave the stored secret unchanged."""
     set_setting("secret_ollama_api_key", "sk-original-value", db_session)
-    assert get_setting("secret_ollama_api_key", db_session) == "sk-original-value"
+    assert get_secret("secret_ollama_api_key", db_session) == "sk-original-value"
+    assert get_setting("secret_ollama_api_key", db_session) == "configured"
 
     # Simulate SettingAdmin update_model skip path
     if is_secret_skip_value("configured"):
@@ -40,18 +42,19 @@ def test_secret_masked_skip_does_not_overwrite(db_session) -> None:
     else:
         set_setting("secret_ollama_api_key", "configured", db_session)
 
-    assert get_setting("secret_ollama_api_key", db_session) == "sk-original-value"
+    assert get_secret("secret_ollama_api_key", db_session) == "sk-original-value"
+    assert get_setting("secret_ollama_api_key", db_session) == "configured"
     row = db_session.execute(
         select(Setting).where(Setting.key == "secret_ollama_api_key")
     ).scalars().first()
     assert row is not None
-    assert row.value == "sk-original-value"
+    assert decrypt_secret(row.value) == "sk-original-value"
 
 
 def test_secret_empty_skip_does_not_overwrite(db_session) -> None:
     set_setting("secret_ollama_api_key", "sk-keep-me", db_session)
     assert is_secret_skip_value("") is True
-    assert get_setting("secret_ollama_api_key", db_session) == "sk-keep-me"
+    assert get_secret("secret_ollama_api_key", db_session) == "sk-keep-me"
 
 
 def test_set_setting_flush_single_commit_writes_audit(db_session) -> None:

@@ -15,12 +15,68 @@ log = logging.getLogger(__name__)
 
 # Import settings registry
 from .settings_registry import _DEFAULT_SETTINGS
+from .settings_crypto import decrypt_secret, encrypt_secret, is_encrypted
 
 
 class Setting(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+def _read_raw_db_value(key: str, db: Session) -> str | None:
+    row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
+    if row and row.value is not None:
+        return row.value
+    return None
+
+
+def _read_env_secret(meta: dict[str, Any]) -> str:
+    env_key = meta.get("key_env", "")
+    if env_key:
+        return os.getenv(env_key, "").strip()
+    return ""
+
+
+def get_secret(key: str, db: Session | None = None) -> str:
+    """Return decrypted secret for provider callables only — never log the result."""
+    meta = _DEFAULT_SETTINGS.get(key)
+    if not meta or meta.get("type") != "secret":
+        return str(get_setting(key, db) or "")
+
+    raw: str | None = None
+    if db:
+        raw = _read_raw_db_value(key, db)
+    if not raw:
+        raw = _read_env_secret(meta)
+    if not raw:
+        return str(meta.get("default", "") or "")
+
+    plaintext = decrypt_secret(raw)
+    if db and plaintext and not is_encrypted(raw):
+        try:
+            _persist_secret_value(key, plaintext, db, reencrypt_only=True)
+        except Exception:
+            log.warning("settings.lazy_encrypt_failed", extra={"key": key}, exc_info=True)
+    return plaintext
+
+
+def _persist_secret_value(
+    key: str,
+    plaintext: str,
+    db: Session,
+    *,
+    reencrypt_only: bool = False,
+) -> None:
+    stored = encrypt_secret(plaintext)
+    row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
+    if row:
+        if reencrypt_only and row.value == stored:
+            return
+        row.value = stored
+    else:
+        db.add(Setting(key=key, value=stored))
+    db.commit()
 
 
 def get_setting(key: str, db: Session | None = None) -> Any:
@@ -30,16 +86,14 @@ def get_setting(key: str, db: Session | None = None) -> Any:
         return None
 
     if meta.get("type") == "secret":
-        if db:
-            row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
-            if row and row.value:
-                return row.value
-        env_key = meta.get("key_env", "")
-        if env_key:
-            val = os.getenv(env_key, "").strip()
-            if val:
-                return val
-        return meta.get("default", "")
+        configured = bool(_secret_configured(key, db))
+        if configured:
+            return "configured"
+        env_val = _read_env_secret(meta)
+        if env_val:
+            return "configured"
+        default = meta.get("default", "")
+        return mask_secret(default) if default else default
 
     # Non-secret path — DB first, env fallback, default last
     if db:
@@ -60,6 +114,15 @@ def get_setting(key: str, db: Session | None = None) -> Any:
             return _coerce(env_val, meta.get("type", "bool"))
 
     return meta.get("default")
+
+
+def _secret_configured(key: str, db: Session | None) -> bool:
+    meta = _DEFAULT_SETTINGS.get(key) or {}
+    if db:
+        raw = _read_raw_db_value(key, db)
+        if raw:
+            return True
+    return bool(_read_env_secret(meta))
 
 
 def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address: str = None, user_agent: str = None, flush: bool = False) -> None:
@@ -83,25 +146,29 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
     if meta.get("type") == "str" and "choices" in meta:
         if str(value) not in meta["choices"]:
             raise ValueError(f"Setting '{key}' must be one of: {', '.join(meta['choices'])}")
-    
+
+    stored_value = str(value)
+    if meta.get("type") == "secret":
+        stored_value = encrypt_secret(stored_value)
+
     # Get the old value for audit logging
     old_row = db.execute(select(Setting).where(Setting.key == key)).scalars().first()
     old_value = old_row.value if old_row else None
-    
+
     # Update or create the setting
     if old_row:
-        old_row.value = str(value)
+        old_row.value = stored_value
     else:
-        db.add(Setting(key=key, value=str(value)))
-    
+        db.add(Setting(key=key, value=stored_value))
+
     if not flush:
         db.commit()
-    
+
     # Log the change to the audit log
     try:
         from services.settings_audit import log_settings_change
         audit_old = old_value
-        audit_new = str(value)
+        audit_new = stored_value
         if meta.get("type") == "secret":
             audit_old = "[REDACTED]" if old_value else None
             audit_new = "[REDACTED]"
@@ -132,22 +199,25 @@ def get_all_settings(db: Session) -> list[dict[str, Any]]:
     for key, meta in _DEFAULT_SETTINGS.items():
         val = rows.get(key)
         if val is not None:
-            typed = _coerce(val, meta.get("type", "bool"))
+            if meta.get("type") == "secret":
+                typed = "configured" if val else None
+            else:
+                typed = _coerce(val, meta.get("type", "bool"))
         else:
             env_val = os.getenv(meta.get("key_env", ""), "").strip() if meta.get("key_env") else None
             if env_val is not None and env_val:
                 if meta.get("type") == "secret":
-                    typed = env_val
+                    typed = "configured"
                 elif meta.get("type") == "str":
                     typed = env_val
                 else:
                     typed = env_val.lower() in ("1", "true", "yes")
             else:
                 typed = meta.get("default")
-        
+
         # Get current usage for settings that track usage
         current_usage = get_current_usage(key, db)
-        
+
         out_item = {
             "key": key,
             "label": meta.get("label"),
@@ -276,6 +346,3 @@ def get_current_usage(key: str, db: Session) -> Any:
         logging.getLogger(__name__).warning("get_current_usage failed", exc_info=True)
 
     return None
-
-
-

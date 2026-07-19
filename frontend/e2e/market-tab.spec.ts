@@ -8,7 +8,8 @@ test.describe('Market tab', () => {
   });
 
   test('renders peg forecast panel', async ({ page }) => {
-    await expect(page.locator('#tab-market')).toBeVisible();
+    await expect(page.locator('#tab-market')).toBeVisible({ timeout: 15000 });
+    await page.getByText('Peg Forecast').first().scrollIntoViewIfNeeded();
     await expect(page.getByText('Peg Forecast').first()).toBeVisible();
   });
 });

@@ -83,8 +83,8 @@ def list_models(
 
 
 def _resolve_api_key_from_settings(db: Session | None, secret_key: str, env_key: str) -> str:
-    from providers.settings import get_setting
-    return str(get_setting(secret_key, db) or os.getenv(env_key, "")).strip()
+    from providers.settings import get_secret
+    return str(get_secret(secret_key, db) or os.getenv(env_key, "")).strip()
 
 
 def _get_ollama_models(db: Session | None = None) -> List[Dict[str, Any]]:

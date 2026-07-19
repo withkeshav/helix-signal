@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import OsintArticle, OsintArticleAsset, get_db
-from providers.settings import get_setting
+from providers.settings import get_setting, get_secret
 
 log = get_logger(__name__)
 router = APIRouter()
@@ -111,7 +111,9 @@ async def _ai_enhance(
     try:
         from services.components.ai.facade import ollama_cloud
 
-        api_key = str(get_setting("secret_ollama_api_key", db) or os.getenv("OLLAMA_API_KEY", "")).strip()
+        from providers.settings import get_secret
+
+        api_key = str(get_secret("secret_ollama_api_key", db) or os.getenv("OLLAMA_API_KEY", "")).strip()
         if not api_key:
             return None
     except Exception:
@@ -180,7 +182,7 @@ async def receive_external_intel(request: Request, db: Session = Depends(get_db)
 
     auth_mode = get_setting("external_intel_auth_mode", db) or "secret_header"
     secret_header_name = get_setting("external_intel_secret_header_name", db) or "X-Intel-Secret"
-    webhook_secret = get_setting("external_intel_webhook_secret", db) or ""
+    webhook_secret = get_secret("external_intel_webhook_secret", db) or ""
 
     body = await request.body()
     try:

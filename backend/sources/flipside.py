@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from providers.settings import get_setting
+from providers.settings import get_setting, get_secret
 from services.source_usage import _check_source_rate_limit, _record_source_call
 from sources.onchain_tokens import ETHEREUM_TOKENS
 
@@ -18,7 +18,7 @@ class FlipsideSource:
     name = "flipside"
 
     def _api_key(self, db: Any = None) -> str:
-        return str(get_setting("secret_flipside_api_key", db) or "").strip()
+        return str(get_secret("secret_flipside_api_key", db) or "").strip()
 
     def configured(self, db: Any = None) -> bool:
         return bool(self._api_key(db)) and bool(get_setting("provider_flipside", db))

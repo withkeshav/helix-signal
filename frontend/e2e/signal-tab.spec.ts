@@ -14,12 +14,13 @@ test.describe('Signal tab', () => {
     await expect(page.getByRole('heading', { name: 'Rotation' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Risk Components' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Anomalies' })).toBeVisible();
-    await expect(page.locator('.risk-gauge')).toBeVisible();
+    await expect(page.locator('.signal-hero-score')).toBeVisible();
     await expect(page.locator('.token-grid')).toBeVisible();
     await expect(page.locator('.token-card').first()).toBeVisible();
   });
 
   test('advanced analytics section is on signal tab', async ({ page }) => {
+    await page.locator('#signal-analytics-section').scrollIntoViewIfNeeded();
     await expect(page.locator('#signal-analytics-section')).toBeVisible();
     await expect(page.getByText('Advanced Analytics')).toBeVisible();
   });
@@ -66,8 +67,9 @@ test.describe('Signal tab', () => {
   });
 
   test('deterministic risk content visible without AI', async ({ page }) => {
-    await expect(page.locator('.risk-gauge')).toBeVisible();
+    await expect(page.locator('.signal-hero-score')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Risk Components' })).toBeVisible();
     await expect(page.locator('.token-grid .token-card').first()).toBeVisible();
+    await expect(page.locator('#signal-ai-overview')).toContainText(/Risk|Regime|DEWS|Machine signals/i);
   });
 });

@@ -65,8 +65,8 @@ class DataQualityMetrics:
             
             return metrics
         except Exception as e:
-            logger.error(f"Error getting source quality metrics: {e}")
-            return {"error": str(e)}
+            logger.error("data_quality.source_metrics_failed", exc_info=True)
+            return {"error": "data_quality_unavailable", "code": "DQ_SOURCE_METRICS_FAILED"}
     
     @staticmethod
     def get_asset_data_quality(db: Session, asset_symbol: Optional[str] = None) -> Dict[str, Any]:
@@ -130,8 +130,8 @@ class DataQualityMetrics:
             
             return metrics
         except Exception as e:
-            logger.error(f"Error getting asset data quality metrics: {e}")
-            return {"error": str(e)}
+            logger.error("data_quality.asset_metrics_failed", exc_info=True)
+            return {"error": "data_quality_unavailable", "code": "DQ_ASSET_METRICS_FAILED"}
     
     @staticmethod
     def get_usage_metrics(db: Session) -> Dict[str, Any]:
@@ -185,9 +185,9 @@ class DataQualityMetrics:
                 metrics["performance_metrics"]["rate_limit_stats"] = limiter._window_stats
             
             return metrics
-        except Exception as e:
-            logger.error(f"Error getting usage metrics: {e}")
-            return {"error": str(e)}
+        except Exception:
+            logger.error("data_quality.usage_metrics_failed", exc_info=True)
+            return {"error": "data_quality_unavailable", "code": "DQ_USAGE_METRICS_FAILED"}
     
     @staticmethod
     def get_consistency_metrics(db: Session) -> Dict[str, Any]:
@@ -248,9 +248,9 @@ class DataQualityMetrics:
             }
             
             return metrics
-        except Exception as e:
-            logger.error(f"Error getting consistency metrics: {e}")
-            return {"error": str(e)}
+        except Exception:
+            logger.error("data_quality.consistency_metrics_failed", exc_info=True)
+            return {"error": "data_quality_unavailable", "code": "DQ_CONSISTENCY_METRICS_FAILED"}
     
     @staticmethod
     def get_overall_data_quality_score(db: Session) -> Dict[str, Any]:
@@ -305,9 +305,9 @@ class DataQualityMetrics:
                     "consistency_metrics": consistency_metrics
                 }
             }
-        except Exception as e:
-            logger.error(f"Error calculating overall data quality score: {e}")
-            return {"error": str(e), "overall_score": 0}
+        except Exception:
+            logger.error("data_quality.overall_score_failed", exc_info=True)
+            return {"error": "data_quality_unavailable", "code": "DQ_OVERALL_SCORE_FAILED", "overall_score": 0}
 
 # Convenience functions
 def get_all_data_quality_metrics(db: Session) -> Dict[str, Any]:
@@ -326,6 +326,10 @@ def get_data_quality_report(db: Session) -> Dict[str, Any]:
             "consistency_metrics": DataQualityMetrics.get_consistency_metrics(db)
         }
         return report
-    except Exception as e:
-        logger.error(f"Error generating data quality report: {e}")
-        return {"error": str(e), "generated_at": datetime.now(timezone.utc).isoformat()}
+    except Exception:
+        logger.error("data_quality.report_failed", exc_info=True)
+        return {
+            "error": "data_quality_unavailable",
+            "code": "DQ_REPORT_FAILED",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }

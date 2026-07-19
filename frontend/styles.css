@@ -218,3 +218,29 @@ button:focus-visible,.btn:focus-visible,.tab:focus-visible,.nav-link:focus-visib
 .badge-critical{background:var(--alert-bg);color:var(--down)}
 .badge-warning{background:var(--warn-bg);color:var(--neutral)}
 .badge-info{background:var(--bg-accent);color:var(--muted)}
+
+/* v4.0.7 — global strip + signal hero (WO-FE-7) */
+.global-strip .kpi-card{border-left:3px solid var(--line)}
+.strip-band-normal,.hero-band-normal{border-left-color:var(--up)!important}
+.strip-band-watch,.hero-band-watch{border-left-color:var(--neutral)!important}
+.strip-band-risk,.hero-band-risk{border-left-color:var(--down)!important}
+.signal-hero{display:grid;grid-template-columns:3fr 2fr;gap:var(--grid-gap);margin-bottom:12px}
+.signal-hero-left,.signal-hero-right{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:var(--card-pad);box-shadow:var(--card-shadow)}
+.signal-hero-left{border-left:4px solid var(--spark)}
+.hero-band-normal .signal-hero-left{border-left-color:var(--up)}
+.hero-band-watch .signal-hero-left{border-left-color:var(--neutral)}
+.hero-band-risk .signal-hero-left{border-left-color:var(--down)}
+.signal-hero-score{font-family:"JetBrains Mono",monospace;font-size:var(--fs-hero);font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.signal-hero-band{font-size:var(--fs-title);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.signal-hero-meta{font-size:var(--fs-sub);color:var(--muted);margin-top:8px;line-height:1.5}
+.signal-hero-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.signal-hero-chip{font-size:var(--fs-sub);padding:3px 8px;border-radius:6px;background:var(--bg-accent);border:1px solid var(--line)}
+.signal-hero-right .chart-wrap{height:140px}
+.ai-insight-row{margin-bottom:12px}
+.section-heading{border-left:3px solid var(--spark);padding-left:8px;font-size:var(--fs-section);text-transform:uppercase;font-weight:600;color:var(--muted);letter-spacing:.04em;margin:0 0 8px}
+.data-table-wrap{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px}
+.data-table thead th{position:sticky;top:0;background:var(--panel);z-index:1}
+.data-table .sev-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.data-table .num{text-align:right;font-variant-numeric:tabular-nums}
+.data-table tbody tr{cursor:pointer}
+@media(max-width:900px){.signal-hero{grid-template-columns:1fr}}

@@ -162,6 +162,60 @@ export function loadTrendChart() {
     .catch(() => {});
 }
 
+export function renderHeroPegChart() {
+  const _asset = this.asset;
+  const tr = this.timeRange || '7d';
+  const muted = _cssVar('--muted', '#9aa8c4');
+  const neutral = _cssVar('--neutral', '#fbbf24');
+  const down = _cssVar('--down', '#f87171');
+  const primary = _cssVar('--cat-1', '#3b82f6');
+  fetch(`/api/trends?asset=${this.asset}&window=${tr}`, { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(t => {
+      if (this.asset !== _asset) return;
+      const el = document.getElementById('chart-hero-peg');
+      if (!el || !t?.points?.length) return;
+      const pts = t.points
+        .filter(p => p.price != null)
+        .map(p => [new Date(p.timestamp).getTime(), Number(p.price)]);
+      if (!pts.length) return;
+      const chart = _initChart(el);
+      if (!chart) return;
+      if (!this._echarts) this._echarts = new Map();
+      _storeChart(this._echarts, 'chart-hero-peg', chart);
+      chart.setOption({
+        ...helixTheme(),
+        ..._timeZoomOption(tr),
+        tooltip: { trigger: 'axis', valueFormatter: v => Number(v).toFixed(4) },
+        grid: { left: 44, right: 12, top: 8, bottom: ['7d', '30d', '90d'].includes(tr) ? 40 : 24 },
+        xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 9 }, splitLine: { show: false } },
+        yAxis: {
+          type: 'value',
+          min: 0.99,
+          max: 1.01,
+          axisLabel: { color: muted, fontSize: 9, formatter: v => Number(v).toFixed(4) },
+          splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } },
+        },
+        series: [{
+          type: 'line',
+          data: pts,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2, color: primary },
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            data: [
+              { yAxis: 0.998, lineStyle: { color: neutral, type: 'dashed' }, label: { formatter: '0.998', fontSize: 8 } },
+              { yAxis: 0.995, lineStyle: { color: down, type: 'dashed' }, label: { formatter: '0.995', fontSize: 8 } },
+            ],
+          },
+        }],
+      });
+    })
+    .catch(() => {});
+}
+
 export function _makeBar(elId, labels, values, color, prefix) {
   if (!this._charts) this._charts = new Map();
   const el = document.getElementById(elId);

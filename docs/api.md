@@ -4,7 +4,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 > **API Versioning Note:** Most routes live at `/api/*` with no version prefix. The V4 intelligence/forensics endpoints (`investigate`, `yield`, `collateral`, `reserve`, `blacklist`, `tags`) use `/api/v1/*`. A future dedicated versioning pass will standardize all routes under `/api/v1`. See `.opencode/AGENTS.md` decision history for context.
 
-## Intelligence API (v4.0.6+)
+## Intelligence API (v4.0.7+)
 
 Self-host first; optional API keys for other apps.
 
@@ -221,7 +221,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.0.6"
+  "version": "4.0.7"
 }
 ```
 

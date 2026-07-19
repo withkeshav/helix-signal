@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from providers.settings import get_setting
+from providers.settings import get_setting, get_secret
 from sources.flipside import FlipsideSource
 from sources.moralis import MoralisSource
 from sources.thegraph import TheGraphSource
@@ -23,7 +23,7 @@ def _feature_enabled(db: Session | None) -> bool:
 def configured_providers(db: Session | None) -> dict[str, bool]:
     moralis = MoralisSource()
     flipside = FlipsideSource()
-    alchemy_key = str(get_setting("secret_alchemy_api_key", db) or "").strip()
+    alchemy_key = str(get_secret("secret_alchemy_api_key", db) or "").strip()
     return {
         "thegraph": bool(get_setting("provider_thegraph", db)),
         "moralis": moralis.configured(db),

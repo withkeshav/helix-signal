@@ -120,7 +120,11 @@ Post-deploy validation:
 
 ## Test coverage
 
-- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~500 cases as of v4.0.6
+- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~500 cases as of v4.0.7
+
+## OLAP / DuckDB (v4.0.7+)
+
+DuckDB is **not** an active analytics mirror in 4.0.x. `core/olap.py` provides only the shared connection; the sole live table is **`fred_yields`** (maintained by `chain/fred_api.py` for macro yield context). Seven unused mirror schemas were removed in v4.0.7 (WO-BE-7a). Optional OLAP activation (WO-BE-7b) is deferred until a concrete analytics query needs DuckDB.
 - **Frontend E2E:** 15 Playwright specs in `frontend/e2e/` covering Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings. Run with `FRONTEND_PORT=3080 docker compose up -d --build frontend` then `cd frontend && npx playwright test --project=chromium`. See [README E2E section](../README.md#e2e-tests-playwright).
 
 ## Design Intent

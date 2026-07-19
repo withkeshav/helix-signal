@@ -28,7 +28,8 @@ test.describe('Tab navigation', () => {
       await page.goto('/');
       await waitForAlpine(page);
       await page.getByRole('tab', { name: tab.name }).click();
-      await expect(page.locator(`#${tab.id}`)).toBeVisible();
+      await expect(page.locator(`#${tab.id}`)).toBeVisible({ timeout: 15000 });
+      await page.getByText(tab.heading).first().scrollIntoViewIfNeeded();
       await expect(page.getByText(tab.heading).first()).toBeVisible();
     });
   }

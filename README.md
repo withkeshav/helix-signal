@@ -1,4 +1,4 @@
-# Helix-Signal v4.0.6
+# Helix-Signal v4.0.7
 
 **Live:** [https://helix.withkeshav.com](https://helix.withkeshav.com)  
 **Repository:** [github.com/withkeshav/helix-signal](https://github.com/withkeshav/helix-signal)  

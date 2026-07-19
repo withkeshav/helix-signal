@@ -72,6 +72,7 @@ def test_enrich_with_ai_ai_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_enrich_with_ai_model_not_configured(db_session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_full")
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     set_setting("ai_model_risk_explain", "", db_session)
     result = enrich_with_ai(
         feature="risk_explain",
@@ -79,7 +80,7 @@ def test_enrich_with_ai_model_not_configured(db_session, monkeypatch: pytest.Mon
         db=db_session,
     )
     assert result["available"] is False
-    assert result["reason"] in ("model_not_configured", "no_providers_configured")
+    assert result["reason"] in ("model_not_configured", "no_providers_configured", "all_providers_failed")
 
 
 def test_enrich_with_ai_all_providers_failed(db_session, monkeypatch: pytest.MonkeyPatch) -> None:

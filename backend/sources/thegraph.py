@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from providers.settings import get_setting
+from providers.settings import get_setting, get_secret
 from services.source_usage import _check_source_rate_limit, _record_source_call
 from sources.onchain_tokens import ETHEREUM_TOKENS, ZERO_ADDRESS, DEFAULT_GRAPH_SUBGRAPH_URL
 
@@ -38,7 +38,7 @@ class TheGraphSource:
         return _validate_subgraph_url(url)
 
     def _api_key(self, db: Any = None) -> str:
-        return str(get_setting("secret_thegraph_api_key", db) or "").strip()
+        return str(get_secret("secret_thegraph_api_key", db) or "").strip()
 
     def _headers(self, db: Any = None) -> dict[str, str]:
         key = self._api_key(db)

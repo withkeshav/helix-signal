@@ -124,4 +124,19 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         if _CSP:
             response.headers["Content-Security-Policy"] = _CSP
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "camera=(), microphone=(), geolocation=(), payment=()",
+        )
+        if request.url.scheme == "https" or os.getenv("HELIX_ENABLE_HSTS", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=31536000; includeSubDomains",
+            )
         return response

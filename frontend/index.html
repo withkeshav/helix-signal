@@ -221,8 +221,38 @@
       </div>
     </nav>
 
-    <!-- KPI Row (reads from shared dashboard store) -->
-    <div class="kpi-row">
+    <!-- Global strip (every tab) -->
+    <div class="kpi-row global-strip">
+      <div class="kpi-card" :class="'strip-band-' + (($store.dashboard.signal?.band||'normal').toLowerCase())" @click="$store.ui.setTab('signal')">
+        <div class="kpi-label">Risk</div>
+        <div class="kpi-row-inner">
+          <div>
+            <div class="kpi-value" style="font-size:var(--fs-kpi)" :class="'band-'+(($store.dashboard.signal?.band||'normal').toLowerCase())" x-text="$store.dashboard.signal?.score ?? '--'"></div>
+            <div class="kpi-trend" x-text="($store.dashboard.signal?.band||'').toUpperCase()"></div>
+          </div>
+          <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--spark)">
+            <polyline fill="none" stroke-width="1.5" :points="$store.dashboard.signalSpark || '0,10 60,10'"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="kpi-card" :class="'strip-band-' + (($store.dashboard.dews?.band||'normal').toLowerCase())" @click="$store.ui.setTab('signal')">
+        <div class="kpi-label">DEWS</div>
+        <div class="kpi-row-inner">
+          <div>
+            <div class="kpi-value" style="font-size:var(--fs-kpi)" x-text="$store.dashboard.dews?.dews_score ?? '--'"></div>
+            <div class="kpi-trend" x-text="($store.dashboard.dews?.band||'normal').toUpperCase()"></div>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-card" @click="$store.ui.setTab('signal')">
+        <div class="kpi-label">Anomalies</div>
+        <div class="kpi-row-inner">
+          <div>
+            <div class="kpi-value" style="font-size:var(--fs-kpi)" :class="$store.dashboard.anomalyCount > 0 ? 'band-watch' : ''" x-text="$store.dashboard.anomalyCount ?? 0"></div>
+            <div class="kpi-trend" x-text="$store.dashboard.anomalyCount > 0 ? 'Active flags' : 'Clear'"></div>
+          </div>
+        </div>
+      </div>
       <div class="kpi-card">
         <div class="kpi-label">Peg</div>
         <div class="kpi-row-inner">
@@ -248,15 +278,6 @@
         </div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Chains</div>
-        <div class="kpi-row-inner">
-          <div>
-            <div class="kpi-value" x-text="$store.dashboard.chains?.length||0"></div>
-            <div class="kpi-trend" x-text="`Top: ${$store.dashboard.concentration.top_chain||''}`"></div>
-          </div>
-        </div>
-      </div>
-      <div class="kpi-card">
         <div class="kpi-label">Fresh</div>
         <div class="kpi-row-inner">
           <div>
@@ -271,7 +292,6 @@
           <div>
             <div class="kpi-value" x-text="`${($store.dashboard.sources||[]).filter(s=>s.status==='ok').length}/${($store.dashboard.sources||[]).length}`"></div>
             <div class="kpi-trend" :class="($store.dashboard.sources||[]).some(s=>s.status!=='ok')?'text-red':'text-green'" x-text="($store.dashboard.sources||[]).some(s=>s.status!=='ok')?'Degraded':'All OK'"></div>
-            <div x-cloak x-show="$store.dashboard.crossSource.discrepancy_flag" class="kpi-sub" style="color:var(--down);font-size:10px">Cross-source: &Delta; <span x-text="$store.dashboard.crossSource.max_discrepancy_pct?.toFixed(2)"></span>%</div>
           </div>
         </div>
       </div>
@@ -319,67 +339,62 @@
 
       <!-- Main dashboard content (hidden while loading) -->
       <div x-cloak x-show="!$store.dashboard.loading">
-      <!-- HERO ZONE: 2-col -- Gauge (left 1/3) + AI Summary with Time Range (right 2/3) -->
-      <div class="insight-grid" style="margin-bottom:12px">
-        <div class="insight-card glass" style="text-align:center">
-          <svg class="risk-gauge" viewBox="0 0 100 100" aria-label="Signal gauge">
-            <circle class="risk-gauge-track" cx="50" cy="50" r="40"></circle>
-            <circle class="risk-gauge-value" cx="50" cy="50" r="40"
-              :style="`stroke-dasharray:${gaugeArc} 251;stroke-dashoffset:0;stroke:${gaugeColor}`"></circle>
-            <text x="50" y="48" text-anchor="middle" font-size="20" font-weight="700" fill="currentColor" x-text="signal.score ?? '--'"></text>
-            <text x="50" y="64" text-anchor="middle" font-size="9" fill="var(--muted)" x-text="signal.band || ''"></text>
-          </svg>
-          <!-- B4: signalSpark sparkline -->
-          <svg class="kpi-spark" viewBox="0 0 60 20" preserveAspectRatio="none" aria-hidden="true">
+      <!-- ROW 1: Signal hero — machine signals only (L4) -->
+      <div id="signal-hero" class="signal-hero" :class="'hero-band-' + ((signal.band||'normal').toLowerCase())">
+        <div class="signal-hero-left">
+          <div class="signal-hero-score" x-text="signal.score ?? '--'"></div>
+          <div class="signal-hero-band" :class="'band-' + ((signal.band||'normal').toLowerCase())" x-text="(signal.band || 'normal').toUpperCase()"></div>
+          <svg class="kpi-spark" viewBox="0 0 60 20" preserveAspectRatio="none" style="width:120px;margin-top:8px" aria-hidden="true">
             <polyline fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" :points="$store.dashboard.signalSpark || '0,10 60,10'"></polyline>
           </svg>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
-            <div>
-              <div class="kpi-label">Peg</div>
-              <div style="font-size:14px;font-weight:600" x-text="$store.dashboard.depeg.current_price?.toFixed(4) ?? '--'"></div>
-            </div>
-            <div>
-              <div class="kpi-label">Supply</div>
-              <div style="font-size:14px;font-weight:600" x-text="$store.dashboard.totalSupply != null ? formatUsd($store.dashboard.totalSupply) : 'N/A'"></div>
-            </div>
-            <div>
-              <div class="kpi-label">Chains</div>
-              <div style="font-size:14px;font-weight:600" x-text="$store.dashboard.chains?.length || 0"></div>
-            </div>
+          <div class="signal-hero-meta" x-text="predictive.regime ? `Regime: ${predictive.regime} · Depeg 1h: ${((predictive.depeg_probability?.horizon_1h || 0) * 100).toFixed(1)}%` : 'Loading predictive layer…'"></div>
+          <div class="signal-hero-chips" x-cloak x-show="dews?.tiers_fired?.length">
+            <template x-for="t in (dews.tiers_fired || [])" :key="`${t.tier}-${t.name}`">
+              <span class="signal-hero-chip band-watch" x-text="`T${t.tier} ${t.name}`"></span>
+            </template>
+          </div>
+          <span x-cloak x-show="anomalyCount() > 0" class="badge badge-warning" style="margin-top:8px" x-text="`${anomalyCount()} anomal${anomalyCount()===1?'y':'ies'}`"></span>
+        </div>
+        <div class="signal-hero-right">
+          <div class="section-heading">Peg · 7d</div>
+          <div class="chart-wrap" id="chart-hero-peg"></div>
+          <div class="signal-hero-chips">
+            <span class="signal-hero-chip" x-text="depeg.current_price != null ? `Peg ${depeg.current_price.toFixed(4)}` : 'Peg —'"></span>
+            <span class="signal-hero-chip" :class="supplyChange >= 0 ? 'text-green' : 'text-red'" x-text="supplyChange != null ? `Supply ${supplyChange>=0?'+':''}${supplyChange.toFixed(2)}% 24h` : 'Supply —'"></span>
           </div>
         </div>
-        <div class="insight-card glass">
-          <div style="display:flex;gap:4px;margin-bottom:8px">
-            <button class="time-pill" :class="aiSubTab==='overview'&&'active'" @click="aiSubTab='overview'">Overview</button>
-            <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
-            <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
-          </div>
-          <div id="signal-ai-overview" x-cloak x-show="aiSubTab==='overview'">
-            <p x-cloak x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
-            <p x-cloak x-show="aiOverviewError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiOverviewError"></p>
-            <p x-cloak x-show="!marketOverview && !aiOverviewError" class="kpi-sub" style="margin:0">No market overview yet — enable AI summary in Settings or wait for the next refresh.</p>
-            <button type="button" class="btn btn-muted" x-cloak x-show="aiOverviewError && aiOverviewError.includes('Sign in')" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
-          </div>
-          <div id="signal-ai-narrative" x-cloak x-show="aiSubTab==='narrative'">
-            <p x-cloak x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
-            <p x-cloak x-show="aiNarrativeError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiNarrativeError"></p>
-            <p x-cloak x-show="!aiNarrative && !aiNarrativeError" class="kpi-sub" style="margin:0">No narrative yet — enable feature_ai_narrative in Settings.</p>
-            <button type="button" class="btn btn-muted" x-cloak x-show="aiNarrativeError && aiNarrativeError.includes('Sign in')" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
-          </div>
-          <div id="signal-ai-insights" x-cloak x-show="aiSubTab==='insights'">
-            <p x-cloak x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
-            <p x-cloak x-show="aiInsightsError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiInsightsError"></p>
-            <p x-cloak x-show="!aiInsights && !aiInsightsError" class="kpi-sub" style="margin:0">No insights yet — enable feature_ai_insights in Settings.</p>
-            <button type="button" class="btn btn-muted" x-cloak x-show="aiInsightsError && aiInsightsError.includes('Sign in')" style="margin-top:6px;padding:4px 10px;font-size:12px" @click="$store.ui.setTab('settings')">Open Settings</button>
-          </div>
-          <div class="time-range" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
-            <span class="time-range-label">Range:</span>
-            <button class="time-pill" :class="timeRange==='6h'&&'active'" @click="timeRange='6h';loadChartRange()">6H</button>
-            <button class="time-pill" :class="timeRange==='24h'&&'active'" @click="timeRange='24h';loadChartRange()">24H</button>
-            <button class="time-pill" :class="timeRange==='7d'&&'active'" @click="timeRange='7d';loadChartRange()">7D</button>
-            <button class="time-pill" :class="timeRange==='30d'&&'active'" @click="timeRange='30d';loadChartRange()">30D</button>
-            <button class="time-pill" :class="timeRange==='90d'&&'active'" @click="timeRange='90d';loadChartRange()">90D</button>
-          </div>
+      </div>
+
+      <!-- ROW 2: AI insight (below hero — L4 deterministic fallback) -->
+      <div class="insight-card glass ai-insight-row">
+        <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <span class="section-heading" style="margin:0;border:none;padding:0">Insight</span>
+          <button class="time-pill" :class="aiSubTab==='overview'&&'active'" @click="aiSubTab='overview'">Overview</button>
+          <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
+          <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
+        </div>
+        <div id="signal-ai-overview" x-cloak x-show="aiSubTab==='overview'">
+          <p x-cloak x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
+          <p x-cloak x-show="!marketOverview && !aiOverviewError" style="margin:0;font-size:13px;line-height:1.5" x-text="deterministicOverviewText()"></p>
+          <p x-cloak x-show="aiOverviewError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiOverviewError"></p>
+        </div>
+        <div id="signal-ai-narrative" x-cloak x-show="aiSubTab==='narrative'">
+          <p x-cloak x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
+          <p x-cloak x-show="!aiNarrative && !aiNarrativeError" style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="deterministicNarrativeText()"></p>
+          <p x-cloak x-show="aiNarrativeError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiNarrativeError"></p>
+        </div>
+        <div id="signal-ai-insights" x-cloak x-show="aiSubTab==='insights'">
+          <p x-cloak x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
+          <p x-cloak x-show="!aiInsights && !aiInsightsError" style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="deterministicInsightsText()"></p>
+          <p x-cloak x-show="aiInsightsError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiInsightsError"></p>
+        </div>
+        <div class="time-range" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+          <span class="time-range-label">Range:</span>
+          <button class="time-pill" :class="timeRange==='6h'&&'active'" @click="timeRange='6h';loadChartRange()">6H</button>
+          <button class="time-pill" :class="timeRange==='24h'&&'active'" @click="timeRange='24h';loadChartRange()">24H</button>
+          <button class="time-pill" :class="timeRange==='7d'&&'active'" @click="timeRange='7d';loadChartRange()">7D</button>
+          <button class="time-pill" :class="timeRange==='30d'&&'active'" @click="timeRange='30d';loadChartRange()">30D</button>
+          <button class="time-pill" :class="timeRange==='90d'&&'active'" @click="timeRange='90d';loadChartRange()">90D</button>
         </div>
       </div>
 
@@ -408,51 +423,50 @@
         <div style="display:flex;flex-direction:column;gap:10px">
           <div class="insight-card glass" style="margin:0">
             <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-              <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Stress Leaderboard <span class="model-badge">&#916;</span></h2>
+              <h2 class="section-heading" style="margin:0">Stress Leaderboard</h2>
               <span class="kpi-sub" style="font-size:10px">Chains ranked by supply velocity</span>
             </div>
-            <div x-cloak x-show="stressLeaderboard?.length" style="font-size:12px">
-              <template x-for="(row, i) in stressLeaderboard" :key="i">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
-                  <span>
-                    <span style="font-weight:600" x-text="row.chain_name"></span>
-                    <span :class="row.direction==='inflow'?'text-green':'text-red'">
-                      <svg class="icon" x-cloak x-show="row.direction==='inflow'"><use href="#icon-arrow-up"/></svg>
-                      <svg class="icon" x-cloak x-show="row.direction==='outflow'"><use href="#icon-arrow-down"/></svg>
-                    </span>
-                  </span>
-                  <span>
-                    <span x-cloak x-show="row.velocity_24h_pct != null" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="`${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}% 24h`"></span>
-                  </span>
-                </div>
-              </template>
+            <div class="data-table-wrap" x-cloak x-show="stressLeaderboard?.length">
+              <table class="data-table">
+                <thead><tr><th></th><th>Chain</th><th class="num">Velocity 24h</th></tr></thead>
+                <tbody>
+                  <template x-for="(row, i) in stressLeaderboard" :key="i">
+                    <tr>
+                      <td><span class="sev-dot" :style="`background:var(--${row.direction==='inflow'?'up':'down'})`"></span></td>
+                      <td class="mono" x-text="row.chain_name"></td>
+                      <td class="mono num" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="row.velocity_24h_pct != null ? `${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}%` : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
             <div x-cloak x-show="!stressLeaderboard?.length" class="empty-state">
               <svg class="icon empty-state-icon"><use href="#icon-bar-chart"/></svg>
               <span class="kpi-label">No chain velocity data yet</span>
-              <span class="kpi-sub">Needs multiple 5-min snapshots to compute chain-level velocity</span>
             </div>
           </div>
           <div class="insight-card glass" style="margin:0">
             <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 8px">
-              <h2 style="margin:0;font-size:12px;text-transform:uppercase;color:var(--muted)">Rotation <span class="model-badge"><svg class="icon"><use href="#icon-refresh-cw"/></svg></span></h2>
+              <h2 class="section-heading" style="margin:0">Rotation</h2>
               <span class="kpi-sub" style="font-size:10px">Cross-asset supply rotation</span>
             </div>
-            <div x-cloak x-show="rotation?.available && rotation?.pairs?.length" style="font-size:12px">
-              <template x-for="(p, i) in rotation.pairs" :key="i">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--line)">
-                  <span style="font-weight:600" x-text="`${p.asset_a} vs ${p.asset_b}`"></span>
-                  <span>
-                    <span :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="`r=${p.correlation_7d.toFixed(3)}`"></span>
-                    <span x-cloak x-show="p.dominance_shift" class="band-watch" style="margin-left:4px;font-size:10px" x-text="formatDisplayName(p.dominance_shift)"></span>
-                  </span>
-                </div>
-              </template>
+            <div class="data-table-wrap" x-cloak x-show="rotation?.available && rotation?.pairs?.length">
+              <table class="data-table">
+                <thead><tr><th>Pair</th><th class="num">r (7d)</th><th>Shift</th></tr></thead>
+                <tbody>
+                  <template x-for="(p, i) in rotation.pairs" :key="i">
+                    <tr>
+                      <td class="mono" x-text="`${p.asset_a} vs ${p.asset_b}`"></td>
+                      <td class="mono num" :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="p.correlation_7d?.toFixed(3)"></td>
+                      <td x-text="p.dominance_shift ? formatDisplayName(p.dominance_shift) : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
             <div x-cloak x-show="!rotation?.available || !rotation?.pairs?.length" class="empty-state">
               <svg class="icon empty-state-icon"><use href="#icon-repeat"/></svg>
               <span class="kpi-label">No rotation data</span>
-              <span class="kpi-sub">Needs 7 days of history on multiple assets. Enable more assets in Settings.</span>
             </div>
           </div>
         </div>
@@ -551,19 +565,26 @@
 
       <!-- Anomaly Events -->
       <div class="insight-card">
-        <h2>Recent Anomalies</h2>
-        <div x-cloak x-show="anomalyEvents.anomalies && anomalyEvents.anomalies.length" style="max-height:120px;overflow-y:auto;font-size:12px;line-height:1.5">
-          <template x-for="a in (anomalyEvents.anomalies || []).slice(0, 8)" :key="`${a.metric}-${a.timestamp}`">
-            <div style="padding:4px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between">
-              <span><span class="kpi-label" x-text="a.metric"></span> <span :class="a.direction === 'above' ? 'text-red' : 'text-green'"><svg class="icon" x-cloak x-show="a.direction === 'above'"><use href="#icon-arrow-up"/></svg><svg class="icon" x-cloak x-show="a.direction === 'below'"><use href="#icon-arrow-down"/></svg></span> <span x-text="a.z_score ? `z=${a.z_score.toFixed(2)}` : ''"></span></span>
-              <span class="kpi-sub" x-text="formatWhen(a.timestamp)"></span>
-            </div>
-          </template>
+        <h2 class="section-heading">Recent Anomalies</h2>
+        <div class="data-table-wrap" x-cloak x-show="anomalyEvents.anomalies && anomalyEvents.anomalies.length">
+          <table class="data-table">
+            <thead><tr><th></th><th>Time</th><th>Metric</th><th class="num">z-score</th><th>Dir</th></tr></thead>
+            <tbody>
+              <template x-for="a in (anomalyEvents.anomalies || []).slice(0, 20)" :key="`${a.metric}-${a.timestamp}`">
+                <tr>
+                  <td><span class="sev-dot" :style="`background:var(--${a.direction === 'above' ? 'down' : 'up'})`"></span></td>
+                  <td class="mono" x-text="formatWhen(a.timestamp)"></td>
+                  <td x-text="a.metric"></td>
+                  <td class="mono num" x-text="a.z_score ? a.z_score.toFixed(2) : '—'"></td>
+                  <td x-text="a.direction || '—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
         <div x-cloak x-show="!anomalyEvents.anomalies || !anomalyEvents.anomalies.length" class="empty-state">
           <svg class="icon empty-state-icon"><use href="#icon-warning"/></svg>
           <span class="kpi-label">No anomalies detected</span>
-          <span class="kpi-sub">All metrics are within normal range</span>
         </div>
       </div>
 
@@ -609,43 +630,92 @@
         <div class="chart-wrap tall" id="chart-distribution"></div>
       </div>
 
-      <!-- Chain Cards Grid (collapsible) -->
+      <!-- Chain Details table -->
       <div x-cloak x-show="(chains || []).length > 0">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <h2 class="section-title" style="margin:0">Chain Details</h2>
-          <button class="btn btn-muted" @click="showAllChains = !showAllChains" style="padding:6px 12px;font-size:12px" x-text="showAllChains ? 'Show Less' : 'Show All'"></button>
+          <h2 class="section-heading" style="margin:0">Chain Details</h2>
         </div>
-        <div class="chain-grid">
-          <template x-for="c in (showAllChains ? chains : chains.slice(0, 4))" :key="c.chain_name">
-            <div class="chain-card glass">
-              <div class="chain-header">
-                <span class="chain-name" x-text="c.chain_name"></span>
-                <span class="chain-peg" :class="c.price&&Math.abs(c.price-1)>0.001?'band-watch':'text-green'" x-text="c.price!=null?pegLabel(c.price):'N/A'"></span>
-              </div>
-              <div class="chain-body">
-                <div class="chain-metric">
-                  <span class="kpi-label">Supply</span>
-                  <span class="chain-val" x-text="formatUsd(c.supply_current)"></span>
-                </div>
-                <div class="chain-metric">
-                  <span class="kpi-label">Share</span>
-                  <span class="chain-val" x-text="c.chain_share_pct!=null?`${c.chain_share_pct.toFixed(1)}%`:'N/A'"></span>
-                </div>
-                <div class="chain-metric">
-                  <span class="kpi-label">TVL</span>
-                  <span class="chain-val" x-text="formatUsd(c.chain_tvl)"></span>
-                </div>
-                <div class="chain-metric">
-                  <span class="kpi-label">Signal</span>
-                  <span class="chain-val" :class="`band-${(c.chain_signal?.band||'normal').toLowerCase()}`" x-text="`${c.chain_signal?.score??''} ${c.chain_signal?.band||''}`"></span>
-                </div>
-              </div>
-              <div class="chain-footer" x-text="`Confidence: ${c.data_confidence?.label||''} (${c.data_confidence?.score??''})`"></div>
-            </div>
-          </template>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Chain</th><th class="num">Peg</th><th class="num">Supply</th><th class="num">Share</th><th class="num">Signal</th><th>Confidence</th></tr></thead>
+            <tbody>
+              <template x-for="c in chains" :key="c.chain_name">
+                <tr>
+                  <td class="mono" x-text="c.chain_name"></td>
+                  <td class="mono num" :class="c.price&&Math.abs(c.price-1)>0.001?'band-watch':'text-green'" x-text="c.price!=null?c.price.toFixed(4):'N/A'"></td>
+                  <td class="mono num" x-text="formatUsd(c.supply_current)"></td>
+                  <td class="mono num" x-text="c.chain_share_pct!=null?`${c.chain_share_pct.toFixed(1)}%`:'N/A'"></td>
+                  <td class="mono num" :class="`band-${(c.chain_signal?.band||'normal').toLowerCase()}`" x-text="`${c.chain_signal?.score??'—'} ${c.chain_signal?.band||''}`"></td>
+                  <td x-text="`${c.data_confidence?.label||''} (${c.data_confidence?.score??''})`"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
+
+      <!-- Analytics (merged into Signal tab) -->
+      <div x-cloak x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="region" id="signal-analytics-section">
+        <h2 style="margin:16px 0 8px 0;font-size:16px">Advanced Analytics</h2>
+        <p class="kpi-sub" style="margin:0 0 12px 0">Regime, change-points, and cross-asset correlation.</p>
+        <div x-cloak x-show="analyticsError" class="warning-banner visible" x-text="analyticsError" style="margin-bottom:8px"></div>
+        <div x-cloak x-show="analyticsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading analytics for <span x-text="analyticsAsset"></span>...</div>
+        <div class="insight-grid">
+          <div class="insight-card">
+            <h2>Regime Detection <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="analyticsAsset"></span> · <span x-text="regimeWindowHours"></span>h window)</span></h2>
+            <div x-cloak x-show="!regime && !analyticsLoading" class="kpi-sub" style="padding:12px">No regime data available.</div>
+            <div x-cloak x-show="regime" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Current State</div><div style="font-size:var(--fs-lg);font-weight:700"><span class="badge" :class="regimeColor(regime?.state)" x-text="regime?.state || '-'"></span></div></div>
+              <div><div class="kpi-label">Duration</div><div style="font-size:var(--fs-base)" x-text="regime?.duration_hours != null ? regime.duration_hours + 'h' : '-'"></div></div>
+            </div>
+          </div>
+          <div class="insight-card">
+            <h2>Change-Point Detection</h2>
+            <div x-cloak x-show="!changePoints && !analyticsLoading" class="kpi-sub" style="padding:12px">No change-point data available.</div>
+            <div class="data-table-wrap" x-cloak x-show="changePoints?.change_points?.length">
+              <table class="data-table">
+                <thead><tr><th>Time</th><th>Metric</th><th class="num">Score</th></tr></thead>
+                <tbody>
+                  <template x-for="cp in (changePoints?.change_points || []).slice(0, 20)" :key="cp.timestamp">
+                    <tr>
+                      <td class="mono" x-text="cp.timestamp"></td>
+                      <td x-text="cp.metric || 'metric'"></td>
+                      <td class="mono num" x-text="cp.score != null ? fmtNum(cp.score) : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="insight-card" style="grid-column:span 2">
+            <h2>Cross-Asset Correlation Matrix</h2>
+            <div x-cloak x-show="!crossAssetMatrix && !analyticsLoading" class="kpi-sub" style="padding:12px">No cross-asset data available.</div>
+            <div x-cloak x-show="crossAssetMatrix" style="overflow-x:auto">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <template x-for="col in (crossAssetMatrix?.assets || [])" :key="'h-' + col">
+                      <th class="num" x-text="col"></th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(row, ri) in (crossAssetMatrix?.matrix || [])" :key="'r-' + (crossAssetMatrix?.assets?.[ri] || ri)">
+                    <tr>
+                      <td class="mono" x-text="crossAssetMatrix?.assets?.[ri] || '-'"></td>
+                      <template x-for="(val, ci) in row" :key="'c-' + ri + '-' + ci">
+                        <td class="mono num" x-text="val != null ? val.toFixed(2) : '-'"></td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></template>
 
     <!-- Tab: Market (Supply + Forecast) -->
     <template x-if="$store.ui.tab === 'market'"><div class="tab-content" x-cloak role="tabpanel" id="tab-market">
@@ -789,73 +859,6 @@
     </div>
     </template>
 
-    <!-- Analytics (merged into Signal tab) -->
-    <div class="tab-content" x-cloak x-data="analyticsPanel" x-init="init()" @asset-changed.window="reloadForAsset($event.detail.asset)" role="region" id="signal-analytics-section">
-      <h2 style="margin:16px 0 8px 0;font-size:16px">Advanced Analytics</h2>
-      <p class="kpi-sub" style="margin:0 0 12px 0">Regime, change-points, and cross-asset correlation (formerly Analytics tab).</p>
-      <div x-cloak x-show="analyticsError" class="warning-banner visible" x-text="analyticsError" style="margin-bottom:8px"></div>
-      <div x-cloak x-show="analyticsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading analytics for <span x-text="analyticsAsset"></span>...</div>
-
-      <div class="insight-grid">
-        <div class="insight-card">
-          <h2>Regime Detection <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="analyticsAsset"></span> · <span x-text="regimeWindowHours"></span>h window)</span></h2>
-          <div x-cloak x-show="!regime && !analyticsLoading" class="kpi-sub" style="padding:12px">No regime data available.</div>
-          <div x-cloak x-show="regime" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-            <div><div class="kpi-label">Current State</div><div style="font-size:var(--fs-lg);font-weight:700"><span class="badge" :class="regimeColor(regime?.state)" x-text="regime?.state || '-'"></span></div></div>
-            <div><div class="kpi-label">Duration</div><div style="font-size:var(--fs-base)" x-text="regime?.duration_hours != null ? regime.duration_hours + 'h' : '-'"></div></div>
-            <div><div class="kpi-label">Transitions (window)</div><div style="font-size:var(--fs-base)" x-text="regime?.transitions ?? '-'"></div></div>
-            <div><div class="kpi-label">Confidence</div><div style="font-size:var(--fs-base)" x-text="fmtNum(regime?.confidence)"></div></div>
-          </div>
-        </div>
-        <div class="insight-card">
-          <h2>Change-Point Detection <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="analyticsAsset"></span> · <span x-text="cpWindowDays"></span>d)</span></h2>
-          <div x-cloak x-show="!changePoints && !analyticsLoading" class="kpi-sub" style="padding:12px">No change-point data available.</div>
-          <div x-cloak x-show="changePoints" style="max-height:280px;overflow-y:auto">
-            <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px" x-show="changePoints?.change_points?.length">
-              <span x-text="changePoints?.change_points?.length || 0"></span> change points detected
-            </div>
-            <template x-for="cp in (changePoints?.change_points || []).slice(0, 20)" :key="cp.timestamp">
-              <div class="event-card" style="margin-bottom:4px;padding:6px 10px">
-                <div class="event-meta" style="font-size:12px">
-                  <strong x-text="cp.metric || 'metric'"></strong>
-                  <span style="color:var(--text-muted);margin-left:6px" x-text="cp.timestamp"></span>
-                  <span x-cloak x-show="cp.score" style="color:var(--text-muted);margin-left:6px">score: <span x-text="fmtNum(cp.score)"></span></span>
-                </div>
-              </div>
-            </template>
-            <div x-cloak x-show="changePoints && (changePoints?.change_points?.length || 0) === 0" class="kpi-sub" style="padding:8px;text-align:center">No significant change points in window.</div>
-          </div>
-        </div>
-        <div class="insight-card" style="grid-column:span 2">
-          <h2>Cross-Asset Correlation Matrix <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<span x-text="matrixWindowDays"></span>d window)</span></h2>
-          <div x-cloak x-show="!crossAssetMatrix && !analyticsLoading" class="kpi-sub" style="padding:12px">No cross-asset data available.</div>
-          <div x-cloak x-show="crossAssetMatrix" style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
-              <thead>
-                <tr>
-                  <th style="text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)"></th>
-                  <template x-for="col in (crossAssetMatrix?.assets || [])" :key="'h-' + col">
-                    <th style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--line)" x-text="col"></th>
-                  </template>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="(row, ri) in (crossAssetMatrix?.matrix || [])" :key="'r-' + (crossAssetMatrix?.assets?.[ri] || ri)">
-                  <tr>
-                    <td style="font-weight:600;padding:4px 8px;border-bottom:1px solid var(--line)" x-text="crossAssetMatrix?.assets?.[ri] || '-'"></td>
-                    <template x-for="(val, ci) in row" :key="'c-' + ri + '-' + ci">
-                      <td style="text-align:right;padding:4px 8px;border-bottom:1px solid var(--line);font-family:monospace" :style="val != null && Math.abs(val) > 0.7 ? 'background:var(--alert-bg);color:var(--down)' : (val != null && Math.abs(val) > 0.4 ? 'background:var(--warn-bg);color:var(--neutral)' : '')" x-text="val != null ? val.toFixed(2) : '-'"></td>
-                    </template>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-    </template>
-
     <!-- Tab: Intel (OSINT + SMIDGE) -->
     <template x-if="$store.ui.tab === 'intel'"><div class="tab-content" x-cloak role="tabpanel" id="tab-intel">
       <div x-data="osint" x-init="init()">
@@ -876,24 +879,25 @@
             </div>
           </div>
           <div class="insight-card">
-            <h2>OSINT Feed</h2>
-            <div style="max-height:400px;overflow-y:auto">
-              <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)"><svg class="icon"><use href="#icon-warning"/></svg> Sentiment analysis disabled — enable <code>feature_nlp_sentiment</code> in Settings</div>
-              <template x-for="art in osintArticles" :key="art.id">
-                <div class="event-card" style="margin-bottom:8px">
-                  <div class="event-title"><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;font-weight:600" x-text="art.title"></a></div>
-                  <div class="event-summary" x-cloak x-show="art.summary" x-text="art.summary"></div>
-                  <div class="event-meta" style="margin-top:6px">
-                    <span x-text="art.source"></span>
-                    <span x-cloak x-show="art.published_at"> · <span x-text="formatWhen(art.published_at)"></span></span>
-                    <span> · sentiment: <span :class="art.sentiment_score > 0.1 ? 'text-green' : art.sentiment_score < -0.1 ? 'text-red' : ''" x-text="art.sentiment_score?.toFixed(2) ?? '0.0'"></span></span>
-                    <span> · <a :href="art.url" target="_blank" rel="noopener" style="color:var(--spark);text-decoration:none">Read →</a></span>
-                  </div>
-                </div>
-              </template>
-              <div x-cloak x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
-              <div x-cloak x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading...</div>
+            <h2 class="section-heading">OSINT Feed</h2>
+            <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">Sentiment analysis disabled — enable <code>feature_nlp_sentiment</code> in Settings</div>
+            <div class="data-table-wrap" x-cloak x-show="osintArticles.length">
+              <table class="data-table">
+                <thead><tr><th></th><th>Time</th><th>Source</th><th>Title</th><th class="num">Sentiment</th></tr></thead>
+                <tbody>
+                  <template x-for="art in osintArticles" :key="art.id">
+                    <tr>
+                      <td><span class="sev-dot" :style="`background:var(--${art.sentiment_score > 0.1 ? 'up' : art.sentiment_score < -0.1 ? 'down' : 'muted'})`"></span></td>
+                      <td class="mono" x-text="art.published_at ? formatWhen(art.published_at) : '—'"></td>
+                      <td x-text="art.source"></td>
+                      <td><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" x-text="art.title"></a></td>
+                      <td class="mono num" x-text="art.sentiment_score?.toFixed(2) ?? '0.00'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
+            <div x-cloak x-show="osintArticles.length === 0 && !loadingEvents" class="kpi-sub" style="padding:12px">No articles yet</div>
           </div>
         </div>
         <div class="chart-card">
@@ -1042,26 +1046,29 @@
           </div>
         </div>
         <div class="insight-card">
-          <h2>Events</h2>
+          <h2 class="section-heading">Blacklist Events</h2>
           <div style="margin-bottom:8px;display:flex;gap:8px">
             <input type="text" placeholder="Filter by asset (e.g. USDT)" x-model="eventsAssetFilter" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" @keyup.enter="filterEvents" />
             <button class="btn btn-muted" @click="filterEvents" style="padding:6px 12px;font-size:13px">Filter</button>
           </div>
-          <div style="max-height:360px;overflow-y:auto">
-            <template x-for="ev in blacklistEvents" :key="ev.id">
-              <div class="event-card" style="margin-bottom:6px">
-                <div class="event-title"><span x-text="ev.asset_symbol"></span> · <span x-text="ev.chain"></span></div>
-                <div class="event-meta">
-                  <span x-text="formatWhen(ev.timestamp)"></span>
-                  <span x-cloak x-show="ev.frozen_balance_usd"> · <span x-text="formatUsd(ev.frozen_balance_usd)"></span> frozen</span>
-                  <span x-cloak x-show="ev.event_type"> · <span x-text="ev.event_type"></span></span>
-                </div>
-                <div class="event-summary" x-cloak x-show="ev.intelligence_note" x-text="ev.intelligence_note"></div>
-              </div>
-            </template>
-            <div x-cloak x-show="!blacklistEvents.length && !loadingEvents" class="kpi-sub" style="padding:12px">No events found</div>
-            <div x-cloak x-show="loadingEvents" class="kpi-sub" style="padding:12px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading events...</div>
+          <div class="data-table-wrap" x-cloak x-show="blacklistEvents.length">
+            <table class="data-table">
+              <thead><tr><th></th><th>Time</th><th>Asset</th><th>Chain</th><th class="num">Frozen USD</th><th>Type</th></tr></thead>
+              <tbody>
+                <template x-for="ev in blacklistEvents" :key="ev.id">
+                  <tr>
+                    <td><span class="sev-dot" style="background:var(--down)"></span></td>
+                    <td class="mono" x-text="formatWhen(ev.timestamp)"></td>
+                    <td class="mono" x-text="ev.asset_symbol"></td>
+                    <td x-text="ev.chain"></td>
+                    <td class="mono num" x-text="ev.frozen_balance_usd != null ? formatUsd(ev.frozen_balance_usd) : '—'"></td>
+                    <td x-text="ev.event_type || '—'"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
+          <div x-cloak x-show="!blacklistEvents.length && !loadingEvents" class="kpi-sub" style="padding:12px">No events found</div>
           <div style="display:flex;gap:6px;margin-top:8px">
             <button class="btn btn-muted" @click="prevEventsPage" x-cloak x-show="eventsOffset > 0" style="padding:4px 10px;font-size:12px">← Prev</button>
             <button class="btn btn-muted" @click="nextEventsPage" x-cloak x-show="blacklistEvents.length >= eventsLimit" style="padding:4px 10px;font-size:12px">Next →</button>
@@ -1211,26 +1218,21 @@
             No fired alerts match the current filters.
             <button type="button" class="btn btn-muted" style="margin-left:8px;padding:4px 10px;font-size:12px" @click="goSettings()">Settings</button>
           </div>
-          <div style="max-height:480px;overflow-y:auto">
-            <template x-for="ev in alerts" :key="ev.id">
-              <div class="event-card" style="margin-bottom:6px">
-                <div class="event-title">
-                  <span class="badge" :class="severityBadge(ev.severity)" x-text="ev.severity"></span>
-                  <span x-text="ev.asset_symbol"></span>
-                  <span x-cloak x-show="ev.chain_key" style="color:var(--text-muted);font-size:12px">· <span x-text="ev.chain_key"></span></span>
-                </div>
-                <div class="event-meta">
-                  <strong x-text="ev.title"></strong>
-                  <span style="color:var(--text-muted);font-size:12px;margin-left:8px" x-text="formatWhen(ev.timestamp)"></span>
-                </div>
-                <div class="event-summary" x-show="ev.summary" style="font-size:13px;color:var(--text-muted);margin-top:4px" x-text="ev.summary"></div>
-                <div x-cloak x-show="ev.old_value || ev.new_value" style="font-size:12px;color:var(--text-muted);margin-top:4px">
-                  <span x-show="ev.old_value"><span style="opacity:0.7">old:</span> <code x-text="ev.old_value"></code></span>
-                  <span x-show="ev.old_value && ev.new_value"> → </span>
-                  <span x-show="ev.new_value"><span style="opacity:0.7">new:</span> <code x-text="ev.new_value"></code></span>
-                </div>
-              </div>
-            </template>
+          <div class="data-table-wrap" x-cloak x-show="alerts.length">
+            <table class="data-table">
+              <thead><tr><th></th><th>Time</th><th>Asset</th><th>Entity</th><th>Severity</th></tr></thead>
+              <tbody>
+                <template x-for="ev in alerts" :key="ev.id">
+                  <tr>
+                    <td><span class="sev-dot" :class="ev.severity === 'critical' ? '' : ''" :style="`background:var(--${ev.severity==='critical'?'down':ev.severity==='warning'?'neutral':'spark'})`"></span></td>
+                    <td class="mono" x-text="formatWhen(ev.timestamp)"></td>
+                    <td class="mono" x-text="ev.asset_symbol"></td>
+                    <td x-text="ev.title"></td>
+                    <td><span class="badge" :class="severityBadge(ev.severity)" x-text="ev.severity"></span></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
         </div>
         <div class="insight-card">
@@ -1269,19 +1271,23 @@
           </template>
         </div>
         <div class="insight-card" style="grid-column:span 2">
-          <h2>Alert History <span class="kpi-sub">recent signal events</span></h2>
-          <div style="max-height:200px;overflow-y:auto;font-size:12px;line-height:1.5">
-            <template x-for="(ev, i) in historyEvents" :key="ev.id || i">
-              <div style="padding:5px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px">
-                <div>
-                  <span :class="`sev-${ev.severity}`" x-text="(ev.severity||'').toUpperCase()"></span>
-                  <span x-text="ev.title"></span>
-                </div>
-                <span class="kpi-sub" style="white-space:nowrap" x-text="formatWhen(ev.timestamp)"></span>
-              </div>
-            </template>
-            <div x-cloak x-show="!historyEvents.length && !loading" class="kpi-sub" style="padding:8px 0">No recent events</div>
+          <h2 class="section-heading">Alert History</h2>
+          <div class="data-table-wrap" x-cloak x-show="historyEvents.length">
+            <table class="data-table">
+              <thead><tr><th></th><th>Time</th><th>Event</th><th>Severity</th></tr></thead>
+              <tbody>
+                <template x-for="(ev, i) in historyEvents" :key="ev.id || i">
+                  <tr>
+                    <td><span class="sev-dot" :style="`background:var(--${ev.severity==='critical'?'down':ev.severity==='warning'?'neutral':'spark'})`"></span></td>
+                    <td class="mono" x-text="formatWhen(ev.timestamp)"></td>
+                    <td x-text="ev.title"></td>
+                    <td x-text="(ev.severity||'').toUpperCase()"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
           </div>
+          <div x-cloak x-show="!historyEvents.length && !loading" class="kpi-sub" style="padding:8px 0">No recent events</div>
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from providers.settings import get_setting
+from providers.settings import get_setting, get_secret
 from services.source_usage import _check_source_rate_limit, _record_source_call
 from sources.onchain_tokens import ETHEREUM_TOKENS, WHALE_THRESHOLD_USD_DEFAULT
 
@@ -19,7 +19,7 @@ class MoralisSource:
     name = "moralis"
 
     def _api_key(self, db: Any = None) -> str:
-        return str(get_setting("secret_moralis_api_key", db) or "").strip()
+        return str(get_secret("secret_moralis_api_key", db) or "").strip()
 
     def configured(self, db: Any = None) -> bool:
         return bool(self._api_key(db)) and bool(get_setting("provider_moralis", db))

@@ -30,13 +30,16 @@ def test_whale_flow_unconfigured(mock_get_setting):
     assert "required_keys" in out
 
 
+@patch("sources.thegraph.get_secret")
 @patch("sources.thegraph.get_setting")
 @patch("sources.thegraph.httpx.post")
-def test_thegraph_mint_burn(mock_post, mock_get_setting):
+def test_thegraph_mint_burn(mock_post, mock_get_setting, mock_get_secret):
     mock_get_setting.side_effect = lambda key, db=None: {
         "provider_thegraph": True,
-        "secret_thegraph_api_key": "",
     }.get(key, False)
+    mock_get_secret.side_effect = lambda key, db=None: {
+        "secret_thegraph_api_key": "",
+    }.get(key, "")
     mock_post.return_value = MagicMock(
         status_code=200,
         json=lambda: {
@@ -53,11 +56,14 @@ def test_thegraph_mint_burn(mock_post, mock_get_setting):
     assert result["net_mint_burn_usd"] == 0.5
 
 
+@patch("sources.moralis.get_secret")
 @patch("sources.moralis.get_setting")
 @patch("sources.moralis.httpx.get")
-def test_moralis_holder_concentration(mock_get, mock_get_setting):
+def test_moralis_holder_concentration(mock_get, mock_get_setting, mock_get_secret):
     mock_get_setting.side_effect = lambda key, db=None: {
         "provider_moralis": True,
+    }.get(key, "")
+    mock_get_secret.side_effect = lambda key, db=None: {
         "secret_moralis_api_key": "test-key",
     }.get(key, "")
     mock_get.return_value = MagicMock(
@@ -75,14 +81,17 @@ def test_moralis_holder_concentration(mock_get, mock_get_setting):
     assert result["concentration_risk"] == "high"
 
 
+@patch("sources.moralis.get_secret")
 @patch("sources.moralis.get_setting")
 @patch("sources.moralis.httpx.get")
-def test_moralis_large_transfers_whale_alert(mock_get, mock_get_setting):
+def test_moralis_large_transfers_whale_alert(mock_get, mock_get_setting, mock_get_secret):
     mock_get_setting.side_effect = lambda key, db=None: {
         "provider_moralis": True,
-        "secret_moralis_api_key": "test-key",
         "onchain_whale_threshold_usd": 1_000_000,
     }.get(key, 1_000_000)
+    mock_get_secret.side_effect = lambda key, db=None: {
+        "secret_moralis_api_key": "test-key",
+    }.get(key, "")
     big = str(2_000_000 * 10**6)
     mock_get.return_value = MagicMock(
         status_code=200,

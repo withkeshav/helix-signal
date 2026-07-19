@@ -13,14 +13,14 @@ router = APIRouter()
 
 
 def _validate_webhook_settings(db: Session) -> None:
-    from providers.settings import get_setting
+    from providers.settings import get_setting, get_secret
     from services.webhook_dispatcher import _coerce_bool, _validate_url
 
     enabled = _coerce_bool(get_setting("webhook_enabled", db))
     if not enabled:
         return
     url = str(get_setting("webhook_url", db) or "").strip()
-    secret = str(get_setting("webhook_signing_secret", db) or "").strip()
+    secret = str(get_secret("webhook_signing_secret", db) or "").strip()
     if not _validate_url(url):
         raise ValueError("webhook_url must be a valid http(s) URL when webhook_enabled is true")
     if not secret:

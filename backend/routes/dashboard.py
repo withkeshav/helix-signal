@@ -8,11 +8,11 @@ from core.admin_auth import require_admin_token
 from core.api_auth import require_read_open, require_keyed_always
 from core.limiter import limiter
 from database import get_db
-from schemas import AssetConfigOut, DashboardResponse
+from schemas import AssetConfigOut, DashboardResponse, DashboardSummaryItemOut
 from services.asset_overlay import catalog_assets, set_asset_enabled
 from services.asset_overlay import load_enabled_assets_with_overrides as load_enabled_assets
 from services.cache import get_or_build_dashboard
-from services.dashboard import build_dashboard_response
+from services.dashboard import build_dashboard_response, build_dashboard_summary
 
 router = APIRouter()
 
@@ -35,6 +35,16 @@ def dashboard(
     payload = get_or_build_dashboard(asset, _build)
     payload.pop("_cache", None)
     return DashboardResponse.model_validate(payload)
+
+
+@router.get("/dashboard/summary", response_model=list[DashboardSummaryItemOut])
+@limiter.limit("60/minute")
+def dashboard_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_read_open("intelligence:read")),
+) -> list[DashboardSummaryItemOut]:
+    return [DashboardSummaryItemOut.model_validate(row) for row in build_dashboard_summary(db)]
 
 
 @router.get("/assets", response_model=list[AssetConfigOut])

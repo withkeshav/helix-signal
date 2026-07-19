@@ -31,7 +31,9 @@ function _dispatchAuthChanged(authenticated) {
 export function registerUiStore(Alpine) {
   Alpine.store('ui', {
     tab: 'signal',
-    theme: 'light',
+    theme: 'dark',
+    refreshTick: 0,
+    fetchInFlight: 0,
     searchQuery: '',
     searchResults: [],
     adminToken: _loadStoredAdminToken(),
@@ -49,6 +51,16 @@ export function registerUiStore(Alpine) {
     modalVisible: false,
     modalTitle: '',
     modalBody: '',
+
+    beginFetch() {
+      this.fetchInFlight += 1;
+      this.refreshing = this.fetchInFlight > 0;
+    },
+
+    endFetch() {
+      this.fetchInFlight = Math.max(0, this.fetchInFlight - 1);
+      this.refreshing = this.fetchInFlight > 0;
+    },
 
     showToast(message, type = 'info', duration = 4000) {
       this.toastMessage = message;

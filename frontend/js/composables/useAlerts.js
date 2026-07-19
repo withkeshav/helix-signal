@@ -15,6 +15,9 @@ export function useAlerts() {
     async init() {
       this._bindAuth();
       await this._loadAll();
+      this.$watch('$store.ui.refreshTick', () => {
+        if (this.$store.ui.tab === 'alerts') this._loadAll();
+      });
     },
 
     _bindAuth() {

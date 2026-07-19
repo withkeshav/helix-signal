@@ -65,7 +65,9 @@ test.describe('Signal tab', () => {
     await expect(page.getByText('Cross-asset supply rotation')).toBeVisible();
   });
 
-  test('status bar shows data health badge', async ({ page }) => {
-    await expect(page.getByText(/^Data:/)).toBeVisible();
+  test('deterministic risk content visible without AI', async ({ page }) => {
+    await expect(page.locator('.risk-gauge')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Risk Components' })).toBeVisible();
+    await expect(page.locator('.token-grid .token-card').first()).toBeVisible();
   });
 });

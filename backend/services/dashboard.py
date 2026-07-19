@@ -365,3 +365,67 @@ def build_dashboard_response(db: Session, asset: str | None = None) -> Dashboard
         chains=dashboard_chains, sources=sources,
         data_quality=DataQualityOut(degraded_sources=degraded_sources, using_cached_data=len(degraded_sources) > 0, nlp_available=nlp_enabled),
     )
+
+
+def build_dashboard_summary(db: Session) -> list[dict]:
+    """Lightweight per-asset summary for token cards (single round-trip)."""
+    from services.asset_overlay import effective_asset_enabled, get_asset_overrides, load_enabled_assets_with_overrides
+
+    from schemas import DashboardSummaryItemOut
+
+    from providers.settings import get_setting
+
+    refresh_interval = int(get_setting("refresh_core_seconds", db) or 300)
+    overrides = get_asset_overrides(db)
+    enabled = [
+        a for a in load_enabled_assets_with_overrides(db)
+        if effective_asset_enabled(a, overrides)
+    ]
+    if not enabled:
+        return []
+
+    symbols = [str(a["symbol"]).upper() for a in enabled]
+    chains_orm = (
+        db.execute(
+            select(AssetChainSnapshot).where(AssetChainSnapshot.asset_symbol.in_(symbols))
+        )
+        .scalars()
+        .all()
+    )
+    sources_orm = db.execute(select(SourceStatus).order_by(SourceStatus.id.asc())).scalars().all()
+    defillama = next((s for s in sources_orm if s.source_name == "defillama"), None)
+    source_status = defillama.status if defillama else "unknown"
+    source_error = defillama.last_error if defillama else None
+
+    by_asset: dict[str, list[AssetChainSnapshot]] = {s: [] for s in symbols}
+    for row in chains_orm:
+        by_asset.setdefault(row.asset_symbol, []).append(row)
+
+    items: list[dict] = []
+    for sym in symbols:
+        asset_chains = by_asset.get(sym, [])
+        freshness, total_supply, total_change_24h_pct, chain_shares, source_ok = _compute_freshness_and_supply(
+            asset_chains, defillama, source_status, refresh_interval
+        )
+        depeg_index, asset_signal, _ = _compute_depeg_and_risk(
+            db,
+            sym,
+            asset_chains,
+            total_supply,
+            chain_shares,
+            source_ok,
+            source_error,
+            freshness.model_dump() if hasattr(freshness, "model_dump") else {},
+            refresh_interval,
+        )
+        item = DashboardSummaryItemOut(
+            symbol=sym,
+            score=int(asset_signal.score),
+            band=str(asset_signal.band),
+            peg=depeg_index.current_price,
+            supply=total_supply,
+            supply_change_24h=total_change_24h_pct,
+            freshness=freshness.status,
+        )
+        items.append(item.model_dump(mode="json"))
+    return items

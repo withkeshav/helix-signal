@@ -22,15 +22,70 @@ export function destroyForecastCharts() {
 export function _disposeAllCharts() {
   this.destroyCharts();
   if (typeof this.destroyForecastCharts === 'function') this.destroyForecastCharts();
-  if (window._helixResizeHandler) {
-    window.removeEventListener('resize', window._helixResizeHandler);
-    window._helixResizeHandler = null;
+  if (this._resizeObserver) {
+    this._resizeObserver.disconnect();
+    this._resizeObserver = null;
   }
 }
 
+const _cssVar = (name, fallback) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+
+export function helixTheme() {
+  const v = n => _cssVar(n, '');
+  return {
+    color: [v('--cat-1'), v('--cat-2'), v('--cat-3'), v('--cat-4'), v('--cat-5')],
+    textStyle: { fontFamily: 'Inter, sans-serif', fontSize: 10, color: v('--muted') },
+    grid: { left: 40, right: 12, top: 16, bottom: 24 },
+    xAxis: {
+      axisLine: { lineStyle: { color: v('--line') } },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(128,128,128,0.12)' } },
+    },
+    tooltip: {
+      backgroundColor: v('--panel'),
+      borderColor: v('--line'),
+      textStyle: { color: v('--text'), fontSize: 11 },
+      trigger: 'axis',
+    },
+    animationDuration: 300,
+  };
+}
+
+function _initChart(el) {
+  if (!el || typeof echarts === 'undefined') return null;
+  const existing = echarts.getInstanceByDom(el);
+  if (existing && !existing.isDisposed()) {
+    existing.dispose();
+  }
+  return echarts.init(el, helixTheme());
+}
+
+function _storeChart(map, key, chart) {
+  if (!map) map = new Map();
+  if (map.has(key)) _disposeChart(map.get(key));
+  map.set(key, chart);
+  return map;
+}
+
+function _timeZoomOption(tr) {
+  const long = ['7d', '30d', '90d'].includes(tr);
+  if (!long) return {};
+  return {
+    dataZoom: [
+      { type: 'inside' },
+      { type: 'slider', height: 14, bottom: 4 },
+    ],
+    grid: { left: 50, right: 16, top: 8, bottom: long ? 48 : 28 },
+  };
+}
+
 export function _setupResizeHandler() {
-  if (window._helixResizeHandler) return;
-  window._helixResizeHandler = () => {
+  if (this._resizeObserver) return;
+  const ro = new ResizeObserver(() => {
     try {
       for (const m of [this._charts, this._echarts]) {
         if (!m) continue;
@@ -40,13 +95,12 @@ export function _setupResizeHandler() {
           } catch (e) { /* chart resize guard */ }
         }
       }
-    } catch (e) { /* resize handler guard */ }
-  };
-  window.addEventListener('resize', window._helixResizeHandler);
+      if (this._smidgeChart && !this._smidgeChart.isDisposed()) this._smidgeChart.resize();
+    } catch (e) { /* resize observer guard */ }
+  });
+  document.querySelectorAll('[id^="chart-"], [id^="graph-"]').forEach(el => ro.observe(el));
+  this._resizeObserver = ro;
 }
-
-const _cssVar = (name, fallback) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
 export function renderCharts(data) {
   if (!this._charts) this._charts = new Map();
@@ -86,14 +140,17 @@ export function loadTrendChart() {
       }
       const el = document.getElementById('chart-trend-signal');
       if (!el) return;
-      if (this._echarts?.has('chart-trend-signal')) this._disposeChart(this._echarts.get('chart-trend-signal'));
       const pts = t.points.map(p => [new Date(p.timestamp).getTime(), p.signal_score != null ? Number(p.signal_score) : null]);
-      const chart = echarts.init(el);
+      const chart = _initChart(el);
+      if (!chart) return;
       if (!this._echarts) this._echarts = new Map();
-      this._echarts.set('chart-trend-signal', chart);
+      _storeChart(this._echarts, 'chart-trend-signal', chart);
       chart.setOption({
-        grid: { left: 50, right: 16, top: 8, bottom: 28 },
-        xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 10 }, axisLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } }, splitLine: { show: false } },
+        ...helixTheme(),
+        ..._timeZoomOption(tr),
+        grid: { left: 50, right: 16, top: 8, bottom: ['7d', '30d', '90d'].includes(tr) ? 48 : 28 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 10 }, axisLine: { lineStyle: { color: _cssVar('--line') } }, splitLine: { show: false } },
         yAxis: { min: 0, max: 100, axisLabel: { color: muted, fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } } },
         series: [{
           type: 'line', data: pts, smooth: true, symbol: 'none',
@@ -107,13 +164,14 @@ export function loadTrendChart() {
 
 export function _makeBar(elId, labels, values, color, prefix) {
   if (!this._charts) this._charts = new Map();
-  if (this._charts.has(elId)) this._disposeChart(this._charts.get(elId));
   const el = document.getElementById(elId);
   if (!el) return;
   const muted = _cssVar('--muted', '#9aa8c4');
-  const chart = echarts.init(el);
-  this._charts.set(elId, chart);
+  const chart = _initChart(el);
+  if (!chart) return;
+  _storeChart(this._charts, elId, chart);
   chart.setOption({
+    ...helixTheme(),
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: p => `${p[0].name}<br/>${prefix}${Number(p[0].value).toLocaleString()}` },
     grid: { left: 120, right: 20, top: 8, bottom: 8 },
     xAxis: { type: 'value', axisLabel: { color: muted, fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } } },
@@ -126,28 +184,24 @@ export function renderSentimentChart(series) {
   if (!series || !series.length) return;
   const el = document.getElementById('chart-sentiment');
   if (!el) return;
-  if (this._echarts?.has('chart-sentiment')) this._disposeChart(this._echarts.get('chart-sentiment'));
   const primary = _cssVar('--spark', '#60a5fa');
   const muted = _cssVar('--muted', '#9aa8c4');
-  const chart = echarts.init(el);
+  const chart = _initChart(el);
+  if (!chart) return;
   if (!this._echarts) this._echarts = new Map();
-  this._echarts.set('chart-sentiment', chart);
+  _storeChart(this._echarts, 'chart-sentiment', chart);
   chart.setOption({
+    ...helixTheme(),
+    tooltip: { trigger: 'axis' },
     grid: { left: 50, right: 16, top: 8, bottom: 28 },
-    xAxis: { type: 'category', data: series.map(s => s.date), axisLabel: { color: muted, fontSize: 10 }, axisLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } } },
+    xAxis: { type: 'category', data: series.map(s => s.date), axisLabel: { color: muted, fontSize: 10 }, axisLine: { lineStyle: { color: _cssVar('--line') } } },
     yAxis: { min: -1, max: 1, axisLabel: { color: muted, fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } } },
     series: [{ type: 'line', data: series.map(s => s.avg_sentiment), smooth: true, symbol: 'none', lineStyle: { width: 2, color: primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.15)' }, { offset: 1, color: 'rgba(59,130,246,0.02)' }] } } }],
   });
 }
 
 export function renderForecastCharts() {
-  if (typeof echarts === 'undefined') {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js';
-    s.onload = () => this._renderForecastChartsImpl();
-    document.head.appendChild(s);
-    return;
-  }
+  if (typeof echarts === 'undefined') return;
   this._renderForecastChartsImpl();
 }
 
@@ -158,7 +212,9 @@ export function _renderForecastChartsImpl() {
   const textColor = _cssVar('--text', '#e8edf7');
   const lineColor = _cssVar('--line', '#273247');
   const baseConfig = {
-    tooltip: { trigger: 'axis' }, grid: { left: 50, right: 16, top: 20, bottom: 36 },
+    ...helixTheme(),
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 16, top: 20, bottom: 36 },
     xAxis: { type: 'time', axisLine: { lineStyle: { color: lineColor } }, axisLabel: { color: textColor } },
     yAxis: { type: 'value', splitLine: { lineStyle: { color: lineColor, opacity: 0.2 } }, axisLabel: { color: textColor } },
     legend: { bottom: 0, textStyle: { color: textColor, fontSize: 11 } },
@@ -173,11 +229,14 @@ export function _renderForecastChartsImpl() {
 }
 
 export function _renderForecastCanvas(el, title, historical, forecast, baseConfig, textColor, lineColor) {
-  if (this._echarts?.has(el.id)) { this._disposeChart(this._echarts.get(el.id)); this._echarts?.delete(el.id); }
-  const chart = echarts.init(el);
-  if (this._echarts) this._echarts.set(el.id, chart);
+  if (!this._echarts) this._echarts = new Map();
+  const chart = _initChart(el);
+  if (!chart) return;
+  _storeChart(this._echarts, el.id, chart);
   const isPeg = /peg/i.test(title);
   const muted = _cssVar('--muted', '#9aa8c4');
+  const neutral = _cssVar('--neutral', '#fbbf24');
+  const down = _cssVar('--down', '#f87171');
   const yAxis = isPeg
     ? {
         type: 'value',
@@ -195,16 +254,25 @@ export function _renderForecastCanvas(el, title, historical, forecast, baseConfi
     ? [
         { name: 'q10 base', type: 'line', data: forecast.map(p => [p.timestamp, p.q10 ?? p.q50 * 0.997]), lineStyle: { opacity: 0 }, itemStyle: { opacity: 0 }, stack: 'confidence', areaStyle: { color: 'rgba(59,130,246,0.06)' }, symbol: 'none' },
         { name: '90% Band', type: 'line', data: forecast.map(p => [p.timestamp, Math.max(0, (p.q90 ?? p.q50) - p.q10)]), lineStyle: { opacity: 0 }, itemStyle: { opacity: 0 }, stack: 'confidence', areaStyle: { color: 'rgba(59,130,246,0.08)' }, symbol: 'none' },
-        { name: 'Median', type: 'line', data: forecast.map(p => [p.timestamp, p.q50]), lineStyle: { width: 2, color: '#3b82f6' }, symbol: 'none', z: 10 },
+        { name: 'Median', type: 'line', data: forecast.map(p => [p.timestamp, p.q50]), lineStyle: { width: 2, color: _cssVar('--cat-1', '#3b82f6') }, symbol: 'none', z: 10 },
         { name: 'Historical', type: 'line', data: historical.map(p => [p.timestamp, p.value]), lineStyle: { width: 1.5, color: textColor }, symbolSize: 2, z: 10 },
       ]
     : [{ name: 'No forecast data', type: 'line', data: historical.map(p => [p.timestamp, p.value]), lineStyle: { width: 1.5, color: textColor }, symbolSize: 2, z: 10 }];
+  const markLine = isPeg ? {
+    silent: true,
+    symbol: 'none',
+    data: [
+      { yAxis: 0.998, lineStyle: { color: neutral, type: 'dashed' }, label: { formatter: 'Watch 0.998', fontSize: 9 } },
+      { yAxis: 0.995, lineStyle: { color: down, type: 'dashed' }, label: { formatter: 'Depeg 0.995', fontSize: 9 } },
+    ],
+  } : undefined;
   chart.setOption({
     ...baseConfig,
     yAxis,
     title: { text: title, left: 'center', top: 0, textStyle: { color: textColor, fontSize: 13, fontWeight: 500 } },
     grid: { left: 50, right: 16, top: 36, bottom: 40 },
-    series,
+    dataZoom: [{ type: 'inside' }, { type: 'slider', height: 14, bottom: 4 }],
+    series: series.map(s => (markLine && s.name === 'Median' ? { ...s, markLine } : s)),
   });
 }
 
@@ -214,16 +282,19 @@ export async function renderSupplyChart() {
   if (!d || !d.points || !d.points.length) return;
   const el = document.getElementById('chart-supply-trend');
   if (!el) return;
-  if (this._echarts?.has('chart-supply-trend')) this._disposeChart(this._echarts.get('chart-supply-trend'));
   const pts = d.points.filter(p => p.total_supply != null).map(p => [new Date(p.timestamp).getTime(), Number(p.total_supply)]);
   const primary = _cssVar('--spark', '#60a5fa');
   const muted = _cssVar('--muted', '#9aa8c4');
-  const chart = echarts.init(el);
+  const chart = _initChart(el);
+  if (!chart) return;
   if (!this._echarts) this._echarts = new Map();
-  this._echarts.set('chart-supply-trend', chart);
+  _storeChart(this._echarts, 'chart-supply-trend', chart);
   chart.setOption({
-    grid: { left: 60, right: 16, top: 8, bottom: 28 },
-    xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 10, formatter: v => formatDate(v, 'axis') }, axisLine: { lineStyle: { color: 'rgba(128,128,128,0.2)' } }, splitLine: { show: false } },
+    ...helixTheme(),
+    ..._timeZoomOption(tr),
+    tooltip: { trigger: 'axis', valueFormatter: v => formatUsd(v) },
+    grid: { left: 60, right: 16, top: 8, bottom: ['7d', '30d', '90d'].includes(tr) ? 48 : 28 },
+    xAxis: { type: 'time', axisLabel: { color: muted, fontSize: 10, formatter: v => formatDate(v, 'axis') }, axisLine: { lineStyle: { color: _cssVar('--line') } }, splitLine: { show: false } },
     yAxis: { type: 'value', axisLabel: { color: muted, fontSize: 10, formatter: v => formatUsd(v) }, splitLine: { lineStyle: { color: 'rgba(128,128,128,0.1)' } } },
     series: [{ type: 'line', data: pts, smooth: true, symbol: 'none', lineStyle: { width: 2, color: primary }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.2)' }, { offset: 1, color: 'rgba(59,130,246,0.02)' }] } } }],
   });
@@ -253,8 +324,11 @@ export function renderRiskTerminalChart(predictive) {
   const muted = _cssVar('--muted', '#9aa8c4');
   const primary = _cssVar('--spark', '#60a5fa');
   const warn = _cssVar('--warn', '#f59e0b');
-  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const chart = echarts.getInstanceByDom(el) || _initChart(el);
+  if (!chart) return;
   chart.setOption({
+    ...helixTheme(),
+    tooltip: { trigger: 'axis', valueFormatter: v => `${Number(v).toFixed(1)}%` },
     grid: { left: 36, right: 8, top: 8, bottom: 24 },
     xAxis: {
       type: 'category',
@@ -299,7 +373,7 @@ export function renderContagionGraph(rotation) {
       value: Math.abs(p.correlation_7d || 0),
       lineStyle: {
         width: 1 + Math.abs(p.correlation_7d || 0) * 4,
-        color: (p.correlation_7d || 0) > 0 ? '#22c55e' : '#ef4444',
+        color: (p.correlation_7d || 0) > 0 ? _cssVar('--up', '#22c55e') : _cssVar('--down', '#ef4444'),
       },
       label: { show: true, formatter: `r=${(p.correlation_7d || 0).toFixed(2)}` },
     });
@@ -310,14 +384,16 @@ export function renderContagionGraph(rotation) {
         source: a,
         target: b,
         value: 0.9,
-        lineStyle: { type: 'dashed', color: '#f59e0b', width: 2 },
+        lineStyle: { type: 'dashed', color: _cssVar('--warn', '#f59e0b'), width: 2 },
         label: { show: true, formatter: 'collateral' },
       });
     }
   }
   const textColor = _cssVar('--text', '#e8edf7');
-  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const chart = echarts.getInstanceByDom(el) || _initChart(el);
+  if (!chart) return;
   chart.setOption({
+    ...helixTheme(),
     tooltip: {},
     series: [{
       type: 'graph',
@@ -358,9 +434,11 @@ export function renderSmidgeRadar(smidge) {
   const indicators = order.map(k => ({ name: k, max: 100 }));
   const values = order.map(k => dims[k] ?? 0);
   const textColor = _cssVar('--text', '#e8edf7');
-  const chart = echarts.init(el);
+  const chart = _initChart(el);
+  if (!chart) return;
   this._smidgeChart = chart;
   chart.setOption({
+    ...helixTheme(),
     radar: {
       indicator: indicators,
       axisName: { color: textColor, fontSize: 12 },
@@ -368,19 +446,12 @@ export function renderSmidgeRadar(smidge) {
     },
     series: [{
       type: 'radar',
-      data: [{ value: values, name: smidge.asset_symbol, areaStyle: { color: 'rgba(59,130,246,0.15)' }, lineStyle: { color: '#3b82f6' } }],
+      data: [{ value: values, name: smidge.asset_symbol, areaStyle: { color: 'rgba(59,130,246,0.15)' }, lineStyle: { color: _cssVar('--cat-1', '#3b82f6') } }],
     }],
   });
 }
 
-// --- Centralized chart-dispose-on-unmount helper (Phase 3.0/3.3) ---
-// Disposes all ECharts instances found on the page that belong to disposed containers.
-// Called on tab-leave / route-change to prevent memory leaks from hidden charts.
 export function disposeAllChartInstances() {
-  // ECharts instances registered via window.echarts
-  if (window.echarts && typeof window.echarts.dispose === 'function') {
-    // Global dispose isn't per-instance; iterate known chart containers
-  }
   const containers = document.querySelectorAll('[id^="chart-"], [id^="graph-"]');
   for (const el of containers) {
     try {
@@ -390,16 +461,4 @@ export function disposeAllChartInstances() {
       }
     } catch (e) { /* chart already disposed */ }
   }
-}
-
-// Set up global visibilitychange listener to dispose heavy viz when tab is hidden
-export function setupVisibilityDispose() {
-  if (window._helixVisibilityDispose) return;
-  window._helixVisibilityDispose = true;
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      // Page hidden — dispose heavy charts to free memory
-      disposeAllChartInstances();
-    }
-  });
 }

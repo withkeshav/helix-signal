@@ -120,7 +120,7 @@ Post-deploy validation:
 
 ## Test coverage
 
-- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~495 cases as of v4.0.5.1
+- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~500 cases as of v4.0.6
 - **Frontend E2E:** 15 Playwright specs in `frontend/e2e/` covering Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings. Run with `FRONTEND_PORT=3080 docker compose up -d --build frontend` then `cd frontend && npx playwright test --project=chromium`. See [README E2E section](../README.md#e2e-tests-playwright).
 
 ## Design Intent

@@ -373,8 +373,8 @@ export function renderInvestigationTimeline(report, containerId = 'graph-timelin
     xAxis: {
       type: 'time',
       axisLabel: { color: '#9aa8c4', fontSize: 10 },
-      axisLine: { lineStyle: { color: '#273247' } },
-      splitLine: { lineStyle: { color: '#1a2440' } },
+      axisLine: { lineStyle: { color: getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#273247' } },
+      splitLine: { lineStyle: { color: getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#273247', opacity: 0.35 } },
     },
     yAxis: {
       type: 'category',

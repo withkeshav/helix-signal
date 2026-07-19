@@ -13,6 +13,9 @@ export function useAnalytics() {
     async init() {
       this.analyticsAsset = this.$store.dashboard.asset || 'USDT';
       await this.loadAllAnalytics();
+      this.$watch('$store.ui.refreshTick', () => {
+        if (this.$store.ui.tab === 'signal') this.loadAllAnalytics();
+      });
     },
 
     async loadAllAnalytics() {

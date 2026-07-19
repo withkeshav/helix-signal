@@ -142,6 +142,7 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
+| v4.0.6 | local | 2026-07-19 | Frontend liveness (`refreshTick`), `GET /api/dashboard/summary`, settings-driven retention (11 tables), Timescale `drop_chunks` + compression |
 | v4.0.5.1 | local | 2026-07-16 | AI provider simplification (Ollama Cloud + OpenRouter), per-feature `provider:model_id` settings, budget enforcement removed, error-logging hardening, APScheduler `max_instances=1` |
 | v4.0.5 | local | 2026-07-16 | SQLAdmin `/admin`, secured intelligence API keys + tiers, Alpine settings shrink, FRED/ONNX DB-first |
 | v4.0.4 | `d0a69ab` | 2026-07-10 | Settings wiring fix — DB priority over env, audit redaction, mask_secret, unified Settings UI, Signal refresh |

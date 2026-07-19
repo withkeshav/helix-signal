@@ -26,6 +26,9 @@ export function useQuality() {
     async init() {
       this._bindAuth();
       await this.loadQualityData();
+      this.$watch('$store.ui.refreshTick', () => {
+        if (this.$store.ui.tab === 'system') this.loadQualityData();
+      });
     },
 
     _bindAuth() {

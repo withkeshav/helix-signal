@@ -274,6 +274,30 @@ Derived from `SourceStatus.last_successful_fetch` for the `defillama` source (sa
 
 This reflects how recently on-chain supply data was ingested, not audit report recency.
 
+## Data retention (v4.0.6+)
+
+Daily prune job (`history-retention`, 03:15 UTC) removes rows older than settings-driven `retention_*_days` keys (group **Data & Assets**). Env vars remain as fallbacks for deploys without DB settings.
+
+| Table | Default days | Notes |
+|-------|-------------|-------|
+| `asset_trend_snapshots` | 90 | Timescale `drop_chunks` on PostgreSQL |
+| `chain_trend_snapshots` | 90 | Timescale `drop_chunks` + 7d compression policy |
+| `signal_events` | 180 | ORM delete |
+| `osint_articles` | 30 | ORM delete |
+| `funding_rate_snapshots` | 30 | ORM delete |
+| `yield_bearing_snapshots` | 180 | ORM delete |
+| `collateral_snapshots` | 180 | ORM delete |
+| `whale_activity_snapshots` | 180 | ORM delete |
+| `fiat_reserve_snapshots` | 730 | ORM delete |
+| `forecast_runs` + `forecast_points` | 180 | Cascade delete |
+| `ai_narrative_history` | 90 | ORM delete |
+| `settings_audit_log` | 365 | ORM delete |
+| `source_usage` | 400 | ORM delete |
+| `ai_usage` | 400 | ORM delete |
+| `fred_yields` (DuckDB) | 730 | DuckDB delete |
+| `blacklist_events` | ∞ | Forensics — never pruned |
+| `address_tags` | ∞ | Curated — never pruned |
+
 ## Known limitations
 
 - Single-source baseline (DefiLlama)

@@ -134,6 +134,16 @@ class DataQualityOut(BaseModel):
     nlp_available: bool = False
 
 
+class DashboardSummaryItemOut(BaseModel):
+    symbol: str
+    score: int
+    band: str
+    peg: float | None = None
+    supply: float | None = None
+    supply_change_24h: float | None = None
+    freshness: str | None = None
+
+
 class DashboardResponse(BaseModel):
     asset: AssetMetadataOut
     generated_at: datetime

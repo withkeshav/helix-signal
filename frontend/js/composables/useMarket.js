@@ -116,12 +116,25 @@ export function useMarket() {
     setTimeRange(range) {
       if (['6h', '24h', '7d', '30d', '90d'].includes(range)) {
         this.timeRange = range;
-        this.$dispatch('time-range-changed', { timeRange: range });
+        this.loadChartRange();
       }
     },
     
     downloadDiagnostics() {
-      this.$dispatch('download-diagnostics');
+      const snapshot = {
+        timestamp: new Date().toISOString(),
+        asset: this.asset,
+        signal: this.signal,
+        depeg: this.depeg,
+        dews: this.dews,
+      };
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `helix-diagnostics-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
     },
     
     loadChartRange() {
@@ -251,6 +264,35 @@ export function useMarket() {
         if (sub === 'overview' || sub === 'narrative' || sub === 'insights') this.aiSubTab = sub;
       };
       window.addEventListener('ai-subtab-set', this._aiSubtabSetHandler);
+
+      this.$watch('$store.ui.refreshTick', () => this.reloadOnTick());
+    },
+
+    async reloadOnTick() {
+      const tab = this.$store.ui.tab;
+      if (tab !== 'signal' && tab !== 'market') return;
+      this.$store.ui.beginFetch();
+      try {
+        const asset = this.$store.dashboard.asset || this.asset;
+        await Promise.all([
+          this.loadDashboard(asset),
+          this.loadAllAssetSnapshots(),
+          this.loadAnomalies(),
+          this.loadPredictive(),
+          this.loadDews(),
+          this.loadStressLeaderboard(),
+          this.loadRotation(),
+        ]);
+      } finally {
+        this.$store.ui.endFetch();
+      }
+      this.$nextTick(() => {
+        this.renderCharts({ chains: this.chains });
+        this.renderSupplyChart();
+        this.renderRiskTerminalChart(this.predictive);
+        this.renderContagionGraph(this.rotation);
+        this.resizeAllHelixCharts();
+      });
     },
 
     destroy() {
@@ -263,29 +305,24 @@ export function useMarket() {
     },
 
     async loadAllAssetSnapshots() {
-      const assets = this.enabledAssets || [];
-      const results = await Promise.all(
-        assets.map(async (sym) => {
-          try {
-            const r = await fetch(`/api/dashboard?asset=${sym}`, { cache: 'no-store' });
-            if (!r.ok) return [sym, null];
-            const d = await r.json();
-            return [sym, {
-              totalSupply: d.total_supply_current,
-              signal: d.asset_signal || {},
-              depeg: d.depeg_index || {},
-              chains: d.chains || [],
-            }];
-          } catch {
-            return [sym, null];
-          }
-        }),
-      );
-      const snaps = {};
-      for (const [sym, data] of results) {
-        if (data) snaps[sym] = data;
+      try {
+        const r = await fetch('/api/dashboard/summary', { cache: 'no-store' });
+        if (!r.ok) return;
+        const rows = await r.json();
+        const snaps = {};
+        for (const row of rows || []) {
+          if (!row?.symbol) continue;
+          snaps[row.symbol] = {
+            totalSupply: row.supply,
+            signal: { score: row.score, band: row.band },
+            depeg: { current_price: row.peg, peg_status: row.peg != null ? undefined : undefined },
+            chains: this.assetSnapshots[row.symbol]?.chains || (row.symbol === this.asset ? this.chains : []),
+          };
+        }
+        this.assetSnapshots = { ...this.assetSnapshots, ...snaps };
+      } catch {
+        // Keep existing snapshots on failure
       }
-      this.assetSnapshots = snaps;
     },
 
     async loadDashboard(asset) {

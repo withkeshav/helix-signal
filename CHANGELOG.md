@@ -1,5 +1,21 @@
 # Helix Signal Changelog
 
+## v4.0.6 (2026-07-19) — Liveness + retention
+
+### Added
+- **`GET /api/dashboard/summary`** — single-request token-card payload (`symbol`, `score`, `band`, `peg`, `supply`, `supply_change_24h`, `freshness`) for all enabled assets.
+- **Settings-driven retention** for 11 additional tables (`retention_*_days` keys in Data & Assets group); DuckDB `fred_yields` pruning; last-prune result logged.
+- **Timescale compression** on `asset_trend_snapshots` and `chain_trend_snapshots` (7-day `compress_after` policy); hypertable pruning uses `drop_chunks` on PostgreSQL.
+
+### Changed
+- **Frontend liveness:** unkillable 60s `refreshTick` loop survives tab-hide; real refresh button; dead `global-refresh` dispatch removed.
+- **Chart lifecycle:** canvas mounts → div; `setupVisibilityDispose` removed; per-component `ResizeObserver`; shared `helixTheme()` with tooltips, dataZoom, peg markLines.
+- **Dark theme default** with `localStorage.helix_theme` persistence; `--warn` / `--text-muted` token aliases; `.source-down` / `.source-watch` classes.
+
+### Docs
+- `docs/api.md` — dashboard summary endpoint.
+- `docs/concepts/data-methodology.md` — retention policy table.
+
 ## v4.0.5.1 (2026-07-16) — AI provider simplification + pre-alpha cleanup
 
 ### Changed

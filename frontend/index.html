@@ -210,7 +210,10 @@
         <span class="badge badge-info" style="font-size:11px;margin-right:6px" x-text="$store.ui.adminToken ? 'Signed in' : 'View only'"></span>
         <span class="badge" style="font-size:11px;margin-right:6px" x-text="'AI: ' + ($store.ui.aiModeLabel || 'Off')"></span>
         <span class="badge" style="font-size:11px;margin-right:6px" x-text="'Data: ' + ($store.ui.dataHealthLabel || '—')"></span>
-        <button class="btn btn-primary" @click="refresh" :disabled="refreshing" title="Refresh now" aria-label="Refresh now" x-text="refreshing?'...':'⟳'" x-cloak x-show="false"></button>
+        <button class="btn btn-primary" @click="refresh()" :disabled="$store.ui.refreshing" title="Refresh now" aria-label="Refresh now">
+          <span x-show="$store.ui.refreshing" class="loading-spinner" style="width:14px;height:14px;border-width:2px"></span>
+          <span x-show="!$store.ui.refreshing">⟳</span>
+        </button>
         <button class="btn btn-muted" @click="cycleTheme" aria-label="Toggle dark/light theme" title="Toggle theme">
           <svg class="icon" x-cloak x-show="theme==='light'"><use href="#icon-sun"/></svg>
           <svg class="icon" x-cloak x-show="theme!=='light'"><use href="#icon-moon"/></svg>
@@ -570,7 +573,7 @@
           <button class="btn btn-muted" @click="openTrendsDeepDive()" style="float:right;padding:4px 10px;font-size:11px">Deep-dive</button>
           <button class="btn btn-muted" @click="exportTrendsCsv()" style="float:right;margin-right:6px;padding:4px 10px;font-size:11px">Export CSV</button>
         </h2>
-        <div class="chart-wrap"><canvas id="chart-trend-signal"></canvas></div>
+        <div class="chart-wrap" id="chart-trend-signal"></div>
 
         <!-- Trends deep-dive modal -->
         <div x-cloak x-show="trendsDeepDiveVisible" @keydown.window.escape="trendsDeepDiveVisible=false" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:50;display:flex;align-items:center;justify-content:center" @click.self="trendsDeepDiveVisible=false">
@@ -603,7 +606,7 @@
       <!-- Chain Supply Distribution -->
       <div class="chart-card" x-cloak x-show="(chains || []).length > 0">
         <h2>Chain Supply Distribution</h2>
-        <div class="chart-wrap tall"><canvas id="chart-distribution"></canvas></div>
+        <div class="chart-wrap tall" id="chart-distribution"></div>
       </div>
 
       <!-- Chain Cards Grid (collapsible) -->
@@ -733,11 +736,11 @@
         </div>
         <div class="chart-card">
           <h2>Supply by Chain</h2>
-          <div class="chart-wrap tall"><canvas id="chart-supply-bar"></canvas></div>
+          <div class="chart-wrap tall" id="chart-supply-bar"></div>
         </div>
         <div class="chart-card">
           <h2>Supply Trend (30d)</h2>
-          <div class="chart-wrap tall"><canvas id="chart-supply-trend"></canvas></div>
+          <div class="chart-wrap tall" id="chart-supply-trend"></div>
         </div>
       </div>
 
@@ -895,7 +898,7 @@
         </div>
         <div class="chart-card">
           <h2>Sentiment Timeseries (7d)</h2>
-          <div class="chart-wrap"><canvas id="chart-sentiment"></canvas></div>
+          <div class="chart-wrap" id="chart-sentiment"></div>
         </div>
       </div>
 

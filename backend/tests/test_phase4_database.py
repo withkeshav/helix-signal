@@ -165,10 +165,15 @@ class TestRetentionPolicy:
 
     def test_retention_env_defaults(self):
         from services.retention import _retention_days
-        assert _retention_days("asset_trend_snapshots") == 90
-        assert _retention_days("signal_events") == 180
-        assert _retention_days("osint_articles") == 30
-        assert _retention_days("chain_trend_snapshots") == 90
+
+        db = SessionLocal()
+        try:
+            assert _retention_days(db, "retention_asset_trend_snapshots_days", "TREND_RETENTION_DAYS", 90) == 90
+            assert _retention_days(db, "retention_signal_events_days", "EVENT_RETENTION_DAYS", 180) == 180
+            assert _retention_days(db, "retention_osint_articles_days", "OSINT_RETENTION_DAYS", 30) == 30
+            assert _retention_days(db, "retention_chain_trend_snapshots_days", "CHAIN_TREND_RETENTION_DAYS", 90) == 90
+        finally:
+            db.close()
 
     def test_osint_pruning(self):
         init_db()

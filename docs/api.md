@@ -4,7 +4,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 > **API Versioning Note:** Most routes live at `/api/*` with no version prefix. The V4 intelligence/forensics endpoints (`investigate`, `yield`, `collateral`, `reserve`, `blacklist`, `tags`) use `/api/v1/*`. A future dedicated versioning pass will standardize all routes under `/api/v1`. See `.opencode/AGENTS.md` decision history for context.
 
-## Intelligence API (v4.0.5.1+)
+## Intelligence API (v4.0.6+)
 
 Self-host first; optional API keys for other apps.
 
@@ -54,6 +54,7 @@ Browser UI: `/admin` (SQLAdmin). Requires an admin user login (same seeded accou
 | GET | `/api/version` | Application version string | 60/min |
 | GET | `/api/assets` | Available assets with metadata | 60/min |
 | GET | `/api/dashboard?asset=USDT` | Live risk monitoring payload | 60/min |
+| GET | `/api/dashboard/summary` | Per-asset token-card summary for all enabled assets (one query set) | 60/min |
 | POST | `/api/refresh` | Trigger immediate data refresh | 10/min |
 | GET | `/api/metrics` | Prometheus metrics (internal, blocked at nginx in production) | — |
 | GET | `/api/settings` | Feature flags, provider toggles, intervals (requires X-Admin-Token) | 10/min |
@@ -220,7 +221,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.0.5.1"
+  "version": "4.0.6"
 }
 ```
 
@@ -239,6 +240,7 @@ Typed Pydantic response models in `backend/schemas.py`:
 | Model | Endpoint |
 |-------|----------|
 | `DashboardResponse` | `/api/dashboard` |
+| `DashboardSummaryItemOut` | `/api/dashboard/summary` |
 | `VersionResponse` | `/api/version` |
 | `TrendResponseOut` | `/api/trends` |
 | `ChainTrendResponseOut` | `/api/trends/chains` |

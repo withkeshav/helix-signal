@@ -101,6 +101,13 @@ export function useOSINT() {
             this.loadAttestation();
           }
         });
+
+        this.$watch('$store.ui.refreshTick', () => {
+          if (this.$store.ui.tab !== 'intel') return;
+          const asset = this.$store.dashboard.asset || 'USDT';
+          this.loadEvents(asset);
+          this.loadAttestation();
+        });
       });
     },
 

@@ -20,7 +20,6 @@ import { useFundamentals } from 'composables/useFundamentals.js';
 import { useAnalytics } from 'composables/useAnalytics.js';
 import { useTrendsDeepDive } from 'composables/useTrendsDeepDive.js';
 import { useAdminOps } from 'composables/useAdminOps.js';
-import { setupVisibilityDispose } from './charts.js';
 
 // Register global infrastructure
 registerDashboardStore(Alpine);
@@ -48,12 +47,11 @@ Alpine.data('adminOps', useAdminOps);
 Alpine.data('helixApp', () => ({
   // Essential global state needed by template
   tab: location.hash.slice(1) || 'signal',
-  theme: 'light',
+  theme: 'dark',
   asset: 'USDT', // Needed by asset select dropdown
   searchQuery: '',
   searchResults: [],
   version: '', // Needed by footer
-  refreshing: false, // Needed by refresh button
   staleWarning: '',
   rateLimitWarning: '',
   operationalWarning: '',
@@ -71,7 +69,12 @@ Alpine.data('helixApp', () => ({
 
   async init() {
     const root = document.documentElement;
-    this.theme = root.getAttribute('data-theme') || 'light';
+    const storedTheme = (() => {
+      try { return localStorage.getItem('helix_theme'); } catch { return null; }
+    })();
+    this.theme = storedTheme || root.getAttribute('data-theme') || 'dark';
+    root.setAttribute('data-theme', this.theme);
+    this.$store.ui.setTheme(this.theme);
 
     const validTabs = ['signal', 'market', 'analytics', 'intel', 'forensics', 'alerts', 'system', 'settings'];
     const hashTab = location.hash.slice(1);
@@ -110,7 +113,7 @@ Alpine.data('helixApp', () => ({
       location.hash = 'signal';
     }
     
-    // Watch for tab changes — dispose charts on leave to prevent memory leaks
+    // Watch for tab changes
     let prevTab = this.tab;
     this.$watch('tab', val => {
       if (val === 'analytics') {
@@ -124,11 +127,12 @@ Alpine.data('helixApp', () => ({
         prevTab = val;
       }
       location.hash = val;
-      this.$dispatch('tab-changed', { tab: val });
     });
 
-    // Dispose charts when page becomes hidden (Phase 3.3)
-    setupVisibilityDispose();
+    // Instant catch-up when tab becomes visible again
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this.$store.ui.refreshTick++;
+    });
 
     // Browser back/forward support — sync tab from URL hash (Phase 3.1)
     window.addEventListener('popstate', () => {
@@ -136,7 +140,6 @@ Alpine.data('helixApp', () => ({
       if (validTabs.includes(hashTab) && hashTab !== this.tab) {
         this.tab = hashTab;
         this.$store.ui.tab = hashTab;
-        this.$dispatch('tab-changed', { tab: hashTab });
       }
     });
     
@@ -190,39 +193,36 @@ Alpine.data('helixApp', () => ({
 
   _scheduleNextRefresh() {
     this._refreshTimer = setTimeout(async () => {
-      if (document.hidden) return;
-      if (this._inFlight) return;
+      this._scheduleNextRefresh();
+      if (document.hidden || this._inFlight) return;
       this._inFlight = true;
       try {
-        this.$dispatch('global-refresh');
+        this.$store.ui.refreshTick++;
         await this._loadWarnings();
       } catch (e) {
         console.warn('refresh cycle failed', e);
       } finally {
         this._inFlight = false;
-        this._scheduleNextRefresh();
       }
     }, 60000);
   },
 
-  // Essential coordination methods only
   async refresh() {
-    this.refreshing = true;
-    this.$dispatch('refresh-requested');
-    // Simulate refresh completion - components will handle actual work
-    setTimeout(() => { this.refreshing = false; }, 1000);
+    this.$store.ui.beginFetch();
+    try {
+      this.$store.ui.refreshTick++;
+      await this._loadWarnings();
+    } finally {
+      this.$store.ui.endFetch();
+    }
   },
 
   cycleTheme() {
     const root = document.documentElement;
     this.theme = this.theme === 'light' ? 'dark' : 'light';
     root.setAttribute('data-theme', this.theme);
-    this.$dispatch('theme-changed', { theme: this.theme });
-  },
-
-  search() {
-    // Search coordination - let components filter results
-    this.$dispatch('search-requested', { query: this.searchQuery });
+    try { localStorage.setItem('helix_theme', this.theme); } catch {}
+    this.$store.ui.setTheme(this.theme);
   },
 
   destroy() {
@@ -230,19 +230,17 @@ Alpine.data('helixApp', () => ({
   },
   
   switchTo(symbol) {
-    // Dispatch event for components to handle asset switching
-    this.$dispatch('asset-switched', { symbol });
+    if (this.enabledAssets.includes(symbol)) {
+      this.asset = symbol;
+      this.$store.dashboard.asset = symbol;
+    }
   },
 
   switchAsset() {
-    // Dispatch event for components to handle asset switching  
-    this.$dispatch('asset-changed', { asset: this.asset });
+    this.$store.dashboard.asset = this.asset;
   },
 
   loadTab() {
-    // Request focused data reload from current tab component
-    this.$dispatch('tab-changed', { tab: this.tab });
-    // Update the UI store with the current tab
     this.$store.ui.tab = this.tab;
   },
 
@@ -271,7 +269,7 @@ Alpine.data('helixApp', () => ({
     this.searchResults = [];
     if (r && r.symbol) {
       this.asset = r.symbol;
-      this.$dispatch('asset-changed', { asset: r.symbol });
+      this.$store.dashboard.asset = r.symbol;
     }
   },
 

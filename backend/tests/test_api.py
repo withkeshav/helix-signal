@@ -8,7 +8,7 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "4.0.5.1"
+    assert body["version"] == "4.0.6"
     assert "db" in body
     assert body["db_connected"] is True
     assert body["redis_connected"] is False
@@ -26,6 +26,21 @@ def test_dashboard_empty_db(client):
     data = response.json()
     assert data["asset"]["symbol"] == "USDT"
     assert "freshness" in data
+
+
+def test_dashboard_summary(client):
+    response = client.get("/api/dashboard/summary")
+    assert response.status_code == 200
+    rows = response.json()
+    assert isinstance(rows, list)
+    if rows:
+        row = rows[0]
+        assert "symbol" in row
+        assert "score" in row
+        assert "band" in row
+        assert "peg" in row
+        assert "supply" in row
+        assert "freshness" in row
 
 
 def test_trends_valid_window_90d(client):

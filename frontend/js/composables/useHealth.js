@@ -15,6 +15,9 @@ export function useHealth() {
 
     async init() {
       await this._loadAll();
+      this.$watch('$store.ui.refreshTick', () => {
+        if (this.$store.ui.tab === 'system') this._loadAll();
+      });
     },
 
     async _loadAll() {

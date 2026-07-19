@@ -624,6 +624,51 @@ class AddressTag(Base):
     )
 
 
+class DataQualitySnapshot(Base):
+    """Daily persisted data-quality summary (WO-BE-6)."""
+
+    __tablename__ = "data_quality_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    overall_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    source_health: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    bucket_fill_rates: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    asset_metrics: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+    __table_args__ = (
+        Index("ix_dq_snapshot_generated", "generated_at"),
+    )
+
+
+class InsightAsset(Base):
+    """Versioned deterministic insight objects (WO-DA-4)."""
+
+    __tablename__ = "insight_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    schema_version: Mapped[str] = mapped_column(String(16), nullable=False, default="1.0")
+    asset_scope: Mapped[str] = mapped_column(String(32), nullable=False, default="*", index=True)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+    deterministic_payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    ai_narrative: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    sources: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    __table_args__ = (
+        Index("ix_insight_asset_kind_scope_ts", "kind", "asset_scope", "generated_at"),
+    )
+
+
 def get_db():
     db = SessionLocal()
     try:

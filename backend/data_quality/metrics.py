@@ -80,7 +80,7 @@ class DataQualityMetrics:
             
             metrics = {
                 "total_snapshots": len(snapshots),
-                "assets_tracked": len(set(s.chain_name for s in snapshots)),
+                "assets_tracked": len(set(s.asset_symbol for s in snapshots)),
                 "chains_tracked": len(set(s.chain_name for s in snapshots)),
                 "completeness_by_asset": {},
                 "data_gaps": [],

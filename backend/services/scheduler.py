@@ -51,6 +51,28 @@ def _retention_job() -> None:
         db.close()
 
 
+def _data_quality_snapshot_job() -> None:
+    db = SessionLocal()
+    try:
+        from services.data_quality_snapshots import run_data_quality_snapshot_job
+        run_data_quality_snapshot_job(db)
+    except Exception:
+        log.exception("data_quality_snapshot_job.failed")
+    finally:
+        db.close()
+
+
+def _insight_refresh_job() -> None:
+    db = SessionLocal()
+    try:
+        from services.insight_assets import refresh_all_insights_job
+        refresh_all_insights_job(db)
+    except Exception:
+        log.exception("insight_refresh_job.failed")
+    finally:
+        db.close()
+
+
 def _osint_job() -> None:
     from providers.settings import get_setting
     db = SessionLocal()
@@ -188,6 +210,26 @@ def register_scheduler_jobs(
         hour=3,
         minute=15,
         id="history-retention",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        _data_quality_snapshot_job,
+        "cron",
+        hour=4,
+        minute=0,
+        id="data-quality-snapshot",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        _insight_refresh_job,
+        "cron",
+        hour=4,
+        minute=30,
+        id="insight-assets-refresh",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

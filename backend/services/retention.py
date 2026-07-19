@@ -30,7 +30,7 @@ from database import (
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "4.0.7"
+HELIX_VERSION = "4.1.0"
 
 _LAST_PRUNE_RESULT: dict[str, Any] | None = None
 

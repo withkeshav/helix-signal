@@ -8,6 +8,7 @@ from core.admin_auth import require_admin_token
 from core.limiter import limiter
 from database import get_db
 from providers.settings import get_all_settings, set_setting
+from services.retention import get_last_prune_result
 
 router = APIRouter()
 
@@ -61,6 +62,57 @@ def api_get_settings(
         s.pop("key_env", None)
         
     return settings
+
+
+@router.get("/settings/last-prune")
+@limiter.limit("30/minute")
+def api_last_prune(
+    request: Request,
+    _auth=Depends(require_admin_token),
+) -> dict:
+    """Last retention prune result for Control Room."""
+    result = get_last_prune_result()
+    return {"available": result is not None, "result": result}
+
+
+@router.get("/settings/ops")
+@limiter.limit("30/minute")
+def api_settings_ops(
+    request: Request,
+    db: Session = Depends(get_db),
+    _auth=Depends(require_admin_token),
+) -> dict:
+    """Scheduler + source health summary for Control Room Overview."""
+    from core.registry import SOURCES_REGISTRY, get_source
+    from services.data_quality_snapshots import get_quality_summary
+
+    scheduler_running = False
+    try:
+        scheduler_running = bool(request.app.state.scheduler.running)
+    except AttributeError:
+        scheduler_running = False
+
+    sources_ok = 0
+    sources_total = len(SOURCES_REGISTRY)
+    for name in SOURCES_REGISTRY:
+        try:
+            source = get_source(name)
+            if source and hasattr(source, "health_check"):
+                st = source.health_check()
+                if st.get("state") == "closed":
+                    sources_ok += 1
+        except Exception:
+            pass
+
+    dq = get_quality_summary(db)
+    return {
+        "scheduler_running": scheduler_running,
+        "sources_ok": sources_ok,
+        "sources_total": sources_total,
+        "last_prune": get_last_prune_result(),
+        "quality_score": dq.get("overall_score"),
+        "quality_generated_at": dq.get("generated_at"),
+    }
 
 
 @router.put("/settings")

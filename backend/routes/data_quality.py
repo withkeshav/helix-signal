@@ -8,8 +8,18 @@ from database import get_db
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
 from data_quality.metrics import get_all_data_quality_metrics, get_data_quality_report
+from services.data_quality_snapshots import get_quality_summary
 
 router = APIRouter()
+
+@router.get("/data-quality/summary")
+@limiter.limit("60/minute")
+def get_data_quality_summary(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Read-open data quality summary from latest snapshot."""
+    return get_quality_summary(db)
 
 @router.get("/data-quality/overview")
 @limiter.limit("30/minute")

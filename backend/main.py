@@ -117,35 +117,41 @@ async def lifespan(app: FastAPI):
 
         loop = asyncio.get_running_loop()
         if not skip_refresh and not disable_bg:
-            loop.create_task(asyncio.to_thread(_osint_job))
-            loop.create_task(_osint_attestation_refresh())
-            loop.create_task(asyncio.to_thread(_ethena_job))
-            loop.create_task(asyncio.to_thread(_sky_job))
-            loop.create_task(asyncio.to_thread(_liquity_job))
-            loop.create_task(asyncio.to_thread(_aave_job))
-            loop.create_task(asyncio.to_thread(_ondo_job))
+            def _schedule_sync(delay: float, fn) -> None:
+                loop.call_later(delay, lambda: loop.create_task(asyncio.to_thread(fn)))
+
+            def _schedule_async(delay: float, fn) -> None:
+                loop.call_later(delay, lambda: loop.create_task(fn()))
+
+            _schedule_sync(0, _osint_job)
+            _schedule_async(30, _osint_attestation_refresh)
+            for idx, job in enumerate((_ethena_job, _sky_job, _liquity_job, _aave_job, _ondo_job)):
+                _schedule_async(60 + 30 * idx, job)
 
         if not skip_refresh:
             await _refresh_job()
 
         if not skip_refresh:
-            db = SessionLocal()
-            try:
-                row_count = db.execute(select(func.count(AssetTrendSnapshot.id))).scalar() or 0
-                if row_count < 24:
-                    log.info("auto_backfill.start", reason="fresh_db", current_rows=row_count)
-                    enabled = load_enabled_assets()
-                    for asset in enabled:
-                        sym = asset.get("symbol", "")
-                        if sym:
-                            try:
-                                run_backfill(db, asset=sym, days=7, _internal=True)
-                                log.info("auto_backfill.complete", asset=sym)
-                            except Exception:
-                                log.warning("auto_backfill.failed", asset=sym, exc_info=True)
-                    db.commit()
-            finally:
-                db.close()
+            async def _startup_backfill() -> None:
+                db = SessionLocal()
+                try:
+                    row_count = db.execute(select(func.count(AssetTrendSnapshot.id))).scalar() or 0
+                    if row_count < 24:
+                        log.info("auto_backfill.start", reason="fresh_db", current_rows=row_count)
+                        enabled = load_enabled_assets()
+                        for asset in enabled:
+                            sym = asset.get("symbol", "")
+                            if sym:
+                                try:
+                                    run_backfill(db, asset=sym, days=7, _internal=True)
+                                    log.info("auto_backfill.complete", asset=sym)
+                                except Exception:
+                                    log.warning("auto_backfill.failed", asset=sym, exc_info=True)
+                        db.commit()
+                finally:
+                    db.close()
+
+            loop.create_task(_startup_backfill())
 
         if not disable_bg:
             try:
@@ -181,7 +187,7 @@ app = FastAPI(
                 "and market-wide early warning for the stablecoin ecosystem. "
                 "Provides REST endpoints for alerts, forensics, OSINT, address tagging, "
                 "and real-time signal streaming.",
-    version="4.1.0",
+    version="4.2.0",
     contact={
         "name": "Helix Signal Team",
         "url": "https://github.com/anomalyco/Helix-Signal",

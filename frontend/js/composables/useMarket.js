@@ -1,7 +1,9 @@
-import { gaugeArc, gaugeColor, formatWhen, formatAiAge, formatUsd, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from '../utils.js';
+import { gaugeArc, gaugeColor, formatUsd, formatWhen, formatAiAge, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from '../utils.js';
+import { useEventLabels } from './useEventLabels.js';
 import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, renderHeroPegChart, _setupResizeHandler, _disposeAllCharts, _disposeChart, renderRiskTerminalChart, renderContagionGraph, resizeAllHelixCharts } from '../charts.js';
 
 export function useMarket() {
+  const eventLabels = useEventLabels();
   return {
     // Core market data (from original market.js)
     asset: 'USDT',
@@ -86,6 +88,15 @@ export function useMarket() {
     freshnessBandClass,
     formatDisplayName,
     depegVelocityMeta,
+
+    async applyAnomalyLabel(anomaly, label) {
+      const eventId = anomaly?.event_id || `${this.asset}:${anomaly?.metric}:${anomaly?.timestamp}`;
+      const row = await eventLabels.applyLabel.call(this, 'anomaly', eventId, label);
+      if (row) anomaly.labels = [...(anomaly.labels || []), row];
+    },
+    latestAnomalyLabel(anomaly) {
+      return eventLabels.latestLabel.call(this, anomaly?.labels);
+    },
 
     assetSupply(asset) {
       const snap = this.assetSnapshots[asset];

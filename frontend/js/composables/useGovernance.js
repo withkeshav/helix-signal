@@ -60,11 +60,6 @@ export function useGovernance() {
       { name: 'quality', label: 'Full (quality)', is_builtin: true },
     ],
 
-    toastMessage: '',
-    toastType: '',
-    toastVisible: false,
-    toastTimer: null,
-
     setupDone: typeof localStorage !== 'undefined' && localStorage.getItem('helix_setup_done') === '1',
     wizardStep: 1,
     wizardPlaybook: 'balanced',
@@ -408,11 +403,7 @@ export function useGovernance() {
     },
 
     showToast(message, type = 'info') {
-      this.toastMessage = message;
-      this.toastType = type;
-      this.toastVisible = true;
-      if (this.toastTimer) clearTimeout(this.toastTimer);
-      this.toastTimer = setTimeout(() => { this.toastVisible = false; }, 3500);
+      this.$store.ui.showToast(message, type);
     },
 
     async applyPlaybook(name) {

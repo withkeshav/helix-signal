@@ -110,6 +110,13 @@ def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) ->
         sym = asset.strip().upper()
         stmt = stmt.join(OsintArticle.asset_links).where(OsintArticleAsset.asset_symbol == sym)
     articles = db.execute(stmt.limit(limit)).scalars().all()
+    from services.event_labels import labels_for_export
+
+    label_map = labels_for_export(
+        db,
+        event_type="osint",
+        event_ids=[str(a.id) for a in articles],
+    )
     return [
         {
             "id": a.id,
@@ -121,6 +128,7 @@ def get_osint_feed(db: Session, *, asset: str | None = None, limit: int = 20) ->
             "sentiment_score": a.sentiment_score,
             "sentiment_label": a.sentiment_label,
             "assets": [ln.asset_symbol for ln in a.asset_links],
+            "labels": label_map.get(str(a.id), []),
         }
         for a in articles
     ]

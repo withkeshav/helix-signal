@@ -30,7 +30,7 @@ from database import (
 
 log = get_logger(__name__)
 
-HELIX_VERSION = "4.1.0"
+HELIX_VERSION = "4.2.0"
 
 _LAST_PRUNE_RESULT: dict[str, Any] | None = None
 
@@ -40,10 +40,10 @@ RETENTION_TABLES: list[tuple[str, Any, str, str, str, int, bool]] = [
     ("chain_trend_rows", ChainTrendSnapshot, "timestamp", "retention_chain_trend_snapshots_days", "CHAIN_TREND_RETENTION_DAYS", 90, True),
     ("signal_event_rows", SignalEvent, "timestamp", "retention_signal_events_days", "EVENT_RETENTION_DAYS", 180, False),
     ("osint_article_rows", OsintArticle, "fetched_at", "retention_osint_articles_days", "OSINT_RETENTION_DAYS", 30, False),
-    ("funding_rate_rows", FundingRateSnapshot, "timestamp", "retention_funding_rate_snapshots_days", "RETENTION_FUNDING_RATE_SNAPSHOTS_DAYS", 30, False),
-    ("yield_bearing_rows", YieldBearingSnapshot, "timestamp", "retention_yield_bearing_snapshots_days", "RETENTION_YIELD_BEARING_SNAPSHOTS_DAYS", 180, False),
-    ("collateral_rows", CollateralSnapshot, "timestamp", "retention_collateral_snapshots_days", "RETENTION_COLLATERAL_SNAPSHOTS_DAYS", 180, False),
-    ("whale_activity_rows", WhaleActivitySnapshot, "timestamp", "retention_whale_activity_snapshots_days", "RETENTION_WHALE_ACTIVITY_SNAPSHOTS_DAYS", 180, False),
+    ("funding_rate_rows", FundingRateSnapshot, "timestamp", "retention_funding_rate_snapshots_days", "RETENTION_FUNDING_RATE_SNAPSHOTS_DAYS", 30, True),
+    ("yield_bearing_rows", YieldBearingSnapshot, "timestamp", "retention_yield_bearing_snapshots_days", "RETENTION_YIELD_BEARING_SNAPSHOTS_DAYS", 180, True),
+    ("collateral_rows", CollateralSnapshot, "timestamp", "retention_collateral_snapshots_days", "RETENTION_COLLATERAL_SNAPSHOTS_DAYS", 180, True),
+    ("whale_activity_rows", WhaleActivitySnapshot, "timestamp", "retention_whale_activity_snapshots_days", "RETENTION_WHALE_ACTIVITY_SNAPSHOTS_DAYS", 180, True),
     ("fiat_reserve_rows", FiatReserveSnapshot, "created_at", "retention_fiat_reserve_snapshots_days", "RETENTION_FIAT_RESERVE_SNAPSHOTS_DAYS", 730, False),
     ("ai_narrative_rows", AiNarrativeHistory, "created_at", "retention_ai_narrative_history_days", "RETENTION_AI_NARRATIVE_HISTORY_DAYS", 90, False),
     ("settings_audit_rows", SettingsAuditLog, "created_at", "retention_settings_audit_log_days", "RETENTION_SETTINGS_AUDIT_LOG_DAYS", 365, False),

@@ -256,4 +256,16 @@ button:focus-visible,.btn:focus-visible,.tab:focus-visible,.nav-link:focus-visib
 .cr-setting-hint{font-size:var(--fs-sub);color:var(--muted);display:block}
 .cr-dirty-bar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
 .input,.select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:Inter,sans-serif}
+.label-actions{display:flex;gap:4px;flex-wrap:wrap}
+.label-btn{font-size:10px;padding:2px 6px}
+.label-pill{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--bg-accent);color:var(--muted)}
+.table-link{color:var(--text);text-decoration:none}
+.cmdk-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh}
+.cmdk-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(520px,92vw);box-shadow:var(--shadow-lg);overflow:hidden}
+.cmdk-input{width:100%;border:none;border-bottom:1px solid var(--line);padding:12px 14px;background:var(--bg);color:var(--text);font-size:14px;font-family:Inter,sans-serif}
+.cmdk-item{display:flex;justify-content:space-between;gap:8px;padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
+.cmdk-item:hover,.cmdk-item.active{background:var(--bg-accent)}
+.kpi-value-lg{font-size:var(--fs-lg);font-weight:700}
+.kpi-value-base{font-size:var(--fs-base)}
+.cmdk-hint{padding:10px 14px}
 @media(max-width:900px){.signal-hero{grid-template-columns:1fr}}

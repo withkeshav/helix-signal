@@ -645,6 +645,30 @@ class DataQualitySnapshot(Base):
     )
 
 
+class EventLabel(Base):
+    """Operator labels for OSINT/anomaly events — append-only training corpus (WO-DA-5)."""
+
+    __tablename__ = "event_labels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    event_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    user_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    label: Mapped[str] = mapped_column(String(32), nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+    __table_args__ = (
+        Index("ix_event_labels_type_id", "event_type", "event_id"),
+    )
+
+
 class InsightAsset(Base):
     """Versioned deterministic insight objects (WO-DA-4)."""
 

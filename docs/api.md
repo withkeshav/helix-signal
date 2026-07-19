@@ -126,6 +126,28 @@ Browser UI: `/admin` (SQLAdmin). Requires an admin user login (same seeded accou
 | GET | `/api/settings/groups` | Get all setting groups | Admin token |
 | GET | `/api/settings/defaults` | Get default values for all settings | Admin token |
 
+## Event Labels (v4.2.0+)
+
+Operator labeling corpus for OSINT and anomaly events. Labels are **append-only** (no delete API).
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/events/{type}/{id}/labels` | List labels (`type`: `osint` \| `anomaly`) | Open |
+| POST | `/api/events/{type}/{id}/labels` | Add label (`confirmed`, `rejected`, `noise`, `tagged`) | Admin token |
+
+OSINT `event_id` = article numeric id. Anomaly `event_id` = `ASSET:metric:ISO-timestamp`.
+
+## V4 Series History (v4.2.0+)
+
+Long-range reads use Timescale continuous aggregates on PostgreSQL (≥7d windows); SQLite/dev uses raw snapshots.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/series/funding?days=30&symbol=USDT` | Funding rate history |
+| GET | `/api/v1/series/{symbol}/yield?days=30` | Yield-bearing snapshots |
+| GET | `/api/v1/series/{symbol}/collateral?days=30` | Collateral snapshots |
+| GET | `/api/v1/series/{symbol}/whale?days=30` | Whale activity snapshots |
+
 ## Data Quality (v4.1.0+)
 
 | Method | Endpoint | Description | Auth |
@@ -254,7 +276,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.1.0"
+  "version": "4.2.0"
 }
 ```
 

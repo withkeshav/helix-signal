@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import AssetChainSnapshot, AssetTrendSnapshot, SignalEvent
+from services.event_labels import anomaly_event_id, labels_for_export
 from services.onnx_inference import MODELS_DIR, MODEL_REGISTRY, predict_depeg_probability_v4
 
 log = get_logger(__name__)
@@ -274,12 +275,21 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
                 continue
             ts = history["timestamps"][idx]
             z = float(item.get("z_score", 0))
+            ts_iso = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
             normalized.append({
                 "metric": metric,
-                "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else ts,
+                "timestamp": ts_iso,
                 "direction": "above" if z >= 0 else "below",
                 "z_score": z,
+                "event_id": anomaly_event_id(asset_symbol=asset_symbol, metric=metric, timestamp=ts_iso),
             })
+    label_map = labels_for_export(
+        db,
+        event_type="anomaly",
+        event_ids=[a["event_id"] for a in normalized],
+    )
+    for item in normalized:
+        item["labels"] = label_map.get(item["event_id"], [])
     results["anomalies"] = normalized
     return results
 

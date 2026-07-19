@@ -1,3 +1,5 @@
+import { formatUsd } from '../utils.js';
+
 export function useFundamentals() {
   return {
     fundamentals: { yield: null, collateral: null, reserve: null },
@@ -40,12 +42,7 @@ export function useFundamentals() {
       return (v * 100).toFixed(2) + '%';
     },
 
-    fmtUsd(v) {
-      if (v == null) return '-';
-      if (Math.abs(v) >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
-      if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-      return '$' + v.toLocaleString();
-    },
+    fmtUsd: formatUsd,
 
     fmtDate(iso) {
       if (!iso) return '-';

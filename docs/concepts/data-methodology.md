@@ -284,10 +284,10 @@ Daily prune job (`history-retention`, 03:15 UTC) removes rows older than setting
 | `chain_trend_snapshots` | 90 | Timescale `drop_chunks` + 7d compression policy |
 | `signal_events` | 180 | ORM delete |
 | `osint_articles` | 30 | ORM delete |
-| `funding_rate_snapshots` | 30 | ORM delete |
-| `yield_bearing_snapshots` | 180 | ORM delete |
-| `collateral_snapshots` | 180 | ORM delete |
-| `whale_activity_snapshots` | 180 | ORM delete |
+| `funding_rate_snapshots` | 30 | Timescale hypertable + hourly aggregate (PostgreSQL) |
+| `yield_bearing_snapshots` | 180 | Timescale hypertable + daily aggregate |
+| `collateral_snapshots` | 180 | Timescale hypertable + daily aggregate |
+| `whale_activity_snapshots` | 180 | Timescale hypertable + daily aggregate |
 | `fiat_reserve_snapshots` | 730 | ORM delete |
 | `forecast_runs` + `forecast_points` | 180 | Cascade delete |
 | `ai_narrative_history` | 90 | ORM delete |
@@ -297,6 +297,11 @@ Daily prune job (`history-retention`, 03:15 UTC) removes rows older than setting
 | `fred_yields` (DuckDB) | 730 | DuckDB delete |
 | `blacklist_events` | ∞ | Forensics — never pruned |
 | `address_tags` | ∞ | Curated — never pruned |
+| `event_labels` | ∞ | Operator labeling corpus — never pruned |
+
+## Labeled event corpus (v4.2.0+)
+
+Operators can label OSINT articles and detected anomalies via the UI or `POST /api/events/{type}/{id}/labels`. Valid labels: `confirmed`, `rejected`, `noise`, `tagged`. Rows in `event_labels` are append-only and form a permanent training corpus for future ML/ONNX refinement.
 
 ## Known limitations
 

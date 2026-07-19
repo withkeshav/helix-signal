@@ -4,13 +4,19 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import CollateralSnapshot, FiatReserveSnapshot, YieldBearingSnapshot, get_db
 from core.api_auth import require_read_open
+from services.v4_series_reads import (
+    fetch_collateral_history,
+    fetch_funding_rate_history,
+    fetch_whale_activity_history,
+    fetch_yield_bearing_history,
+)
 
 router = APIRouter()
 
@@ -134,3 +140,31 @@ def reserve_route(symbol: str, db: Session = Depends(get_db)):
         genius_act_compliant=row.genius_act_compliant,
         mica_status=row.mica_status, created_at=_iso(row.created_at),
     )
+
+
+@router.get("/series/funding", dependencies=[Depends(require_read_open("intelligence:read"))])
+def funding_history_route(
+    days: int = Query(30, ge=1, le=90),
+    symbol: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    rows = fetch_funding_rate_history(db, days=days, symbol=symbol)
+    return {"days": days, "symbol": symbol, "points": rows, "source": rows[0]["source"] if rows else "raw"}
+
+
+@router.get("/series/{symbol}/yield", dependencies=[Depends(require_read_open("intelligence:read"))])
+def yield_history_route(symbol: str, days: int = Query(30, ge=1, le=180), db: Session = Depends(get_db)):
+    rows = fetch_yield_bearing_history(db, asset_symbol=symbol, days=days)
+    return {"asset": symbol.upper(), "days": days, "points": rows, "source": rows[0]["source"] if rows else "raw"}
+
+
+@router.get("/series/{symbol}/collateral", dependencies=[Depends(require_read_open("intelligence:read"))])
+def collateral_history_route(symbol: str, days: int = Query(30, ge=1, le=180), db: Session = Depends(get_db)):
+    rows = fetch_collateral_history(db, asset_symbol=symbol, days=days)
+    return {"asset": symbol.upper(), "days": days, "points": rows, "source": rows[0]["source"] if rows else "raw"}
+
+
+@router.get("/series/{symbol}/whale", dependencies=[Depends(require_read_open("intelligence:read"))])
+def whale_history_route(symbol: str, days: int = Query(30, ge=1, le=180), db: Session = Depends(get_db)):
+    rows = fetch_whale_activity_history(db, asset_symbol=symbol, days=days)
+    return {"asset": symbol.upper(), "days": days, "points": rows, "source": rows[0]["source"] if rows else "raw"}

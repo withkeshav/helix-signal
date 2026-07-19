@@ -99,26 +99,46 @@ def trends(request: Request, asset: str, window: str = Query("7d"), db: Session 
 
     now = datetime.now(timezone.utc)
     cutoff = now - window_delta(w)
-    rows = (
-        db.execute(
-            select(AssetTrendSnapshot)
-            .where(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
-            .order_by(AssetTrendSnapshot.timestamp.asc())
-        ).scalars().all()
-    )
-    points = [
-        TrendPointOut(
-            timestamp=r.timestamp,
-            total_supply=r.total_supply,
-            price=r.price,
-            depeg_index=int(r.depeg_index),
-            signal_score=int(r.signal_score),
-            signal_band=str(r.signal_band),
-            concentration_score=int(r.concentration_score),
-            data_confidence=str(r.data_confidence_label),
+    agg_rows = None
+    if w in ("30d", "90d"):
+        from services.v4_series_reads import fetch_asset_trend_history
+
+        agg_rows = fetch_asset_trend_history(db, asset_symbol=sym, window=w)
+    if agg_rows is not None:
+        points = [
+            TrendPointOut(
+                timestamp=r["timestamp"],
+                total_supply=r.get("total_supply"),
+                price=r.get("price"),
+                depeg_index=int(r.get("depeg_index") or 0),
+                signal_score=int(r.get("signal_score") or 0),
+                signal_band=str(r.get("signal_band") or "normal"),
+                concentration_score=int(r.get("concentration_score") or 0),
+                data_confidence=str(r.get("data_confidence_label") or "Low"),
+            )
+            for r in agg_rows
+        ]
+    else:
+        rows = (
+            db.execute(
+                select(AssetTrendSnapshot)
+                .where(AssetTrendSnapshot.asset_symbol == sym, AssetTrendSnapshot.timestamp >= cutoff)
+                .order_by(AssetTrendSnapshot.timestamp.asc())
+            ).scalars().all()
         )
-        for r in rows
-    ]
+        points = [
+            TrendPointOut(
+                timestamp=r.timestamp,
+                total_supply=r.total_supply,
+                price=r.price,
+                depeg_index=int(r.depeg_index),
+                signal_score=int(r.signal_score),
+                signal_band=str(r.signal_band),
+                concentration_score=int(r.concentration_score),
+                data_confidence=str(r.data_confidence_label),
+            )
+            for r in rows
+        ]
 
     from services.dashboard import build_trend_summary as _build_ts
 

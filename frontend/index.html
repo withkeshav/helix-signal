@@ -202,6 +202,7 @@
         <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings" aria-label="Settings"><svg class="icon"><use href="#icon-settings"/></svg></button>
       </div>
       <div class="nav-controls">
+        <button type="button" class="btn btn-muted" title="Command palette (Ctrl+K)" @click="openPalette()">⌘K</button>
         <select class="asset-select" x-model="asset" @change="switchAsset">
           <template x-for="a in ($store.ui.enabledAssets.length ? $store.ui.enabledAssets : enabledAssets)" :key="a">
             <option x-text="a" :value="a"></option>
@@ -568,7 +569,7 @@
         <h2 class="section-heading">Recent Anomalies</h2>
         <div class="data-table-wrap" x-cloak x-show="anomalyEvents.anomalies && anomalyEvents.anomalies.length">
           <table class="data-table">
-            <thead><tr><th></th><th>Time</th><th>Metric</th><th class="num">z-score</th><th>Dir</th></tr></thead>
+            <thead><tr><th></th><th>Time</th><th>Metric</th><th class="num">z-score</th><th>Dir</th><th>Label</th></tr></thead>
             <tbody>
               <template x-for="a in (anomalyEvents.anomalies || []).slice(0, 20)" :key="`${a.metric}-${a.timestamp}`">
                 <tr>
@@ -577,6 +578,14 @@
                   <td x-text="a.metric"></td>
                   <td class="mono num" x-text="a.z_score ? a.z_score.toFixed(2) : '—'"></td>
                   <td x-text="a.direction || '—'"></td>
+                  <td>
+                    <span class="label-pill" x-show="latestAnomalyLabel(a)" x-text="latestAnomalyLabel(a)"></span>
+                    <div class="label-actions" x-show="!latestAnomalyLabel(a)">
+                      <button type="button" class="btn btn-muted label-btn" @click.stop="applyAnomalyLabel(a,'confirmed')">✓</button>
+                      <button type="button" class="btn btn-muted label-btn" @click.stop="applyAnomalyLabel(a,'rejected')">✗</button>
+                      <button type="button" class="btn btn-muted label-btn" @click.stop="applyAnomalyLabel(a,'noise')">~</button>
+                    </div>
+                  </td>
                 </tr>
               </template>
             </tbody>
@@ -883,15 +892,22 @@
             <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">Sentiment analysis disabled — enable <code>feature_nlp_sentiment</code> in Settings</div>
             <div class="data-table-wrap" x-cloak x-show="osintArticles.length">
               <table class="data-table">
-                <thead><tr><th></th><th>Time</th><th>Source</th><th>Title</th><th class="num">Sentiment</th></tr></thead>
+                <thead><tr><th></th><th>Time</th><th>Source</th><th>Title</th><th class="num">Sentiment</th><th>Label</th></tr></thead>
                 <tbody>
                   <template x-for="art in osintArticles" :key="art.id">
                     <tr>
                       <td><span class="sev-dot" :style="`background:var(--${art.sentiment_score > 0.1 ? 'up' : art.sentiment_score < -0.1 ? 'down' : 'muted'})`"></span></td>
                       <td class="mono" x-text="art.published_at ? formatWhen(art.published_at) : '—'"></td>
                       <td x-text="art.source"></td>
-                      <td><a :href="art.url" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none" x-text="art.title"></a></td>
+                      <td><a :href="art.url" target="_blank" rel="noopener" class="table-link" x-text="art.title"></a></td>
                       <td class="mono num" x-text="art.sentiment_score?.toFixed(2) ?? '0.00'"></td>
+                      <td>
+                        <span class="label-pill" x-show="latestOsintLabel(art)" x-text="latestOsintLabel(art)"></span>
+                        <div class="label-actions" x-show="!latestOsintLabel(art)">
+                          <button type="button" class="btn btn-muted label-btn" @click.stop="applyOsintLabel(art,'confirmed')">✓</button>
+                          <button type="button" class="btn btn-muted label-btn" @click.stop="applyOsintLabel(art,'noise')">~</button>
+                        </div>
+                      </td>
                     </tr>
                   </template>
                 </tbody>
@@ -1404,16 +1420,6 @@
           </div>
         </div>
       </div>
-      <div class="insight-grid">
-        <div class="chart-card" x-cloak x-show="dataQualityHistory.length">
-        <h2>Data Quality</h2>
-        <div style="font-size:13px">
-          <template x-for="(dq, i) in dataQualityHistory" :key="i">
-            <div class="signal-item" x-text="`${dq.label}: ${dq.value}`"></div>
-          </template>
-          <div x-cloak x-show="!dataQualityHistory.length" class="kpi-sub" style="padding:8px 0">All systems nominal</div>
-        </div>
-      </div>
     </div>
     <!-- Quality (sibling inside System) -->
     <div x-data="qualityDashboard" x-init="init()">
@@ -1733,13 +1739,24 @@
           </div>
         </div>
 
-        <div x-cloak x-show="toastVisible" class="toast-wrap" style="position:fixed;bottom:24px;right:24px;z-index:500" role="status">
-          <div class="toast" :class="'toast-' + toastType"><span x-text="toastMessage"></span></div>
-        </div>
       </div>
     </div>
     </template>
 
+
+    <!-- Cmd+K palette -->
+    <div class="cmdk-overlay" x-cloak x-show="paletteOpen" @click.self="closePalette()" @keydown.window="paletteKeydown($event)">
+      <div class="cmdk-panel" @click.stop>
+        <input id="cmdk-input" class="cmdk-input" type="text" placeholder="Jump to asset, tab, settings…" x-model="paletteQuery" @keydown="paletteKeydown($event)">
+        <template x-for="(item, idx) in paletteItems" :key="item.type + item.label">
+          <div class="cmdk-item" :class="idx === paletteIndex ? 'active' : ''" @click="runPaletteItem(item)">
+            <span x-text="item.label"></span>
+            <span class="search-type" x-text="item.sub || item.type"></span>
+          </div>
+        </template>
+        <div class="kpi-sub cmdk-hint">Type an address (0x…) to investigate · Esc to close</div>
+      </div>
+    </div>
 
     <!-- Toast Container (global) -->
     <div class="toast-wrap" x-cloak x-show="$store.ui.toastVisible" role="status" aria-live="polite">

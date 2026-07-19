@@ -6,6 +6,8 @@ Provides job functions and a registration helper so main.py stays lean.
 from __future__ import annotations
 
 import os
+import random
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
@@ -17,6 +19,14 @@ from services.retention import prune_old_history
 from signal_engine.core import refresh_chain_data
 
 log = get_logger(__name__)
+
+_JOB_DEFAULTS = {
+    "max_instances": 1,
+    "coalesce": True,
+    "misfire_grace_time": 300,
+}
+
+_PLUGIN_JITTER = (30, 120)
 
 
 async def _refresh_job() -> None:
@@ -183,20 +193,23 @@ def register_scheduler_jobs(
     """Register all background job functions with the APScheduler instance."""
     from providers.settings import get_setting
 
+    def _add_job(func, trigger, *, job_id: str, jitter: int | None = None, **trigger_kwargs):
+        kwargs = {**_JOB_DEFAULTS, "id": job_id, "replace_existing": True}
+        if jitter is not None:
+            trigger_kwargs["jitter"] = jitter
+        scheduler.add_job(func, trigger, **trigger_kwargs, **kwargs)
+
     if not skip_refresh:
         interval_seconds = max(
             60,
             get_setting("refresh_core_seconds", setup_db)
             or int(os.getenv("REFRESH_INTERVAL_SECONDS", "300")),
         )
-        scheduler.add_job(
+        _add_job(
             _refresh_job,
             "interval",
+            job_id="defillama-refresh",
             seconds=interval_seconds,
-            id="defillama-refresh",
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
         )
 
     osint_minutes = max(
@@ -204,114 +217,37 @@ def register_scheduler_jobs(
         get_setting("refresh_osint_minutes", setup_db) or 60,
     )
 
-    scheduler.add_job(
-        _retention_job,
-        "cron",
-        hour=3,
-        minute=15,
-        id="history-retention",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _data_quality_snapshot_job,
-        "cron",
-        hour=4,
-        minute=0,
-        id="data-quality-snapshot",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _insight_refresh_job,
-        "cron",
-        hour=4,
-        minute=30,
-        id="insight-assets-refresh",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _osint_job,
-        "interval",
-        minutes=osint_minutes,
-        id="osint-ingest",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _osint_attestation_refresh,
-        "interval",
-        minutes=osint_minutes,
-        id="osint-attestation-refresh",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
+    _add_job(_retention_job, "cron", job_id="history-retention", hour=3, minute=15)
+    _add_job(_data_quality_snapshot_job, "cron", job_id="data-quality-snapshot", hour=4, minute=0)
+    _add_job(_insight_refresh_job, "cron", job_id="insight-assets-refresh", hour=4, minute=30)
+    _add_job(_osint_job, "interval", job_id="osint-ingest", minutes=osint_minutes)
+    _add_job(_osint_attestation_refresh, "interval", job_id="osint-attestation-refresh", minutes=osint_minutes)
+    _add_job(
         _blacklist_job,
         "interval",
+        job_id="blacklist-monitor",
         seconds=get_setting("blacklist_poll_interval_seconds", setup_db) or 300,
-        id="blacklist-monitor",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
     )
-    scheduler.add_job(
-        _coinglass_job,
-        "interval",
-        seconds=get_setting("funding_rate_poll_interval_seconds", setup_db) or 300,
-        id="funding-rate-poll",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
+    coinglass_seconds = max(
+        900,
+        get_setting("funding_rate_poll_interval_seconds", setup_db) or 900,
     )
-    scheduler.add_job(
-        _ethena_job,
-        "interval",
-        minutes=15,
-        id="ethena-poll",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _sky_job,
-        "interval",
-        minutes=15,
-        id="sky-poll",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _liquity_job,
-        "interval",
-        minutes=15,
-        id="liquity-poll",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _aave_job,
-        "interval",
-        minutes=15,
-        id="aave-poll",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    scheduler.add_job(
-        _ondo_job,
-        "interval",
-        minutes=15,
-        id="ondo-poll",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+    _add_job(_coinglass_job, "interval", job_id="funding-rate-poll", seconds=coinglass_seconds)
+    plugin_jitter = random.randint(*_PLUGIN_JITTER)
+    for idx, (func, job_id) in enumerate(
+        (
+            (_ethena_job, "ethena-poll"),
+            (_sky_job, "sky-poll"),
+            (_liquity_job, "liquity-poll"),
+            (_aave_job, "aave-poll"),
+            (_ondo_job, "ondo-poll"),
+        )
+    ):
+        _add_job(
+            func,
+            "interval",
+            job_id=job_id,
+            minutes=15,
+            jitter=plugin_jitter,
+            next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30 * (idx + 1)),
+        )

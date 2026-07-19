@@ -51,6 +51,9 @@ Alpine.data('helixApp', () => ({
   asset: 'USDT', // Needed by asset select dropdown
   searchQuery: '',
   searchResults: [],
+  paletteOpen: false,
+  paletteQuery: '',
+  paletteIndex: 0,
   version: '', // Needed by footer
   staleWarning: '',
   rateLimitWarning: '',
@@ -67,6 +70,110 @@ Alpine.data('helixApp', () => ({
   formatDisplayName,
   depegVelocityMeta,
 
+  get paletteItems() {
+    const q = (this.paletteQuery || '').trim().toLowerCase();
+    const tabs = [
+      { type: 'tab', label: 'Signal', sub: 'Risk & analytics', run: () => this.goTab('signal') },
+      { type: 'tab', label: 'Market', sub: 'Supply & chains', run: () => this.goTab('market') },
+      { type: 'tab', label: 'Intel', sub: 'OSINT feed', run: () => this.goTab('intel') },
+      { type: 'tab', label: 'Forensics', sub: 'Graph & blacklist', run: () => this.goTab('forensics') },
+      { type: 'tab', label: 'Alerts', sub: 'Rules & history', run: () => this.goTab('alerts') },
+      { type: 'tab', label: 'System', sub: 'Health & quality', run: () => this.goTab('system') },
+      { type: 'tab', label: 'Settings', sub: 'Control Room', run: () => this.goTab('settings') },
+    ];
+    const settings = [
+      { type: 'settings', label: 'Settings → Overview', run: () => this.goSettings('overview') },
+      { type: 'settings', label: 'Settings → AI & Models', run: () => this.goSettings('ai') },
+      { type: 'settings', label: 'Settings → Data & Sources', run: () => this.goSettings('data') },
+      { type: 'settings', label: 'Settings → Security', run: () => this.goSettings('security') },
+    ];
+    const assets = (this.enabledAssets || []).map(sym => ({
+      type: 'asset',
+      label: sym,
+      sub: 'Switch asset',
+      run: () => this.switchTo(sym),
+    }));
+    let items = [...assets, ...tabs, ...settings];
+    if (q.startsWith('0x') && q.length >= 10) {
+      items.unshift({
+        type: 'investigate',
+        label: `Investigate ${q.slice(0, 10)}…`,
+        sub: 'Forensics tab',
+        run: () => this.investigateAddress(q),
+      });
+    }
+    if (q) {
+      items = items.filter(i =>
+        i.label.toLowerCase().includes(q) ||
+        (i.sub || '').toLowerCase().includes(q) ||
+        i.type.includes(q)
+      );
+    }
+    return items.slice(0, 12);
+  },
+
+  goTab(name) {
+    this.tab = name;
+    this.$store.ui.tab = name;
+    location.hash = name;
+    this.paletteOpen = false;
+    this.paletteQuery = '';
+  },
+
+  goSettings(sub) {
+    this.goTab('settings');
+    this.$nextTick(() => {
+      const gov = document.querySelector('#tab-settings')?._x_dataStack?.[0];
+      if (gov) gov.controlSubTab = sub;
+    });
+  },
+
+  investigateAddress(addr) {
+    this.goTab('forensics');
+    this.$nextTick(() => {
+      const panel = document.querySelector('#tab-forensics')?._x_dataStack?.[0];
+      if (panel) {
+        panel.investigateAddress = addr;
+        panel.runInvestigate?.();
+      }
+    });
+  },
+
+  openPalette() {
+    this.paletteOpen = true;
+    this.paletteQuery = '';
+    this.paletteIndex = 0;
+    this.$nextTick(() => document.getElementById('cmdk-input')?.focus());
+  },
+
+  closePalette() {
+    this.paletteOpen = false;
+    this.paletteQuery = '';
+  },
+
+  runPaletteItem(item) {
+    if (!item?.run) return;
+    item.run();
+    this.closePalette();
+  },
+
+  paletteKeydown(e) {
+    if (!this.paletteOpen) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this.paletteIndex = Math.min(this.paletteIndex + 1, this.paletteItems.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this.paletteIndex = Math.max(this.paletteIndex - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = this.paletteItems[this.paletteIndex];
+      if (item) this.runPaletteItem(item);
+    } else if (e.key === 'Escape') {
+      this.closePalette();
+    }
+  },
+
   async init() {
     const root = document.documentElement;
     const storedTheme = (() => {
@@ -75,6 +182,15 @@ Alpine.data('helixApp', () => ({
     this.theme = storedTheme || root.getAttribute('data-theme') || 'dark';
     root.setAttribute('data-theme', this.theme);
     this.$store.ui.setTheme(this.theme);
+
+    // Cmd+K command palette
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (this.paletteOpen) this.closePalette();
+        else this.openPalette();
+      }
+    });
 
     const validTabs = ['signal', 'market', 'analytics', 'intel', 'forensics', 'alerts', 'system', 'settings'];
     const hashTab = location.hash.slice(1);

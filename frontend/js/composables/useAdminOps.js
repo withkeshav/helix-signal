@@ -1,3 +1,5 @@
+import { formatUsd } from '../utils.js';
+
 export function useAdminOps() {
   return {
     adminDrawerVisible: false,
@@ -93,11 +95,6 @@ export function useAdminOps() {
       }
     },
 
-    fmtUsd(v) {
-      if (v == null) return '-';
-      if (Math.abs(v) >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
-      if (Math.abs(v) >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
-      return '$' + v.toLocaleString();
-    },
+    fmtUsd: formatUsd,
   };
 }

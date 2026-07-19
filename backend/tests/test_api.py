@@ -8,7 +8,7 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "4.1.0"
+    assert body["version"] == "4.2.0"
     assert "db" in body
     assert body["db_connected"] is True
     assert body["redis_connected"] is False

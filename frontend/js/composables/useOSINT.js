@@ -1,7 +1,9 @@
 import { renderSentimentChart, _disposeChart } from '../charts.js';
 import { formatWhen, statusBand, formatFeedAge } from '../utils.js';
+import { useEventLabels } from './useEventLabels.js';
 
 export function useOSINT() {
+  const eventLabels = useEventLabels();
   return {
     _charts: new Map(),
     _echarts: new Map(),
@@ -115,6 +117,14 @@ export function useOSINT() {
       this._destroyCharts();
       if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
       this._resizeHandler = null;
+    },
+
+    async applyOsintLabel(article, label) {
+      const row = await eventLabels.applyLabel.call(this, 'osint', String(article.id), label);
+      if (row) article.labels = [...(article.labels || []), row];
+    },
+    latestOsintLabel(article) {
+      return eventLabels.latestLabel.call(this, article?.labels);
     },
   };
 }

@@ -1,5 +1,24 @@
 # Helix Signal Changelog
 
+## v4.2.0 (2026-07-19) — Hypertables + event labels + scheduler hardening
+
+### Added
+- **V4 hypertables + continuous aggregates** — `funding_rate_snapshots`, `yield_bearing_snapshots`, `collateral_snapshots`, `whale_activity_snapshots` on TimescaleDB with hourly/daily aggregates; long-range trend reads (30d/90d) use `asset_signal_1h`; `GET /api/v1/series/*` history endpoints.
+- **`event_labels` table (WO-DA-5)** — append-only operator labels for OSINT/anomaly events; `GET/POST /api/events/{type}/{id}/labels` (POST auth-gated); labels included in feed/anomaly payloads.
+- **Cmd+K command palette** — assets, tabs, settings sections, investigate-address jump.
+- **Scheduler hardening** — `misfire_grace_time=300`, plugin job jitter (30–120s), staggered startup, Coinglass default poll 900s (15 min free-tier).
+
+### Changed
+- **Frontend hygiene** — deduped `formatUsd`/`formatWhen` to `utils.js`; single global toast (`$store.ui.showToast`); System tab duplicate quality panel removed.
+- **Startup backfill** — runs as background task with progress logs.
+
+### Skipped
+- **WO-BE-7b OLAP activate** — locked amputated per owner decision.
+
+### Docs
+- `docs/api.md` — event labels + v4 series history endpoints.
+- `docs/concepts/data-methodology.md` — labeled event corpus section.
+
 ## v4.1.0 (2026-07-19) — Control Room + insight assets + quality history
 
 ### Added

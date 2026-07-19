@@ -43,6 +43,7 @@ _TABLES = [
     "collateral_snapshots",
     "yield_bearing_snapshots",
     "funding_rate_snapshots",
+    "event_labels",
 ]
 
 

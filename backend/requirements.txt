@@ -18,3 +18,5 @@ web3>=7.0.0
 python-multipart>=0.0.9
 bcrypt>=4.0.0
 defusedxml>=0.7.1
+sqladmin==0.29.0
+itsdangerous>=2.1.0

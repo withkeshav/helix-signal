@@ -28,7 +28,7 @@ security = HTTPBearer()
 
 @router.post("/auth/login")
 @limiter.limit("10/minute")
-async def login(
+def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
@@ -54,7 +54,7 @@ async def login(
 
 @router.post("/auth/logout")
 @limiter.limit("30/minute")
-async def logout(
+def logout(
     request: Request,
     _auth=Depends(require_admin_token),
 ) -> Dict[str, Any]:
@@ -66,7 +66,7 @@ async def logout(
 
 @router.get("/auth/me")
 @limiter.limit("30/minute")
-async def get_current_user(
+def get_current_user(
     request: Request,
     _auth=Depends(require_admin_token),
     db: Session = Depends(get_db),

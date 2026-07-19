@@ -10,11 +10,12 @@ from signal_engine.core import get_asset_by_symbol
 from utils import signal_event_rows_to_out
 
 from core.limiter import limiter
+from core.api_auth import require_read_open
 
 router = APIRouter()
 
 
-@router.get("/events", response_model=SignalEventsResponseOut)
+@router.get("/events", response_model=SignalEventsResponseOut, dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def events(
     request: Request,
@@ -34,7 +35,7 @@ def events(
     return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
 
 
-@router.get("/events/export")
+@router.get("/events/export", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def events_export_route(
     request: Request,

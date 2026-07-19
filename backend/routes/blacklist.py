@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from core.admin_auth import require_admin_token
+from core.api_auth import require_keyed_always
 from database import BlacklistEvent, get_db
 from datetime import datetime, timedelta, timezone
 
@@ -35,7 +35,7 @@ class BlacklistStatsOut(BaseModel):
     last_30d_count: int
 
 
-@router.get("/blacklist/events", response_model=list[BlacklistEventOut], dependencies=[Depends(require_admin_token)])
+@router.get("/blacklist/events", response_model=list[BlacklistEventOut], dependencies=[Depends(require_keyed_always("intelligence:read"))])
 def blacklist_events(
     asset: str | None = None,
     chain: str | None = None,
@@ -63,7 +63,7 @@ def blacklist_events(
     ]
 
 
-@router.get("/blacklist/stats", response_model=BlacklistStatsOut)
+@router.get("/blacklist/stats", response_model=BlacklistStatsOut, dependencies=[Depends(require_keyed_always("intelligence:read"))])
 def blacklist_stats(db: Session = Depends(get_db)):
     total = db.execute(select(func.count(BlacklistEvent.id))).scalar() or 0
     total_usd = db.execute(select(func.sum(BlacklistEvent.frozen_balance_usd))).scalar() or 0.0

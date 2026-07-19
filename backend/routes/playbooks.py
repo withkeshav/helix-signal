@@ -83,7 +83,7 @@ def apply_playbook_by_name(name: str, db: Session) -> list[dict[str, Any]]:
 
 @router.get("/playbooks")
 @limiter.limit("30/minute")
-async def list_playbooks(
+def list_playbooks(
     request: Request,
     db: Session = Depends(get_db),
     _auth=Depends(require_admin_token),
@@ -94,7 +94,7 @@ async def list_playbooks(
 
 @router.post("/playbooks")
 @limiter.limit("10/minute")
-async def create_playbook(
+def create_playbook(
     request: Request,
     body: PlaybookCreate,
     db: Session = Depends(get_db),
@@ -129,7 +129,7 @@ async def create_playbook(
 
 @router.get("/playbooks/{playbook_id}")
 @limiter.limit("30/minute")
-async def get_playbook(
+def get_playbook(
     request: Request,
     playbook_id: str,
     db: Session = Depends(get_db),
@@ -148,7 +148,7 @@ async def get_playbook(
 
 @router.put("/playbooks/{playbook_id}")
 @limiter.limit("10/minute")
-async def update_playbook(
+def update_playbook(
     request: Request,
     playbook_id: str,
     body: PlaybookUpdate,
@@ -179,7 +179,7 @@ async def update_playbook(
 
 @router.delete("/playbooks/{playbook_id}")
 @limiter.limit("10/minute")
-async def delete_playbook(
+def delete_playbook(
     request: Request,
     playbook_id: str,
     db: Session = Depends(get_db),

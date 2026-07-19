@@ -11,14 +11,14 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from core.admin_auth import require_admin_token
+from core.api_auth import require_read_open, require_keyed_always
 from database import AddressTag, get_db
 from schemas import AddressTagCreate, AddressTagOut
 
 router = APIRouter()
 
 
-@router.get("/v1/tags/export", dependencies=[Depends(require_admin_token)])
+@router.get("/v1/tags/export", dependencies=[Depends(require_keyed_always("admin"))])
 def export_tags_csv(db: Session = Depends(get_db)):
     stmt = select(AddressTag).order_by(AddressTag.created_at.desc())
     tags = db.execute(stmt).scalars().all()
@@ -30,7 +30,7 @@ def export_tags_csv(db: Session = Depends(get_db)):
     return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=address_tags.csv"})
 
 
-@router.get("/v1/tags/{address}", response_model=list[AddressTagOut])
+@router.get("/v1/tags/{address}", response_model=list[AddressTagOut], dependencies=[Depends(require_read_open("intelligence:read"))])
 def get_tags_for_address(address: str, chain: str | None = None, db: Session = Depends(get_db)):
     stmt = select(AddressTag).where(AddressTag.address == address.lower())
     if chain:
@@ -38,7 +38,7 @@ def get_tags_for_address(address: str, chain: str | None = None, db: Session = D
     return db.execute(stmt).scalars().all()
 
 
-@router.post("/v1/tags", response_model=AddressTagOut, dependencies=[Depends(require_admin_token)])
+@router.post("/v1/tags", response_model=AddressTagOut, dependencies=[Depends(require_keyed_always("admin"))])
 def create_tag(body: AddressTagCreate, db: Session = Depends(get_db)):
     tag = AddressTag(
         address=body.address.lower(),
@@ -54,7 +54,7 @@ def create_tag(body: AddressTagCreate, db: Session = Depends(get_db)):
     return tag
 
 
-@router.delete("/v1/tags/{tag_id}", dependencies=[Depends(require_admin_token)])
+@router.delete("/v1/tags/{tag_id}", dependencies=[Depends(require_keyed_always("admin"))])
 def delete_tag(tag_id: int, db: Session = Depends(get_db)):
     stmt = select(AddressTag).where(AddressTag.id == tag_id)
     tag = db.execute(stmt).scalar_one_or_none()

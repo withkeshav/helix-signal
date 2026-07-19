@@ -1,5 +1,39 @@
 # Helix Signal Changelog
 
+## v4.0.5.1 (2026-07-16) — AI provider simplification + pre-alpha cleanup
+
+### Changed
+- **AI providers simplified to Ollama Cloud + OpenRouter only.** Removed Groq and Cloudflare provider support and legacy provider priority chains.
+- **Per-feature model settings.** Each AI feature now reads `ai_model_<feature>` in `provider:model_id` format. No hardcoded model IDs remain in application code.
+- **Token budget enforcement removed.** `_deduct_tokens` and `_within_budget` deleted; `AiUsage` tracking preserved for operator monitoring.
+- **Error logging hardened.** Silent `except: pass` converted to `log.error(..., exc_info=True)` or `log.warning(..., exc_info=True)` across the backend.
+- **APScheduler jobs configured with** `max_instances=1, coalesce=True` to prevent runaway overlapping jobs.
+- **Semantic cache global-scope bug fixed.** DB-driven semantic cache settings now propagate to the lookup logic.
+- **Dead code removed.** `_SEMANTIC_CACHE` local dict in `ai_router.py` and unused `semantic_cache_search` in `cache.py` deleted.
+- **Structured logging emphasized.** `LOG_FORMAT=json` is now the production default expectation for error triage.
+
+### Docs
+- `docs/guides/ai-configuration.md` rewritten to be the single source of truth for AI configuration.
+- Removed stale `.progress/transform.md` and `.progress/CURSOR.md` references from README and `.env.example`.
+
+## v4.0.5 (2026-07-16) — SQLAdmin + secured intelligence API
+
+### Added
+- **SQLAdmin at `/admin`** — operator CRUD for Settings, Audit Log, Playbooks, Users, API Keys (`backend/sqladmin_setup.py`). Alpine Settings UI kept for Quick Setup, Test AI, playbook apply, and thin import/export.
+- **Secured intelligence API** — `ApiKey` model (SHA-256), scopes (`intelligence:read`, `investigate:write`, `admin`), `api_auth_mode` (`open` | `key_required`), Bearer / `X-API-Key`, per-key RPM (Redis or in-process fallback), `last_used_at` via BackgroundTasks.
+- **Auth tiers** — Public (health/version); Read-open (dashboard/trends/…); Keyed-always (investigate, alerts, blacklist, tags write) — never anonymous for keyed-always routes.
+- **nginx** — `location ^~ /admin` so SQLAdmin static CSS/JS is not swallowed by frontend static rules.
+- Alembic `v4_011_api_keys`.
+
+### Changed
+- Fake-async routes converted to sync `def` (`auth`, `playbooks`, `ai_models` with `httpx.Client`, settings import JSON body).
+- Alpine `useGovernance.js` shrunk (~355 lines); settings HTML thinned; e2e gates on Test AI / Open Admin Panel.
+- FRED / ONNX paths resolve DB-first via `get_setting` + fresh `SessionLocal()`.
+- `alert_email_enabled` gates SMTP dispatch.
+
+### Docs
+- README / architecture corrected to 7 tabs, ECharts-only, 15 Playwright specs; Intelligence API section in `docs/api.md`.
+
 ## v4.0.4 (2026-07-10) — Settings wiring fix
 
 ### Fixed

@@ -1,4 +1,4 @@
-# Helix-Signal
+# Helix-Signal v4.0.5.1
 
 **Live:** [https://helix.withkeshav.com](https://helix.withkeshav.com)  
 **Repository:** [github.com/withkeshav/helix-signal](https://github.com/withkeshav/helix-signal)  
@@ -8,9 +8,9 @@ Helix-Signal powers **Helix**, an open-source, self-hostable OSINT intelligence 
 
 One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chains. Fully self-hostable with a single `docker compose up`. AI intelligence via open-source models only (no paid ML APIs).
 
-**461 regression tests pass (0 failed).**
+**Regression tests:** run `cd backend && python -m pytest` (see CI). Frontend: 15 Playwright specs under `frontend/e2e/`.
 
-**Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. Heuristic `.onnx` stubs and `data/depeg_events.json` are now tracked in git so CI tests pass deterministically. See [`.progress/transform.md`](.progress/transform.md) §3.2 for the execution log.
+**Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. Heuristic `.onnx` stubs and `data/depeg_events.json` are now tracked in git so CI tests pass deterministically.
 
 ## V4 Highlights
 
@@ -26,7 +26,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **3 new API endpoints** — `/api/v1/investigate`, `/api/v1/yield/intelligence`, `/api/v1/blacklist/events`
 - **8 Alembic migrations** — Full schema evolution for V4 tables and column additions
 - **SA 2.0 style** — All 63 `db.query()` calls in production code migrated to `select()` + `execute()`
-- **461 regression tests** — All tests pass, including 24 new tests for address tagging, clustering, and webhook dispatch
+- **pytest suite** — Backend unit/integration coverage including API auth tiers and SQLAdmin secret-mask contracts
 
 ## V3 Highlights
 
@@ -232,7 +232,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/services/rss_feed.py` — OSINT RSS feed ingestion with sentiment scoring
 - `backend/data_quality/` — Data quality checks (freshness, cross-source validation, coverage) using SA 2.0 style
 - `frontend/` — pure static HTML, Alpine.js 8-tab dashboard (lazy-mounted Settings), ECharts with dispose-on-unmount, nginx API proxy
-- `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast, forensics, onchain, taxonomy) + 3 Web Components
+- `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast, forensics, onchain, taxonomy)
 - `config/` — chain, asset, and alert configuration
 - `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories
 - `scripts/` — deployment smoke checks, backup.sh, SQLite→Postgres migration, ONNX model builder, depeg training

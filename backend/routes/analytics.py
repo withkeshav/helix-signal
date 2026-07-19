@@ -9,17 +9,18 @@ from services.analytics import compute_correlations, detect_patterns, detect_reg
 from services.compare import build_compare_payload
 
 from core.limiter import limiter
+from core.api_auth import require_read_open
 
 router = APIRouter()
 
 
-@router.get("/compare")
+@router.get("/compare", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def compare(request: Request, assets: str = Query(..., min_length=1), window: str = Query("7d"), db: Session = Depends(get_db)) -> dict[str, Any]:
     return build_compare_payload(db, assets_csv=assets, window=window)
 
 
-@router.get("/analytics/correlations")
+@router.get("/analytics/correlations", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_correlations(
     request: Request,
@@ -30,7 +31,7 @@ def api_correlations(
     return compute_correlations(db, asset_symbol=asset.upper(), window_days=window_days)
 
 
-@router.get("/analytics/patterns")
+@router.get("/analytics/patterns", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_patterns(
     request: Request,
@@ -41,7 +42,7 @@ def api_patterns(
     return detect_patterns(db, asset_symbol=asset.upper(), window_days=window_days)
 
 
-@router.get("/analytics/finbert/sentiment")
+@router.get("/analytics/finbert/sentiment", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_finbert_sentiment(
     request: Request,
@@ -58,7 +59,7 @@ def api_finbert_sentiment(
     return result
 
 
-@router.get("/analytics/forecast-accuracy")
+@router.get("/analytics/forecast-accuracy", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_forecast_accuracy(
     request: Request,
@@ -69,7 +70,7 @@ def api_forecast_accuracy(
     return compute_forecast_accuracy(db, asset_symbol=asset)
 
 
-@router.get("/analytics/regime")
+@router.get("/analytics/regime", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_regime(
     request: Request,
@@ -80,7 +81,7 @@ def api_regime(
     return detect_regime(db, asset_symbol=asset.upper(), window_hours=window_hours)
 
 
-@router.get("/analytics/rotation")
+@router.get("/analytics/rotation", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_rotation(
     request: Request,
@@ -92,7 +93,7 @@ def api_rotation(
     return cross_asset_rotation(db, asset_symbols=symbols, window_days=window_days)
 
 
-@router.get("/analytics/cross-asset-matrix")
+@router.get("/analytics/cross-asset-matrix", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_cross_asset_matrix(
     request: Request,
@@ -103,20 +104,20 @@ def api_cross_asset_matrix(
     return compute_cross_asset_matrix(db, window_days=window_days)
 
 
-@router.get("/smidge")
+@router.get("/smidge", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_smidge(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
     from services.smidge import compute_smidge
     return compute_smidge(db, asset_symbol=asset.upper())
 
 
-@router.get("/anomaly/detect")
+@router.get("/anomaly/detect", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_anomaly_detect(request: Request, asset: str = Query(...), db: Session = Depends(get_db)) -> dict[str, Any]:
     return detect_anomalies(db, asset_symbol=asset)
 
 
-@router.get("/analytics/stress-leaderboard")
+@router.get("/analytics/stress-leaderboard", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_stress_leaderboard(
     request: Request,
@@ -127,7 +128,7 @@ def api_stress_leaderboard(
     return build_stress_leaderboard(db, asset_symbol=asset.upper())
 
 
-@router.get("/anomaly/change-points")
+@router.get("/anomaly/change-points", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def api_change_points(
     request: Request,

@@ -183,7 +183,7 @@ app = FastAPI(
                 "and market-wide early warning for the stablecoin ecosystem. "
                 "Provides REST endpoints for alerts, forensics, OSINT, address tagging, "
                 "and real-time signal streaming.",
-    version="4.0.4",
+    version="4.0.5",
     contact={
         "name": "Helix Signal Team",
         "url": "https://github.com/anomalyco/Helix-Signal",
@@ -217,9 +217,14 @@ app.add_middleware(
     allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Content-Type", "X-Admin-Token", "Authorization", "X-Request-ID"],
+    allow_headers=["Content-Type", "X-Admin-Token", "Authorization", "X-API-Key", "X-Request-ID"],
 )
 register_routes(app)
+
+# Operator CRUD panel (SQLAdmin). Must stay after register_routes; never use backend/admin.py.
+from sqladmin_setup import setup_admin  # noqa: E402
+
+setup_admin(app)
 
 
 @app.get("/")

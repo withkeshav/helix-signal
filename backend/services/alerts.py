@@ -386,6 +386,8 @@ def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict, db: Session | N
 
 def _dispatch_email(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
     from providers.settings import get_setting
+    if not get_setting("alert_email_enabled", db):
+        return
     smtp_host = get_setting("alert_smtp_host", db) or ""
     smtp_port = int(get_setting("alert_smtp_port", db) or "587")
     smtp_user = get_setting("alert_smtp_user", db) or ""

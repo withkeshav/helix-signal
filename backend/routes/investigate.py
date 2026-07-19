@@ -5,14 +5,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from core.admin_auth import require_admin_token
+from core.api_auth import require_keyed_always
 from database import get_db
 from schemas import InvestigateRequest, InvestigationReportOut
 
 router = APIRouter()
 
 
-@router.post("/investigate", response_model=InvestigationReportOut, dependencies=[Depends(require_admin_token)])
+@router.post("/investigate", response_model=InvestigationReportOut, dependencies=[Depends(require_keyed_always("investigate:write"))])
 async def investigate(body: InvestigateRequest, db: Session = Depends(get_db)):
     from services.investigation_engine import run_investigation
     report = await run_investigation(db, body.address, body.chain, body.asset)

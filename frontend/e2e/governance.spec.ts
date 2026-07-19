@@ -10,7 +10,6 @@ async function waitForAlpine(page: Page) {
   );
 }
 
-/** Sync Playwright fill() into Alpine x-model bindings on the login form. */
 async function fillAlpineInput(page: Page, placeholder: string, value: string) {
   const input = page.getByPlaceholder(placeholder);
   await input.fill(value);
@@ -32,15 +31,9 @@ async function signInAsAdmin(page: Page, username: string, password: string) {
     if (!gov?.submitAdminLogin) throw new Error('governance component not ready');
     await gov.submitAdminLogin();
   }, [username, password]);
-  await expect(page.getByRole('button', { name: 'Simple' })).toBeVisible({ timeout: 120000 });
+  await expect(page.getByRole('button', { name: /Test AI/i })).toBeVisible({ timeout: 120000 });
 }
 
-/**
- * Admin credentials are read from the environment first, falling back to the
- * gitignored repo-root .env (docker-compose `env_file`). They are NEVER
- * hardcoded or committed. The Settings/Governance UI is admin-gated, so these
- * tests must authenticate through the real login form to render settings.
- */
 function adminCreds(): { username: string; password: string } {
   let username = process.env.HELIX_ADMIN_USERNAME || '';
   let password = process.env.HELIX_ADMIN_PASSWORD || '';
@@ -55,7 +48,7 @@ function adminCreds(): { username: string; password: string } {
         if (m[1] === 'HELIX_ADMIN_PASSWORD' && !password) password = val;
       }
     } catch {
-      /* .env not present — creds must come from the environment */
+      /* .env not present */
     }
   }
   return { username, password };
@@ -69,7 +62,6 @@ test.describe('Governance Tab (Settings)', () => {
 
     await page.goto('/');
     await waitForAlpine(page);
-    // Open the Settings tab (gear icon; accessible name "Settings").
     await page.getByRole('tab', { name: /settings/i }).click();
     await page.waitForFunction(
       () => {
@@ -80,36 +72,22 @@ test.describe('Governance Tab (Settings)', () => {
       { timeout: 10000 }
     );
     await expect(page.locator('.tab-content.settings')).toBeVisible();
-
-    // Authenticate through the real login form so admin-gated settings render.
     await signInAsAdmin(page, username, password);
   });
 
-  test('loads settings tab with admin token field', async ({ page }) => {
-    // Admin authentication section renders with a password field + heading.
+  test('loads settings tab with admin login', async ({ page }) => {
     await expect(page.locator('#tab-settings input[type="password"]').first()).toBeVisible();
     await expect(page.locator('#tab-settings').getByRole('heading', { name: 'Admin Login' })).toBeVisible();
   });
 
-  test('loads settings list and API keys section', async ({ page }) => {
-    await page.getByRole('button', { name: 'Advanced' }).click();
+  test('shows Open Admin Panel and AI surface after login', async ({ page }) => {
     const panel = page.locator('#tab-settings');
-    await expect(panel.getByRole('heading', { name: 'API Keys & Secrets' })).toBeVisible();
-    await expect(panel.getByRole('heading', { name: 'Data Providers' })).toBeVisible();
-    await expect(panel.getByRole('heading', { name: 'Feature Toggles' })).toBeVisible();
-    await expect(panel.getByRole('heading', { name: 'Refresh Intervals' })).toBeVisible();
-    await expect(panel.getByRole('heading', { name: 'AI & Intelligence' })).toBeVisible();
+    await expect(panel.getByRole('link', { name: /Open Admin Panel/i })).toBeVisible();
+    await expect(panel.getByText('AI Feature Mapping')).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Test provider chain/i })).toBeVisible();
   });
 
-  test('Simple mode shows AI mapping table', async ({ page }) => {
-    await page.getByRole('button', { name: 'Simple' }).click();
-    await expect(page.getByText('AI Feature Mapping')).toBeVisible();
-  });
-
-  test('loads AI budget display', async ({ page }) => {
-    await page.getByRole('button', { name: 'Advanced' }).click();
-    await expect(
-      page.locator('#tab-settings').getByText('Daily AI Token Budget')
-    ).toBeVisible({ timeout: 120000 });
+  test('shows AI status budget line', async ({ page }) => {
+    await expect(page.locator('#tab-settings').getByText(/Mode:/i)).toBeVisible({ timeout: 120000 });
   });
 });

@@ -298,6 +298,17 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
         "requires_restart": False,
         "affects_rate_limits": False,
     },
+    "api_auth_mode": {
+        "label": "API Auth Mode",
+        "type": "str",
+        "default": "open",
+        "key_env": "API_AUTH_MODE",
+        "choices": ["open", "key_required"],
+        "group": "Security",
+        "description": "open = anonymous read OK for intelligence routes; key_required = API key or admin session required. Investigate/alerts/blacklist stay keyed in both modes.",
+        "requires_restart": False,
+        "affects_rate_limits": False,
+    },
     "ai_daily_token_budget": {
         "label": "AI Daily Token Budget",
         "type": "int",

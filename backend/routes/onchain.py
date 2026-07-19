@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 
 from core.limiter import limiter
 from database import get_db
+from core.api_auth import require_read_open
 from services.onchain import get_holder_concentration, get_whale_flow
 
 router = APIRouter()
 
 
-@router.get("/onchain/whale-flow")
+@router.get("/onchain/whale-flow", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_whale_flow(
     request: Request,
@@ -22,7 +23,7 @@ def api_whale_flow(
     return get_whale_flow(asset, db)
 
 
-@router.get("/onchain/holder-concentration")
+@router.get("/onchain/holder-concentration", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_holder_concentration(
     request: Request,

@@ -7,6 +7,7 @@
 
 - Docker + Compose plugin
 - `.env` configured (copy from `.env.example`) — **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
+- For production intelligence API: set `API_AUTH_MODE=key_required` (or Settings `api_auth_mode`) and create keys via `POST /api/v1/api-keys` / SQLAdmin.
 - Git checkout of target release
 
 ## Deploy
@@ -21,7 +22,10 @@ Verify:
 ```bash
 docker ps --filter name=helix
 curl -sf http://localhost/api/health | python3 -m json.tool
+curl -sfI http://localhost/admin/statics/css/tabler.min.css   # expect 200 (nginx ^~ /admin)
 ```
+
+Operator CRUD: open `http://localhost/admin` and sign in with the seeded admin user.
 
 ---
 
@@ -138,7 +142,9 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
-| v4.0.4 | `HEAD` | 2026-07-10 | Settings wiring fix — DB priority over env, audit redaction, mask_secret, unified Settings UI, Signal refresh |
+| v4.0.5.1 | local | 2026-07-16 | AI provider simplification (Ollama Cloud + OpenRouter), per-feature `provider:model_id` settings, budget enforcement removed, error-logging hardening, APScheduler `max_instances=1` |
+| v4.0.5 | local | 2026-07-16 | SQLAdmin `/admin`, secured intelligence API keys + tiers, Alpine settings shrink, FRED/ONNX DB-first |
+| v4.0.4 | `d0a69ab` | 2026-07-10 | Settings wiring fix — DB priority over env, audit redaction, mask_secret, unified Settings UI, Signal refresh |
 | v4.0.3 | `HEAD` | 2026-07-08 | FE lifecycle refactor — x-if tabs, single Market, auth dedupe, chart lifecycle, Settings wizard + AI mapping, bounded empty states |
 | v4.0.2 | `c5427f5` | 2026-07-08 | Cookie session auth, alert rule editor, asset enable overrides, provider test, CI Postgres path, E2E expansion |
 | v4.0.1 | `cabb85a` | 2026-07-08 | Audit rectification — auth, hardening, reliability, SA 2.0, docs, tests |
@@ -149,4 +155,4 @@ docker compose up -d --build
 
 ---
 
-*Last updated: 2026-07-05*
+*Last updated: 2026-07-16*

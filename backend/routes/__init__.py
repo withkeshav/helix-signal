@@ -30,6 +30,7 @@ def register_routes(app):
     from routes.yield_intelligence import router as yield_intelligence_router
     from routes.blacklist import router as blacklist_router
     from routes.tags import router as tags_router
+    from routes.api_keys import router as api_keys_router
 
     app.include_router(admin_router, prefix="/api", tags=["admin"])
     app.include_router(ai_router, prefix="/api", tags=["ai"])
@@ -59,3 +60,4 @@ def register_routes(app):
     app.include_router(yield_intelligence_router, prefix="/api/v1", tags=["yield"])
     app.include_router(blacklist_router, prefix="/api/v1", tags=["blacklist"])
     app.include_router(tags_router, prefix="/api", tags=["tags"])
+    app.include_router(api_keys_router, prefix="/api", tags=["api-keys"])

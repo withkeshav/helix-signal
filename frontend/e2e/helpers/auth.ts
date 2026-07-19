@@ -72,6 +72,6 @@ export async function signInAsAdmin(page: Page) {
     ui.loginPassword = p;
     await ui.login();
   }, [username, password]);
-  // Wait for the Simple mode button to appear (indicates login + settings load succeeded).
-  await expect(page.getByRole('button', { name: 'Simple' })).toBeVisible({ timeout: 120000 });
+  // Wait for post-login Settings surface (Test AI / Open Admin Panel).
+  await expect(page.getByRole('button', { name: /Test AI/i })).toBeVisible({ timeout: 120000 });
 }

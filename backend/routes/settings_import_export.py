@@ -47,7 +47,7 @@ def export_settings_endpoint(
 
 @router.post("/settings/import", response_model=ImportResponse)
 @limiter.limit("5/minute")
-async def import_settings_endpoint(
+def import_settings_endpoint(
     request: Request,
     settings_data: dict,
     db: Session = Depends(get_db),
@@ -61,7 +61,7 @@ async def import_settings_endpoint(
         user = db.execute(select(User).where(User.id == payload["sub"])).scalars().first() if payload else None
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
-        
+
         results = import_settings(db, settings_data, user, ip_address, user_agent)
         return results
     except Exception:

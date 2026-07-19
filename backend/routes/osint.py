@@ -12,11 +12,12 @@ from services.osint import (
 )
 
 from core.limiter import limiter
+from core.api_auth import require_read_open
 
 router = APIRouter()
 
 
-@router.get("/osint/feed")
+@router.get("/osint/feed", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_osint_feed(
     request: Request,
@@ -27,7 +28,7 @@ def api_osint_feed(
     return get_osint_feed(db, asset=asset, limit=limit)
 
 
-@router.get("/osint/sentiment")
+@router.get("/osint/sentiment", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_osint_sentiment(
     request: Request,
@@ -38,13 +39,13 @@ def api_osint_sentiment(
     return get_sentiment_timeseries(db, asset=asset, window_days=window_days)
 
 
-@router.get("/osint/attestation")
+@router.get("/osint/attestation", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_osint_attestation(request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
     return get_attestation_status(db=db)
 
 
-@router.get("/osint/correlate")
+@router.get("/osint/correlate", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def api_osint_correlate(
     request: Request,

@@ -21,7 +21,18 @@ SERIES_MAP: dict[str, str] = {
 
 
 def _fred_api_key() -> str:
-    return os.getenv("FRED_API_KEY", "")
+    """DB-first via get_setting; env FRED_API_KEY fallback (fresh SessionLocal)."""
+    try:
+        from database import SessionLocal
+        from providers.settings import get_setting
+
+        with SessionLocal() as db:
+            val = get_setting("fred_api_key", db)
+            if val:
+                return str(val).strip()
+    except Exception:
+        pass
+    return os.getenv("FRED_API_KEY", "").strip()
 
 
 def _poll_interval_seconds() -> int:

@@ -8,11 +8,11 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
 from database import get_db
-from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ _PROVIDER_ALIASES: dict[str, str] = {
 
 @router.get("/ai/providers")
 @limiter.limit("30/minute")
-async def list_providers(
+def list_providers(
     request: Request,
     _auth=Depends(require_admin_token),
 ) -> List[Dict[str, Any]]:
@@ -91,7 +91,7 @@ async def list_providers(
 
 @router.get("/ai/providers/{provider_id}/models")
 @limiter.limit("30/minute")
-async def list_models(
+def list_models(
     request: Request,
     provider_id: str,
     db: Session = Depends(get_db),
@@ -102,15 +102,17 @@ async def list_models(
 
     try:
         if resolved_id == "ollama":
-            return await _get_ollama_models(db)
+            return _get_ollama_models(db)
         elif resolved_id == "groq":
-            return await _get_groq_models(db)
+            return _get_groq_models(db)
         elif resolved_id == "openrouter":
-            return await _get_openrouter_models(db)
+            return _get_openrouter_models(db)
         elif resolved_id == "cloudflare":
-            return await _get_cloudflare_models(db)
+            return _get_cloudflare_models(db)
         else:
             raise HTTPException(status_code=404, detail=f"Provider {provider_id} not found")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch models: {str(e)}")
 
@@ -120,14 +122,14 @@ def _resolve_api_key_from_settings(db: Session | None, secret_key: str, env_key:
     return str(get_setting(secret_key, db) or os.getenv(env_key, "")).strip()
 
 
-async def _get_ollama_models(db: Session | None = None) -> List[Dict[str, Any]]:
+def _get_ollama_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from Ollama."""
     api_key = _resolve_api_key_from_settings(db, "secret_ollama_api_key", "OLLAMA_API_KEY")
     if not api_key:
         # Fallback to local Ollama
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get("http://localhost:11434/api/tags", timeout=10.0)
+            with httpx.Client() as client:
+                response = client.get("http://localhost:11434/api/tags", timeout=10.0)
                 response.raise_for_status()
                 data = response.json()
                 models = []
@@ -140,11 +142,11 @@ async def _get_ollama_models(db: Session | None = None) -> List[Dict[str, Any]]:
                 return models
         except Exception:
             return []
-    
+
     # Use Ollama Cloud API
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
+        with httpx.Client() as client:
+            response = client.get(
                 "https://ollama.com/v1/models",
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=10.0
@@ -163,15 +165,15 @@ async def _get_ollama_models(db: Session | None = None) -> List[Dict[str, Any]]:
         return []
 
 
-async def _get_groq_models(db: Session | None = None) -> List[Dict[str, Any]]:
+def _get_groq_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from Groq."""
     api_key = _resolve_api_key_from_settings(db, "secret_groq_api_key", "GROQ_API_KEY")
     if not api_key:
         return []
-    
+
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
+        with httpx.Client() as client:
+            response = client.get(
                 "https://api.groq.com/openai/v1/models",
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=10.0
@@ -191,15 +193,15 @@ async def _get_groq_models(db: Session | None = None) -> List[Dict[str, Any]]:
         return []
 
 
-async def _get_openrouter_models(db: Session | None = None) -> List[Dict[str, Any]]:
+def _get_openrouter_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from OpenRouter."""
     api_key = _resolve_api_key_from_settings(db, "secret_openrouter_api_key", "OPENROUTER_API_KEY")
     if not api_key:
         return []
-    
+
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
+        with httpx.Client() as client:
+            response = client.get(
                 "https://openrouter.ai/api/v1/models",
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=10.0
@@ -219,18 +221,18 @@ async def _get_openrouter_models(db: Session | None = None) -> List[Dict[str, An
         return []
 
 
-async def _get_cloudflare_models(db: Session | None = None) -> List[Dict[str, Any]]:
+def _get_cloudflare_models(db: Session | None = None) -> List[Dict[str, Any]]:
     """Get models from Cloudflare."""
     from providers.settings import get_setting
     api_token = _resolve_api_key_from_settings(db, "secret_cloudflare_api_token", "CLOUDFLARE_API_TOKEN")
     account_id = str(get_setting("cloudflare_account_id", db) or os.getenv("CLOUDFLARE_ACCOUNT_ID", "")).strip()
-    
+
     if not api_token or not account_id:
         return []
-    
+
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
+        with httpx.Client() as client:
+            response = client.get(
                 f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/models/search",
                 headers={
                     "Authorization": f"Bearer {api_token}",

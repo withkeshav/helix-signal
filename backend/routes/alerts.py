@@ -11,6 +11,7 @@ from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from core.admin_auth import require_admin_token
+from core.api_auth import require_keyed_always
 from core.limiter import limiter
 from database import SignalEvent, get_db
 from schemas import SignalEventsResponseOut
@@ -32,7 +33,7 @@ def list_fired_alerts(
     asset: str | None = None,
     severity: str | None = None,
     db: Session = Depends(get_db),
-    _auth=Depends(require_admin_token),
+    _auth=Depends(require_keyed_always("intelligence:read")),
 ) -> SignalEventsResponseOut:
     """List fired signal events (admin-gated alerts inbox).
 

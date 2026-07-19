@@ -38,14 +38,29 @@ def _warn_heuristic_fallback(*, path: str, detail: str) -> None:
         log.warning(f"ONNX depeg model not configured ({detail}); using heuristic fallback")
 
 
+def _resolve_onnx_path(setting_key: str, env_key: str) -> str:
+    """DB-first path via get_setting with fresh SessionLocal; env fallback."""
+    try:
+        from database import SessionLocal
+        from providers.settings import get_setting
+
+        with SessionLocal() as db:
+            val = get_setting(setting_key, db)
+            if val:
+                return str(val).strip()
+    except Exception:
+        pass
+    return os.getenv(env_key, "").strip()
+
+
 def _get_session(model_key: str = "heuristic_v1") -> Any | None:
     if model_key in _SESSION:
         return _SESSION[model_key]
 
     if model_key == "heuristic_v1":
-        path = os.getenv("ONNX_DEPEG_MODEL_PATH", "").strip()
+        path = _resolve_onnx_path("onnx_depeg_model_path", "ONNX_DEPEG_MODEL_PATH")
         if not path:
-            _warn_heuristic_fallback(path="", detail="ONNX_DEPEG_MODEL_PATH not set")
+            _warn_heuristic_fallback(path="", detail="onnx_depeg_model_path / ONNX_DEPEG_MODEL_PATH not set")
             return None
     elif model_key in V4_MODEL_NAMES:
         path = str(MODELS_DIR / model_key)

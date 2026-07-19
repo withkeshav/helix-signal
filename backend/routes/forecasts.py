@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 
 from core.limiter import limiter
 from database import ForecastPoint, ForecastRun, AssetTrendSnapshot, get_db
+from core.api_auth import require_read_open
 
 router = APIRouter()
 
 
-@router.get("/forecasts")
+@router.get("/forecasts", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def list_forecasts(
     request: Request,

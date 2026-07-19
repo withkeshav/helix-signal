@@ -87,16 +87,16 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 
 ### Frontend (`frontend/`)
 
-- `index.html` — dashboard shell, Alpine.js bindings, CDN Chart.js + ECharts
+- `index.html` — dashboard shell, Alpine.js bindings, CDN ECharts
 - `js/init.js` — Alpine component (`helixApp`), chart wiring, tab loaders
 - `js/stores/` — Alpine stores: `dashboard.js` (shared data), `ui.js` (tab/admin/theme)
 - `js/composables/` — Alpine components (per-tab x-data): `useMarket.js`, `useOSINT.js`, `useSMIDGE.js`, `useForecast.js`, `useGovernance.js`
-- `js/charts.js` — Chart.js + ECharts rendering (extracted from init.js)
+- `js/charts.js` — ECharts rendering (extracted from init.js)
 - `js/utils.js` — Shared utility functions (formatUsd, formatWhen, etc.)
 - `styles.css` — Design system: tokens, glass, elevation, skeleton, icon utilities
-- 8-tab layout: Signal (hero gauge + AI summary + risk/charts) | Market (forecast + supply) | Analytics (regimes + correlations) | Intel (OSINT + SMIDGE) | Forensics (blacklist + chain investigate + tags) | Alerts (event stream + rules) | System (health + quality) | Settings (governance + admin)
+- 7-tab layout: Signal | Market | Analytics | Intel | Forensics | Alerts | System | Settings (operator shell; full CRUD at `/admin` SQLAdmin)
 - Frontend a11y: `@media (prefers-reduced-motion: reduce)`, `:focus-visible` outlines, `aria-label` on icon-only buttons, `role="dialog"` + `aria-modal` on all modals, global toast/modal composables in `stores/ui.js`
-- nginx in Docker: same-origin `/api` proxy; `return 404` for public `/metrics`
+- nginx in Docker: same-origin `/api` proxy; `location ^~ /admin` → backend SQLAdmin; `return 404` for public `/metrics`
 - Frontend container binds to host port 80 (mapped from container port 80)
 - Content-Security-Policy uses SHA-256 hashes to allow specific inline scripts (like importmap) without using 'unsafe-inline'
 
@@ -120,8 +120,8 @@ Post-deploy validation:
 
 ## Test coverage
 
-- **Backend:** 461 pytest regression tests (`cd backend && .venv/bin/pytest`)
-- **Frontend E2E:** 28 Playwright tests in `frontend/e2e/` covering all 8 tabs — Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings (Governance). Run with `FRONTEND_PORT=3080 docker compose up -d --build frontend` then `cd frontend && npx playwright test --project=chromium`. See [README E2E section](../README.md#e2e-tests-playwright).
+- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~495 cases as of v4.0.5.1
+- **Frontend E2E:** 15 Playwright specs in `frontend/e2e/` covering Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings. Run with `FRONTEND_PORT=3080 docker compose up -d --build frontend` then `cd frontend && npx playwright test --project=chromium`. See [README E2E section](../README.md#e2e-tests-playwright).
 
 ## Design Intent
 

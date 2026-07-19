@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import CollateralSnapshot, FiatReserveSnapshot, YieldBearingSnapshot, get_db
+from core.api_auth import require_read_open
 
 router = APIRouter()
 
@@ -66,7 +67,7 @@ def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
-@router.get("/assets/{symbol}/yield", response_model=YieldBearingSnapshotOut)
+@router.get("/assets/{symbol}/yield", response_model=YieldBearingSnapshotOut, dependencies=[Depends(require_read_open("intelligence:read"))])
 def yield_route(symbol: str, db: Session = Depends(get_db)):
     row = db.execute(
         select(YieldBearingSnapshot)
@@ -90,7 +91,7 @@ def yield_route(symbol: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/assets/{symbol}/collateral", response_model=CollateralSnapshotOut)
+@router.get("/assets/{symbol}/collateral", response_model=CollateralSnapshotOut, dependencies=[Depends(require_read_open("intelligence:read"))])
 def collateral_route(symbol: str, db: Session = Depends(get_db)):
     row = db.execute(
         select(CollateralSnapshot)
@@ -112,7 +113,7 @@ def collateral_route(symbol: str, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/assets/{symbol}/reserve", response_model=FiatReserveSnapshotOut)
+@router.get("/assets/{symbol}/reserve", response_model=FiatReserveSnapshotOut, dependencies=[Depends(require_read_open("intelligence:read"))])
 def reserve_route(symbol: str, db: Session = Depends(get_db)):
     row = db.execute(
         select(FiatReserveSnapshot)

@@ -9,6 +9,7 @@ from structlog import get_logger
 
 from core.limiter import limiter
 from database import AssetChainSnapshot, get_db
+from core.api_auth import require_read_open
 from services.anomaly import detect_anomalies, detect_change_points
 from services.dews import compute_dews
 from services.onnx_inference import (
@@ -27,7 +28,7 @@ log = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/dews")
+@router.get("/dews", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def get_dews(
     request: Request,

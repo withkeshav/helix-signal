@@ -4,6 +4,48 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 > **API Versioning Note:** Most routes live at `/api/*` with no version prefix. The V4 intelligence/forensics endpoints (`investigate`, `yield`, `collateral`, `reserve`, `blacklist`, `tags`) use `/api/v1/*`. A future dedicated versioning pass will standardize all routes under `/api/v1`. See `.opencode/AGENTS.md` decision history for context.
 
+## Intelligence API (v4.0.5.1+)
+
+Self-host first; optional API keys for other apps.
+
+### Auth modes (`api_auth_mode` setting / `API_AUTH_MODE` env)
+
+| Mode | Read routes (dashboard, trends, OSINT, …) | Keyed-always (investigate, alerts, blacklist, tag writes) |
+|------|-------------------------------------------|-----------------------------------------------------------|
+| `open` (default) | Anonymous OK | API key **or** admin session |
+| `key_required` | API key **or** admin session | API key **or** admin session |
+
+Public always: `GET /api/health`, `GET /api/version`.
+
+### Create a key (admin session / legacy token)
+
+```bash
+curl -s -X POST http://localhost/api/v1/api-keys \
+  -H "X-Admin-Token: $HELIX_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-app","scopes":["intelligence:read","investigate:write"],"rate_limit_rpm":60}'
+```
+
+Raw `api_key` is returned **once**. Store it securely.
+
+### Call intelligence routes
+
+```bash
+# Bearer
+curl -s http://localhost/api/dashboard?asset=USDT -H "Authorization: Bearer hx_..."
+
+# Or header
+curl -s http://localhost/api/dashboard?asset=USDT -H "X-API-Key: hx_..."
+```
+
+Scopes: `intelligence:read`, `investigate:write`, `admin`. Manage keys in SQLAdmin at `/admin` or via `GET/DELETE /api/v1/api-keys`.
+
+### Operator Admin Panel
+
+Browser UI: `/admin` (SQLAdmin). Requires an admin user login (same seeded account as Settings). nginx must proxy with `location ^~ /admin`.
+
+---
+
 ## Core
 
 | Method | Endpoint | Description | Rate Limit |
@@ -116,7 +158,7 @@ Data Quality Dashboard provides comprehensive monitoring of:
 | GET | `/api/ai/narrative?asset=USDT` | Market narrative with sentiment + events | 30/min | `AI_MODE != ai_off` |
 | GET | `/api/ai/insights?asset=USDT` | Supply, chain, and anomaly insights | 30/min | `AI_MODE != ai_off` |
 | GET | `/api/ai/market-overview` | Cross-asset market summary | 20/min | `AI_MODE != ai_off` (returns engine data when off) |
-| GET | `/api/ai/budget` | Daily token budget, used, remaining, pct | 30/min | Always available |
+| GET | `/api/ai/usage` | Recent AI usage per feature / provider / model | 30/min | Always available |
 
 AI endpoints can optionally require `X-Admin-Token` — enable `ai_require_token` in Settings UI.
 When enabled, failed auth triggers a per-IP lockout after 20 failed attempts (15-minute window).
@@ -134,16 +176,14 @@ Lockout uses Redis when available, falling back to in-memory tracking.
 External modules (forensics, OSINT, webhooks) call the AI subsystem through the public facade at `services/components/ai/facade.py`:
 
 ```python
-from services.components.ai.facade import ollama_cloud, within_budget, get_budget_status
+from services.components.ai.facade import ollama_cloud
 ```
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `ollama_cloud` | `(prompt, max_tokens, system=None, model=None, **kwargs)` | Ollama Cloud chat completion; pass `_resolved_api_key` kwarg |
-| `within_budget` | `(count: int) -> bool` | Non-deducting check if `count` tokens fit in the daily budget |
-| `get_budget_status` | `() -> dict` | Current daily budget, tokens used, remaining, pct |
 
-The underscore-prefixed originals (`_ollama_cloud`, `_within_budget`) remain in `services/ai_router` and `services/components/ai/budget` for backward compatibility; new code should import from the facade.
+The underscore-prefixed original (`_ollama_cloud`) remains in `services/ai_router` for backward compatibility; new code should import from the facade. Budget helpers have been removed; usage is tracked via `AiUsage`.
 
 ## Common Parameters
 
@@ -180,7 +220,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.0.4"
+  "version": "4.0.5.1"
 }
 ```
 

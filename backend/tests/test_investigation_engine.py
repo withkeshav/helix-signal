@@ -54,15 +54,15 @@ class TestInvestigation:
 
 
 class TestBlacklistRoutes:
-    def test_blacklist_stats_empty_db(self, client: TestClient):
-        resp = client.get("/api/v1/blacklist/stats")
+    def test_blacklist_stats_empty_db(self, client: TestClient, admin_headers):
+        resp = client.get("/api/v1/blacklist/stats", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["total_events"] == 0
         assert data["total_frozen_usd"] == 0.0
 
-    def test_blacklist_stats_with_data(self, client: TestClient, sample_blacklist_events):
-        resp = client.get("/api/v1/blacklist/stats")
+    def test_blacklist_stats_with_data(self, client: TestClient, sample_blacklist_events, admin_headers):
+        resp = client.get("/api/v1/blacklist/stats", headers=admin_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["total_events"] == 3

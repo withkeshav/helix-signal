@@ -13,6 +13,7 @@ from signal_engine.core import get_asset_by_symbol
 from utils import window_delta
 
 from core.limiter import limiter
+from core.api_auth import require_read_open
 
 router = APIRouter()
 
@@ -85,7 +86,7 @@ def _chain_trend_summary_dict(
     }
 
 
-@router.get("/trends", response_model=TrendResponseOut)
+@router.get("/trends", response_model=TrendResponseOut, dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def trends(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> TrendResponseOut:
     w = window.strip().lower()
@@ -131,7 +132,7 @@ def trends(request: Request, asset: str, window: str = Query("7d"), db: Session 
     )
 
 
-@router.get("/trends/export")
+@router.get("/trends/export", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("30/minute")
 def trends_export_route(
     request: Request,
@@ -143,7 +144,7 @@ def trends_export_route(
     return trends_export(db, asset=asset, window=window, fmt=format)
 
 
-@router.get("/trends/chains", response_model=ChainTrendResponseOut)
+@router.get("/trends/chains", response_model=ChainTrendResponseOut, dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
 def trends_chains(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> ChainTrendResponseOut:
     w = window.strip().lower()

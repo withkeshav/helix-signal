@@ -4,7 +4,7 @@ Base path: `/api` (proxied through nginx in Docker; same-origin from frontend)
 
 > **API Versioning Note:** Most routes live at `/api/*` with no version prefix. The V4 intelligence/forensics endpoints (`investigate`, `yield`, `collateral`, `reserve`, `blacklist`, `tags`) use `/api/v1/*`. A future dedicated versioning pass will standardize all routes under `/api/v1`. See `.opencode/AGENTS.md` decision history for context.
 
-## Intelligence API (v4.0.7+)
+## Intelligence API (v4.1.0+)
 
 Self-host first; optional API keys for other apps.
 
@@ -121,8 +121,41 @@ Browser UI: `/admin` (SQLAdmin). Requires an admin user login (same seeded accou
 |--------|----------|-------------|------|
 | GET | `/api/settings` | Get all settings (supports `?search=`, `?group=`) | Admin token |
 | PUT | `/api/settings` | Update a setting (`key`, `value`) | Admin token |
+| GET | `/api/settings/last-prune` | Last retention prune result JSON | Admin token |
+| GET | `/api/settings/ops` | Scheduler + sources + quality score summary | Admin token |
 | GET | `/api/settings/groups` | Get all setting groups | Admin token |
 | GET | `/api/settings/defaults` | Get default values for all settings | Admin token |
+
+## Data Quality (v4.1.0+)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/data-quality/summary` | Latest snapshot: overall score, source health, bucket fill-rates, 30d history | Open |
+| GET | `/api/data-quality/overview` | Live computed metrics (admin) | Admin token |
+| GET | `/api/data-quality/report` | Full quality report (admin) | Admin token |
+
+## Insight Assets (v4.1.0+)
+
+Versioned deterministic insight objects (L4: payload always present; `ai_narrative` only when `ai_mode` on).
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/insights/{kind}?asset=USDT` | Latest insight (`risk_explain`, `market_snapshot`, `anomaly_digest`, `forecast_run`, `dews_explain`) | Open |
+| GET | `/api/insights/{kind}/export?format=ndjson` | Historical insights export (NDJSON or CSV) | Open |
+
+Response shape:
+
+```json
+{
+  "kind": "risk_explain",
+  "schema_version": "1.0",
+  "asset_scope": "USDT",
+  "generated_at": "2026-07-19T12:00:00Z",
+  "deterministic_payload": { "signal_score": 42, "rule_sentences": ["..."] },
+  "sources": { "engine": "helix_deterministic" },
+  "quality_score": 100.0
+}
+```
 
 ## Settings Audit
 
@@ -221,7 +254,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.0.7"
+  "version": "4.1.0"
 }
 ```
 

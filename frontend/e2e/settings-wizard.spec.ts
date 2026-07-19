@@ -6,7 +6,7 @@ test.describe('Settings wizard', () => {
     await page.goto('/#settings');
     await waitForAlpine(page);
     await signInAsAdmin(page);
-    await expect(page.getByRole('link', { name: /Open Admin Panel/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /Advanced → SQLAdmin|Open SQLAdmin/i })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: /Test AI/i })).toBeVisible();
   });
 
@@ -14,6 +14,7 @@ test.describe('Settings wizard', () => {
     await page.goto('/#settings');
     await waitForAlpine(page);
     await signInAsAdmin(page);
+    await page.getByRole('button', { name: 'AI & Models' }).click();
     await expect(page.getByRole('button', { name: 'Test provider chain' })).toBeVisible({ timeout: 15000 });
   });
 });

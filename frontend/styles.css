@@ -243,4 +243,17 @@ button:focus-visible,.btn:focus-visible,.tab:focus-visible,.nav-link:focus-visib
 .data-table .sev-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .data-table .num{text-align:right;font-variant-numeric:tabular-nums}
 .data-table tbody tr{cursor:pointer}
+/* v4.1.0 — Control Room */
+.control-room-subtabs{display:flex;gap:4px;flex-wrap:wrap;margin:12px 0;border-bottom:1px solid var(--line);padding-bottom:8px}
+.control-room-subtab{padding:6px 12px;border:none;border-radius:6px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif}
+.control-room-subtab.active{background:var(--bg-accent);color:var(--text)}
+.cr-status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+.cr-status-card{background:var(--bg-accent);border:1px solid var(--line);border-radius:8px;padding:10px}
+.cr-status-label{font-size:var(--fs-sub);color:var(--muted);margin:0 0 4px}
+.cr-status-value{font-size:var(--fs-kpi);font-family:"JetBrains Mono",monospace;font-weight:700}
+.cr-setting-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.cr-setting-row label{flex:1;min-width:0}
+.cr-setting-hint{font-size:var(--fs-sub);color:var(--muted);display:block}
+.cr-dirty-bar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
+.input,.select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px;font-family:Inter,sans-serif}
 @media(max-width:900px){.signal-hero{grid-template-columns:1fr}}

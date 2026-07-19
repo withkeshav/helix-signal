@@ -77,17 +77,17 @@ test.describe('Governance Tab (Settings)', () => {
 
   test('loads settings tab with admin login', async ({ page }) => {
     await expect(page.locator('#tab-settings input[type="password"]').first()).toBeVisible();
-    await expect(page.locator('#tab-settings').getByRole('heading', { name: 'Admin Login' })).toBeVisible();
+    await expect(page.locator('#tab-settings').getByText('Control Room')).toBeVisible();
   });
 
-  test('shows Open Admin Panel and AI surface after login', async ({ page }) => {
+  test('shows Control Room sub-tabs after login', async ({ page }) => {
     const panel = page.locator('#tab-settings');
-    await expect(panel.getByRole('link', { name: /Open Admin Panel/i })).toBeVisible();
-    await expect(panel.getByText('AI Feature Mapping')).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Overview' })).toBeVisible();
+    await panel.getByRole('button', { name: 'AI & Models' }).click();
     await expect(panel.getByRole('button', { name: /Test provider chain/i })).toBeVisible();
   });
 
-  test('shows AI status budget line', async ({ page }) => {
-    await expect(page.locator('#tab-settings').getByText(/Mode:/i)).toBeVisible({ timeout: 120000 });
+  test('shows AI mode status on overview', async ({ page }) => {
+    await expect(page.locator('#tab-settings').getByText(/AI mode/i)).toBeVisible({ timeout: 120000 });
   });
 });

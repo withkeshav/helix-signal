@@ -1,5 +1,24 @@
 # Helix Signal Changelog
 
+## v4.1.0 (2026-07-19) — Control Room + insight assets + quality history
+
+### Added
+- **`data_quality_snapshots` table** — daily persisted quality score, source health, bucket fill-rates; `GET /api/data-quality/summary` (read-open, snapshot-backed).
+- **`insight_assets` table + `GET /api/insights/{kind}`** — versioned deterministic insight objects (`risk_explain`, `market_snapshot`, `anomaly_digest`, `forecast_run`, `dews_explain`); AI narrative appended only when `ai_mode` on; NDJSON/CSV export.
+- **Settings Control Room** — 6 sub-tabs (Overview, AI & Models, Data & Sources, Alerts & Notify, Security, Advanced) with ~25 Tier-1 keys; Advanced registry editor gated by search + allowlist.
+- **`GET /api/settings/last-prune`** and **`GET /api/settings/ops`** — retention + scheduler status for Control Room Overview.
+- **Scheduler jobs** — `data-quality-snapshot` (04:00), `insight-assets-refresh` (04:30).
+
+### Fixed
+- **`metrics.py:83`** — `assets_tracked` now counts distinct `asset_symbol` (was incorrectly counting chains).
+
+### Changed
+- **Settings tab** — replaced flat login shell with Control Room; SQLAdmin demoted to Advanced link.
+- **System tab** — quality history sparkline reads `/api/data-quality/summary`.
+
+### Docs
+- `docs/api.md` — data-quality summary, insights API, settings ops endpoints.
+
 ## v4.0.7 (2026-07-19) — Visual hierarchy + safe security
 
 ### Added

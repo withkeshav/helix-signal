@@ -144,6 +144,7 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
+| v4.1.0 | local | 2026-07-19 | Control Room (6 sub-tabs), data-quality snapshots, insight assets API |
 | v4.0.7 | local | 2026-07-19 | Global strip + signal hero, `.data-table` lists, Fernet settings encryption, security headers, OLAP amputate (fred_yields only) |
 | v4.0.6 | local | 2026-07-19 | Frontend liveness (`refreshTick`), `GET /api/dashboard/summary`, settings-driven retention (11 tables), Timescale `drop_chunks` + compression |
 | v4.0.5.1 | local | 2026-07-16 | AI provider simplification (Ollama Cloud + OpenRouter), per-feature `provider:model_id` settings, budget enforcement removed, error-logging hardening, APScheduler `max_instances=1` |

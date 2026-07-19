@@ -120,7 +120,16 @@ Post-deploy validation:
 
 ## Test coverage
 
-- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~500 cases as of v4.0.7
+- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~485 cases as of v4.1.0
+
+## Data assets (v4.1.0+)
+
+- **`data_quality_snapshots`** — daily persisted quality metrics; `GET /api/data-quality/summary` serves the latest row.
+- **`insight_assets`** — versioned deterministic insight objects per `kind` + `asset_scope`; `GET /api/insights/{kind}` always returns `deterministic_payload`; optional `ai_narrative` when AI on.
+
+## Settings Control Room (v4.1.0+)
+
+Tier 1: Settings tab with 6 sub-tabs (~25 high-touch keys). Tier 2: SQLAdmin at `/admin` for full registry CRUD.
 
 ## OLAP / DuckDB (v4.0.7+)
 

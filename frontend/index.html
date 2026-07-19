@@ -1548,136 +1548,193 @@
          role="tabpanel" id="tab-settings">
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
-          <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-            <div style="flex:1;min-width:280px">
-              <h2 style="margin:0 0 8px 0"><svg class="icon"><use href="#icon-lock"/></svg> Admin Login</h2>
-              <p class="kpi-sub" style="margin:0 0 12px 0">Sign in with the seeded admin account. Operator CRUD (keys, users, playbooks, audit) is in the Admin Panel.</p>
-              <div x-cloak x-show="$store.ui.authError" class="warning-banner visible" x-text="$store.ui.authError" style="margin-bottom:12px"></div>
-              <div x-cloak x-show="settingsError" class="warning-banner visible" x-text="settingsError" style="margin-bottom:12px"></div>
-              <form id="admin-login-form" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px" @submit.prevent="submitAdminLogin()">
-                <input type="text" x-model="$store.ui.loginUsername" placeholder="Username" autocomplete="username"
-                       style="flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px">
-                <input type="password" x-model="$store.ui.loginPassword" placeholder="Password" autocomplete="current-password"
-                       style="flex:1;min-width:140px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:13px">
-                <button class="btn btn-primary" type="submit" style="padding:10px 20px">Sign in</button>
-                <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.adminToken" @click="$store.ui.logout(); settingsError=''; settingsList=[]" style="padding:10px 20px">Sign out</button>
-              </form>
-            </div>
-            <div style="background:var(--warn-bg);padding:16px;border-radius:8px;min-width:200px">
-              <h3 style="margin:0 0 8px 0;color:var(--neutral)">Admin Panel</h3>
-              <p style="margin:0 0 12px;font-size:12px;color:var(--neutral)">Edit settings, users, playbooks, and audit logs in SQLAdmin.</p>
-              <a class="btn btn-primary" href="/admin" target="_blank" rel="noopener noreferrer" id="open-admin-panel" style="padding:10px 16px;display:inline-block;text-decoration:none">Open Admin Panel</a>
-            </div>
-          </div>
+          <h2 class="section-heading">Control Room</h2>
+          <p class="kpi-sub">Tier-1 operator surface — SQLAdmin remains Tier 2 for raw tables and user CRUD.</p>
+          <div x-cloak x-show="$store.ui.authError" class="warning-banner visible" x-text="$store.ui.authError"></div>
+          <div x-cloak x-show="settingsError" class="warning-banner visible" x-text="settingsError"></div>
+          <form class="cr-setting-row" @submit.prevent="submitAdminLogin()">
+            <input class="input" type="text" x-model="$store.ui.loginUsername" placeholder="Username" autocomplete="username">
+            <input class="input" type="password" x-model="$store.ui.loginPassword" placeholder="Password" autocomplete="current-password">
+            <button class="btn btn-primary" type="submit">Sign in</button>
+            <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.adminToken" @click="$store.ui.logout(); settingsError=''; settingsList=[]">Sign out</button>
+          </form>
         </div>
 
         <div class="insight-card" style="grid-column:1/-1" x-show="!$store.ui.adminToken">
-          <p class="kpi-sub" style="margin:0">Sign in above to run Quick Setup, Test AI, and apply playbooks.</p>
+          <p class="kpi-sub">Sign in to manage AI, retention, alerts, API keys, and registry settings.</p>
         </div>
 
         <div class="insight-card" style="grid-column:1/-1" x-show="$store.ui.adminToken">
-            <div x-show="!setupDone" style="padding:16px;border:1px solid var(--line);border-radius:8px;margin-bottom:16px;background:var(--bg-accent)">
-              <h3 style="margin:0 0 8px 0;font-size:15px">Quick Setup — Step <span x-text="wizardStep"></span> of 3</h3>
+          <nav class="control-room-subtabs" aria-label="Control Room sections">
+            <template x-for="t in controlSubTabs" :key="t.id">
+              <button type="button" class="control-room-subtab" :class="controlSubTab===t.id&&'active'" @click="controlSubTab=t.id; if(t.id==='overview') loadOpsStatus()" x-text="t.label"></button>
+            </template>
+          </nav>
+
+          <!-- Overview -->
+          <div x-show="controlSubTab==='overview'">
+            <div class="cr-status-grid">
+              <div class="cr-status-card"><div class="cr-status-label">AI mode</div><div class="cr-status-value" x-text="aiModeLabel"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Auth mode</div><div class="cr-status-value" x-text="authModeLabel"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Sources</div><div class="cr-status-value" x-text="`${opsStatus?.sources_ok ?? '—'}/${opsStatus?.sources_total ?? '—'}`"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Scheduler</div><div class="cr-status-value" x-text="opsStatus?.scheduler_running ? 'OK' : 'Down'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Quality</div><div class="cr-status-value" x-text="qualitySummary?.overall_score != null ? Math.round(qualitySummary.overall_score) : '—'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Last prune</div><div class="cr-status-value" style="font-size:12px" x-text="opsStatus?.last_prune?.result?.generated_at?.slice(0,10) || '—'"></div></div>
+            </div>
+            <div class="cr-setting-row">
+              <button class="btn btn-muted" type="button" :disabled="testAiLoading" @click="runTestAi()">Test AI</button>
+              <button class="btn btn-muted" type="button" @click="exportSettings()">Export settings</button>
+              <button class="btn btn-muted" type="button" @click="openAdminPanel()">Advanced → SQLAdmin</button>
+            </div>
+            <h3 class="section-heading">Recent audit</h3>
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Key</th><th>User</th><th>When</th></tr></thead>
+                <tbody>
+                  <template x-for="row in auditTail" :key="row.id">
+                    <tr><td x-text="row.setting_key"></td><td x-text="row.user_username || '—'"></td><td x-text="row.created_at?.slice(0,19)"></td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- AI & Models -->
+          <div x-show="controlSubTab==='ai'">
+            <div x-show="!setupDone" class="cr-status-card" style="margin-bottom:12px">
+              <h3>Quick Setup — Step <span x-text="wizardStep"></span> of 3</h3>
               <div x-show="wizardStep===1">
-                <p class="kpi-sub" style="margin:0 0 12px 0">Choose an AI preset (sets mode, providers, budget).</p>
-                <select x-model="wizardPlaybook" style="padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);margin-right:8px">
-                  <option value="max_free">Off / Minimal (max_free)</option>
+                <select class="select" x-model="wizardPlaybook">
+                  <option value="max_free">Off / Minimal</option>
                   <option value="balanced">Lite (balanced)</option>
                   <option value="quality">Full (quality)</option>
                 </select>
                 <button class="btn btn-primary" type="button" @click="wizardApplyAiMode()">Apply &amp; Continue</button>
               </div>
               <div x-show="wizardStep===2">
-                <p class="kpi-sub" style="margin:0 0 12px 0">Add API keys in the Admin Panel, then enable features here.</p>
                 <template x-for="(on, key) in wizardFeatures" :key="key">
-                  <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px">
-                    <input type="checkbox" :checked="wizardFeatures[key]" @change="wizardFeatures[key] = $event.target.checked">
-                    <span x-text="key"></span>
-                  </label>
+                  <label class="cr-setting-row"><input type="checkbox" :checked="wizardFeatures[key]" @change="wizardFeatures[key]=$event.target.checked"><span x-text="key"></span></label>
                 </template>
-                <button class="btn btn-primary" type="button" style="margin-top:8px" @click="wizardApplyFeatures()">Save features &amp; finish</button>
-              </div>
-              <div x-show="wizardStep>=3">
-                <p class="kpi-sub" style="margin:0">Setup complete. Use Test AI below to verify narrative generation.</p>
+                <button class="btn btn-primary" type="button" @click="wizardApplyFeatures()">Save &amp; finish</button>
               </div>
             </div>
-
-            <div style="margin-bottom:16px">
-              <h3 style="margin:0 0 8px 0;font-size:14px">AI Status</h3>
-              <p class="kpi-sub" style="margin:0 0 8px 0">Mode: <strong x-text="aiModeLabel"></strong></p>
-              <button class="btn btn-muted" type="button" :disabled="testAiLoading" @click="runTestAi()">
-                <span x-show="testAiLoading">Testing...</span>
-                <span x-show="!testAiLoading">Test AI (USDT narrative)</span>
-              </button>
-              <button class="btn btn-muted" type="button" style="margin-left:8px" :disabled="providerTestLoading" @click="runProviderTest()">
-                <span x-show="providerTestLoading">Testing provider...</span>
-                <span x-show="!providerTestLoading">Test provider chain</span>
-              </button>
-              <p class="kpi-sub" x-show="testAiResult" style="margin-top:8px" x-text="testAiResult"></p>
-              <p class="kpi-sub" x-show="providerTestResult" style="margin-top:4px" x-text="providerTestResult"></p>
-            </div>
-
-            <div style="margin-bottom:16px">
-              <h3 style="margin:0 0 8px 0;font-size:14px">AI Playbook Presets</h3>
-              <p class="kpi-sub" style="margin:0 0 8px 0">One-click apply. Create/edit custom playbooks in the Admin Panel.</p>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <template x-for="pb in playbooks" :key="pb.name">
-                  <button class="playbook-btn btn btn-muted" type="button"
-                          @click="applyPlaybook(pb.name)" :disabled="playbookLoading !== null">
-                    <span x-show="playbookLoading===pb.name">…</span>
-                    <span x-text="pb.label || pb.name"></span>
-                  </button>
-                </template>
+            <template x-for="s in tier1Settings('ai')" :key="s.key">
+              <div class="cr-setting-row">
+                <label><span x-text="s.label || s.key"></span><span class="cr-setting-hint" x-text="s.description"></span></label>
+                <template x-if="s.type==='bool'"><input type="checkbox" :checked="_toBool(s.value)" @change="onTier1Change(s, $event)"></template>
+                <template x-if="s.type==='enum'"><select class="select" :value="s.value" @change="onTier1Change(s, $event)"><template x-for="opt in (s.options||[])" :key="opt"><option :value="opt" x-text="opt"></option></template></select></template>
+                <template x-if="s.type!=='bool' && s.type!=='enum'"><input class="input" :value="s.value" @change="onTier1Change(s, $event)"></template>
               </div>
+            </template>
+            <h3 class="section-heading">Playbooks</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+              <template x-for="pb in playbooks" :key="pb.name">
+                <button class="btn btn-muted" type="button" @click="applyPlaybook(pb.name)" :disabled="playbookLoading!==null" x-text="pb.label || pb.name"></button>
+              </template>
             </div>
+            <button class="btn btn-muted" type="button" :disabled="providerTestLoading" @click="runProviderTest()">Test provider chain</button>
+            <p class="kpi-sub" x-show="testAiResult" x-text="testAiResult"></p>
+            <p class="kpi-sub" x-show="providerTestResult" x-text="providerTestResult"></p>
+          </div>
 
-            <div style="margin-bottom:16px">
-              <h3 style="margin:0 0 8px 0;font-size:14px">AI Feature Mapping</h3>
-              <table style="width:100%;font-size:12px;border-collapse:collapse">
-                <thead><tr style="text-align:left;border-bottom:1px solid var(--line)"><th>UI</th><th>Tab</th><th>Kind</th><th>Toggle</th><th>Enabled</th></tr></thead>
+          <!-- Data & Sources -->
+          <div x-show="controlSubTab==='data'">
+            <template x-for="s in tier1Settings('data')" :key="s.key">
+              <div class="cr-setting-row">
+                <label><span x-text="s.label || s.key"></span></label>
+                <input class="input" type="number" :value="s.value" style="width:100px" @change="onTier1Change(s, $event)">
+              </div>
+            </template>
+            <h3 class="section-heading">Quality history</h3>
+            <p class="kpi-sub">Score sparkline (30d): <span x-text="qualitySparkline() || '—'"></span></p>
+            <button class="btn btn-muted" type="button" @click="loadOpsStatus()">Refresh quality</button>
+            <h3 class="section-heading">Enabled assets</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <template x-for="row in assetCatalog" :key="row.symbol">
+                <label class="signal-hero-chip"><input type="checkbox" :checked="row.enabled" @change="toggleAssetEnabled(row)"> <span x-text="row.symbol"></span></label>
+              </template>
+            </div>
+          </div>
+
+          <!-- Alerts -->
+          <div x-show="controlSubTab==='alerts'">
+            <template x-for="s in tier1Settings('alerts')" :key="s.key">
+              <div class="cr-setting-row">
+                <label><span x-text="s.label || s.key"></span></label>
+                <template x-if="s.type==='bool'"><input type="checkbox" :checked="_toBool(s.value)" @change="onTier1Change(s, $event)"></template>
+                <template x-if="s.type!=='bool'"><input class="input" :value="s.value" @change="onTier1Change(s, $event)"></template>
+              </div>
+            </template>
+          </div>
+
+          <!-- Security -->
+          <div x-show="controlSubTab==='security'">
+            <template x-for="s in tier1Settings('security')" :key="s.key">
+              <div class="cr-setting-row">
+                <label><span x-text="s.label || s.key"></span></label>
+                <template x-if="s.type==='bool'"><input type="checkbox" :checked="_toBool(s.value)" @change="onTier1Change(s, $event)"></template>
+                <template x-if="s.type==='enum'"><select class="select" :value="s.value" @change="onTier1Change(s, $event)"><template x-for="opt in (s.options||[])" :key="opt"><option :value="opt" x-text="opt"></option></template></select></template>
+              </div>
+            </template>
+            <p class="kpi-sub">Set <code>TRUSTED_PROXY_CIDR</code> in <code>.env</code> for rate-limiter XFF trust.</p>
+            <h3 class="section-heading">API keys</h3>
+            <div class="cr-setting-row">
+              <input class="input" x-model="newApiKeyName" placeholder="Key name">
+              <button class="btn btn-primary" type="button" @click="createApiKey()">Create</button>
+            </div>
+            <p class="kpi-sub" x-show="createdApiKeyRaw" x-text="'Copy now: ' + createdApiKeyRaw"></p>
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>Prefix</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                  <template x-for="row in aiFeatureMap" :key="row.ui">
-                    <tr style="border-bottom:1px solid var(--line);cursor:pointer" @click="navigateAiEffect(row)">
-                      <td x-text="row.ui"></td>
-                      <td x-text="row.tab"></td>
-                      <td x-text="row.kind"></td>
-                      <td><code x-text="row.toggle"></code></td>
-                      <td x-text="row.toggle && row.toggle !== '—' ? (isFeatureEnabled(row.toggle) === true ? 'ON' : (isFeatureEnabled(row.toggle) === false ? 'OFF' : '--')) : '--'"></td>
+                  <template x-for="k in apiKeys" :key="k.id">
+                    <tr>
+                      <td x-text="k.name"></td><td x-text="k.key_prefix"></td>
+                      <td x-text="k.revoked_at ? 'revoked' : (k.enabled ? 'active' : 'disabled')"></td>
+                      <td><button class="btn btn-muted" type="button" x-show="!k.revoked_at" @click="revokeApiKey(k.id)">Revoke</button></td>
                     </tr>
                   </template>
                 </tbody>
               </table>
-              <p class="kpi-sub" style="margin-top:8px;font-size:11px">Click a row to jump to its effect. Toggle keys in Admin Panel → Settings.</p>
             </div>
+          </div>
 
-            <div style="margin-bottom:16px">
-              <h3 style="margin:0 0 8px 0;font-size:14px">Enabled Assets</h3>
-              <p class="kpi-sub" style="margin:0 0 8px 0">Toggle assets without editing <code>config/assets.json</code>.</p>
-              <button class="btn btn-muted" type="button" style="margin-bottom:8px;padding:6px 12px;font-size:12px" @click="loadAssetCatalog()">Refresh catalog</button>
-              <div style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow-y:auto">
-                <template x-for="row in assetCatalog" :key="row.symbol">
-                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:6px">
-                    <input type="checkbox" :checked="row.enabled" @change="toggleAssetEnabled(row)">
-                    <span x-text="row.symbol"></span>
-                  </label>
+          <!-- Advanced -->
+          <div x-show="controlSubTab==='advanced'">
+            <p class="kpi-sub">Search-gated registry editor for safe keys. Secrets: rotate only (masked).</p>
+            <input class="input" type="search" x-model="advancedSearch" placeholder="Search registry…" style="width:100%;margin-bottom:12px">
+            <template x-for="s in advancedSettings" :key="s.key">
+              <div class="cr-setting-row">
+                <label>
+                  <span x-text="s.label || s.key"></span>
+                  <span class="cr-setting-hint" x-text="s.requires_restart ? 'requires restart' : ''"></span>
+                </label>
+                <template x-if="s.type==='bool'">
+                  <input type="checkbox" :checked="advancedDirty[s.key] !== undefined ? _toBool(advancedDirty[s.key]) : _toBool(s.value)" @change="markAdvancedDirty(s.key, $event.target.checked)">
                 </template>
-                <span x-show="!assetCatalog.length && !assetCatalogLoading" class="kpi-sub">Load catalog after sign-in</span>
+                <template x-if="s.type==='int'">
+                  <input class="input" type="number" :value="advancedDirty[s.key] ?? s.value" style="width:100px" @change="markAdvancedDirty(s.key, parseInt($event.target.value,10))">
+                </template>
+                <template x-if="s.type==='enum'">
+                  <select class="select" :value="advancedDirty[s.key] ?? s.value" @change="markAdvancedDirty(s.key, $event.target.value)">
+                    <template x-for="opt in (s.options||[])" :key="opt"><option :value="opt" x-text="opt"></option></template>
+                  </select>
+                </template>
               </div>
+            </template>
+            <div class="cr-dirty-bar" x-show="advancedDirtyCount > 0">
+              <span x-text="`${advancedDirtyCount} unsaved change(s)`"></span>
+              <button class="btn btn-primary" type="button" :disabled="advancedSaving" @click="saveAdvancedDirty()">Save</button>
             </div>
-
-            <div>
-              <h3 style="margin:0 0 8px 0;font-size:14px">Import / Export</h3>
-              <p class="kpi-sub" style="margin:0 0 8px 0">Backup or restore settings JSON.</p>
-              <button class="btn btn-muted" type="button" @click="exportSettings()">Export settings</button>
-              <button class="btn btn-muted" type="button" style="margin-left:8px" @click="triggerImport()">Import settings</button>
-              <input type="file" x-ref="settingsImportInput" accept="application/json,.json" style="display:none" @change="importSettings($event)">
-            </div>
+            <p class="kpi-sub" style="margin-top:12px"><a href="/admin" target="_blank" rel="noopener">Open SQLAdmin</a> for users, audit, and all 110 keys.</p>
+            <button class="btn btn-muted" type="button" @click="exportSettings()">Export</button>
+            <button class="btn btn-muted" type="button" @click="triggerImport()">Import</button>
+            <input type="file" x-ref="settingsImportInput" accept="application/json,.json" style="display:none" @change="importSettings($event)">
+          </div>
         </div>
 
-        <div x-cloak x-show="toastVisible" style="position:fixed;bottom:24px;right:24px;z-index:500;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:400px"
-             :style="`background:${toastType === 'error' ? 'var(--alert-bg)' : 'var(--ok-bg)'};color:${toastType === 'error' ? 'var(--down)' : 'var(--up)'};border:1px solid ${toastType === 'error' ? 'var(--down)' : 'var(--up)'}`"
-             role="status" aria-live="polite">
-          <span x-text="toastMessage"></span>
+        <div x-cloak x-show="toastVisible" class="toast-wrap" style="position:fixed;bottom:24px;right:24px;z-index:500" role="status">
+          <div class="toast" :class="'toast-' + toastType"><span x-text="toastMessage"></span></div>
         </div>
       </div>
     </div>

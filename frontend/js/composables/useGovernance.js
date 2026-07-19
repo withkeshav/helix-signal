@@ -1,13 +1,57 @@
-/** Slim Settings / governance Alpine component (Phase 2).
- *
- * Operator CRUD (settings keys, users, playbooks, audit) lives in SQLAdmin at /admin.
- * This composable keeps: login shell, Quick Setup wizard, Test AI / provider chain,
- * playbook apply, asset catalog, thin import/export, Open Admin Panel.
- */
+/** Settings Control Room (v4.1.0 — kimi §7.2). */
 export function useGovernance() {
+  const TIER1 = {
+    ai: [
+      'ai_mode', 'feature_ai_summary', 'feature_ai_explain', 'feature_ai_insights',
+      'feature_ai_narrative', 'feature_nlp_sentiment', 'feature_osint_feed',
+      'ai_model_risk_explain', 'ai_model_market_overview', 'ai_model_market_narrative',
+      'ai_model_insight_summary', 'ai_model_anomaly_investigation',
+    ],
+    data: [
+      'refresh_core_seconds', 'refresh_osint_minutes', 'funding_rate_poll_interval_seconds',
+      'retention_asset_trend_snapshots_days', 'retention_osint_articles_days',
+      'retention_funding_rate_snapshots_days', 'retention_signal_events_days',
+    ],
+    alerts: [
+      'webhook_enabled', 'webhook_url', 'webhook_min_severity',
+      'blacklist_monitor_enabled', 'blacklist_poll_interval_seconds',
+    ],
+    security: ['api_auth_mode', 'ai_require_token'],
+  };
+
+  const ADVANCED_ALLOWLIST = new Set([
+    'feature_multi_user', 'feature_onchain_signals', 'anomaly_std_floor',
+    'ai_cache_enabled', 'ai_cache_ttl_seconds', 'semantic_cache_enabled',
+    'retention_chain_trend_snapshots_days', 'retention_yield_bearing_snapshots_days',
+    'retention_collateral_snapshots_days', 'retention_whale_activity_snapshots_days',
+    'retention_forecast_runs_days', 'retention_ai_narrative_history_days',
+    'retention_settings_audit_log_days', 'retention_source_usage_days', 'retention_ai_usage_days',
+    'retention_fred_yields_days', 'retention_fiat_reserve_snapshots_days',
+    'webhook_timeout_seconds', 'external_intel_webhook_enabled',
+  ]);
+
   return {
     settingsList: [],
     settingsError: '',
+    controlSubTab: 'overview',
+    controlSubTabs: [
+      { id: 'overview', label: 'Overview' },
+      { id: 'ai', label: 'AI & Models' },
+      { id: 'data', label: 'Data & Sources' },
+      { id: 'alerts', label: 'Alerts & Notify' },
+      { id: 'security', label: 'Security' },
+      { id: 'advanced', label: 'Advanced' },
+    ],
+
+    opsStatus: null,
+    qualitySummary: null,
+    auditTail: [],
+    apiKeys: [],
+    newApiKeyName: '',
+    createdApiKeyRaw: '',
+    advancedSearch: '',
+    advancedDirty: {},
+    advancedSaving: false,
 
     playbookLoading: null,
     playbooks: [
@@ -51,6 +95,138 @@ export function useGovernance() {
 
     _toBool(v) {
       return v === true || v === 'true' || v === 1 || v === '1';
+    },
+
+    tier1Settings(group) {
+      const keys = TIER1[group] || [];
+      return keys
+        .map(k => this.settingsList.find(s => s.key === k))
+        .filter(Boolean);
+    },
+
+    get advancedSettings() {
+      const tier1 = new Set(Object.values(TIER1).flat());
+      const q = (this.advancedSearch || '').trim().toLowerCase();
+      return (this.settingsList || []).filter(s => {
+        if (!s?.key || tier1.has(s.key) || s.type === 'secret') return false;
+        if (!ADVANCED_ALLOWLIST.has(s.key)) return false;
+        if (!q) return true;
+        return s.key.toLowerCase().includes(q)
+          || (s.label || '').toLowerCase().includes(q)
+          || (s.description || '').toLowerCase().includes(q);
+      });
+    },
+
+    get advancedDirtyCount() {
+      return Object.keys(this.advancedDirty).length;
+    },
+
+    markAdvancedDirty(key, value) {
+      this.advancedDirty = { ...this.advancedDirty, [key]: value };
+    },
+
+    async saveAdvancedDirty() {
+      if (!this.adminToken || !this.advancedDirtyCount) return;
+      this.advancedSaving = true;
+      try {
+        for (const [key, value] of Object.entries(this.advancedDirty)) {
+          await this.toggleSetting(key, value);
+        }
+        this.advancedDirty = {};
+        this.showToast('Advanced settings saved', 'success');
+        await this.loadSettings();
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      } finally {
+        this.advancedSaving = false;
+      }
+    },
+
+    settingInputType(s) {
+      if (!s) return 'text';
+      if (s.type === 'bool') return 'checkbox';
+      if (s.type === 'int') return 'number';
+      if (s.type === 'enum') return 'select';
+      return 'text';
+    },
+
+    async loadOpsStatus() {
+      if (!this.adminToken) return;
+      try {
+        const [opsR, dqR, auditR] = await Promise.all([
+          this._adminFetch('/api/settings/ops', { cache: 'no-store' }),
+          fetch('/api/data-quality/summary', { cache: 'no-store' }),
+          this._adminFetch('/api/settings/audit/recent?limit=8', { cache: 'no-store' }),
+        ]);
+        if (opsR.ok) this.opsStatus = await opsR.json();
+        if (dqR.ok) this.qualitySummary = await dqR.json();
+        if (auditR.ok) this.auditTail = await auditR.json();
+      } catch {
+        /* ignore */
+      }
+    },
+
+    async loadApiKeys() {
+      if (!this.adminToken) return;
+      try {
+        const r = await this._adminFetch('/api/v1/api-keys', { cache: 'no-store' });
+        if (r.ok) this.apiKeys = await r.json();
+      } catch {
+        this.apiKeys = [];
+      }
+    },
+
+    async createApiKey() {
+      if (!this.newApiKeyName.trim()) {
+        this.showToast('Key name required', 'error');
+        return;
+      }
+      try {
+        const r = await this._adminFetch('/api/v1/api-keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: this.newApiKeyName.trim() }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || 'Create failed');
+        this.createdApiKeyRaw = j.api_key || '';
+        this.newApiKeyName = '';
+        await this.loadApiKeys();
+        this.showToast('API key created — copy it now', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async revokeApiKey(id) {
+      try {
+        const r = await this._adminFetch(`/api/v1/api-keys/${id}`, { method: 'DELETE' });
+        if (!r.ok) throw new Error('Revoke failed');
+        await this.loadApiKeys();
+        this.showToast('API key revoked', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async rotateSecretKey(key) {
+      const newVal = prompt(`Paste new value for ${key} (masked in UI after save):`);
+      if (newVal == null || !newVal.trim()) return;
+      try {
+        await this.toggleSetting(key, newVal.trim());
+        this.showToast(`${key} rotated`, 'success');
+        await this.loadSettings();
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    qualitySparkline() {
+      const hist = this.qualitySummary?.history || [];
+      if (!hist.length) return '';
+      const vals = hist.map(h => h.overall_score).reverse();
+      const max = Math.max(...vals, 1);
+      return vals.map(v => Math.round((v / max) * 8)).join(',');
     },
 
     isFeatureEnabled(toggleKey) {
@@ -104,6 +280,11 @@ export function useGovernance() {
       if (mode === 'ai_full') return 'Full';
       if (mode === 'ai_lite') return 'Lite';
       return 'Off';
+    },
+
+    get authModeLabel() {
+      const s = this.settingsList.find(x => x.key === 'api_auth_mode');
+      return s?.value || 'open';
     },
 
     get adminToken() {
@@ -218,14 +399,12 @@ export function useGovernance() {
           await this.loadSettings();
           await this.loadPlaybooks();
           await this.loadAssetCatalog();
+          await this.loadOpsStatus();
+          await this.loadApiKeys();
         }
       } catch (e) {
         this.settingsError = e.message || 'Login failed';
       }
-    },
-
-    _bindAdminLoginForm() {
-      /* no-op: form uses @submit.prevent */
     },
 
     showToast(message, type = 'info') {
@@ -245,7 +424,6 @@ export function useGovernance() {
         if (r.ok) {
           this.showToast(`Applied playbook: ${name}`, 'success');
           await this.loadSettings();
-          await this.loadAiBudget();
         } else {
           this.showToast(j.detail || `Playbook failed (${r.status})`, 'error');
         }
@@ -294,6 +472,20 @@ export function useGovernance() {
       }
       const s = this.settingsList.find(x => x.key === key);
       if (s) s.value = value;
+      window.dispatchEvent(new CustomEvent('settings-changed'));
+    },
+
+    async onTier1Change(s, event) {
+      if (!s) return;
+      let val = event?.target?.value;
+      if (s.type === 'bool') val = event.target.checked;
+      if (s.type === 'int') val = parseInt(val, 10);
+      try {
+        await this.toggleSetting(s.key, val);
+        this.showToast(`${s.label || s.key} updated`, 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
     },
 
     async exportSettings() {

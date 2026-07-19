@@ -168,6 +168,17 @@ def latest_zscore(values: list[float], threshold: float = 3.0, min_bps: float = 
     return {"z_score": float(z), "mean": float(mean), "std": float(std), "latest": latest, "bps": float(bps), "anomaly": is_anomaly}
 
 
+def _z_threshold(metric: str, default: float, db: Session | None = None) -> float:
+    from providers.settings import get_setting
+    try:
+        val = get_setting(f"anomaly_z_threshold_{metric}", db)
+        if val is not None:
+            return float(val)
+    except Exception:
+        log.warning("anomaly.z_threshold_lookup_failed", metric=metric, exc_info=True)
+    return default
+
+
 def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     if not ENABLED:
         return {"enabled": False, "note": "Anomaly detection is disabled. Set ENABLE_ANOMALY_DETECTION=true to enable."}
@@ -179,18 +190,22 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
     bridge = _check_bridge_flow(db, asset_symbol=asset_symbol)
     results["bridge_flow"] = bridge
 
-    supply_anomalies = zscore_detect(history["supplies"], threshold=_adaptive_zscore_threshold(history["supplies"], 3.5), min_bps=15.0)
-    price_anomalies = zscore_detect(history["prices"], threshold=_adaptive_zscore_threshold(history["prices"], 2.5), min_bps=5.0)
-    depeg_anomalies = zscore_detect(history["depeg_indices"], threshold=_adaptive_zscore_threshold(history["depeg_indices"], 2.5), min_bps=5.0)
+    supply_thresh = _z_threshold("supply", 3.5, db)
+    price_thresh = _z_threshold("price", 2.5, db)
+    depeg_thresh = _z_threshold("depeg_index", 2.5, db)
+
+    supply_anomalies = zscore_detect(history["supplies"], threshold=_adaptive_zscore_threshold(history["supplies"], supply_thresh), min_bps=15.0)
+    price_anomalies = zscore_detect(history["prices"], threshold=_adaptive_zscore_threshold(history["prices"], price_thresh), min_bps=5.0)
+    depeg_anomalies = zscore_detect(history["depeg_indices"], threshold=_adaptive_zscore_threshold(history["depeg_indices"], depeg_thresh), min_bps=5.0)
     results["z_score"] = {
         "supply": supply_anomalies,
         "price": price_anomalies,
         "depeg_index": depeg_anomalies,
     }
     results["latest_zscore"] = {
-        "supply": latest_zscore(history["supplies"], threshold=3.5, min_bps=15.0),
-        "price": latest_zscore(history["prices"], threshold=2.5, min_bps=5.0),
-        "depeg_index": latest_zscore(history["depeg_indices"], threshold=2.5, min_bps=5.0),
+        "supply": latest_zscore(history["supplies"], threshold=supply_thresh, min_bps=15.0),
+        "price": latest_zscore(history["prices"], threshold=price_thresh, min_bps=5.0),
+        "depeg_index": latest_zscore(history["depeg_indices"], threshold=depeg_thresh, min_bps=5.0),
     }
 
     features: list[list[float]] = []
@@ -212,7 +227,7 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
             ml_out = trained.predict({"values": signal_vals[-200:]})
             ml_detector_note = ml_out
     except Exception:
-        pass
+        log.warning("anomaly.ml_detector_failed", asset=asset_symbol, exc_info=True)
     results["isolation_forest"] = {
         "anomaly_indices": if_anomalies,
         "point_count": len(features),
@@ -229,17 +244,22 @@ def detect_anomalies(db: Session, *, asset_symbol: str) -> dict[str, Any]:
             )
         ).scalars().first()
         if row and row.stablecoin_type:
-            v4_model = MODEL_REGISTRY.get(row.stablecoin_type)
+            v4_model = MODEL_REGISTRY.get(row.stablecoin_type) or MODEL_REGISTRY.get("yield_bearing_delta_neutral")
             if v4_model and (MODELS_DIR / v4_model).is_file():
                 prices = history.get("prices", [])
                 latest_price = prices[-1] if prices else 1.0
-                price_dev_bps = abs((latest_price or 1.0) - 1.0) * 10000
-                v4_features = {"price_deviation_bps": price_dev_bps}
+                from signal_engine.risk_inputs import build_v4_onnx_features
+                v4_features = build_v4_onnx_features(
+                    db,
+                    asset_symbol=asset_symbol,
+                    stablecoin_type=row.stablecoin_type,
+                    price=latest_price,
+                )
                 v4_depeg_prob = predict_depeg_probability_v4(
                     asset_symbol, v4_features, row.stablecoin_type
                 )
     except Exception:
-        log.warning("anomaly.v4_onnx_failed", asset=asset_symbol)
+        log.warning("anomaly.v4_onnx_failed", asset=asset_symbol, exc_info=True)
     results["v4_depeg_probability"] = v4_depeg_prob
 
     normalized: list[dict[str, Any]] = []

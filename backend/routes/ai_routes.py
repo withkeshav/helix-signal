@@ -6,7 +6,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from database import AiNarrativeHistory, SignalEvent, get_db
-from services.ai_router import ai_mode, enrich_with_ai, get_budget_status, get_provider_stats
+from services.ai_router import ai_mode, enrich_with_ai, get_provider_stats
 from routes.playbooks import apply_playbook_by_name, get_all_playbooks, seed_builtin_playbooks
 from services.ai_usage import get_ai_usage_summary
 from services.dashboard import build_dashboard_response
@@ -38,8 +38,10 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
     try:
         dash = build_dashboard_response(db, asset)
     except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.build_context_failed", asset=asset, exc_info=True)
         return None
-    return {
+    ctx = {
         "asset_symbol": dash.asset.symbol,
         "signal_score": dash.asset_signal.score,
         "signal_band": dash.asset_signal.band,
@@ -48,13 +50,14 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
         "chain_count": len(dash.chains),
         "top_chain_share": dash.chain_concentration.top_chain_share_pct or 0,
     }
-
-
-@router.get("/ai/budget")
-@limiter.limit("30/minute")
-def ai_budget_endpoint(request: Request) -> dict[str, Any]:
-    _require_admin_token(request)
-    return get_budget_status()
+    try:
+        from services.predictive import run_predictive_bundle
+        bundle = run_predictive_bundle(db, asset_symbol=asset)
+        ctx["regime"] = bundle.get("regime", "?")
+    except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.regime_lookup_failed", asset=asset, exc_info=True)
+    return ctx
 
 
 @router.get("/ai/usage")
@@ -66,10 +69,8 @@ def ai_usage_endpoint(
     _require_admin_token(request)
     per_provider = get_ai_usage_summary(db)
     provider_stats = get_provider_stats(db)
-    budget = get_budget_status()
     return {
         **per_provider,
-        "budget": budget,
         "provider_stats": provider_stats,
     }
 
@@ -126,7 +127,8 @@ def ai_narrative(
                 ctx["sentiment_label"] = "positive" if avg_s > 0.15 else ("negative" if avg_s < -0.15 else "neutral")
                 ctx["sentiment_score"] = f"{avg_s:.2f}"
     except Exception:
-        pass
+        import structlog
+        structlog.get_logger(__name__).warning("ai.sentiment_lookup_failed", asset=asset, exc_info=True)
     ctx.setdefault("sentiment_label", "?")
     ctx.setdefault("sentiment_score", "?")
 
@@ -141,17 +143,21 @@ def ai_narrative(
         )
         ctx["recent_events"] = "; ".join(f"{e.title} ({e.severity})" for e in events) if events else "No recent events."
     except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.recent_events_failed", asset=asset, exc_info=True)
         ctx["recent_events"] = "?"
 
     try:
         from services.predictive import run_predictive_bundle
         bundle = run_predictive_bundle(db, asset_symbol=asset)
-        ctx["regime"] = bundle.get("regime", "?")
+        ctx["regime"] = bundle.get("regime", ctx.get("regime", "?"))
         depeg = bundle.get("depeg_probability", {})
         ctx["depeg_1h"] = f"{depeg.get('horizon_1h', 0) * 100:.1f}"
         ctx["depeg_24h"] = f"{depeg.get('horizon_24h', 0) * 100:.1f}"
     except Exception:
-        ctx["regime"] = "?"
+        import structlog
+        structlog.get_logger(__name__).warning("ai.depeg_lookup_failed", asset=asset, exc_info=True)
+        ctx.setdefault("regime", "?")
         ctx["depeg_1h"] = "?"
         ctx["depeg_24h"] = "?"
 
@@ -168,6 +174,8 @@ def ai_narrative(
             ))
             db.commit()
         except Exception:
+            import structlog
+            structlog.get_logger(__name__).warning("ai.narrative_history_save_failed", asset=asset, exc_info=True)
             db.rollback()
     return result
 
@@ -198,6 +206,8 @@ def ai_insights(
         from services.anomaly import get_recent_anomaly_count
         ctx["anomaly_count"] = get_recent_anomaly_count(db, asset_symbol=asset, days=7)
     except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.anomaly_count_failed", asset=asset, exc_info=True)
         ctx["anomaly_count"] = 0
 
     return enrich_with_ai(feature="insight_summary", context=ctx, db=db)
@@ -256,7 +266,8 @@ def ai_list_playbooks(
     try:
         seed_builtin_playbooks(db)
     except Exception:
-        pass
+        import structlog
+        structlog.get_logger(__name__).warning("ai.playbook_seed_failed", exc_info=True)
     return {"playbooks": get_all_playbooks(db)}
 
 
@@ -299,7 +310,6 @@ def ai_test_connection(
             "signal_score": 10,
             "signal_band": "Normal",
             "regime": "stable",
-            "web_search_results": "none",
         },
         db=db,
     )

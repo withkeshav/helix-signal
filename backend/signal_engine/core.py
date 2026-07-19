@@ -219,7 +219,7 @@ async def refresh_chain_data(db: Session) -> None:
             from sources.chainlink_oracle import refresh_oracle_prices
             refresh_oracle_prices(all_symbols)
         except Exception as exc:
-            log.debug("chainlink_oracle.refresh_skipped", error=str(exc))
+            log.debug("chainlink_oracle.refresh_skipped", exc_info=True)
 
         dl_results = await asyncio.gather(
             *[_fetch_asset(i, asset, tvl_map) for i, asset in enumerate(enabled_assets)]

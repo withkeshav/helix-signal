@@ -152,7 +152,7 @@ def _flush_events(db: Session, pending_events: list[SignalEvent], *, metrics_by_
             dispatch_events(db, to_dispatch, metrics_by_asset=metrics_by_asset)
         except Exception as exc:
             log = __import__("structlog").get_logger(__name__)
-            log.warning("webhook.dispatch_error", error=str(exc))
+            log.warning("webhook.dispatch_error", exc_info=True)
     threading.Thread(target=_bg_dispatch, daemon=True, name="webhook-dispatch").start()
 
 

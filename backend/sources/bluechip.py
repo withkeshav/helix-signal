@@ -42,7 +42,7 @@ def fetch_bluechip_ratings(asset_symbol: str, *, api_key: str | None = None) -> 
             "raw": ratings,
         }
     except Exception as exc:
-        log.info("bluechip.fetch_failed", asset=sym, error=str(exc))
+        log.info("bluechip.fetch_failed", asset=sym, exc_info=True)
         return {"available": False, "reason": str(exc), "asset_symbol": sym}
 
 

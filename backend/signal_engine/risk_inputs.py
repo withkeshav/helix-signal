@@ -125,7 +125,8 @@ def _cross_source_fields(chains_orm: list[AssetChainSnapshot], *, asset_symbol: 
             if oracle_p is not None:
                 prices["chainlink"] = oracle_p
         except Exception:
-            pass
+            import structlog
+            structlog.get_logger(__name__).warning("chainlink_oracle.lookup_failed", asset=sym, exc_info=True)
     check = cross_source_price_check(prices)
     agreement = int(check.get("sources_agreeing") or 0)
     discrepancy = float(check.get("max_discrepancy_pct") or 0.0)
@@ -243,9 +244,49 @@ def type_specific_inputs(
             v4_inputs["staking_ratio"] = yb.staking_ratio
             v4_inputs["lending_utilization_pct"] = yb.lending_utilization_pct
     except Exception:
-        pass
+        import structlog
+        structlog.get_logger(__name__).warning("type_specific_inputs.failed", asset=asset_symbol, exc_info=True)
 
     return v4_inputs
+
+
+def build_v4_onnx_features(
+    db: Session | None,
+    *,
+    asset_symbol: str,
+    stablecoin_type: str | None,
+    price: float | None = None,
+) -> dict[str, float]:
+    """Merge V4 snapshot + on-chain inputs into a flat ONNX feature dict."""
+    features: dict[str, float] = {
+        "price_deviation_bps": abs((price or 1.0) - 1.0) * 10000.0,
+    }
+    if db is None:
+        return features
+
+    v4 = type_specific_inputs(db, asset_symbol=asset_symbol, stablecoin_type=stablecoin_type)
+    onchain = inject_onchain(db, {}, asset_symbol=asset_symbol)
+
+    if v4.get("coverage_ratio") is not None:
+        features["coverage_ratio"] = float(v4["coverage_ratio"])
+    if v4.get("attestation_lag_days") is not None:
+        features["attestation_lag_days"] = float(v4["attestation_lag_days"])
+    if v4.get("collateral_ratio") is not None:
+        features["collateral_ratio"] = float(v4["collateral_ratio"])
+    if v4.get("debt_ceiling_utilization_pct") is not None:
+        features["debt_ceiling_utilization_pct"] = float(v4["debt_ceiling_utilization_pct"])
+    liq_q = v4.get("liquidation_queue_usd")
+    if liq_q is not None:
+        features["liquidation_queue_usd_norm"] = min(1.0, float(liq_q) / 1_000_000.0)
+    if v4.get("insurance_fund_coverage") is not None:
+        features["insurance_fund_coverage_ratio"] = float(v4["insurance_fund_coverage"])
+    if v4.get("staking_ratio") is not None:
+        features["staking_ratio"] = float(v4["staking_ratio"])
+
+    if onchain.get("top10_holder_share_pct") is not None:
+        features["top10_holder_pct"] = float(onchain["top10_holder_share_pct"])
+
+    return features
 
 
 def inject_onchain(
@@ -265,7 +306,8 @@ def inject_onchain(
             kwargs["top10_holder_share_pct"] = onchain.get("top10_holder_share_pct")
             kwargs["net_mint_burn_usd_24h"] = onchain.get("net_mint_burn_usd_24h")
     except Exception:
-        pass
+        import structlog
+        structlog.get_logger(__name__).warning("inject_onchain.failed", asset=asset_symbol, exc_info=True)
     return kwargs
 
 

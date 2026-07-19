@@ -173,7 +173,7 @@ def test_trigram_similarity_normalizes_whitespace() -> None:
 
 
 def test_semantic_cache_disabled_by_default() -> None:
-    assert r._SEMANTIC_CACHE_ENABLED is False
+    assert cache_mod._SEMANTIC_CACHE_ENABLED is False
 
 
 def test_semantic_store_adds_entry() -> None:
@@ -196,7 +196,7 @@ def test_semantic_lookup_returns_cached() -> None:
     _cache_set(stored_key, "risk_explain", "What is the risk of USDT with score 30?", {"summary": "medium risk", "tokens": 5})
 
     lookup_key = _prompt_hash("risk_explain", {"asset_symbol": "USDT", "signal_score": 35})
-    result = _semantic_cache_lookup(lookup_key, "What is the risk of USDT with score 35?")
+    result = _semantic_cache_lookup(lookup_key, "What is the risk of USDT with score 35?", "risk_explain")
     assert result is not None
     assert result["summary"] == "medium risk"
 
@@ -209,14 +209,14 @@ def test_semantic_lookup_respects_threshold() -> None:
     _cache_set(stored_key, "risk_explain", "USDT risk analysis very important", {"summary": "low risk", "tokens": 5})
 
     lookup_key = _prompt_hash("risk_explain", {"asset_symbol": "DAI"})
-    result = _semantic_cache_lookup(lookup_key, "DAI depeg probability analysis")
+    result = _semantic_cache_lookup(lookup_key, "DAI depeg probability analysis", "risk_explain")
     assert result is None
 
 
 def test_semantic_lookup_noop_when_disabled() -> None:
     cache_mod._SEMANTIC_CACHE_ENABLED = False
     key = _prompt_hash("risk_explain", {"asset_symbol": "USDT"})
-    result = _semantic_cache_lookup(key, "some prompt")
+    result = _semantic_cache_lookup(key, "some prompt", "risk_explain")
     assert result is None
 
 
@@ -251,8 +251,8 @@ def test_cache_evictions_tracked() -> None:
 
 
 def test_cache_stats_semantic_flag() -> None:
-    r._SEMANTIC_CACHE_ENABLED = True
-    r._SEMANTIC_CACHE_THRESHOLD = 0.80
+    cache_mod._SEMANTIC_CACHE_ENABLED = True
+    cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.80
     stats = get_cache_stats()
     assert stats["semantic_enabled"] is True
     assert stats["semantic_threshold"] == 0.80

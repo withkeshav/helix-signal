@@ -62,6 +62,6 @@ def build_governance_payload(db: Session, *, asset: str) -> dict[str, Any]:
             result["health_score"] = 100 if len(events) < 5 else 80
             result["note"] = "Governance events from Etherscan (last 10 transactions)."
     except Exception as exc:
-        log.warning("governance_fetch_failed", error=str(exc))
+        log.warning("governance_fetch_failed", exc_info=True)
         result["note"] = f"Failed to fetch governance data: {exc}"
     return result

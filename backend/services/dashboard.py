@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import logging
 import os
+
+log = logging.getLogger(__name__)
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
@@ -280,7 +282,7 @@ def _compute_cross_source_and_feed(
             source_rows.append({"source": "Chainlink", "price": oracle_p})
             all_prices.append(oracle_p)
     except Exception:
-        pass
+        log.debug("dashboard.chainlink_oracle_skipped", exc_info=True)
     cross_source = CrossSourceSignalOut()
     if len(all_prices) >= 2:
         avg_p = sum(all_prices) / len(all_prices)

@@ -173,6 +173,8 @@ def register_scheduler_jobs(
             seconds=interval_seconds,
             id="defillama-refresh",
             replace_existing=True,
+            max_instances=1,
+            coalesce=True,
         )
 
     osint_minutes = max(
@@ -187,6 +189,8 @@ def register_scheduler_jobs(
         minute=15,
         id="history-retention",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _osint_job,
@@ -194,6 +198,8 @@ def register_scheduler_jobs(
         minutes=osint_minutes,
         id="osint-ingest",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _osint_attestation_refresh,
@@ -201,6 +207,8 @@ def register_scheduler_jobs(
         minutes=osint_minutes,
         id="osint-attestation-refresh",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _blacklist_job,
@@ -208,6 +216,8 @@ def register_scheduler_jobs(
         seconds=get_setting("blacklist_poll_interval_seconds", setup_db) or 300,
         id="blacklist-monitor",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _coinglass_job,
@@ -215,6 +225,8 @@ def register_scheduler_jobs(
         seconds=get_setting("funding_rate_poll_interval_seconds", setup_db) or 300,
         id="funding-rate-poll",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _ethena_job,
@@ -222,6 +234,8 @@ def register_scheduler_jobs(
         minutes=15,
         id="ethena-poll",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _sky_job,
@@ -229,6 +243,8 @@ def register_scheduler_jobs(
         minutes=15,
         id="sky-poll",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _liquity_job,
@@ -236,6 +252,8 @@ def register_scheduler_jobs(
         minutes=15,
         id="liquity-poll",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _aave_job,
@@ -243,6 +261,8 @@ def register_scheduler_jobs(
         minutes=15,
         id="aave-poll",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
     scheduler.add_job(
         _ondo_job,
@@ -250,4 +270,6 @@ def register_scheduler_jobs(
         minutes=15,
         id="ondo-poll",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )

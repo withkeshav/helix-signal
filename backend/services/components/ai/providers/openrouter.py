@@ -7,13 +7,20 @@ import httpx
 
 
 def openrouter_lite(
-    prompt: str, max_tokens: int, model: Optional[str] = None, **kwargs
+    prompt: str,
+    max_tokens: int,
+    system: Optional[str] = None,
+    model: Optional[str] = None,
+    **kwargs,
 ) -> Optional[Dict[str, Any]]:
-    """Call OpenRouter Lite API."""
+    """Call OpenRouter API."""
     api_key = kwargs.get("_resolved_api_key", "").strip()
-    if not api_key:
+    if not api_key or not model:
         return None
-    model = model or os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -21,7 +28,7 @@ def openrouter_lite(
             json={
                 "model": model,
                 "max_tokens": max_tokens,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
             },
         )
         resp.raise_for_status()

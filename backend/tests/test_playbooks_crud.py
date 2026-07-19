@@ -207,7 +207,7 @@ def test_custom_playbook_can_be_applied(client, admin_headers) -> None:
             "name": "apply_custom",
             "label": "Apply Custom",
             "description": "",
-            "settings": {"ai_mode": "ai_lite", "ai_daily_token_budget": 7777},
+            "settings": {"ai_mode": "ai_lite", "ai_model_risk_explain": "ollama_cloud:ministral-3:8b-cloud"},
         },
         headers=admin_headers,
     )
@@ -217,4 +217,4 @@ def test_custom_playbook_can_be_applied(client, admin_headers) -> None:
     assert data["ok"] is True
     changes = {c["key"]: c["value"] for c in data["changes"]}
     assert changes["ai_mode"] == "ai_lite"
-    assert changes["ai_daily_token_budget"] == 7777
+    assert changes["ai_model_risk_explain"] == "ollama_cloud:ministral-3:8b-cloud"

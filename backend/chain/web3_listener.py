@@ -125,7 +125,7 @@ async def poll_stablecoin_logs() -> None:
             last_block = to_block
 
         except Exception as exc:
-            log.warning("rpc_listener.error", error=str(exc))
+            log.warning("rpc_listener.error", exc_info=True)
 
         await asyncio.sleep(POLL_INTERVAL)
 

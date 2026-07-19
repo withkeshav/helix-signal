@@ -47,7 +47,7 @@ def get_dews(
         from providers.settings import get_setting
         refresh_interval = int(get_setting("refresh_core_seconds", db) or 300)
     except Exception:
-        pass
+        log.warning("dews.refresh_interval_lookup_failed", asset=sym, exc_info=True)
 
     risk = compute_unified_risk_score(
         chains,
@@ -88,7 +88,7 @@ def get_dews(
 
     llm_escalated = z_max > 3.0 and ai_mode() != "ai_off"
 
-    from signal_engine.risk_inputs import inject_velocity
+    from signal_engine.risk_inputs import inject_velocity, build_v4_onnx_features
     vel_kwargs = inject_velocity(db, {}, asset_symbol=sym)
     features = build_feature_vector(
         price=bundle.price,
@@ -114,11 +114,12 @@ def get_dews(
         v4_model = MODEL_REGISTRY.get(stablecoin_type)
         if v4_model and (MODELS_DIR / v4_model).is_file():
             try:
-                price_dev_bps = abs((bundle.price or 1.0) - 1.0) * 10000
-                v4_features = {
-                    "price_deviation_bps": price_dev_bps,
-                    "top10_holder_pct": onchain.get("top10_holder_share_pct", 0),
-                }
+                v4_features = build_v4_onnx_features(
+                    db,
+                    asset_symbol=sym,
+                    stablecoin_type=stablecoin_type,
+                    price=bundle.price,
+                )
                 v4_prob = predict_depeg_probability_v4(sym, v4_features, stablecoin_type)
                 pred = {
                     "horizon_1h": round(min(v4_prob * 0.5, 0.99), 4),

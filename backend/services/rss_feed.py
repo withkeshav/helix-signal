@@ -78,7 +78,7 @@ def _fetch_rss(url: str, source: str) -> list[dict[str, Any]]:
             articles.append({"title": title, "url": link, "summary": desc, "published_at": dt, "source": source})
         return articles
     except Exception as exc:
-        log.warning("rss_fetch_failed", source=source, error=str(exc))
+        log.warning("rss_fetch_failed", source=source, exc_info=True)
         return []
 
 

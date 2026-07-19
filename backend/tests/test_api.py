@@ -8,13 +8,16 @@ def test_health(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "4.0.5"
+    assert body["version"] == "4.0.5.1"
     assert "db" in body
     assert body["db_connected"] is True
     assert body["redis_connected"] is False
     assert "scheduler_running" in body
     assert "asset_freshness" in body
     assert "worst_asset_age_hours" in body
+
+
+test_version = test_health
 
 
 def test_dashboard_empty_db(client):

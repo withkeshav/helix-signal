@@ -56,10 +56,10 @@ def test_balanced_sets_full_mode(db_session) -> None:
     assert get_setting("ai_mode", db_session) == "ai_full"
 
 
-def test_quality_sets_high_budget(db_session) -> None:
+def test_quality_sets_openrouter_primary(db_session) -> None:
     apply_playbook("quality", db_session)
     from providers.settings import get_setting
-    assert get_setting("ai_daily_token_budget", db_session) == 200000
+    assert get_setting("ai_model_risk_explain", db_session).startswith("openrouter:")
 
 
 def test_quality_disables_semantic_cache(db_session) -> None:
@@ -82,28 +82,28 @@ def test_apply_playbook_returns_changes(db_session) -> None:
         assert "value" in c
     keys = [c["key"] for c in changes]
     assert "ai_mode" in keys
-    assert "ai_daily_token_budget" in keys
+    assert "ai_model_risk_explain" in keys
 
 
 def test_apply_playbook_overwrites_previous(db_session) -> None:
     apply_playbook("quality", db_session)
     apply_playbook("max_free", db_session)
     from providers.settings import get_setting
-    assert get_setting("ai_daily_token_budget", db_session) == 10000
-    assert get_setting("ai_web_search", db_session) is False
+    assert get_setting("ai_mode", db_session) == "ai_lite"
+    assert get_setting("ai_cache_semantic_enabled", db_session) is True
 
 
-def test_balanced_enables_web_search(db_session) -> None:
+def test_balanced_sets_per_feature_models(db_session) -> None:
     apply_playbook("balanced", db_session)
     from providers.settings import get_setting
-    assert get_setting("ai_web_search", db_session) is True
-    assert get_setting("ai_web_search_max_results", db_session) == 3
+    assert get_setting("ai_model_risk_explain", db_session).startswith("ollama_cloud:")
+    assert get_setting("ai_fallback_provider", db_session) == "openrouter"
 
 
-def test_max_free_disables_web_search(db_session) -> None:
+def test_max_free_uses_openrouter_fallback(db_session) -> None:
     apply_playbook("max_free", db_session)
     from providers.settings import get_setting
-    assert get_setting("ai_web_search", db_session) is False
+    assert get_setting("ai_fallback_provider", db_session) == "openrouter"
 
 
 def test_all_playbooks_use_known_settings() -> None:
@@ -136,7 +136,7 @@ def test_apply_playbook_endpoint_success(client, admin_headers) -> None:
     assert "changes" in data
     keys = [c["key"] for c in data["changes"]]
     assert "ai_mode" in keys
-    assert "ai_daily_token_budget" in keys
+    assert "ai_model_risk_explain" in keys
 
 
 def test_apply_unknown_playbook_endpoint_404(client, admin_headers) -> None:

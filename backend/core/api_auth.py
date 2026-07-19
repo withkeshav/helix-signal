@@ -68,7 +68,7 @@ def _get_auth_mode(db: Session | None) -> str:
         if mode in ("open", "key_required"):
             return mode
     except Exception:
-        pass
+        log.debug("api_auth.mode_lookup_failed", exc_info=True)
     env = os.getenv("API_AUTH_MODE", "open").strip().lower()
     return env if env in ("open", "key_required") else "open"
 

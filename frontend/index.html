@@ -1535,7 +1535,7 @@
     <!-- Tab: Settings (lazy-mounted via x-if — DOM unmounts on tab switch) -->
     <template x-if="$store.ui.tab === 'settings'">
     <div class="tab-content settings" x-cloak x-data="governance"
-         x-init="loadSettings(); loadAiBudget(); loadPlaybooks(); loadAssetCatalog();"
+         x-init="loadSettings(); loadPlaybooks(); loadAssetCatalog();"
          role="tabpanel" id="tab-settings">
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
@@ -1595,7 +1595,7 @@
 
             <div style="margin-bottom:16px">
               <h3 style="margin:0 0 8px 0;font-size:14px">AI Status</h3>
-              <p class="kpi-sub" style="margin:0 0 8px 0">Mode: <strong x-text="aiModeLabel"></strong> · Budget: <span x-text="aiBudgetLoaded ? Math.round(aiBudget.pct_used||0)+'%' : '—'"></span></p>
+              <p class="kpi-sub" style="margin:0 0 8px 0">Mode: <strong x-text="aiModeLabel"></strong></p>
               <button class="btn btn-muted" type="button" :disabled="testAiLoading" @click="runTestAi()">
                 <span x-show="testAiLoading">Testing...</span>
                 <span x-show="!testAiLoading">Test AI (USDT narrative)</span>

@@ -11,7 +11,10 @@ Heuristic rule exported as ONNX. Returns float 0.0–1.0.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 import numpy as np
 from sklearn.pipeline import Pipeline
@@ -68,7 +71,7 @@ def export_onnx() -> bytes:
 def save():
     data = export_onnx()
     MODEL_PATH.write_bytes(data)
-    print(f"Saved {MODEL_PATH} ({len(data) / 1024:.1f} KB)")
+    log.info("onnx_model.saved", path=str(MODEL_PATH), size_kb=round(len(data) / 1024, 1))
 
 
 if __name__ == "__main__":

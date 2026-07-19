@@ -17,7 +17,6 @@ from separate modules in the routes/ directory.
 import asyncio
 import os
 import sys
-import traceback
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import Depends, FastAPI, Request
@@ -82,15 +81,15 @@ async def lifespan(app: FastAPI):
             from scripts.seed_admin import ensure_admin_user
             if ensure_admin_user():
                 log.info("admin_user.seeded")
-        except Exception as exc:
-            log.warning("admin_user.seed_failed", error=str(exc))
+        except Exception:
+            log.warning("admin_user.seed_failed", exc_info=True)
 
         try:
             from scripts.train_anomaly import train_anomaly_detector
             if train_anomaly_detector():
                 log.info("anomaly_detector.trained")
-        except Exception as exc:
-            log.warning("anomaly_detector.train_failed", error=str(exc))
+        except Exception:
+            log.warning("anomaly_detector.train_failed", exc_info=True)
 
         discover_plugins()
 
@@ -103,7 +102,7 @@ async def lifespan(app: FastAPI):
                 app.state.cors_origins = [o.strip() for o in str(_db_cors).split(",") if o.strip()]
                 log.info("cors.loaded_from_db", origins=app.state.cors_origins)
         except Exception:
-            pass
+            log.warning("cors.load_failed", exc_info=True)
 
         scheduler = AsyncIOScheduler()
         disable_bg = os.getenv("HELIX_DISABLE_BACKGROUND_TASKS", "").strip().lower() in ("1", "true", "yes")
@@ -142,8 +141,8 @@ async def lifespan(app: FastAPI):
                             try:
                                 run_backfill(db, asset=sym, days=7, _internal=True)
                                 log.info("auto_backfill.complete", asset=sym)
-                            except Exception as exc:
-                                log.warning("auto_backfill.failed", asset=sym, error=str(exc))
+                            except Exception:
+                                log.warning("auto_backfill.failed", asset=sym, exc_info=True)
                     db.commit()
             finally:
                 db.close()
@@ -152,17 +151,16 @@ async def lifespan(app: FastAPI):
             try:
                 from chain.web3_listener import start_block_listener
                 listener_task = await start_block_listener()
-            except Exception as exc:
-                log.warning("block_listener.start_failed", error=str(exc))
+            except Exception:
+                log.warning("block_listener.start_failed", exc_info=True)
 
             try:
                 from chain.fred_api import start_fred_poller
                 fred_task = loop.create_task(start_fred_poller())
-            except Exception as exc:
-                log.warning("fred_poller.start_failed", error=str(exc))
+            except Exception:
+                log.warning("fred_poller.start_failed", exc_info=True)
     except Exception:
         log.exception("lifespan.startup_failed")
-        traceback.print_exc(file=sys.stderr)
         raise
 
     try:
@@ -183,7 +181,7 @@ app = FastAPI(
                 "and market-wide early warning for the stablecoin ecosystem. "
                 "Provides REST endpoints for alerts, forensics, OSINT, address tagging, "
                 "and real-time signal streaming.",
-    version="4.0.5",
+    version="4.0.5.1",
     contact={
         "name": "Helix Signal Team",
         "url": "https://github.com/anomalyco/Helix-Signal",

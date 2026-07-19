@@ -98,6 +98,7 @@ def investigate_anomaly(
         feature="anomaly_investigation",
         context=context,
         priority=True,
+        db=db,
     )
 
     if not result.get("available"):

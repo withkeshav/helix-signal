@@ -49,7 +49,7 @@ def _resolve_onnx_path(setting_key: str, env_key: str) -> str:
             if val:
                 return str(val).strip()
     except Exception:
-        pass
+        log.warning("onnx.resolve_path_failed", setting_key=setting_key, exc_info=True)
     return os.getenv(env_key, "").strip()
 
 
@@ -142,7 +142,12 @@ def predict_depeg_probability(features: list[float]) -> dict[str, Any] | None:
 def _stablecoin_type_to_model_key(stablecoin_type: str | None) -> str | None:
     if stablecoin_type in MODEL_REGISTRY:
         return MODEL_REGISTRY[stablecoin_type]
-    if stablecoin_type in ("yield_bearing_tbill", "yield_bearing_defi_lending", "algorithmic"):
+    if stablecoin_type in (
+        "yield_bearing",
+        "yield_bearing_tbill",
+        "yield_bearing_defi_lending",
+        "algorithmic",
+    ):
         return MODEL_REGISTRY.get("yield_bearing_delta_neutral")
     return None
 

@@ -10,48 +10,10 @@ from providers.settings import _DEFAULT_SETTINGS
 
 
 def check_warnings(db: Session | None = None) -> list[dict[str, Any]]:
-    """Check all configured warning thresholds and return active warnings.
-
-    Returns a list of warning dicts with keys:
-        type, severity, message, current_value, threshold, setting_key
-    """
+    """Check all configured warning thresholds and return active warnings."""
     warnings: list[dict[str, Any]] = []
-
-    # 1. AI daily token budget threshold
-    _check_ai_budget(warnings, db)
-
-    # 2. Source usage vs rate limits
     _check_source_usage(warnings, db)
-
     return warnings
-
-
-def _check_ai_budget(warnings: list[dict[str, Any]], db: Session | None) -> None:
-    """Check if AI token budget usage exceeds the warning threshold."""
-    from services.ai_router import get_budget_status
-
-    threshold = _get_warning_threshold("ai_daily_token_budget", db)
-    if threshold is None:
-        return
-
-    budget_status = get_budget_status()
-    pct_used = budget_status.get("pct_used", 0) / 100.0
-    used = budget_status.get("tokens_used_today", 0)
-    total = budget_status.get("daily_budget", 0)
-
-    if pct_used >= threshold:
-        severity = "critical" if pct_used >= 0.95 else "warning"
-        warnings.append({
-            "type": "ai_budget",
-            "severity": severity,
-            "message": (
-                f"AI daily token budget at {budget_status.get('pct_used', 0)}% "
-                f"({used}/{total} tokens)"
-            ),
-            "current_value": used,
-            "threshold": int(total * threshold),
-            "setting_key": "ai_daily_token_budget",
-        })
 
 
 def _check_source_usage(warnings: list[dict[str, Any]], db: Session | None) -> None:

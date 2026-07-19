@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -9,6 +10,8 @@ from sqlalchemy import String, Text, select
 from sqlalchemy.orm import Mapped, mapped_column, Session
 
 from database import Base
+
+log = logging.getLogger(__name__)
 
 # Import settings registry
 from .settings_registry import _DEFAULT_SETTINGS
@@ -112,8 +115,7 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
             user_agent=user_agent,
         )
     except Exception:
-        # Don't fail the settings update if audit logging fails
-        pass
+        log.warning("settings.audit_log_failed", exc_info=True)
 
 
 def mask_secret(value: str) -> str | None:
@@ -183,45 +185,51 @@ def _coerce(val: str, typ: str) -> Any:
 PLAYBOOKS: dict[str, dict[str, Any]] = {
     "max_free": {
         "label": "Maximum Free Tier",
-        "description": "Zero API cost — uses only free providers, minimal AI features",
+        "description": "Zero API cost — uses Ollama Cloud with aggressive caching",
         "settings": {
             "ai_mode": "ai_lite",
-            "ai_daily_token_budget": 10000,
-            "ai_provider_priority": '["openrouter_free", "ollama_cloud"]',
+            "ai_model_risk_explain": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_model_market_narrative": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_model_insight_summary": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_fallback_provider": "openrouter",
+            "ai_fallback_model": "openrouter/free",
             "ai_cache_ttl_seconds": 7200,
             "ai_cache_semantic_enabled": True,
             "ai_cache_max_entries": 500,
-            "ai_web_search": False,
             "feature_ai_summary": True,
         },
     },
     "balanced": {
         "label": "Balanced",
-        "description": "Good quality with reasonable cost — uses cheap providers with caching",
+        "description": "Good quality with reasonable cost — Ollama primary, OpenRouter fallback",
         "settings": {
             "ai_mode": "ai_full",
-            "ai_daily_token_budget": 50000,
-            "ai_provider_priority": '["groq", "ollama_cloud", "openrouter_free", "openrouter_paid"]',
+            "ai_model_risk_explain": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_model_market_narrative": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_model_insight_summary": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_model_market_overview": "ollama_cloud:ministral-3:8b-cloud",
+            "ai_fallback_provider": "openrouter",
+            "ai_fallback_model": "openai/gpt-4o-mini",
             "ai_cache_ttl_seconds": 3600,
             "ai_cache_semantic_enabled": True,
             "ai_cache_max_entries": 1000,
-            "ai_web_search": True,
-            "ai_web_search_max_results": 3,
             "feature_ai_summary": True,
         },
     },
     "quality": {
         "label": "Maximum Quality",
-        "description": "Best results — uses paid providers, full AI features, web search",
+        "description": "Best results — OpenRouter primary with Ollama fallback",
         "settings": {
             "ai_mode": "ai_full",
-            "ai_daily_token_budget": 200000,
-            "ai_provider_priority": '["openrouter_paid", "groq", "ollama_cloud"]',
+            "ai_model_risk_explain": "openrouter:openai/gpt-4o-mini",
+            "ai_model_market_narrative": "openrouter:openai/gpt-4o-mini",
+            "ai_model_insight_summary": "openrouter:openai/gpt-4o-mini",
+            "ai_model_market_overview": "openrouter:openai/gpt-4o-mini",
+            "ai_fallback_provider": "ollama_cloud",
+            "ai_fallback_model": "ministral-3:8b-cloud",
             "ai_cache_ttl_seconds": 1800,
             "ai_cache_semantic_enabled": False,
             "ai_cache_max_entries": 2000,
-            "ai_web_search": True,
-            "ai_web_search_max_results": 5,
             "feature_ai_summary": True,
         },
     },
@@ -255,23 +263,18 @@ def apply_playbook(name: str, db: Session) -> list[dict[str, Any]]:
 def get_current_usage(key: str, db: Session) -> Any:
     """Get current usage for a setting that tracks usage."""
     try:
-        from services.ai_router import get_budget_status
         from services.source_usage import get_source_usage_summary
-        
-        if key == "ai_daily_token_budget":
-            status = get_budget_status()
-            return status.get("tokens_used_today", 0)
-        elif key in ("provider_dexscreener", "provider_coingecko", "provider_defillama", 
+
+        if key in ("provider_dexscreener", "provider_coingecko", "provider_defillama",
                      "provider_coinmarketcap", "provider_moralis", "provider_thegraph", "provider_flipside"):
-            # Get source usage for data providers
             source_name = key.replace("provider_", "")
             usage_summary = get_source_usage_summary(db)
             source_usage = usage_summary.get("sources", {}).get(source_name, {})
             return source_usage.get("call_count", 0)
     except Exception:
-        # If there's any error (e.g., database not initialized), return None
-        pass
-    
+        import logging
+        logging.getLogger(__name__).warning("get_current_usage failed", exc_info=True)
+
     return None
 
 

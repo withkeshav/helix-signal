@@ -8,8 +8,6 @@ export function useGovernance() {
   return {
     settingsList: [],
     settingsError: '',
-    aiBudget: { daily_budget: 0, tokens_used_today: 0, tokens_remaining: 0, pct_used: 0 },
-    aiBudgetLoaded: false,
 
     playbookLoading: null,
     playbooks: [
@@ -218,7 +216,6 @@ export function useGovernance() {
         await this.$store.ui.login();
         if (this.$store.ui.adminToken) {
           await this.loadSettings();
-          await this.loadAiBudget();
           await this.loadPlaybooks();
           await this.loadAssetCatalog();
         }
@@ -282,19 +279,6 @@ export function useGovernance() {
         }
       } catch (e) {
         this.settingsError = e.message;
-      }
-    },
-
-    async loadAiBudget() {
-      if (!this.adminToken) return;
-      try {
-        const r = await this._adminFetch('/api/ai/budget', { cache: 'no-store' });
-        if (r.ok) {
-          this.aiBudget = await r.json();
-          this.aiBudgetLoaded = true;
-        }
-      } catch {
-        this.aiBudgetLoaded = false;
       }
     },
 

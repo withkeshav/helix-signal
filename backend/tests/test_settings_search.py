@@ -44,7 +44,7 @@ def test_app():
         # Add some sample settings for testing
         test_settings = [
             ("ai_mode", "ai_full"),
-            ("ai_daily_token_budget", "50000"),
+            ("ai_model_risk_explain", "ollama_cloud:ministral-3:8b-cloud"),
             ("feature_ai_summary", "true"),
             ("provider_coingecko", "true"),
         ]

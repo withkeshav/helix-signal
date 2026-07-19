@@ -229,7 +229,7 @@ async def receive_external_intel(request: Request, db: Session = Depends(get_db)
         try:
             published_at = datetime.fromisoformat(str(published_at_raw).replace("Z", "+00:00"))
         except (ValueError, TypeError):
-            pass
+            log.debug("intel_webhook.published_at_parse_failed", exc_info=True)
 
     helix_event_type = "GEOPOLITICAL"
     source_authority = _lookup_authority(source_domain)

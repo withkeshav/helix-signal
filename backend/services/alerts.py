@@ -369,7 +369,7 @@ def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict, db: Session | N
         resp = httpx.post(url, json={"asset": asset_symbol, "type": rule["type"], "severity": rule["severity"], "meta": meta}, timeout=10)
         resp.raise_for_status()
     except Exception as exc:
-        log.warning("webhook_failed", error=str(exc))
+        log.warning("webhook_failed", exc_info=True)
 
 
 def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
@@ -381,7 +381,7 @@ def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict, db: Session | N
         resp = httpx.post(url, json={"content": f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']} - {rule['condition']}"}, timeout=10)
         resp.raise_for_status()
     except Exception as exc:
-        log.warning("discord_failed", error=str(exc))
+        log.warning("discord_failed", exc_info=True)
 
 
 def _dispatch_email(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
@@ -415,4 +415,4 @@ def _dispatch_email(asset_symbol: str, rule: dict, meta: dict, db: Session | Non
             s.send_message(msg)
         log.info("email_sent", asset=asset_symbol, to=mail_to)
     except Exception as exc:
-        log.warning("email_failed", error=str(exc))
+        log.warning("email_failed", exc_info=True)

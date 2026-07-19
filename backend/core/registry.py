@@ -74,6 +74,6 @@ def discover_plugins():
             try:
                 importlib.import_module(f"backend.ml_models.{name}")
             except Exception as exc:
-                log.warning("ml_plugin_import_failed", module=name, error=str(exc))
+                log.warning("ml_plugin_import_failed", module=name, exc_info=True)
     except ModuleNotFoundError:
         log.warning("plugins_module_not_found", module="ml_models")

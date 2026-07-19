@@ -79,22 +79,9 @@ def test_ai_insights_returns_200_when_asset_not_found(admin_headers, client, mon
     assert body.get("available") is False
 
 
-def test_ai_budget_endpoint(admin_headers, client) -> None:
+def test_ai_budget_endpoint_removed(admin_headers, client) -> None:
     r = client.get("/api/ai/budget", headers=admin_headers)
-    assert r.status_code == 200
-    body = r.json()
-    assert "daily_budget" in body
-    assert "tokens_used_today" in body
-    assert "tokens_remaining" in body
-    assert "pct_used" in body
-
-
-def test_ai_budget_shape(admin_headers, client) -> None:
-    r = client.get("/api/ai/budget", headers=admin_headers)
-    body = r.json()
-    assert body["daily_budget"] > 0
-    assert body["tokens_remaining"] >= 0
-    assert 0 <= body["pct_used"] <= 100
+    assert r.status_code == 404
 
 
 def _seed_ai_require_token(db_session, value: str = "true") -> None:

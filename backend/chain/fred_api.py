@@ -31,7 +31,7 @@ def _fred_api_key() -> str:
             if val:
                 return str(val).strip()
     except Exception:
-        pass
+        log.debug("fred.api_key_lookup_failed", exc_info=True)
     return os.getenv("FRED_API_KEY", "").strip()
 
 
@@ -76,7 +76,7 @@ async def fetch_series(series_id: str) -> list[dict[str, Any]]:
             resp.raise_for_status()
             data = resp.json()
     except Exception as exc:
-        log.warning("fred.fetch_failed", series=series_id, error=str(exc))
+        log.warning("fred.fetch_failed", series=series_id, exc_info=True)
         return []
 
     observations = data.get("observations", [])
@@ -133,5 +133,5 @@ async def start_fred_poller() -> None:
         try:
             await refresh_fred_yields()
         except Exception as exc:
-            log.warning("fred.poller.error", error=str(exc))
+            log.warning("fred.poller.error", exc_info=True)
         await asyncio.sleep(_poll_interval_seconds())

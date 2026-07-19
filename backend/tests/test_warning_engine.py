@@ -21,7 +21,6 @@ os.environ["HELIX_DISABLE_BACKGROUND_TASKS"] = "1"
 from database import engine, init_db  # noqa: E402
 from services.ai_usage import increment_ai_usage, get_ai_usage_summary  # noqa: E402
 from services.warning_engine import check_warnings, _get_warning_threshold  # noqa: E402
-import services.components.ai.budget as budget_mod  # noqa: E402
 import main  # noqa: E402
 
 
@@ -65,7 +64,6 @@ def client():
 
 
 def test_get_warning_threshold_known() -> None:
-    assert _get_warning_threshold("ai_daily_token_budget", None) == 0.8
     assert _get_warning_threshold("provider_dexscreener", None) == 0.8
     assert _get_warning_threshold("provider_coingecko", None) == 0.8
 
@@ -93,55 +91,13 @@ def test_check_warnings_empty_on_low_usage(db_session) -> None:
         assert w["severity"] in ("warning", "critical")
 
 
-def test_check_warnings_ai_budget_threshold(monkeypatch, db_session) -> None:
-    """AI budget warning triggers when usage exceeds warning_threshold."""
-    monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-    budget_mod._LOCAL_DAILY_TOKENS = 850
-    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    warnings = check_warnings(db=db_session)
-    ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
-    assert len(ai_warnings) >= 1
-    assert ai_warnings[0]["severity"] in ("warning", "critical")
-    assert ai_warnings[0]["current_value"] == 850
-
-    budget_mod._LOCAL_DAILY_TOKENS = 0
-
-
-def test_check_warnings_ai_budget_critical(monkeypatch, db_session) -> None:
-    """Critical severity when usage >= 95%."""
-    monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-    budget_mod._LOCAL_DAILY_TOKENS = 980
-    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    warnings = check_warnings(db=db_session)
-    ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
-    assert len(ai_warnings) >= 1
-    assert ai_warnings[0]["severity"] == "critical"
-
-    budget_mod._LOCAL_DAILY_TOKENS = 0
-
-
-def test_check_warnings_ai_budget_below_threshold(monkeypatch, db_session) -> None:
-    """No AI budget warning when usage is below threshold."""
-    monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "1000")
-    budget_mod._LOCAL_DAILY_TOKENS = 100
-    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    warnings = check_warnings(db=db_session)
-    ai_warnings = [w for w in warnings if w["type"] == "ai_budget"]
-    assert len(ai_warnings) == 0
-
-    budget_mod._LOCAL_DAILY_TOKENS = 0
-
-
 # ---------------------------------------------------------------------------
 # AI usage tracking and endpoint
 # ---------------------------------------------------------------------------
 
 
 def test_increment_ai_usage_new(db_session) -> None:
-    increment_ai_usage(db_session, provider="groq", model="llama-3.1-8b-instant", tokens=150, cost=0.0075)
+    increment_ai_usage(db_session, provider="openrouter", model="openai/gpt-4o-mini", tokens=150, cost=0.0075)
     summary = get_ai_usage_summary(db_session)
     assert summary["total_calls"] == 1
     assert summary["total_tokens"] == 150
@@ -149,8 +105,8 @@ def test_increment_ai_usage_new(db_session) -> None:
 
 
 def test_increment_ai_usage_increment(db_session) -> None:
-    increment_ai_usage(db_session, provider="groq", model="llama-3.1-8b-instant", tokens=150, cost=0.0075)
-    increment_ai_usage(db_session, provider="groq", model="llama-3.1-8b-instant", tokens=200, cost=0.01)
+    increment_ai_usage(db_session, provider="openrouter", model="openai/gpt-4o-mini", tokens=150, cost=0.0075)
+    increment_ai_usage(db_session, provider="openrouter", model="openai/gpt-4o-mini", tokens=200, cost=0.01)
     summary = get_ai_usage_summary(db_session)
     assert summary["total_calls"] == 2
     assert summary["total_tokens"] == 350
@@ -158,13 +114,13 @@ def test_increment_ai_usage_increment(db_session) -> None:
 
 
 def test_increment_ai_usage_multiple_providers(db_session) -> None:
-    increment_ai_usage(db_session, provider="groq", model="llama-3.1-8b-instant", tokens=150, cost=0.0075)
+    increment_ai_usage(db_session, provider="openrouter", model="openai/gpt-4o-mini", tokens=150, cost=0.0075)
     increment_ai_usage(db_session, provider="ollama_cloud", model="ministral-3:8b-cloud", tokens=300, cost=0.045)
     summary = get_ai_usage_summary(db_session)
     assert summary["total_calls"] == 2
     assert summary["total_tokens"] == 450
     assert len(summary["providers"]) == 2
-    assert summary["providers"]["groq"]["calls"] == 1
+    assert summary["providers"]["openrouter"]["calls"] == 1
     assert summary["providers"]["ollama_cloud"]["calls"] == 1
 
 
@@ -175,9 +131,9 @@ def test_ai_usage_endpoint(admin_headers, client) -> None:
     assert "date" in data
     assert "total_calls" in data
     assert "total_tokens" in data
-    assert "budget" in data
     assert "provider_stats" in data
     assert "providers" in data
+    assert "budget" not in data
 
 
 def test_ai_warnings_endpoint(admin_headers, client) -> None:
@@ -188,7 +144,7 @@ def test_ai_warnings_endpoint(admin_headers, client) -> None:
 
 
 def test_ai_usage_endpoint_with_data(admin_headers, db_session, client) -> None:
-    increment_ai_usage(db_session, provider="groq", model="llama-3.1-8b-instant", tokens=150, cost=0.0075)
+    increment_ai_usage(db_session, provider="openrouter", model="openai/gpt-4o-mini", tokens=150, cost=0.0075)
     resp = client.get("/api/ai/usage", headers=admin_headers)
     assert resp.status_code == 200
     data = resp.json()
@@ -200,12 +156,8 @@ def test_ai_usage_endpoint_with_data(admin_headers, db_session, client) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_warning_structure(monkeypatch, db_session) -> None:
+def test_warning_structure(db_session) -> None:
     """Warning dicts have the expected fields."""
-    monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "100")
-    budget_mod._LOCAL_DAILY_TOKENS = 90
-    budget_mod._LOCAL_TOKEN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
     warnings = check_warnings(db=db_session)
     for w in warnings:
         assert "type" in w
@@ -214,5 +166,3 @@ def test_warning_structure(monkeypatch, db_session) -> None:
         assert "current_value" in w
         assert "threshold" in w
         assert "setting_key" in w
-
-    budget_mod._LOCAL_DAILY_TOKENS = 0

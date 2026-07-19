@@ -24,7 +24,6 @@ import main  # noqa: E402
 
 # Module references for global state reset (avoid "reset pollution" across test files)
 import services.ai_router as _r
-import services.components.ai.budget as _budget_mod
 import services.components.ai.cache as _cache_mod
 from services.source_usage import _SOURCE_RATE_LIMITS
 
@@ -62,18 +61,10 @@ def _reset_shared_globals() -> None:
     single process state leaks between files.  This single fixture replaces
     all of them.
     """
-    # -- services.ai_router (legacy copies) --
-    _r._AI_CACHE.clear()
-    _r._SEMANTIC_CACHE.clear()
+    # -- services.ai_router --
     _r._CACHE_HITS = 0
     _r._CACHE_MISSES = 0
-    _r._CACHE_EVICTIONS = 0
     _r._CACHE_TOKENS_SAVED = 0
-    _r._MAX_CACHE_ENTRIES = 1000
-    _r._SEMANTIC_CACHE_ENABLED = False
-    _r._SEMANTIC_CACHE_THRESHOLD = 0.90
-    _r._LOCAL_DAILY_TOKENS = 0
-    _r._LOCAL_TOKEN_DATE = ""
 
     # -- services.components.ai.cache (authoritative copies) --
     _cache_mod._AI_CACHE.clear()
@@ -83,10 +74,6 @@ def _reset_shared_globals() -> None:
     _cache_mod._MAX_CACHE_ENTRIES = 1000
     _cache_mod._SEMANTIC_CACHE_ENABLED = False
     _cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.90
-
-    # -- services.components.ai.budget --
-    _budget_mod._LOCAL_DAILY_TOKENS = 0
-    _budget_mod._LOCAL_TOKEN_DATE = ""
 
     # -- Provider / source rate-limit counters --
     _r._PROVIDER_RATE_LIMITS.clear()

@@ -6,13 +6,14 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
-
-import os
 from pathlib import Path
 
 from fastapi import Header, HTTPException, Request
+
+log = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = "helix_session"
 
@@ -36,12 +37,12 @@ def _ip_key(request: Request) -> str:
                 if forwarded:
                     raw = forwarded.split(",")[0].strip()
         except ValueError:
-            pass
+            log.debug("admin_auth.forwarded_ip_parse_failed", exc_info=True)
 
     try:
         raw = str(_ipa.ip_address(raw))
     except ValueError:
-        pass
+        log.debug("admin_auth.ip_normalize_failed", exc_info=True)
 
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 

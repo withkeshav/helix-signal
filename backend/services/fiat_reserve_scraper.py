@@ -89,7 +89,7 @@ def _extract_composition(text: str, symbol: str) -> dict[str, Any]:
         try:
             result["total_reserves_usd"] = float(m.group(1).replace(",", "")) * 1_000_000_000
         except ValueError:
-            pass
+            log.debug("reserve_scraper.total_reserves_parse_failed", exc_info=True)
     cash_m = re.search(r'([\d.]+)\s*%\s*cash', text, re.IGNORECASE)
     if cash_m:
         result["cash_equivalent_pct"] = float(cash_m.group(1))
@@ -107,5 +107,5 @@ def _extract_lag_days(text: str, symbol: str) -> int | None:
             reported = dt.strptime(m.group(1).replace(",", "").strip(), "%B %d %Y")
             return (datetime.now(timezone.utc).date() - reported.date()).days
         except (ValueError, AttributeError):
-            pass
+            log.debug("reserve_scraper.lag_days_parse_failed", exc_info=True)
     return None

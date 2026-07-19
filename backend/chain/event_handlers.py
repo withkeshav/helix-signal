@@ -88,7 +88,7 @@ async def process_stablecoin_logs(logs: list[dict[str, Any]]) -> int:
                 _store_chain_snapshot(db, transfer["symbol"], transfer)
                 db.commit()
             except Exception as exc:
-                log.warning("event_handler.db_error", symbol=transfer["symbol"], error=str(exc))
+                log.warning("event_handler.db_error", symbol=transfer["symbol"], exc_info=True)
                 db.rollback()
             finally:
                 db.close()

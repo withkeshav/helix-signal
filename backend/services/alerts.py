@@ -11,7 +11,6 @@ from typing import Any, Callable
 import smtplib
 from email.mime.text import MIMEText
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -345,43 +344,8 @@ def _log_alert_fire(db: Session, *, asset_symbol: str, rule: dict, meta: dict, n
 def _dispatch_alert(rule: dict, *, asset_symbol: str, meta: dict, db: Session | None = None) -> None:
     channels = rule.get("channels", ["dashboard"])
     for channel in channels:
-        if channel == "webhook":
-            # Legacy rule-engine webhook (alert_webhook_url): simple JSON POST when a rule lists
-            # channel "webhook". The canonical signed event pipeline is webhook_dispatcher
-            # (webhook_enabled / webhook_url / HMAC) on signal_engine.history event flush.
-            _dispatch_webhook(asset_symbol, rule, meta, db)
-        elif channel == "discord":
-            _dispatch_discord(asset_symbol, rule, meta, db)
-        elif channel == "email":
+        if channel == "email":
             _dispatch_email(asset_symbol, rule, meta, db)
-
-
-def _dispatch_webhook(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
-    """Legacy rule-engine webhook: POST to alert_webhook_url (no HMAC).
-
-    Primary outbound alerts use services.webhook_dispatcher (Sprint 5 signed webhooks).
-    """
-    from providers.settings import get_setting
-    url = get_setting("alert_webhook_url", db) or ""
-    if not url:
-        return
-    try:
-        resp = httpx.post(url, json={"asset": asset_symbol, "type": rule["type"], "severity": rule["severity"], "meta": meta}, timeout=10)
-        resp.raise_for_status()
-    except Exception as exc:
-        log.warning("webhook_failed", exc_info=True)
-
-
-def _dispatch_discord(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:
-    from providers.settings import get_setting
-    url = get_setting("alert_discord_webhook", db) or ""
-    if not url:
-        return
-    try:
-        resp = httpx.post(url, json={"content": f"[{rule['severity'].upper()}] {asset_symbol}: {rule['type']} - {rule['condition']}"}, timeout=10)
-        resp.raise_for_status()
-    except Exception as exc:
-        log.warning("discord_failed", exc_info=True)
 
 
 def _dispatch_email(asset_symbol: str, rule: dict, meta: dict, db: Session | None = None) -> None:

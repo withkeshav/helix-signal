@@ -24,20 +24,20 @@ from services.rss_feed import (
 log = get_logger(__name__)
 
 
-def _compute_sentiment(text: str, nlp_enabled: bool | None = None) -> dict[str, Any]:
+def _compute_sentiment(text: str, nlp_enabled: bool | None = None, db: Session | None = None) -> dict[str, Any]:
     active = ENABLE_NLP if nlp_enabled is None else nlp_enabled
     if not active or not text:
         return {"score": 0.0, "label": "neutral"}
     from services.sentiment import analyze_batch
-    results = analyze_batch([text])
+    results = analyze_batch([text], db=db)
     return results[0] if results else {"score": 0.0, "label": "neutral"}
 
 
-def _batch_sentiment(titles: list[str], nlp_active: bool) -> list[dict[str, Any]]:
+def _batch_sentiment(titles: list[str], nlp_active: bool, db: Session | None = None) -> list[dict[str, Any]]:
     if not nlp_active or not titles:
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
     from services.sentiment import analyze_batch
-    return analyze_batch(titles)
+    return analyze_batch(titles, db=db)
 
 
 def ingest_osint_feed(db: Session) -> int:
@@ -65,13 +65,15 @@ def ingest_osint_feed(db: Session) -> int:
         return 0
 
     titles = [a["title"] for a in all_articles]
-    sentiments = _batch_sentiment(titles, nlp_active)
+    sentiments = _batch_sentiment(titles, nlp_active, db=db)
 
     classification_cache: dict[str, dict[str, Any]] = {}
     for art, sentiment in zip(all_articles, sentiments):
         classify_key = art["title"][:100]
         if classify_key not in classification_cache:
-            classification_cache[classify_key] = classify_article_structured(art["title"], art.get("summary", ""))
+            classification_cache[classify_key] = classify_article_structured(
+                art["title"], art.get("summary", ""), db=db
+            )
         cls = classification_cache[classify_key]
 
         article = OsintArticle(

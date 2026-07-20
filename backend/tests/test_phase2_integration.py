@@ -7,7 +7,7 @@ All tests are fast — no real network calls. HTTP calls are monkeypatched.
 
 from __future__ import annotations
 
-import json
+from typing import Any
 import time
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -30,7 +30,7 @@ from services.ai_usage import get_ai_usage_summary, increment_ai_usage
 from services.source_usage import _check_source_rate_limit, _record_source_call, _SOURCE_RATE_LIMITS
 from services.warning_engine import check_warnings
 from sources.base import http_get_with_retry
-from database import engine
+from database import AiProvider, engine
 
 
 _USAGE_TABLES = ["ai_usage", "source_usage", "settings"]
@@ -46,16 +46,67 @@ def _truncate_usage_tables():
 # Fixtures
 # ---------------------------------------------------------------------------
 
+def _seed_registry_providers(db_session) -> None:
+    from providers.settings_crypto import encrypt_secret
+
+    for pid, url in (
+        ("ollama_cloud", "https://ollama.com/v1"),
+        ("openrouter", "https://openrouter.ai/api/v1"),
+    ):
+        if db_session.get(AiProvider, pid) is None:
+            db_session.add(
+                AiProvider(
+                    id=pid,
+                    label=pid,
+                    base_url=url,
+                    api_key_enc=encrypt_secret("test-key"),
+                    enabled=True,
+                )
+            )
+    db_session.commit()
+
+
+def _mock_chat_completion(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    responses: dict[str, dict[str, Any] | None] | None = None,
+    default_text: str = "Test response",
+    default_tokens: int = 50,
+) -> dict[str, int]:
+    """Patch ai_router.chat_completion; return mutable per-provider call counts."""
+    responses = responses or {}
+    call_counts: dict[str, int] = {}
+
+    def _chat(db, provider_id, model_id, messages, max_tokens=256, **kwargs):
+        call_counts[provider_id] = call_counts.get(provider_id, 0) + 1
+        payload = responses.get(provider_id)
+        if provider_id in responses and payload is None:
+            return None
+        if payload is not None:
+            return {**payload, "provider": provider_id, "model": model_id}
+        return {
+            "provider": provider_id,
+            "model": model_id,
+            "text": default_text,
+            "tokens": default_tokens,
+        }
+
+    monkeypatch.setattr(r, "chat_completion", _chat)
+    return call_counts
+
+
 @pytest.fixture()
 def _enrich_env(monkeypatch: pytest.MonkeyPatch, db_session) -> None:
     """Set up standard env vars and per-feature model settings for enrichment tests.
 
-    Post-4.0.5.1 chain is settings-driven: ai_mode + provider:model + secrets/env keys.
+    Post-4.0.5.1 chain is settings-driven: ai_mode + provider:model + registry rows.
     """
     monkeypatch.setenv("AI_MODE", "ai_lite")
+    monkeypatch.setenv("SETTINGS_ENCRYPTION_KEY", "phase2-test-encryption-key")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     monkeypatch.setenv("OLLAMA_API_KEY", "ok-test")
     set_setting("ai_mode", "ai_lite", db_session)
+    _seed_registry_providers(db_session)
     # L4 tests permanently set these False in shared settings table — re-enable for enrich.
     for key in (
         "feature_ai_summary",
@@ -98,12 +149,10 @@ def _mock_failing_provider():
 class TestEnrichmentFlow:
     def test_enrich_with_ai_full_flow(self, monkeypatch, db_session):
         """Verify payload structure on successful enrichment."""
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(
-            text="Fallback not needed.", tokens=30, provider="openrouter", model="openai/gpt-4o-mini"
-        ))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(
-            text="Low risk. Peg is stable.", tokens=40
-        ))
+        _mock_chat_completion(
+            monkeypatch,
+            responses={"ollama_cloud": {"text": "Low risk. Peg is stable.", "tokens": 40}},
+        )
 
         result = enrich_with_ai(
             db=db_session,
@@ -124,32 +173,29 @@ class TestEnrichmentFlow:
 
     def test_enrich_with_ai_cache_hit(self, monkeypatch, db_session):
         """Second call with same context returns cached=True without calling provider."""
-        call_count = 0
-
-        def counting_mock(prompt, max_tokens, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            return {"provider": "openrouter", "model": "openai/gpt-4o-mini", "text": "Cached response", "tokens": 25}
-
-        monkeypatch.setattr(r, "_openrouter_call", counting_mock)
-        monkeypatch.setattr(r, "_ollama_cloud", counting_mock)
+        call_counts = _mock_chat_completion(
+            monkeypatch, default_text="Cached response", default_tokens=25
+        )
 
         ctx = {"asset_symbol": "USDT", "signal_score": 10, "signal_band": "Normal", "regime": "stable"}
         first = enrich_with_ai(db=db_session, feature="risk_explain", context=ctx)
         assert first["available"] is True
-        assert call_count == 1
+        assert sum(call_counts.values()) == 1
 
         second = enrich_with_ai(db=db_session, feature="risk_explain", context=ctx)
         assert second["available"] is True
         assert second["cached"] is True
-        assert call_count == 1
+        assert sum(call_counts.values()) == 1
 
     def test_enrich_with_ai_provider_chain(self, monkeypatch, db_session):
         """First provider fails, second is called and returns success."""
-        monkeypatch.setattr(r, "_openrouter_call", _mock_failing_provider())
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(
-            text="Provider chain fallback", tokens=60, provider="ollama_cloud", model="ministral-3:8b-cloud"
-        ))
+        _mock_chat_completion(
+            monkeypatch,
+            responses={
+                "ollama_cloud": None,
+                "openrouter": {"text": "Provider chain fallback", "tokens": 60},
+            },
+        )
 
         result = enrich_with_ai(
             db=db_session,
@@ -158,7 +204,7 @@ class TestEnrichmentFlow:
         )
 
         assert result["available"] is True
-        assert result["provider"] == "ollama_cloud"
+        assert result["provider"] == "openrouter"
         assert "chain fallback" in result["summary"]
 
     def test_enrich_with_ai_all_providers_fail(self, monkeypatch, db_session):
@@ -184,11 +230,10 @@ class TestEnrichmentFlow:
 
     def test_enrich_with_ai_rate_limited(self, monkeypatch, db_session):
         """Exhaust rate limit for primary provider; fallback provider is called."""
-        mock_ollama = _mock_provider(text="ollama response", tokens=40)
-        mock_openrouter = _mock_provider(text="openrouter response", tokens=30, provider="openrouter", model="openai/gpt-4o-mini")
-
-        monkeypatch.setattr(r, "_ollama_cloud", mock_ollama)
-        monkeypatch.setattr(r, "_openrouter_call", mock_openrouter)
+        _mock_chat_completion(
+            monkeypatch,
+            responses={"openrouter": {"text": "openrouter response", "tokens": 30}},
+        )
 
         _PROVIDER_RATE_LIMITS["ollama_cloud"] = [time.time()] * 60
 
@@ -207,12 +252,11 @@ class TestEnrichmentFlow:
         cache_mod._SEMANTIC_CACHE_ENABLED = True
         cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.80
 
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(
-            text="Semantic cached response", tokens=30
-        ))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(
-            text="Semantic cached response", tokens=30
-        ))
+        _mock_chat_completion(
+            monkeypatch,
+            default_text="Semantic cached response",
+            default_tokens=30,
+        )
 
         ctx1 = {"asset_symbol": "USDT", "signal_score": 30, "signal_band": "Watch", "regime": "volatile"}
         first = enrich_with_ai(db=db_session, feature="risk_explain", context=ctx1)
@@ -238,8 +282,7 @@ class TestEnrichmentFlow:
 
     def test_get_cache_stats_after_enrich(self, monkeypatch, db_session):
         """After enrich calls, cache stats reflect activity."""
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(tokens=50))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(tokens=50))
+        _mock_chat_completion(monkeypatch, default_tokens=50)
 
         stats_before = get_cache_stats()
         assert stats_before["hits"] == 0
@@ -264,15 +307,11 @@ class TestEnrichmentFlow:
         """Provider call order matches configured priority."""
         call_order: list[str] = []
 
-        def tracking_mock(provider_name: str):
-            def _fn(prompt, max_tokens, **kwargs):
-                call_order.append(provider_name)
-                return {"provider": provider_name, "model": "test", "text": "ok", "tokens": 10}
-            return _fn
+        def _chat(db, provider_id, model_id, messages, max_tokens=256, **kwargs):
+            call_order.append(provider_id)
+            return {"provider": provider_id, "model": model_id, "text": "ok", "tokens": 10}
 
-        monkeypatch.setattr(r, "_ollama_cloud", tracking_mock("ollama_cloud"))
-        monkeypatch.setattr(r, "_ollama_cloud", tracking_mock("ollama_cloud"))
-        monkeypatch.setattr(r, "_openrouter_call", tracking_mock("openrouter"))
+        monkeypatch.setattr(r, "chat_completion", _chat)
         monkeypatch.setenv("AI_MODE", "ai_full")
 
         ctx = {"asset_symbol": "USDT", "signal_score": 10, "signal_band": "Normal", "regime": "stable"}
@@ -330,7 +369,7 @@ class TestApiEndpoints:
         data = resp.json()
         assert "playbooks" in data
         names = {p["name"] for p in data["playbooks"]}
-        assert names == {"max_free", "balanced", "quality"}
+        assert names == {"max_free", "balanced", "quality", "public_demo", "data_hoarder"}
 
     def test_api_ai_playbook_apply(self, client, db_session, admin_headers):
         """POST /api/ai/playbook/max_free applies settings."""
@@ -568,8 +607,7 @@ class TestCacheMonitoring:
         monkeypatch.setenv("AI_MODE", "ai_lite")
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "50000")
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(tokens=50))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(tokens=50))
+        _mock_chat_completion(monkeypatch, default_tokens=50)
 
         ctx = {"asset_symbol": "USDT", "signal_score": 10, "signal_band": "Normal", "regime": "stable"}
 
@@ -587,8 +625,7 @@ class TestCacheMonitoring:
         monkeypatch.setenv("AI_MODE", "ai_lite")
         monkeypatch.setenv("AI_DAILY_TOKEN_BUDGET", "50000")
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(tokens=75))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(tokens=75))
+        _mock_chat_completion(monkeypatch, default_tokens=75)
 
         ctx = {"asset_symbol": "USDT", "signal_score": 10, "signal_band": "Normal", "regime": "stable"}
 
@@ -607,8 +644,7 @@ class TestCacheMonitoring:
         monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
         cache_mod._MAX_CACHE_ENTRIES = 3
 
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(tokens=10))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(tokens=75))
+        _mock_chat_completion(monkeypatch, default_tokens=10)
 
         for i in range(6):
             enrich_with_ai(
@@ -629,12 +665,11 @@ class TestCacheMonitoring:
         cache_mod._SEMANTIC_CACHE_ENABLED = True
         cache_mod._SEMANTIC_CACHE_THRESHOLD = 0.75
 
-        monkeypatch.setattr(r, "_openrouter_call", _mock_provider(
-            text="Semantic chain response", tokens=40
-        ))
-        monkeypatch.setattr(r, "_ollama_cloud", _mock_provider(
-            text="Semantic chain response", tokens=40
-        ))
+        _mock_chat_completion(
+            monkeypatch,
+            default_text="Semantic chain response",
+            default_tokens=40,
+        )
 
         ctx1 = {"asset_symbol": "USDT", "signal_score": 30, "signal_band": "Watch", "regime": "volatile"}
         result1 = enrich_with_ai(db=db_session, feature="risk_explain", context=ctx1)

@@ -1,5 +1,22 @@
 # Helix Signal Changelog
 
+## v4.4.0 (2026-07-20) — Platform Phases 1–8
+
+### Breaking / behavior
+- **Public display** defaults to **24h** history via `public_history_hours`; anonymous UI uses `/api/public/*` clamps. Admin session on the same URL is unrestricted.
+- **API keys** default to `core:read` only (was `intelligence:read`). Prefer resource bundles + `access_policy` (`docs/api/scopes.md`). Legacy `intelligence:read` still expands to all read bundles.
+- **Outbound alerts** prefer multi-webhook `webhook_endpoints` + SMTP event subscriptions; Discord/Telegram adapters removed earlier.
+
+### Added
+- Settings presets: `retention_preset`, `anomaly_sensitivity`; playbooks `public_demo`, `data_hoarder`; Display & Access Control Room tab.
+- `/api/public/config|dashboard|trends|osint/headlines|timeline`
+- Multi-webhook CRUD + `alert_router`; SMTP `alert_email_event_types` + test email
+- AI provider registry + 3-tier fallback (`llm_client`); `/api/v1/ai-providers`
+- Web search / AI health endpoints; degradation alert events
+- `GET /api/v1/timeline` (+ co-occurrence); FRED dual-write to Postgres `fred_yields`
+- Alembic `v4_017_platform_tables` (`webhook_endpoints`, `ai_providers`, `fred_yields`, `api_keys.access_policy`)
+- Docs: `docs/api/scopes.md`, `docs/guides/alert-routing.md`
+
 ## v4.3.0 (2026-07-20) — Product re-arch, web search, Control Room, audit remediation
 
 ### Added

@@ -449,6 +449,7 @@ class ApiKey(Base):
     key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
     key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     scopes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    access_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     rate_limit_rpm: Mapped[int] = mapped_column(Integer, default=60)
     created_at: Mapped[datetime] = mapped_column(
@@ -458,6 +459,67 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+
+
+class WebhookEndpoint(Base):
+    """Outbound signed webhook destinations (multi-endpoint alert routing)."""
+
+    __tablename__ = "webhook_endpoints"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    signing_secret_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    min_severity: Mapped[str] = mapped_column(String(16), default="warning")
+    event_types: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    assets: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    timeout_seconds: Mapped[int] = mapped_column(Integer, default=10)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class AiProvider(Base):
+    """Named OpenAI-compatible LLM providers (base URL + API key)."""
+
+    __tablename__ = "ai_providers"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    api_key_enc: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_test_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_test_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    last_test_error: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
+class FredYield(Base):
+    """FRED macro yield series (Postgres SoT; replaces DuckDB-only mirror)."""
+
+    __tablename__ = "fred_yields"
+    __table_args__ = (Index("ix_fred_yields_series_date", "series_id", "date"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    series_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    series_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    date: Mapped[str] = mapped_column(String(16), nullable=False)
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
 
 
 # ---- V4 additional models ----

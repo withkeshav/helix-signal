@@ -158,18 +158,24 @@ def _default_classification() -> dict[str, Any]:
     }
 
 
-def classify_article_structured(title: str, summary: str) -> dict[str, Any]:
-    """Use Ollama Cloud to classify a stablecoin article into structured fields."""
+def classify_article_structured(title: str, summary: str, db: Any | None = None) -> dict[str, Any]:
+    """Use configured LLM provider to classify a stablecoin article into structured fields."""
     try:
-        from services.components.ai.facade import ollama_cloud
-        import os
+        from services.ai_router import ai_mode, chat_for_feature
+
+        if db is not None and ai_mode(db) == "ai_off":
+            return _default_classification()
+
         text = f"Title: {title}\nSummary: {summary}"
-        api_key = os.getenv("OLLAMA_API_KEY", "").strip()
-        result = ollama_cloud(
+        if db is None:
+            return _default_classification()
+
+        result = chat_for_feature(
+            db=db,
+            feature="market_narrative",
             prompt=text,
-            max_tokens=300,
             system=CLASSIFIER_SYSTEM_PROMPT,
-            _resolved_api_key=api_key,
+            max_tokens=300,
         )
         if not result or not result.get("text"):
             return _default_classification()

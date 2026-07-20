@@ -1,13 +1,7 @@
-"""User service — single-operator admin is the product default.
-
-Multi-user CRUD exists for rare ops when `feature_multi_user` is enabled; it is
-not the intended deployment model. Prefer one seeded admin via
-`scripts/seed_admin.py` (HELIX_ADMIN_USERNAME / HELIX_ADMIN_PASSWORD).
-"""
+"""User service — single seeded admin for operator login and SQLAdmin."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Optional
 
 import bcrypt
@@ -35,11 +29,6 @@ def get_user_by_username(db: Session, username: str) -> Optional[User]:
     return db.execute(select(User).where(User.username == username)).scalars().first()
 
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    """Get a user by email."""
-    return db.execute(select(User).where(User.email == email)).scalars().first()
-
-
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
     """Authenticate a user by username and password."""
     user = get_user_by_username(db, username)
@@ -50,8 +39,15 @@ def authenticate_user(db: Session, username: str, password: str) -> Optional[Use
     return user
 
 
-def create_user(db: Session, username: str, email: str, password: str, is_admin: bool = False, role: str = "user") -> User:
-    """Create a new user."""
+def create_user(
+    db: Session,
+    username: str,
+    email: str,
+    password: str,
+    is_admin: bool = False,
+    role: str = "user",
+) -> User:
+    """Create the seeded admin user (seed_admin.py only)."""
     hashed_password = get_password_hash(password)
     db_user = User(
         username=username,
@@ -64,35 +60,3 @@ def create_user(db: Session, username: str, email: str, password: str, is_admin:
     db.commit()
     db.refresh(db_user)
     return db_user
-
-
-def update_user(db: Session, user_id: int, **kwargs) -> Optional[User]:
-    """Update a user."""
-    user = get_user(db, user_id)
-    if not user:
-        return None
-    
-    for key, value in kwargs.items():
-        if hasattr(user, key):
-            setattr(user, key, value)
-    
-    user.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-def delete_user(db: Session, user_id: int) -> bool:
-    """Delete a user."""
-    user = get_user(db, user_id)
-    if not user:
-        return False
-    
-    db.delete(user)
-    db.commit()
-    return True
-
-
-def get_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
-    """Get all users."""
-    return db.execute(select(User).offset(skip).limit(limit)).scalars().all()

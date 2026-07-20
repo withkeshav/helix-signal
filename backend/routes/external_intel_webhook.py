@@ -109,36 +109,28 @@ async def _ai_enhance(
         return None
 
     try:
-        from services.components.ai.facade import ollama_cloud
+        from services.ai_router import chat_for_feature
 
-        from providers.settings import get_secret
-
-        api_key = str(get_secret("secret_ollama_api_key", db) or os.getenv("OLLAMA_API_KEY", "")).strip()
-        if not api_key:
-            return None
-    except Exception:
-        return None
-
-    text = f"Title: {title}\n\nBody: {summary}" if summary else f"Title: {title}"
-    prompt = (
-        "Analyze this stablecoin intelligence. Return ONLY valid JSON with these keys:\n"
-        "- event_type: one of DEPEG_CONFIRMED, PROTOCOL_EXPLOIT, ISSUER_FREEZE, "
-        "SANCTIONS_ACTION, LAW_ENFORCEMENT, AML_CASE, REGULATORY_PRESSURE, FRAUD_SIGNAL, GEOPOLITICAL\n"
-        "- affected_coins: list of ticker symbols mentioned\n"
-        "- severity: critical, warning, or info\n"
-        "- narrative: one-sentence assessment\n"
-        "- sentiment: positive, negative, or neutral\n"
-        "- sentiment_score: float -1.0 to 1.0\n"
-        "- confidence: float 0.0 to 1.0\n\n"
-        f"Intel:\n{text[:2500]}"
-    )
-    try:
+        text = f"Title: {title}\n\nBody: {summary}" if summary else f"Title: {title}"
+        prompt = (
+            "Analyze this stablecoin intelligence. Return ONLY valid JSON with these keys:\n"
+            "- event_type: one of DEPEG_CONFIRMED, PROTOCOL_EXPLOIT, ISSUER_FREEZE, "
+            "SANCTIONS_ACTION, LAW_ENFORCEMENT, AML_CASE, REGULATORY_PRESSURE, FRAUD_SIGNAL, GEOPOLITICAL\n"
+            "- affected_coins: list of ticker symbols mentioned\n"
+            "- severity: critical, warning, or info\n"
+            "- narrative: one-sentence assessment\n"
+            "- sentiment: positive, negative, or neutral\n"
+            "- sentiment_score: float -1.0 to 1.0\n"
+            "- confidence: float 0.0 to 1.0\n\n"
+            f"Intel:\n{text[:2500]}"
+        )
         result = await asyncio.to_thread(
-            ollama_cloud,
+            chat_for_feature,
+            db=db,
+            feature="market_narrative",
             prompt=prompt,
-            max_tokens=400,
             system="You are a stablecoin intelligence analyst. Respond ONLY with valid JSON.",
-            _resolved_api_key=api_key,
+            max_tokens=400,
         )
         if not result or not result.get("text"):
             return None

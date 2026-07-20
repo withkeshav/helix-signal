@@ -10,7 +10,7 @@ def test_playbook_definitions_are_dict() -> None:
 
 
 def test_playbook_definitions_structure() -> None:
-    required_playbooks = {"max_free", "balanced", "quality"}
+    required_playbooks = {"max_free", "balanced", "quality", "public_demo", "data_hoarder"}
     assert set(PLAYBOOKS.keys()) == required_playbooks
 
 
@@ -30,7 +30,7 @@ def test_each_playbook_sets_ai_mode() -> None:
 
 def test_get_playbooks_returns_all() -> None:
     result = get_playbooks()
-    assert set(result.keys()) == {"max_free", "balanced", "quality"}
+    assert set(result.keys()) == {"max_free", "balanced", "quality", "public_demo", "data_hoarder"}
     for name, entry in result.items():
         assert entry["name"] == name
         assert "label" in entry
@@ -119,7 +119,7 @@ def test_playbook_endpoint_returns_playbooks(client, admin_headers) -> None:
     data = resp.json()
     assert "playbooks" in data
     names = {p["name"] for p in data["playbooks"]}
-    assert names == {"max_free", "balanced", "quality"}
+    assert {"max_free", "balanced", "quality", "public_demo", "data_hoarder"}.issubset(names)
 
 
 def test_playbook_endpoint_requires_auth(client) -> None:

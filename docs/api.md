@@ -38,7 +38,60 @@ curl -s http://localhost/api/dashboard?asset=USDT -H "Authorization: Bearer hx_.
 curl -s http://localhost/api/dashboard?asset=USDT -H "X-API-Key: hx_..."
 ```
 
-Scopes: `intelligence:read`, `investigate:write`, `admin`. Manage keys in SQLAdmin at `/admin` or via `GET/DELETE /api/v1/api-keys`.
+Scopes / bundles: see **[docs/api/scopes.md](api/scopes.md)**. Defaults for new keys: `core:read` only. Legacy `intelligence:read` expands to all read bundles. Optional `access_policy` clamps assets and history hours.
+
+### Call intelligence routes
+
+```bash
+# Bearer
+curl -s http://localhost/api/dashboard?asset=USDT -H "Authorization: Bearer hx_..."
+
+# Or header
+curl -s http://localhost/api/dashboard?asset=USDT -H "X-API-Key: hx_..."
+```
+
+Manage keys in Control Room → Security or `GET/DELETE /api/v1/api-keys`.
+
+### Public lite API (anonymous, clamped)
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/public/config` | Non-secret Display & Access policy |
+| GET | `/api/public/dashboard` | Lite dashboard |
+| GET | `/api/public/trends?asset=&window=` | Window clamped to `public_history_hours` (default 24) |
+| GET | `/api/public/osint/headlines` | Limited headlines |
+| GET | `/api/public/timeline?asset=` | Lite strip (band + recent items) |
+
+Admin session uses full `/api/*` routes (unclamped).
+
+### Webhooks & SMTP
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET/POST | `/api/v1/webhook-endpoints` | Multi-endpoint CRUD |
+| PUT/DELETE | `/api/v1/webhook-endpoints/{id}` | Update / delete |
+| POST | `/api/v1/webhook-endpoints/{id}/test` | Signed test POST |
+| GET | `/api/v1/alert-event-catalog` | Event category checkboxes |
+| POST | `/api/v1/alerts/test-email` | SMTP test |
+
+See `docs/guides/alert-routing.md`.
+
+### AI providers & health
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET/POST | `/api/v1/ai-providers` | Registry CRUD |
+| PUT/DELETE | `/api/v1/ai-providers/{id}` | Update / delete |
+| POST | `/api/v1/ai-providers/{id}/test` | Connection test |
+| GET | `/api/settings/ai-health` | Provider + usage card |
+| GET | `/api/settings/web-search-status` | Cache / last run |
+| POST | `/api/settings/web-search/run` | Manual job |
+
+### Timeline
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/v1/timeline?asset=&from=&to=` | Merged scores/events/OSINT/web/FRED; needs `events:read`+`osint:read` (or legacy read) |
 
 ### Operator Admin Panel
 
@@ -105,7 +158,7 @@ Admin-gated routes accept: signed session cookie, `X-Admin-Token: <access_token>
 | GET | `/api/analytics/regime?asset=USDT&window_hours=48` | Three-state regime classifier (stable/elevated/crisis) with duration and transitions |
 | GET | `/api/analytics/rotation?assets=USDT,USDC&window_days=30` | Cross-asset supply rotation signals (correlation + dominance shift) |
 | GET | `/api/analytics/stress-leaderboard?asset=USDT` | Chains ranked by 24h/7d supply velocity with direction |
-| GET | `/api/analytics/sentiment?text=...` | On-demand LLM-powered sentiment analysis (Ollama Cloud) |
+| GET | `/api/analytics/sentiment?text=...` | On-demand LLM sentiment (Ollama Cloud). Legacy alias: `/api/analytics/finbert/sentiment` |
 | GET | `/api/analytics/forecast-accuracy?asset=USDT` | Forecast accuracy vs actuals |
 | GET | `/api/anomaly/detect?asset=USDT` | Z-score + Isolation Forest anomaly detection |
 | GET | `/api/anomaly/change-points?asset=USDT&window_days=14` | CUSUM change-point detection on depeg, supply, concentration |
@@ -308,7 +361,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.3.0"
+  "version": "4.4.0"
 }
 ```
 
@@ -351,4 +404,4 @@ Typed Pydantic response models in `backend/schemas.py`:
 | GET | `/api/v1/assets/{symbol}/yield` | Yield snapshot: `current_apy`, `apy_7d_avg`, `apy_7d_delta`, `yield_source`, `yield_sustainability`, `funding_rate_current/7d_avg`, `insurance_fund_usd/coverage`, `staking_ratio`, `lending_utilization_pct` | Public |
 | GET | `/api/v1/assets/{symbol}/collateral` | Collateral snapshot: `collateral_ratio`, `collateral_assets`, `liquidation_threshold`, `liquidation_queue_usd`, `debt_ceiling_utilization_pct`, `largest_vault_usd`, `collateral_health_score` | Public |
 | GET | `/api/v1/assets/{symbol}/reserve` | Reserve snapshot: `reserve_usd`, `circulating_supply`, `coverage_ratio`, `reserve_composition`, `attestation_date/source/url`, `attestation_lag_days`, `genius_act_compliant`, `mica_status` | Public |
-| POST | `/api/v1/investigate` | 8-step investigation pipeline — peel chain, bridge hops, clustering, blacklist, OSINT, timeline, risk, AI narrative | Admin token |
+| POST | `/api/v1/investigate` | Investigation pipeline — peel chain, bridge hops, clustering, blacklist, OSINT, timeline, risk, AI narrative | Admin token |

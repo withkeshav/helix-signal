@@ -10,23 +10,25 @@ from signal_engine.core import get_asset_by_symbol
 from utils import signal_event_rows_to_out
 
 from core.limiter import limiter
-from core.api_auth import require_read_open
+from core.api_auth import AuthContext, enforce_asset_allowed, require_read_open
 
 router = APIRouter()
 
 
-@router.get("/events", response_model=SignalEventsResponseOut, dependencies=[Depends(require_read_open("intelligence:read"))])
+@router.get("/events", response_model=SignalEventsResponseOut, dependencies=[Depends(require_read_open("events:read"))])
 @limiter.limit("60/minute")
 def events(
     request: Request,
     limit: int = Query(50, ge=1, le=200),
     asset: str | None = None,
     db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_read_open("events:read")),
 ) -> SignalEventsResponseOut:
     now = datetime.now(timezone.utc)
     stmt = select(SignalEvent)
     if asset:
         sym = asset.strip().upper()
+        enforce_asset_allowed(auth, sym)
         selected = get_asset_by_symbol(sym)
         if selected is None or not bool(selected.get("enabled")):
             raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
@@ -35,7 +37,7 @@ def events(
     return SignalEventsResponseOut(generated_at=now, events=signal_event_rows_to_out(rows))
 
 
-@router.get("/events/export", dependencies=[Depends(require_read_open("intelligence:read"))])
+@router.get("/events/export", dependencies=[Depends(require_read_open("export:read"))])
 @limiter.limit("30/minute")
 def events_export_route(
     request: Request,
@@ -43,5 +45,8 @@ def events_export_route(
     asset: str | None = None,
     format: str = Query("csv", alias="format"),
     db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_read_open("export:read")),
 ):
+    if asset:
+        enforce_asset_allowed(auth, asset)
     return events_export(db, asset=asset, limit=limit, fmt=format)

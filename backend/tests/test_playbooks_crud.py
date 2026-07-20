@@ -27,7 +27,7 @@ def test_create_custom_playbook(client, admin_headers) -> None:
             "name": "test_playbook",
             "label": "Test Playbook",
             "description": "A test playbook",
-            "settings": {"ai_mode": "ai_lite", "ai_web_search": False},
+            "settings": {"ai_mode": "ai_lite"},
         },
         headers=admin_headers,
     )
@@ -132,7 +132,7 @@ def test_update_custom_playbook(client, admin_headers) -> None:
         json={
             "label": "Updated Label",
             "description": "Updated description",
-            "settings": {"ai_mode": "ai_full", "ai_web_search": True},
+            "settings": {"ai_mode": "ai_full"},
         },
         headers=admin_headers,
     )

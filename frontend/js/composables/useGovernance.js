@@ -11,24 +11,34 @@ export function useGovernance() {
   const TIER1 = {
     ai: [
       'ai_mode', 'ai_fallback_provider', 'ai_fallback_model',
+      'ai_default_fallback_provider', 'ai_default_fallback_model_id',
       'feature_ai_summary', 'feature_ai_explain', 'feature_ai_insights',
       'feature_ai_narrative', 'feature_nlp_sentiment', 'feature_osint_feed',
-      // model strings handled by dedicated pickers (AI_MODEL_FEATURES)
     ],
     data: [
+      'retention_preset', 'anomaly_sensitivity',
       'refresh_core_seconds', 'refresh_osint_minutes', 'funding_rate_poll_interval_seconds',
       'retention_asset_trend_snapshots_days', 'retention_osint_articles_days',
       'retention_funding_rate_snapshots_days', 'retention_signal_events_days',
     ],
     alerts: [
       'webhook_enabled', 'webhook_url', 'webhook_min_severity',
+      'alert_email_enabled', 'alert_email_to', 'alert_email_from',
+      'alert_smtp_host', 'alert_smtp_port', 'alert_smtp_user',
+      'alert_email_min_severity', 'alert_email_event_types',
       'blacklist_monitor_enabled', 'blacklist_poll_interval_seconds',
     ],
     security: ['api_auth_mode', 'ai_require_token'],
+    display: [
+      'public_history_hours', 'public_tabs_enabled', 'public_export_enabled',
+      'public_show_forensics', 'public_deterministic_why',
+      'demo_mode_enabled', 'demo_history_hours', 'demo_mode_until',
+      'intelligence_api_enabled',
+    ],
   };
 
   const ADVANCED_ALLOWLIST = new Set([
-    // feature_multi_user intentionally omitted — single-operator product
+    // Single-operator product — no multi-user settings
     'feature_onchain_signals', 'provider_moralis', 'provider_thegraph', 'provider_flipside',
     'anomaly_std_floor', 'onchain_whale_threshold_usd',
     // Real cache keys used by ai_router / playbooks (not legacy ai_cache_enabled)
@@ -55,6 +65,7 @@ export function useGovernance() {
       { id: 'ai', label: 'AI & Models' },
       { id: 'data', label: 'Data & Sources' },
       { id: 'alerts', label: 'Alerts & Notify' },
+      { id: 'display', label: 'Display & Access' },
       { id: 'security', label: 'Security' },
       { id: 'advanced', label: 'Advanced' },
     ],
@@ -70,6 +81,19 @@ export function useGovernance() {
     apiKeys: [],
     newApiKeyName: '',
     createdApiKeyRaw: '',
+    newApiKeyBundles: ['core:read'],
+    newApiKeyAssets: '',
+    newApiKeyHistoryHours: '',
+    apiKeyBundles: [
+      'core:read', 'trends:read', 'events:read', 'osint:read', 'risk:read',
+      'forensics:read', 'export:read', 'investigate:write', 'admin',
+    ],
+    webhookEndpoints: [],
+    alertEventCatalog: [],
+    newWebhook: { name: '', url: '', signing_secret: '', min_severity: 'warning', event_types: [] },
+    aiProviders: [],
+    webSearchStatus: null,
+    aiHealth: null,
     advancedSearch: '',
     advancedDirty: {},
     advancedSaving: false,
@@ -79,6 +103,8 @@ export function useGovernance() {
       { name: 'max_free', label: 'Off / Minimal', is_builtin: true },
       { name: 'balanced', label: 'Lite (balanced)', is_builtin: true },
       { name: 'quality', label: 'Full (quality)', is_builtin: true },
+      { name: 'public_demo', label: 'Public demo', is_builtin: true },
+      { name: 'data_hoarder', label: 'Data hoarder', is_builtin: true },
     ],
 
     setupDone: typeof localStorage !== 'undefined' && localStorage.getItem('helix_setup_done') === '1',
@@ -217,11 +243,23 @@ export function useGovernance() {
         this.showToast('Key name required', 'error');
         return;
       }
+      const bundles = (this.newApiKeyBundles || []).filter(Boolean);
+      const assets = (this.newApiKeyAssets || '').split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+      const maxH = parseInt(this.newApiKeyHistoryHours, 10);
+      const access_policy = {
+        allowed_bundles: bundles.length ? bundles : ['core:read'],
+        allowed_assets: assets,
+        max_history_hours: Number.isFinite(maxH) && maxH > 0 ? maxH : null,
+      };
       try {
         const r = await this._adminFetch('/api/v1/api-keys', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: this.newApiKeyName.trim() }),
+          body: JSON.stringify({
+            name: this.newApiKeyName.trim(),
+            scopes: access_policy.allowed_bundles,
+            access_policy,
+          }),
         });
         const j = await r.json();
         if (!r.ok) throw new Error(j.detail || 'Create failed');
@@ -242,6 +280,130 @@ export function useGovernance() {
         this.showToast('API key revoked', 'success');
       } catch (e) {
         this.showToast(e.message, 'error');
+      }
+    },
+
+    toggleNewKeyBundle(bundle) {
+      const set = new Set(this.newApiKeyBundles || []);
+      if (set.has(bundle)) set.delete(bundle);
+      else set.add(bundle);
+      this.newApiKeyBundles = [...set];
+    },
+
+    async loadWebhookEndpoints() {
+      if (!this.adminToken) return;
+      try {
+        const [epR, catR] = await Promise.all([
+          this._adminFetch('/api/v1/webhook-endpoints', { cache: 'no-store' }),
+          this._adminFetch('/api/v1/alert-event-catalog', { cache: 'no-store' }),
+        ]);
+        if (epR.ok) this.webhookEndpoints = await epR.json();
+        if (catR.ok) this.alertEventCatalog = await catR.json();
+      } catch {
+        this.webhookEndpoints = [];
+      }
+    },
+
+    async createWebhookEndpoint() {
+      const body = {
+        name: (this.newWebhook.name || '').trim(),
+        url: (this.newWebhook.url || '').trim(),
+        signing_secret: (this.newWebhook.signing_secret || '').trim(),
+        min_severity: this.newWebhook.min_severity || 'warning',
+        event_types: this.newWebhook.event_types || [],
+      };
+      if (!body.name || !body.url || body.signing_secret.length < 8) {
+        this.showToast('Name, URL, and signing secret (8+) required', 'error');
+        return;
+      }
+      try {
+        const r = await this._adminFetch('/api/v1/webhook-endpoints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || 'Create failed');
+        this.newWebhook = { name: '', url: '', signing_secret: '', min_severity: 'warning', event_types: [] };
+        await this.loadWebhookEndpoints();
+        this.showToast('Webhook endpoint created', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async testWebhookEndpoint(id) {
+      try {
+        const r = await this._adminFetch(`/api/v1/webhook-endpoints/${id}/test`, { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || 'Test failed');
+        this.showToast(j.dispatched ? 'Webhook delivered' : `Not delivered: ${j.reason}`, j.dispatched ? 'success' : 'error');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async deleteWebhookEndpoint(id) {
+      try {
+        const r = await this._adminFetch(`/api/v1/webhook-endpoints/${id}`, { method: 'DELETE' });
+        if (!r.ok) throw new Error('Delete failed');
+        await this.loadWebhookEndpoints();
+        this.showToast('Endpoint deleted', 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async sendTestEmail() {
+      try {
+        const r = await this._adminFetch('/api/v1/alerts/test-email', { method: 'POST' });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.detail || 'Test email failed');
+        this.showToast(`Test email sent to ${j.to}`, 'success');
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async loadAiProviders() {
+      if (!this.adminToken) return;
+      try {
+        const r = await this._adminFetch('/api/v1/ai-providers', { cache: 'no-store' });
+        if (r.ok) this.aiProviders = await r.json();
+      } catch {
+        this.aiProviders = [];
+      }
+    },
+
+    async loadWebSearchStatus() {
+      if (!this.adminToken) return;
+      try {
+        const r = await this._adminFetch('/api/settings/web-search-status', { cache: 'no-store' });
+        if (r.ok) this.webSearchStatus = await r.json();
+      } catch {
+        this.webSearchStatus = null;
+      }
+    },
+
+    async runWebSearchNow() {
+      try {
+        const r = await this._adminFetch('/api/settings/web-search/run', { method: 'POST' });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.detail || 'Web search run failed');
+        this.showToast(`Web search: ${j.status || 'ok'}`, 'success');
+        await this.loadWebSearchStatus();
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    async loadAiHealth() {
+      if (!this.adminToken) return;
+      try {
+        const r = await this._adminFetch('/api/settings/ai-health', { cache: 'no-store' });
+        if (r.ok) this.aiHealth = await r.json();
+      } catch {
+        this.aiHealth = null;
       }
     },
 
@@ -436,12 +598,19 @@ export function useGovernance() {
 
     onControlSubTab(id) {
       this.controlSubTab = id;
-      if (id === 'overview') this.loadOpsStatus();
+      if (id === 'overview') {
+        this.loadOpsStatus();
+        this.loadWebSearchStatus();
+        this.loadAiHealth();
+      }
       if (id === 'security') this.loadApiKeys();
+      if (id === 'alerts') this.loadWebhookEndpoints();
       if (id === 'data') this.loadAssetCatalog();
       if (id === 'ai') {
         this.loadSettings();
         this.loadModelCatalogs();
+        this.loadAiProviders();
+        this.loadAiHealth();
       }
     },
 

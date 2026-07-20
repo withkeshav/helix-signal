@@ -6,7 +6,6 @@
  * - POST /api/auth/login → HMAC session token in JSON + httpOnly helix_session cookie.
  * - Browser keeps a mirror in localStorage (X-Admin-Token) for non-cookie clients.
  * - isAuthenticated is the UI gate; restoreSession() re-hydrates from cookie and/or token.
- * - Multi-user CRUD exists only behind feature_multi_user (off by default) — not the product path.
  */
 
 const ADMIN_TOKEN_KEY = 'helix_admin_token';
@@ -58,6 +57,8 @@ export function registerUiStore(Alpine) {
     enabledAssets: [],
     aiModeLabel: 'Off',
     dataHealthLabel: '—',
+    /** Public Display & Access policy (anonymous clamp). Null until loaded. */
+    publicPolicy: null,
     /** Bridge: Settings sub-tab to open after navigating to Settings (avoids Alpine _x_dataStack). */
     controlSubTabRequest: '',
     /** Bridge: address to investigate after navigating to Forensics. */
@@ -259,6 +260,40 @@ export function registerUiStore(Alpine) {
       this.loginPassword = '';
       this.authError = '';
       this._setAuthenticated(false);
+      await this.loadPublicPolicy();
+    },
+
+    async loadPublicPolicy() {
+      if (this.isAuthenticated) {
+        this.publicPolicy = null;
+        return;
+      }
+      try {
+        const r = await fetch('/api/public/config', { cache: 'no-store', credentials: 'include' });
+        if (r.ok) this.publicPolicy = await r.json();
+      } catch {
+        this.publicPolicy = { public_history_hours: 24, public_export_enabled: false, public_show_forensics: false };
+      }
+    },
+
+    /** Anonymous visitors: clamp trend window to public policy hours. */
+    clampPublicWindow(window) {
+      if (this.isAuthenticated || !this.publicPolicy) return window;
+      const hours = Number(this.publicPolicy.public_history_hours || this.publicPolicy.effective_history_hours || 24);
+      const order = [['90d', 2160], ['30d', 720], ['7d', 168], ['24h', 24], ['6h', 6]];
+      const w = String(window || '24h').toLowerCase();
+      for (const [name, h] of order) {
+        if (w === name) return h <= hours ? name : (order.find(([, hh]) => hh <= hours)?.[0] || '24h');
+      }
+      return hours >= 24 ? '24h' : '6h';
+    },
+
+    publicAllowsForensics() {
+      return this.isAuthenticated || !!(this.publicPolicy?.public_show_forensics);
+    },
+
+    publicAllowsExport() {
+      return this.isAuthenticated || !!(this.publicPolicy?.public_export_enabled);
     },
   });
 }

@@ -35,8 +35,25 @@ def test_parse_provider_model_valid() -> None:
 
 def test_parse_provider_model_invalid() -> None:
     assert _parse_provider_model("") is None
-    assert _parse_provider_model("invalid:model") is None
     assert _parse_provider_model("ollama_cloud") is None
+    assert _parse_provider_model(":model") is None
+    assert _parse_provider_model("provider:") is None
+
+
+def _seed_provider(db, provider_id: str, api_key: str = "sk-test") -> None:
+    from database import AiProvider
+    from providers.settings_crypto import encrypt_secret
+
+    db.add(
+        AiProvider(
+            id=provider_id,
+            label=provider_id,
+            base_url=f"https://{provider_id}.example.com/v1",
+            api_key_enc=encrypt_secret(api_key),
+            enabled=True,
+        )
+    )
+    db.commit()
 
 
 def test_provider_metadata_only_supported() -> None:
@@ -50,16 +67,19 @@ def test_provider_chain_ai_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_provider_chain_from_db(db_session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_full")
-    monkeypatch.setenv("OLLAMA_API_KEY", "ok-test")
+    monkeypatch.setenv("SETTINGS_ENCRYPTION_KEY", "test-key-for-ai-router-chain")
+    _seed_provider(db_session, "ollama_cloud")
+    _seed_provider(db_session, "openrouter")
     set_setting("ai_model_risk_explain", "ollama_cloud:ministral-3:8b-cloud", db_session)
     set_setting("ai_fallback_provider", "openrouter", db_session)
     set_setting("ai_fallback_model", "openai/gpt-4o-mini", db_session)
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
 
     chain = get_ai_provider_chain(db=db_session, feature="risk_explain")
     assert len(chain) == 2
     assert chain[0]._provider_name == "ollama_cloud"
+    assert chain[0]._tier == "primary"
     assert chain[1]._provider_name == "openrouter"
+    assert chain[1]._tier == "task_fallback"
 
 
 def test_enrich_with_ai_ai_off(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -85,8 +105,10 @@ def test_enrich_with_ai_model_not_configured(db_session, monkeypatch: pytest.Mon
 
 def test_enrich_with_ai_all_providers_failed(db_session, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AI_MODE", "ai_full")
-    monkeypatch.setenv("OLLAMA_API_KEY", "ok-test")
+    monkeypatch.setenv("SETTINGS_ENCRYPTION_KEY", "test-key-for-ai-router-fail")
+    _seed_provider(db_session, "ollama_cloud")
     set_setting("ai_model_risk_explain", "ollama_cloud:ministral-3:8b-cloud", db_session)
+    monkeypatch.setattr("services.ai_router.chat_completion", lambda *a, **k: None)
     result = enrich_with_ai(
         feature="risk_explain",
         context={"asset_symbol": "USDT", "signal_score": 10},

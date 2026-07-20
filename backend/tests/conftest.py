@@ -44,6 +44,11 @@ _TABLES = [
     "yield_bearing_snapshots",
     "funding_rate_snapshots",
     "event_labels",
+    "webhook_endpoints",
+    "ai_providers",
+    "fred_yields",
+    "api_keys",
+    "settings",
 ]
 
 

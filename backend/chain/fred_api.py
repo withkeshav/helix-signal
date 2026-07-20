@@ -102,14 +102,67 @@ async def fetch_series(series_id: str) -> list[dict[str, Any]]:
 def _store_yields(rows: list[dict[str, Any]]) -> int:
     if not rows:
         return 0
-    con = get_duckdb()
-    con.execute("DELETE FROM fred_yields WHERE series_id = ?", [rows[0]["series_id"]])
-    for row in rows:
-        con.execute(
-            "INSERT INTO fred_yields (series_id, series_name, date, value, fetched_at) VALUES (?, ?, ?, ?, ?)",
-            [row["series_id"], row["series_name"], row["date"], row["value"], row["fetched_at"]],
-        )
+    # DuckDB (legacy mirror — kept until cutover verified)
+    try:
+        con = get_duckdb()
+        con.execute("DELETE FROM fred_yields WHERE series_id = ?", [rows[0]["series_id"]])
+        for row in rows:
+            con.execute(
+                "INSERT INTO fred_yields (series_id, series_name, date, value, fetched_at) VALUES (?, ?, ?, ?, ?)",
+                [row["series_id"], row["series_name"], row["date"], row["value"], row["fetched_at"]],
+            )
+    except Exception:
+        log.warning("fred.duckdb_store_failed", exc_info=True)
+
+    # Postgres SoT
+    try:
+        from database import FredYield, SessionLocal
+        from sqlalchemy import delete
+
+        with SessionLocal() as db:
+            series_id = rows[0]["series_id"]
+            db.execute(delete(FredYield).where(FredYield.series_id == series_id))
+            for row in rows:
+                db.add(
+                    FredYield(
+                        series_id=row["series_id"],
+                        series_name=row.get("series_name"),
+                        date=str(row["date"]),
+                        value=row.get("value"),
+                        fetched_at=row.get("fetched_at") or datetime.now(timezone.utc),
+                    )
+                )
+            db.commit()
+    except Exception:
+        log.warning("fred.postgres_store_failed", exc_info=True)
+
     return len(rows)
+
+
+def read_fred_yields_pg(
+    db: Any,
+    *,
+    series_id: str | None = None,
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Read FRED yields from Postgres (preferred SoT)."""
+    from database import FredYield
+    from sqlalchemy import desc, select
+
+    q = select(FredYield).order_by(desc(FredYield.date)).limit(limit)
+    if series_id:
+        q = q.where(FredYield.series_id == series_id)
+    rows = db.execute(q).scalars().all()
+    return [
+        {
+            "series_id": r.series_id,
+            "series_name": r.series_name,
+            "date": r.date,
+            "value": r.value,
+            "fetched_at": r.fetched_at.isoformat() if r.fetched_at else None,
+        }
+        for r in rows
+    ]
 
 
 async def refresh_fred_yields() -> dict[str, int]:

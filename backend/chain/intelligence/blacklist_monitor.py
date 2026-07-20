@@ -99,15 +99,14 @@ async def _generate_intel_note(db: Session, address: str, amount: float, asset: 
         f"and whether this is related to sanctioned entities, exchange security, or regulatory action."
     )
     try:
-        from services.components.ai.facade import ollama_cloud
-        from providers.settings import get_secret
-        api_key = get_secret("secret_ollama_api_key", db)
+        from services.ai_router import chat_for_feature
         result = await asyncio.to_thread(
-            ollama_cloud,
+            chat_for_feature,
+            db=db,
+            feature="market_narrative",
             prompt=prompt,
-            max_tokens=150,
             system="You are a blockchain intelligence analyst. Provide concise, factual assessments.",
-            _resolved_api_key=str(api_key or ""),
+            max_tokens=150,
         )
         if result and result.get("text"):
             return result["text"].strip()

@@ -233,22 +233,21 @@ async def _run_pipeline(
         "risk_level": report.risk_level,
     }
     try:
-        from services.components.ai.facade import ollama_cloud
+        from services.ai_router import chat_for_feature
         prompt = (
             f"You are a crypto forensics analyst. Summarize the following "
             f"investigation findings in 3 sentences for a compliance officer. "
             f"Focus on risk level, fund flow pattern, and recommended action. "
             f"Data: {json.dumps(summary_dict)}"
         )
-        from providers.settings import get_secret
-        api_key = get_secret("secret_ollama_api_key", db)
         import asyncio
         result = await asyncio.to_thread(
-            ollama_cloud,
+            chat_for_feature,
+            db=db,
+            feature="anomaly_investigation",
             prompt=prompt,
-            max_tokens=200,
             system="You are a compliance-focused blockchain forensics analyst. Be concise.",
-            _resolved_api_key=str(api_key or ""),
+            max_tokens=200,
         )
         if result and result.get("text"):
             report.narrative = result["text"].strip()

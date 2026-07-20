@@ -121,22 +121,29 @@ Post-deploy validation:
 
 ## Test coverage
 
-- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~485 cases as of v4.1.0
+- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~560+ cases as of v4.4.0
 
-## Data assets (v4.1.0+ / post-4.2.0)
+## Data assets (v4.1.0+ / post-4.4.0)
 
 - **`data_quality_snapshots`** — daily persisted quality metrics; `GET /api/data-quality/summary` serves the latest row.
 - **`insight_assets`** — versioned deterministic insight objects; GET path is deterministic-only (no LLM on request).
 - **`whale_activity_snapshots`** — written when Moralis is configured during on-chain refresh (not cache-only).
 - **`fiat_reserve_snapshots`** — optional daily scrape job (`fiat-reserve-scrape`); failures isolated.
+- **`fred_yields`** — FRED macro series in Postgres (v4.4.0+); DuckDB mirror optional during cutover.
+- **`webhook_endpoints`** — multi-destination signed alert routing (v4.4.0+).
+- **`ai_providers`** — OpenAI-compatible LLM registry (v4.4.0+).
+
+## Public display policy (v4.4.0+)
+
+Anonymous visitors read `/api/public/config` for effective history hours (default 24), tab/export/forensics flags, and demo mode window. Admin session bypasses clamps on authenticated `/api/*` routes.
 
 ## Settings Control Room (v4.1.0+)
 
-Tier 0: optional first-run wizard. Tier 1: Settings Control Room (6 sub-tabs, ~25 high-touch keys + secret rotate). Tier 2: SQLAdmin at `/admin` for full registry / rare table ops. Auth is single-admin (seeded user), not multi-user self-service.
+Tier 0: optional first-run wizard. Tier 1: Settings Control Room (7 sub-tabs including **Display & Access**, ~30 high-touch keys + secret rotate). Tier 2: SQLAdmin at `/admin` for full registry / rare table ops. Auth is single-admin (seeded user), not multi-user self-service.
 
 ## OLAP / DuckDB (v4.0.7+)
 
-DuckDB is **not** an active analytics mirror in 4.0.x. `core/olap.py` provides only the shared connection; the sole live table is **`fred_yields`** (maintained by `chain/fred_api.py` for macro yield context). Seven unused mirror schemas were removed in v4.0.7 (WO-BE-7a). Optional OLAP activation (WO-BE-7b) is deferred until a concrete analytics query needs DuckDB.
+DuckDB is **not** an active analytics mirror in 4.0.x. `core/olap.py` provides only the shared connection; **`fred_yields`** is maintained in **Postgres** (v4.4.0+) with an optional DuckDB mirror in `chain/fred_api.py`. Seven unused mirror schemas were removed in v4.0.7 (WO-BE-7a).
 - **Frontend E2E:** 15 Playwright specs in `frontend/e2e/` covering Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings. Run with `FRONTEND_PORT=3080 docker compose up -d --build frontend` then `cd frontend && npx playwright test --project=chromium`. See [README E2E section](../README.md#e2e-tests-playwright).
 
 ## Design Intent

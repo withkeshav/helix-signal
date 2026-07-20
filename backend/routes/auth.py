@@ -2,9 +2,6 @@
 
 Helix is **not** a multi-tenant user product. One admin account is seeded at
 deploy (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` via `scripts/seed_admin.py`).
-Additional users are out of scope unless `feature_multi_user` is explicitly on
-(SQLAdmin / rare ops only).
-
 Login flow:
 1. POST /api/auth/login with username+password (form)
 2. Server returns HMAC-signed session token (~30 min) and sets httpOnly cookie `helix_session`

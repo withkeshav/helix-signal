@@ -1,7 +1,7 @@
 # Helix Signal — Deployment Runbook
 
 > Living document for safe deploy + **post-deploy operator setup**.  
-> Current release target: **v4.3.0** (product re-arch, web search, Control Room, forecast writer).  
+> Current release target: **v4.4.0** (platform Phases 1–8: public 24h, multi-webhook, scoped API keys, AI registry, timeline).  
 > Companions: `SECURITY.md`, `docs/guides/ai-configuration.md`, `docs/guides/cross-tab-auth.md`.
 
 ## Prerequisites
@@ -10,7 +10,7 @@
 - `.env` configured (copy from `.env.example`) — **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
 - **`SETTINGS_ENCRYPTION_KEY`** (recommended for production): Fernet key for secret settings at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Without it, secrets store as plaintext (dev OK).
 - **`RATE_LIMITER_STORAGE_URI`** defaults to `redis://redis:6379/0` in `docker-compose.yml` so multi-worker rate limits share state. Backend image must include the **`redis`** Python package (`backend/requirements.txt`) or startup fails with `ConfigurationError: 'redis' prerequisite not available`.
-- **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend. Head includes `v4_016_web_search_snapshots`.
+- **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend. Head includes **`v4_017_platform_tables`** (webhook_endpoints, ai_providers, fred_yields, api_keys.access_policy).
 - **Auth:** single seeded admin (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD`). Sign in at Settings → Admin login. See `docs/guides/cross-tab-auth.md`.
 - **Compose project name must stay `helix-signal`** so the volume stays `helix-signal_postgres_data`.
 - Git checkout of target release (after push, `git pull origin main` on the server)
@@ -40,7 +40,7 @@ git pull origin main
 # preserve .env — do not rotate POSTGRES_PASSWORD casually
 bash scripts/backup.sh || true
 
-# Full rebuild when FE + BE both changed (v4.3.0-class releases)
+# Full rebuild when FE + BE both changed (v4.4.0-class releases)
 docker compose -p helix-signal build --no-cache backend frontend   # optional but safer after large FE/BE delta
 docker compose -p helix-signal up -d --build --remove-orphans
 
@@ -54,7 +54,7 @@ docker compose -p helix-signal up -d --build --remove-orphans
 docker volume ls | grep postgres   # expect helix-signal_postgres_data
 docker compose -p helix-signal ps  # postgres, redis, backend, frontend healthy
 curl -sf http://127.0.0.1:8000/api/health | python3 -m json.tool
-# expect: status ok, db/redis true, scheduler_running true, version "4.3.0" (or current release)
+# expect: status ok, db/redis true, scheduler_running true, version "4.4.0" (or current release)
 curl -sfI http://127.0.0.1:3080/ 2>/dev/null || curl -sfI http://127.0.0.1/
 docker compose -p helix-signal exec -T backend alembic current
 # expect head including v4_016_web_search_snapshots after migrate
@@ -67,16 +67,24 @@ SQLAdmin (Tier-2): `http://<host>/admin` with seeded admin — for rare table op
 
 ---
 
-## Post-deploy operator guide (v4.3.0)
+## Post-deploy operator guide (v4.4.0)
 
 Complete these **after** containers are healthy. Order matters for AI and web search.
+
+### 0. Run migrations (v4.4.0+)
+
+```bash
+docker compose -p helix-signal exec backend alembic upgrade head
+```
+
+Expect head **`v4_017_platform_tables`**. SQLite dev uses `create_all`; Postgres/Timescale prod requires this step.
 
 ### 1. Admin login
 
 1. Open the app → **Settings**.
 2. **Admin login** with `HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` from `.env`.
 3. Confirm nav shows authenticated state (not stuck “logged out” with a valid cookie).
-4. Control Room sub-tabs: Overview, AI & Models, Data & Sources, Alerts, Security, Advanced.
+4. Control Room sub-tabs: Overview, AI & Models, Data & Sources, Alerts, **Display & Access**, Security, Advanced.
 
 See `docs/guides/cross-tab-auth.md` for single-admin session model.
 
@@ -157,7 +165,25 @@ db.close()
 | Retention | Nightly prune; web search snapshots default 30 days |
 | Overview | Control Room Overview: scheduler, quality, last prune |
 
-### 8. Tab smoke checklist (UI)
+### 8. Display & Access (v4.4.0)
+
+1. Control Room → **Display & Access**: confirm `public_history_hours` (default **24**).
+2. Log out → confirm anonymous trends clamp to 24h; Forensics tab hidden unless `public_show_forensics`.
+3. Log in → full history on same URL.
+
+### 9. Webhooks & SMTP (v4.4.0)
+
+1. Control Room → **Alerts** → add webhook endpoints (name, URL, signing secret, optional event filters).
+2. Configure SMTP + `alert_email_event_types`; use **Send test email**.
+3. See `docs/guides/alert-routing.md`.
+
+### 10. Scoped API keys (v4.4.0)
+
+1. Control Room → **Security** → create key with bundle checkboxes (default `core:read` only).
+2. Optional asset list + max history hours.
+3. See `docs/api/scopes.md`.
+
+### 11. Tab smoke checklist (UI)
 
 | Tab | Check |
 |-----|--------|
@@ -169,14 +195,14 @@ db.close()
 | **System** | Sources + quality; Admin ops if needed |
 | **Settings** | Secrets rotate, enums for `ai_mode` / `api_auth_mode`, Advanced float keys (e.g. anomaly floor) |
 
-### 9. Settings import / export
+### 12. Settings import / export
 
 - **Export** includes secrets only as `"configured"`.
 - **Import** **skips** secret keys when value is a mask sentinel — will not wipe live API keys.
 - To change a key: Control Room **Rotate** with a real new value, or import an intentional plaintext secret.
 - Import toast shows imported / skipped / errors.
 
-### 10. Optional: force one-shot jobs after deploy
+### 13. Optional: force one-shot jobs after deploy
 
 If you need cache/forecast sooner than cron:
 
@@ -311,6 +337,7 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
+| v4.4.0 | local | 2026-07-20 | Platform Phases 1–8: public 24h, multi-webhook, scoped API keys, AI registry + 3-tier fallback, timeline, FRED Postgres |
 | v4.3.0 | local `95c1d24`+ | 2026-07-20 | Re-arch, web search cache, Control Room polish, forecast writer, secret import/PUT safety, FE asset/overlay fixes |
 | v4.2.0 | local | 2026-07-19 | Hypertables, event labels, scheduler hardening |
 | v4.1.0 | local | 2026-07-19 | Control Room (6 sub-tabs), data-quality snapshots, insight assets API |
@@ -329,4 +356,4 @@ docker compose up -d --build
 
 ---
 
-*Last updated: 2026-07-20 (v4.3.0 post-deploy operator guide)*
+*Last updated: 2026-07-20 (v4.4.0 post-deploy operator guide)*

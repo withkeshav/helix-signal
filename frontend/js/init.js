@@ -404,4 +404,4 @@ Alpine.data('helixApp', () => ({
 
 Alpine.start();
 Alpine.store('ui').initAuthSync();
-Alpine.store('ui').restoreSession();
+Alpine.store('ui').restoreSession().then(() => Alpine.store('ui').loadPublicPolicy());

@@ -1,4 +1,4 @@
-# Helix-Signal v4.3.0
+# Helix-Signal v4.4.0
 
 **Live:** [https://helix.withkeshav.com](https://helix.withkeshav.com)  
 **Repository:** [github.com/withkeshav/helix-signal](https://github.com/withkeshav/helix-signal)  
@@ -12,16 +12,27 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 
 **Model status (honest):** Until you train on historical depegs (`python scripts/train_depeg_model.py`) and set `ONNX_DEPEG_MODEL_PATH`, the UI shows `heuristic_v1` — a rule-based placeholder, not a model trained on real depeg events. Build V4 ONNX models with `python scripts/build_v4_models.py`. Heuristic `.onnx` stubs and `data/depeg_events.json` are now tracked in git so CI tests pass deterministically.
 
+## v4.4.0 — Platform (Phases 1–8)
+
+- **Public display & access** — anonymous visitors see a **24h** lite window (configurable); admin login bypasses clamps on the same URL (`/api/public/*`)
+- **Multi-webhook alerting** — per-endpoint HMAC signing, event-type and asset filters; legacy single-webhook settings auto-migrate
+- **SMTP event subscriptions** — filter by event category + min severity; test email from Control Room
+- **Scoped API keys** — resource bundles (`core:read`, `trends:read`, …) + optional asset list and history cap (`docs/api/scopes.md`)
+- **AI provider registry** — OpenAI-compatible providers in DB; **3-tier fallback** (task primary → task fallback → global default)
+- **Health visibility** — web-search status/run + AI health cards; degradation events route through `alert_router`
+- **Timeline API** — merged scores, events, OSINT, web-search, FRED macro; public lite strip at `/api/public/timeline`
+- **Settings presets** — retention + anomaly sensitivity; playbooks `public_demo`, `data_hoarder`; Display & Access tab
+
 ## V4 Highlights
 
 - **24-coin stablecoin taxonomy** — 4 types (Fiat-backed, Crypto-backed, Yield-bearing, Algorithmic) across USDT, USDC, DAI, PYUSD, FDUSD, FRAX, LUSD, GHO, sDAI, USDe, and more
 - **Type-specific scoring** — Separate depeg model rules for Fiat (price_dev + coverage + attest_lag), Crypto (price_dev + coll_ratio + liq_queue), and Delta (price_dev + funding + insurance) with per-sub-type V4 weight matrices
 - **ONNX ML models** — 3 models built via `onnx.helper` (opset 9): depeg probability, funding regime detection, yield sustainability. Build with `scripts/build_v4_models.py`
-- **Investigation engine** — 8-step async pipeline (address clustering, bridge hop tracing, peel chain analysis, blacklist watch, on-chain token lookup, DEWS anomaly scoring, AI narrative generation, yield intelligence)
+- **Investigation engine** — async pipeline: peel chain → address clustering → bridge hops → blacklist query → OSINT articles → timeline → risk level → LLM narrative
 - **Forensics tab** — Dashboard tab with blacklist stats/events, wallet investigation form, and threat-level KPIs
 - **Alerts inbox** — Dashboard tab showing fired `SignalEvent` rows with asset/severity filters plus active alert rule list. Backend: `GET /api/alerts` (admin-gated).
 - **DEWS** — Distributed Early Warning System combining multi-source anomaly scores with circuit-breaker chain dispatch
-- **6 new ORM tables** — `FiatReserve`, `Collateral`, `YieldBearing`, `FundingRate`, `WhaleActivity`, `BlacklistEvent` + 3 DuckDB OLAP tables
+- **6 new ORM tables** — `FiatReserve`, `Collateral`, `YieldBearing`, `FundingRate`, `WhaleActivity`, `BlacklistEvent`
 - **On-chain intelligence** — Alchemy RPC, Moralis, Flipside, The Graph, Chainlink Oracle feeds + address clustering + bridge hop tracking + peel chain detection
 - **3 new API endpoints** — `/api/v1/investigate`, `/api/v1/yield/intelligence`, `/api/v1/blacklist/events`
 - **8 Alembic migrations** — Full schema evolution for V4 tables and column additions
@@ -33,12 +44,12 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **V3 Risk Score**: 5-component composite (depeg 35%, concentration 20%, velocity 15%, liquidity depth 10%, age penalty 20%) with source health modifier. Weights sum to 1.0. Contracting supply contributes via abs().
 - **Multi-source engine**: DefiLlama (supply, TVL, peg) + CoinGecko (price, market cap, volume) + DEX Screener (liquidity depth, pool concentration, slippage)
 - **Cross-source price validator**: flags discrepancies >0.5% between sources
-- **Alerting system**: 9 rule types (peg deviation, slippage, supply contraction, concentration, staleness, source failure/recovery, etc.) with persistence, dedup, and dispatch to dashboard + signed webhooks (primary for external automation: Zapier/Pabbly/Make/Slack/Discord/Telegram/email via webhook bridge). Configured in Settings UI (`webhook_*` keys). Legacy direct channels (native Telegram, Resend email) deferred.
+- **Alerting system**: rule types (peg deviation, slippage, supply contraction, concentration, staleness, source failure/recovery, etc.) with persistence, dedup, and dispatch to dashboard + **multi-webhook endpoints** (Control Room) and optional **SMTP** email filtered by event type. Use webhooks for Slack/automation via Zapier, n8n, or Pabbly.
 - **OSINT feed**: RSS ingestion (Coindesk, CoinTelegraph, The Block) + LLM-powered sentiment scoring (Ollama Cloud)
 - **Attestation & supply feed**: issuer report age (when parseable) plus DefiLlama on-chain supply feed freshness — no synthetic dates
 - **Governance monitoring**: contract upgrade tracking via Etherscan API
-- **AI anomaly detection** (gated): Z-score, Isolation Forest (trained on startup when enough history), StatsForecast forecast. Train ONNX depeg model with `scripts/train_depeg_model.py` using labels from `data/depeg_events.json`.
-- **DuckDB analytics**: embedded time-series queries on trend data
+- **AI anomaly detection** (gated): Z-score, Isolation Forest (trained on startup when enough history). Train ONNX depeg model with `scripts/train_depeg_model.py` using labels from `data/depeg_events.json`.
+- **FRED macro yields**: Postgres `fred_yields` (SoT) with optional DuckDB mirror for macro context
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
 - **Alpine.js + ECharts frontend**: 7-tab layout (Signal, Market, Intel, Forensics, Alerts, System, Settings — Analytics merged into Signal), lazy-mounted Settings, chart dispose-on-unmount, no build step, CDN-loaded
 
@@ -71,7 +82,8 @@ A reference deployment is live at [helix.withkeshav.com](https://helix.withkesha
 
 | Route | Access |
 |-------|--------|
-| [Dashboard](https://helix.withkeshav.com/) | Public UI + `/api/*` |
+| [Dashboard](https://helix.withkeshav.com/) | Public UI (24h lite by default) + full `/api/*` when admin session |
+| `/api/public/config` | Anonymous display policy (history hours, tabs, export/forensics flags) |
 
 Before deploying your own instance, set in `.env`:
 
@@ -167,6 +179,14 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /api/health` | Operational health and version |
+| `GET /api/public/config` | Anonymous display policy (history hours, tabs, export flags) |
+| `GET /api/public/dashboard` | Lite dashboard (clamped history) |
+| `GET /api/public/timeline` | Lite timeline strip (24h default) |
+| `GET /api/v1/timeline` | Merged timeline (events, OSINT, scores, FRED); scoped API key |
+| `GET /api/v1/webhook-endpoints` | Multi-webhook CRUD (admin) |
+| `GET /api/v1/ai-providers` | AI provider registry CRUD (admin) |
+| `GET /api/settings/web-search-status` | Web search cache health (admin) |
+| `GET /api/settings/ai-health` | AI provider tests + usage (admin) |
 | `GET /api/dashboard` | Live V3 risk monitoring payload |
 | `GET /api/trends`, `/api/trends/chains` | Historical windows |
 | `GET /api/trends/export`, `/api/events/export` | CSV/JSON export |
@@ -176,9 +196,8 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/predictive` | Predictive bundle (depeg probability, regime, forecast) |
 | `GET /api/analytics/correlations` | Pearson correlation matrix (5 metrics, ranked pairs) |
 | `GET /api/analytics/patterns` | Trend/volatility/seasonality detection |
-| `GET /api/analytics/finbert/sentiment` | On-demand FinBERT sentiment |
+| `GET /api/analytics/sentiment` | On-demand LLM sentiment (Ollama Cloud; legacy alias: `/api/analytics/finbert/sentiment`) |
 | `GET /api/anomaly/detect` | Z-score + Isolation Forest anomaly flags |
-| `GET /api/anomaly/forecast` | Supply forecast (StatsForecast/AutoARIMA) |
 | `POST /api/admin/backfill` | Optional synthetic history (env-gated; admin token required) |
 | `GET /api/alerts/config` | Alert rule definitions (admin token required) |
 | `GET /api/alerts` | Fired signal events with optional `?asset=`, `?severity=`, `?limit=` filters (admin token required) |
@@ -200,9 +219,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 | `GET /api/settings/audit/history/{key}` | Change history for a specific setting (admin token required) |
 | `GET /api/settings/export/json` | Export all settings as downloadable JSON (admin token required) |
 | `POST /api/settings/import/json` | Import settings from uploaded JSON file (admin token required) |
-| `POST /api/users` | Create user (admin token + multi-user enabled required) |
-| `GET /api/users` | List all users (admin token + multi-user enabled required) |
-| `POST /api/auth/login` | Authenticate user and return token (multi-user enabled required) |
+| `POST /api/auth/login` | Operator login (seeded admin); returns session token + httpOnly cookie |
 | `POST /api/v1/investigate` | Investigation pipeline (peel chain, address clustering, bridge hops, blacklist query, OSINT, timeline, risk, AI narrative) |
 | `GET /api/dews` | DEWS anomaly scoring and depeg probability per asset |
 | `GET /api/onchain/whale-flow` | On-chain whale flow analysis (net inflows/outflows by asset) |

@@ -1,8 +1,12 @@
 # Webhook Alerts
 
-Helix Signal can POST signed JSON alert events to any HTTPS webhook when signal events are persisted (band changes, depeg pressure, supply moves, etc.).
+Helix Signal POSTs signed JSON alert events to configured HTTPS endpoints when signal events are persisted (band changes, depeg pressure, supply moves, etc.).
 
-## Configuration (Settings UI)
+**Preferred path:** multi-endpoint routing via Control Room → Alerts → **Webhook endpoints** (see `docs/guides/alert-routing.md`). Each endpoint has its own URL, HMAC secret, severity floor, event types, and optional asset filter.
+
+## Legacy single-webhook settings (fallback)
+
+When no rows exist in `webhook_endpoints`, these settings still work:
 
 | Setting | Description |
 |---------|-------------|
@@ -12,7 +16,9 @@ Helix Signal can POST signed JSON alert events to any HTTPS webhook when signal 
 | `webhook_min_severity` | Minimum severity: `info`, `warning`, or `critical` |
 | `webhook_timeout_seconds` | HTTP timeout (default 10s) |
 
-Direct Telegram, email, Discord, and Slack adapters are **not** built in — connect those via Zapier, Make, n8n, or Pabbly using this webhook.
+On first admin list of endpoints, configured legacy settings are migrated into one default endpoint row.
+
+Email is configured separately via SMTP settings + `alert_email_event_types` (not via Discord/Telegram adapters — those are not built in).
 
 ## Signature Verification
 
@@ -34,41 +40,12 @@ def verify(body: bytes, secret: str, header: str) -> bool:
 
 ## Payload Schema (v1.0)
 
-Matches `webhook_dispatcher.build_alert_payload` exactly (additional fields may be present):
+Matches `webhook_dispatcher.build_alert_payload` (plus `event_category` from the router).
 
-```json
-{
-  "schema_version": "1.0",
-  "event_id": "uuid",
-  "timestamp": "2026-06-23T12:00:00+00:00",
-  "asset_symbol": "USDT",
-  "chain_key": "ethereum",
-  "severity": "warning",
-  "event_type": "signal_band_change",
-  "title": "USDT signal moved to Watch",
-  "summary": "...",
-  "old_value": "...",
-  "new_value": "...",
-  "delta": 0.123,
-  "threshold": 50,
-  "metrics": {
-    "signal_score": 45,
-    "depeg_index": 12,
-    "supply_change_7d_pct": -1.2
-  },
-  "metadata": {},
-  "links": { "dashboard": "https://helix.withkeshav.com/?asset=USDT" }
-}
-```
+## Retry
 
-Use `severity`, `event_type`, `metrics.signal_score` etc. for routing.
+3 attempts with 1s / 2s backoff. Private / loopback URLs are rejected.
 
-## Retry Behavior
+## Automation examples
 
-Up to 3 delivery attempts with 1s then 2s backoff on network errors or non-2xx responses. Delivery is best-effort; there is no persistent delivery audit log yet.
-
-## Automation Examples
-
-- **Zapier / Make**: Webhooks → Catch Hook → route to Slack, email, Telegram bot
-- **n8n**: Webhook node → verify HMAC → branch on `severity`
-- **Pabbly Connect**: Incoming webhook trigger → multi-step workflow
+Zapier, n8n, Make, Pabbly — point at a public HTTPS catch URL and verify the HMAC header.

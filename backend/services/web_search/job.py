@@ -24,7 +24,7 @@ def web_search_feature_enabled(db: Session) -> bool:
 
     Ollama alone is never enough (that key is always present for LLM).
     Opt-in is adding Tavily and/or Exa in Settings → Control Room → secrets.
-    No separate enable toggle. The legacy ai_web_search bool is not the gate.
+    Opt-in: Tavily and/or Exa API key present while ai_mode is on.
     """
     mode = str(get_setting("ai_mode", db) or "ai_off").strip().lower()
     if mode in ("", "ai_off", "off", "false", "0"):
@@ -85,4 +85,11 @@ def run_web_search_job(db: Session) -> dict[str, Any]:
     except Exception:
         log.warning("web_search.usage_flush_failed", exc_info=True)
 
-    return {"status": "ok", "saved": saved, "errors": errors, "planned": len(plan)}
+    result = {"status": "ok", "saved": saved, "errors": errors, "planned": len(plan)}
+    try:
+        from routes.health_status import emit_web_search_alerts
+
+        emit_web_search_alerts(db, job_result=result)
+    except Exception:
+        log.warning("web_search.alert_emit_failed", exc_info=True)
+    return result

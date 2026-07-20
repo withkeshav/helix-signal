@@ -13,7 +13,7 @@ from signal_engine.core import get_asset_by_symbol
 from utils import window_delta
 
 from core.limiter import limiter
-from core.api_auth import require_read_open
+from core.api_auth import AuthContext, enforce_asset_allowed, enforce_window_history, require_read_open
 
 router = APIRouter()
 
@@ -86,13 +86,21 @@ def _chain_trend_summary_dict(
     }
 
 
-@router.get("/trends", response_model=TrendResponseOut, dependencies=[Depends(require_read_open("intelligence:read"))])
+@router.get("/trends", response_model=TrendResponseOut, dependencies=[Depends(require_read_open("trends:read"))])
 @limiter.limit("60/minute")
-def trends(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> TrendResponseOut:
+def trends(
+    request: Request,
+    asset: str,
+    window: str = Query("7d"),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_read_open("trends:read")),
+) -> TrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
         raise HTTPException(status_code=400, detail="Invalid window. Use 6h, 24h, 7d, 30d, or 90d.")
+    enforce_window_history(auth, w)
     sym = asset.strip().upper()
+    enforce_asset_allowed(auth, sym)
     selected = get_asset_by_symbol(sym)
     if selected is None or not bool(selected.get("enabled")):
         raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")
@@ -152,7 +160,7 @@ def trends(request: Request, asset: str, window: str = Query("7d"), db: Session 
     )
 
 
-@router.get("/trends/export", dependencies=[Depends(require_read_open("intelligence:read"))])
+@router.get("/trends/export", dependencies=[Depends(require_read_open("export:read"))])
 @limiter.limit("30/minute")
 def trends_export_route(
     request: Request,
@@ -160,17 +168,29 @@ def trends_export_route(
     window: str = Query("7d"),
     format: str = Query("csv", alias="format"),
     db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_read_open("export:read")),
 ):
+    w = window.strip().lower()
+    enforce_window_history(auth, w)
+    enforce_asset_allowed(auth, asset)
     return trends_export(db, asset=asset, window=window, fmt=format)
 
 
-@router.get("/trends/chains", response_model=ChainTrendResponseOut, dependencies=[Depends(require_read_open("intelligence:read"))])
+@router.get("/trends/chains", response_model=ChainTrendResponseOut, dependencies=[Depends(require_read_open("trends:read"))])
 @limiter.limit("60/minute")
-def trends_chains(request: Request, asset: str, window: str = Query("7d"), db: Session = Depends(get_db)) -> ChainTrendResponseOut:
+def trends_chains(
+    request: Request,
+    asset: str,
+    window: str = Query("7d"),
+    db: Session = Depends(get_db),
+    auth: AuthContext = Depends(require_read_open("trends:read")),
+) -> ChainTrendResponseOut:
     w = window.strip().lower()
     if w not in _ALLOWED_TREND_WINDOWS:
         raise HTTPException(status_code=400, detail="Invalid window. Use 6h, 24h, 7d, 30d, or 90d.")
+    enforce_window_history(auth, w)
     sym = asset.strip().upper()
+    enforce_asset_allowed(auth, sym)
     selected = get_asset_by_symbol(sym)
     if selected is None or not bool(selected.get("enabled")):
         raise HTTPException(status_code=404, detail=f"Asset '{sym}' is not enabled")

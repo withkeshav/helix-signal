@@ -198,7 +198,7 @@
         <button class="nav-link" role="tab" :class="tab==='signal'&&'active'" :aria-selected="tab==='signal'" @click="tab='signal';loadTab()" aria-controls="tab-signal">Signal</button>
         <button class="nav-link" role="tab" :class="tab==='market'&&'active'" :aria-selected="tab==='market'" @click="tab='market';loadTab()" aria-controls="tab-market">Market</button>
         <button class="nav-link" role="tab" :class="tab==='intel'&&'active'" :aria-selected="tab==='intel'" @click="tab='intel';loadTab()" aria-controls="tab-intel">Intel</button>
-        <button class="nav-link" role="tab" :class="tab==='forensics'&&'active'" :aria-selected="tab==='forensics'" @click="tab='forensics';loadTab()" aria-controls="tab-forensics">Forensics</button>
+        <button class="nav-link" role="tab" :class="tab==='forensics'&&'active'" :aria-selected="tab==='forensics'" @click="tab='forensics';loadTab()" aria-controls="tab-forensics" x-show="$store.ui.publicAllowsForensics()">Forensics</button>
         <button class="nav-link" role="tab" :class="tab==='alerts'&&'active'" :aria-selected="tab==='alerts'" @click="tab='alerts';loadTab()" aria-controls="tab-alerts">Alerts</button>
         <button class="nav-link" role="tab" :class="tab==='system'&&'active'" :aria-selected="tab==='system'" @click="tab='system';loadTab()" aria-controls="tab-system">System</button>
         <button class="nav-link" role="tab" :class="tab==='settings'&&'active'" :aria-selected="tab==='settings'" @click="tab='settings';loadTab()" aria-controls="tab-settings" aria-label="Settings"><svg class="icon"><use href="#icon-settings"/></svg></button>
@@ -677,7 +677,7 @@
       <div class="chart-card" x-data="trendsDeepDive">
         <h2>Signal Score Trend <span class="time-badge" x-text="timeRange.toUpperCase()"></span>
           <button class="btn btn-muted" @click="openTrendsDeepDive()" style="float:right;padding:4px 10px;font-size:11px">Deep-dive</button>
-          <button class="btn btn-muted" @click="exportTrendsCsv()" style="float:right;margin-right:6px;padding:4px 10px;font-size:11px">Export CSV</button>
+          <button class="btn btn-muted" @click="exportTrendsCsv()" style="float:right;margin-right:6px;padding:4px 10px;font-size:11px" x-show="$store.ui.publicAllowsExport()">Export CSV</button>
         </h2>
         <div class="chart-wrap" id="chart-trend-signal"></div>
 
@@ -1628,12 +1628,16 @@
               <div class="cr-status-card"><div class="cr-status-label">Scheduler</div><div class="cr-status-value" x-text="opsStatus?.scheduler_running ? 'OK' : 'Down'"></div></div>
               <div class="cr-status-card"><div class="cr-status-label">Quality</div><div class="cr-status-value" x-text="qualitySummary?.overall_score != null ? Math.round(qualitySummary.overall_score) : '—'"></div></div>
               <div class="cr-status-card"><div class="cr-status-label">Last prune</div><div class="cr-status-value" style="font-size:12px" x-text="opsStatus?.last_prune?.result?.generated_at?.slice(0,10) || '—'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Web search</div><div class="cr-status-value" style="font-size:12px" x-text="webSearchStatus?.feature_enabled ? (webSearchStatus.cache_stale ? 'Stale' : (webSearchStatus.last_provider || 'On')) : 'Off'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">AI providers</div><div class="cr-status-value" x-text="(aiHealth?.providers || []).filter(p => p.enabled).length || '—'"></div></div>
             </div>
             <div class="cr-setting-row">
               <button class="btn btn-muted" type="button" :disabled="testAiLoading" @click="runTestAi()">Test AI</button>
+              <button class="btn btn-muted" type="button" @click="runWebSearchNow()">Run web search</button>
               <button class="btn btn-muted" type="button" @click="exportSettings()">Export settings</button>
               <button class="btn btn-muted" type="button" @click="openAdminPanel()">Advanced → SQLAdmin</button>
             </div>
+            <p class="kpi-sub" x-show="webSearchStatus" x-text="webSearchStatus ? `Web search last run: ${webSearchStatus.last_run_at || 'never'} · headlines: ${(webSearchStatus.preview_headlines||[]).length}` : ''"></p>
             <h3 class="section-heading">Recent audit</h3>
             <div class="data-table-wrap">
               <table class="data-table">
@@ -1762,7 +1766,69 @@
           <div x-show="controlSubTab==='alerts'">
             <template x-for="s in tier1Settings('alerts')" :key="s.key">
               <div class="cr-setting-row">
-                <label><span x-text="s.label || s.key"></span></label>
+                <label><span x-text="s.label || s.key"></span><span class="cr-setting-hint" x-text="s.description"></span></label>
+                <template x-if="s.type==='bool'"><input type="checkbox" :checked="_toBool(s.value)" @change="onTier1Change(s, $event)"></template>
+                <template x-if="s.type==='enum' || (s.options && s.options.length)"><select class="select" :value="s.value" @change="onTier1Change(s, $event)"><template x-for="opt in (s.options||s.choices||[])" :key="opt"><option :value="opt" x-text="opt"></option></template></select></template>
+                <template x-if="s.type!=='bool' && s.type!=='enum' && !(s.options && s.options.length)"><input class="input" :value="s.value" @change="onTier1Change(s, $event)"></template>
+              </div>
+            </template>
+            <div class="cr-setting-row">
+              <label>SMTP password</label>
+              <button class="btn btn-muted" type="button" @click="rotateSecretKey('alert_smtp_pass')">Rotate</button>
+            </div>
+            <div class="cr-setting-row">
+              <label>Send test email</label>
+              <button class="btn btn-primary" type="button" @click="sendTestEmail()">Send test</button>
+            </div>
+            <h3 class="section-heading">Webhook endpoints</h3>
+            <p class="kpi-sub">Per-endpoint HMAC signing. Event types leave empty to receive all.</p>
+            <div class="cr-setting-row" style="flex-wrap:wrap;gap:8px">
+              <input class="input" x-model="newWebhook.name" placeholder="Name">
+              <input class="input" x-model="newWebhook.url" placeholder="https://…/hook" style="min-width:220px">
+              <input class="input" x-model="newWebhook.signing_secret" placeholder="Signing secret" type="password">
+              <select class="select" x-model="newWebhook.min_severity">
+                <option value="info">info</option>
+                <option value="warning">warning</option>
+                <option value="critical">critical</option>
+              </select>
+              <button class="btn btn-primary" type="button" @click="createWebhookEndpoint()">Add</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0" x-show="alertEventCatalog.length">
+              <template x-for="c in alertEventCatalog" :key="c.id">
+                <label class="signal-hero-chip">
+                  <input type="checkbox" :value="c.id" :checked="(newWebhook.event_types||[]).includes(c.id)"
+                    @change="newWebhook.event_types = $event.target.checked ? [...(newWebhook.event_types||[]), c.id] : (newWebhook.event_types||[]).filter(x => x !== c.id)">
+                  <span x-text="c.label"></span>
+                </label>
+              </template>
+            </div>
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>URL</th><th>Min sev</th><th>Events</th><th></th></tr></thead>
+                <tbody>
+                  <template x-for="ep in webhookEndpoints" :key="ep.id">
+                    <tr>
+                      <td x-text="ep.name"></td>
+                      <td x-text="ep.url" style="max-width:180px;overflow:hidden;text-overflow:ellipsis"></td>
+                      <td x-text="ep.min_severity"></td>
+                      <td x-text="(ep.event_types||[]).join(', ') || 'all'"></td>
+                      <td>
+                        <button class="btn btn-muted" type="button" @click="testWebhookEndpoint(ep.id)">Test</button>
+                        <button class="btn btn-muted" type="button" @click="deleteWebhookEndpoint(ep.id)">Delete</button>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Display & Access -->
+          <div x-show="controlSubTab==='display'">
+            <p class="kpi-sub">Public visitors see a limited history window (default 24h). Admin login bypasses these limits.</p>
+            <template x-for="s in tier1Settings('display')" :key="s.key">
+              <div class="cr-setting-row">
+                <label><span x-text="s.label || s.key"></span><span class="cr-setting-hint" x-text="s.description"></span></label>
                 <template x-if="s.type==='bool'"><input type="checkbox" :checked="_toBool(s.value)" @change="onTier1Change(s, $event)"></template>
                 <template x-if="s.type!=='bool'"><input class="input" :value="s.value" @change="onTier1Change(s, $event)"></template>
               </div>
@@ -1780,19 +1846,30 @@
             </template>
             <p class="kpi-sub">Set <code>TRUSTED_PROXY_CIDR</code> in <code>.env</code> for rate-limiter XFF trust.</p>
             <h3 class="section-heading">API keys</h3>
-            <div class="cr-setting-row">
+            <div class="cr-setting-row" style="flex-wrap:wrap;gap:8px">
               <input class="input" x-model="newApiKeyName" placeholder="Key name">
+              <input class="input" x-model="newApiKeyAssets" placeholder="Assets (USDT,USDC) optional">
+              <input class="input" x-model="newApiKeyHistoryHours" placeholder="Max history hours" style="width:140px">
               <button class="btn btn-primary" type="button" @click="createApiKey()">Create</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">
+              <template x-for="b in apiKeyBundles" :key="b">
+                <label class="signal-hero-chip">
+                  <input type="checkbox" :checked="(newApiKeyBundles||[]).includes(b)" @change="toggleNewKeyBundle(b)">
+                  <span x-text="b"></span>
+                </label>
+              </template>
             </div>
             <p class="kpi-sub" x-show="createdApiKeyRaw" x-text="'Copy now: ' + createdApiKeyRaw"></p>
             <div class="data-table-wrap">
               <table class="data-table">
-                <thead><tr><th>Name</th><th>Prefix</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Name</th><th>Prefix</th><th>Bundles</th><th>Policy</th><th></th></tr></thead>
                 <tbody>
                   <template x-for="k in apiKeys" :key="k.id">
                     <tr>
                       <td x-text="k.name"></td><td x-text="k.key_prefix"></td>
-                      <td x-text="k.revoked_at ? 'revoked' : (k.enabled ? 'active' : 'disabled')"></td>
+                      <td x-text="(k.scopes||[]).join(', ')"></td>
+                      <td x-text="k.access_policy ? JSON.stringify(k.access_policy) : '—'" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px"></td>
                       <td><button class="btn btn-muted" type="button" x-show="!k.revoked_at" @click="revokeApiKey(k.id)">Revoke</button></td>
                     </tr>
                   </template>

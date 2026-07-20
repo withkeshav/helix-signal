@@ -1,5 +1,16 @@
 import { formatUsd, formatDate } from './utils.js';
 
+function _trendsUrl(asset, window) {
+  try {
+    const ui = typeof Alpine !== 'undefined' ? Alpine.store('ui') : null;
+    if (ui && !ui.isAuthenticated) {
+      const w = ui.clampPublicWindow ? ui.clampPublicWindow(window) : window;
+      return `/api/public/trends?asset=${asset}&window=${w}`;
+    }
+  } catch { /* fall through */ }
+  return `/api/trends?asset=${asset}&window=${window}`;
+}
+
 export function _disposeChart(c) {
   if (!c) return;
   if (typeof c.dispose === 'function') {
@@ -123,7 +134,7 @@ export function loadTrendChart() {
   const primary = _cssVar('--spark', '#60a5fa');
   const muted = _cssVar('--muted', '#9aa8c4');
   const tr = this.timeRange || '7d';
-  fetch(`/api/trends?asset=${this.asset}&window=${tr}`, { cache: 'no-store' })
+  fetch(_trendsUrl(this.asset, tr), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
     .then(t => {
       if (this.asset !== _asset) return;
@@ -171,7 +182,7 @@ export function renderHeroPegChart() {
   const neutral = _cssVar('--neutral', '#fbbf24');
   const down = _cssVar('--down', '#f87171');
   const primary = _cssVar('--cat-1', '#3b82f6');
-  fetch(`/api/trends?asset=${this.asset}&window=${tr}`, { cache: 'no-store' })
+  fetch(_trendsUrl(this.asset, tr), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
     .then(t => {
       if (this.asset !== _asset) return;
@@ -334,7 +345,7 @@ export function _renderForecastCanvas(el, title, historical, forecast, baseConfi
 
 export async function renderSupplyChart() {
   const tr = this.timeRange || '30d';
-  const d = await fetch(`/api/trends?asset=${this.asset}&window=${tr}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
+  const d = await fetch(_trendsUrl(this.asset, tr), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
   if (!d || !d.points || !d.points.length) return;
   const el = document.getElementById('chart-supply-trend');
   if (!el) return;

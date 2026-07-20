@@ -196,6 +196,20 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
     except Exception:
         log.warning("settings.audit_log_failed", exc_info=True)
 
+    # Side-effects: presets expand to many keys
+    if key == "retention_preset" and not flush:
+        try:
+            from providers.settings_presets import apply_retention_preset
+            apply_retention_preset(str(value), db)
+        except Exception:
+            log.warning("settings.retention_preset_apply_failed", exc_info=True)
+    if key == "anomaly_sensitivity" and not flush:
+        try:
+            from providers.settings_presets import apply_anomaly_sensitivity
+            apply_anomaly_sensitivity(str(value), db)
+        except Exception:
+            log.warning("settings.anomaly_sensitivity_apply_failed", exc_info=True)
+
 
 def mask_secret(value: str) -> str | None:
     """Return a display-safe value for secret-type settings.
@@ -353,6 +367,29 @@ PLAYBOOKS: dict[str, dict[str, Any]] = {
             "ai_cache_ttl_seconds": 1800,
             "ai_cache_semantic_enabled": False,
             "ai_cache_max_entries": 2000,
+            "feature_ai_summary": True,
+        },
+    },
+    "public_demo": {
+        "label": "Public Demo",
+        "description": "24h public window, AI off, forensics/export hidden",
+        "settings": {
+            "ai_mode": "ai_off",
+            "public_history_hours": 24,
+            "public_export_enabled": False,
+            "public_show_forensics": False,
+            "public_deterministic_why": True,
+            "demo_mode_enabled": False,
+            "retention_preset": "minimal",
+        },
+    },
+    "data_hoarder": {
+        "label": "Data Hoarder",
+        "description": "Research retention + AI lite for long-term asset building",
+        "settings": {
+            "ai_mode": "ai_lite",
+            "retention_preset": "research",
+            "feature_osint_feed": True,
             "feature_ai_summary": True,
         },
     },

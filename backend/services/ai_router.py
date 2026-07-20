@@ -1,7 +1,8 @@
 """Optional LLM router — add-on only; core platform must run with AI_MODE=ai_off.
 
-Per-feature provider:model_id routing via Settings. Supported providers:
-Ollama Cloud and OpenRouter only. Usage tracked via AiUsage; no token budget enforcement.
+Per-feature provider:model_id routing via Settings and ai_providers registry.
+Three-tier fallback: task primary → task fallback (ai_fallback_*) → global default
+(ai_default_fallback_*). Usage tracked via AiUsage; no token budget enforcement.
 """
 
 from __future__ import annotations
@@ -16,7 +17,6 @@ from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 
-import httpx
 from structlog import get_logger
 
 import services.components.ai.cache as _cache_mod
@@ -28,9 +28,7 @@ from services.components.ai.cache import (
     cache_get_enhanced,
     cache_set_enhanced,
 )
-from services.components.ai.providers import openrouter_lite as _openrouter_call
-
-_openrouter_lite = _openrouter_call  # back-compat alias for tests
+from services.llm_client import chat_completion, get_enabled_provider, seed_default_providers
 
 log = get_logger(__name__)
 
@@ -42,8 +40,7 @@ _MAX_CACHE_ENTRIES = int(os.getenv("AI_CACHE_MAX_ENTRIES", "1000"))
 _PROVIDER_RATE_LIMITS: dict[str, list[float]] = {}
 _PROVIDER_FALLBACK_COUNTS: dict[str, int] = {}
 
-VALID_PROVIDERS = frozenset({"ollama_cloud", "openrouter"})
-
+# Legacy metadata for rate limits / cost estimates on built-in provider ids.
 PROVIDER_METADATA: dict[str, dict[str, Any]] = {
     "ollama_cloud": {
         "label": "Ollama Cloud",
@@ -61,9 +58,11 @@ PROVIDER_METADATA: dict[str, dict[str, Any]] = {
     },
 }
 
+VALID_PROVIDERS = frozenset(PROVIDER_METADATA.keys())
+
 
 def _parse_provider_model(value: str | None) -> tuple[str, str] | None:
-    """Parse ``provider:model_id`` (model_id may contain additional colons)."""
+    """Parse ``provider_id:model_id`` (model_id may contain additional colons)."""
     if not value or not str(value).strip():
         return None
     s = str(value).strip()
@@ -72,41 +71,25 @@ def _parse_provider_model(value: str | None) -> tuple[str, str] | None:
     provider, _, model_id = s.partition(":")
     provider = provider.strip()
     model_id = model_id.strip()
-    if provider not in VALID_PROVIDERS or not model_id:
+    if not provider or not model_id:
         return None
     return provider, model_id
 
 
-def _ollama_cloud(
+def _provider_chat(
+    db: Any,
+    provider_id: str,
+    model_id: str,
     prompt: str,
     max_tokens: int,
     system: str | None = None,
-    model: str | None = None,
     **kwargs: Any,
 ) -> dict[str, Any] | None:
-    api_key = kwargs.get("_resolved_api_key", "").strip()
-    if not api_key or not model:
-        return None
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    with httpx.Client(timeout=60.0) as client:
-        resp = client.post(
-            "https://ollama.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}"},
-            json={"model": model, "messages": messages, "max_tokens": max_tokens},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    text = data["choices"][0]["message"]["content"]
-    usage = data.get("usage") or {}
-    return {
-        "provider": "ollama_cloud",
-        "model": model,
-        "text": text,
-        "tokens": usage.get("total_tokens", 0),
-    }
+    return chat_completion(db, provider_id, model_id, messages, max_tokens=max_tokens)
 
 
 def _cache_get(key: str, feature: str | None = None) -> dict[str, Any] | None:
@@ -208,25 +191,64 @@ def _resolve_api_key(provider: str, db: Any = None) -> str:
     return os.getenv(env_key, "").strip() if env_key else ""
 
 
-def _build_provider_callable(
-    provider: str,
-    model_id: str,
-    db: Any = None,
-) -> Callable[..., dict[str, Any] | None] | None:
-    if provider not in VALID_PROVIDERS or not model_id:
-        return None
-    api_key = _resolve_api_key(provider, db)
-    if not api_key:
-        return None
-    if provider == "ollama_cloud":
-        return partial(_ollama_cloud, model=model_id, _resolved_api_key=api_key)
-    return partial(_openrouter_call, model=model_id, _resolved_api_key=api_key)
-
-
 def _feature_model_setting(feature: str | None) -> str | None:
     if not feature:
         return None
     return f"ai_model_{feature}"
+
+
+def _resolve_chain_entries(db: Any, feature: str | None) -> list[tuple[str, str, str]]:
+    """Return ordered (tier, provider_id, model_id) triples for the 3-tier fallback chain."""
+    from providers.settings import get_setting
+
+    entries: list[tuple[str, str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def _add(tier: str, provider_id: str, model_id: str) -> None:
+        provider_id = provider_id.strip()
+        model_id = model_id.strip()
+        if not provider_id or not model_id:
+            return
+        key = (provider_id, model_id)
+        if key in seen:
+            return
+        entries.append((tier, provider_id, model_id))
+        seen.add(key)
+
+    if feature:
+        setting_key = _feature_model_setting(feature)
+        primary = _parse_provider_model(get_setting(setting_key, db) if setting_key else None)
+        if primary:
+            _add("primary", primary[0], primary[1])
+
+    task_fb_provider = str(get_setting("ai_fallback_provider", db) or "").strip()
+    task_fb_model = str(get_setting("ai_fallback_model", db) or "").strip()
+    if task_fb_provider and task_fb_model:
+        _add("task_fallback", task_fb_provider, task_fb_model)
+
+    global_provider = str(get_setting("ai_default_fallback_provider", db) or "").strip()
+    global_model = str(get_setting("ai_default_fallback_model_id", db) or "").strip()
+    if global_provider and global_model:
+        _add("global_fallback", global_provider, global_model)
+
+    return entries
+
+
+def _build_provider_callable(
+    tier: str,
+    provider_id: str,
+    model_id: str,
+    db: Any = None,
+) -> Callable[..., dict[str, Any] | None] | None:
+    if db is None or not provider_id or not model_id:
+        return None
+    if get_enabled_provider(db, provider_id) is None:
+        return None
+    fn = partial(_provider_chat, db, provider_id, model_id)
+    fn._provider_name = provider_id  # type: ignore[attr-defined]
+    fn._tier = tier  # type: ignore[attr-defined]
+    fn._model_id = model_id  # type: ignore[attr-defined]
+    return fn
 
 
 def get_ai_provider_chain(
@@ -234,34 +256,22 @@ def get_ai_provider_chain(
     mode: str | None = None,
     feature: str | None = None,
 ) -> list[Callable[..., dict[str, Any] | None]]:
-    """Build [primary, fallback] provider callables from per-feature settings."""
+    """Build [primary, task_fallback, global_fallback] callables from settings + registry."""
     mode = mode or ai_mode(db)
     if mode == "ai_off":
         return []
 
+    if db is not None:
+        seed_default_providers(db)
+
     chain: list[Callable[..., dict[str, Any] | None]] = []
-    seen: set[str] = set()
+    if db is None:
+        return chain
 
-    if db is not None and feature:
-        from providers.settings import get_setting
-
-        setting_key = _feature_model_setting(feature)
-        primary = _parse_provider_model(get_setting(setting_key, db) if setting_key else None)
-        if primary:
-            fn = _build_provider_callable(primary[0], primary[1], db)
-            if fn is not None:
-                fn._provider_name = primary[0]  # type: ignore[attr-defined]
-                chain.append(fn)
-                seen.add(primary[0])
-
-        fallback_provider = str(get_setting("ai_fallback_provider", db) or "openrouter").strip()
-        fallback_model = str(get_setting("ai_fallback_model", db) or "").strip()
-        if fallback_provider in VALID_PROVIDERS and fallback_model:
-            if fallback_provider not in seen:
-                fn = _build_provider_callable(fallback_provider, fallback_model, db)
-                if fn is not None:
-                    fn._provider_name = fallback_provider  # type: ignore[attr-defined]
-                    chain.append(fn)
+    for tier, provider_id, model_id in _resolve_chain_entries(db, feature):
+        fn = _build_provider_callable(tier, provider_id, model_id, db)
+        if fn is not None:
+            chain.append(fn)
 
     return chain
 
@@ -292,18 +302,30 @@ def _record_fallback(name: str) -> None:
 
 def get_provider_stats(db: Any = None) -> dict[str, Any]:
     stats: dict[str, dict[str, Any]] = {}
-    for name, meta in PROVIDER_METADATA.items():
+    provider_ids = set(PROVIDER_METADATA.keys())
+    if db is not None:
+        from sqlalchemy import select
+        from database import AiProvider
+
+        rows = db.execute(select(AiProvider.id)).scalars().all()
+        provider_ids.update(rows)
+
+    for name in provider_ids:
+        meta = PROVIDER_METADATA.get(name, {})
         timestamps = _PROVIDER_RATE_LIMITS.get(name, [])
         now = time.time()
         recent = [t for t in timestamps if now - t < 60]
+        configured = bool(_resolve_api_key(name, db))
+        if db is not None and not configured:
+            configured = get_enabled_provider(db, name) is not None
         stats[name] = {
-            "label": meta["label"],
-            "cost_per_million": meta["cost_per_million"],
-            "rate_limit_rpm": meta["rate_limit_rpm"],
+            "label": meta.get("label", name),
+            "cost_per_million": meta.get("cost_per_million", 0),
+            "rate_limit_rpm": meta.get("rate_limit_rpm", 0),
             "calls_last_minute": len(recent),
             "total_calls_today": len(timestamps),
             "fallback_count": _PROVIDER_FALLBACK_COUNTS.get(name, 0),
-            "api_key_configured": bool(_resolve_api_key(name, db)),
+            "api_key_configured": configured,
         }
     return stats
 
@@ -492,7 +514,6 @@ def _build_prompt(feature: str, context: dict[str, Any], db: Any = None) -> tupl
         available.setdefault(k, "?")
     if "feature" in template:
         available.setdefault("feature", feature)
-    # Append cached web context when present (scheduled search; not live)
     prompt = template.format(**available)
     web_ctx = str(context.get("web_context") or "").strip()
     if web_ctx and web_ctx != "?":
@@ -521,6 +542,79 @@ def _read_cache_settings_from_db(db: Any) -> None:
             _cache_mod._MAX_SEMANTIC_CACHE_ENTRIES = int(val)
     except Exception:
         log.warning("Failed to load cache configuration from settings", exc_info=True)
+
+
+def _record_usage(db: Any, provider_id: str, model: str, tokens: int) -> None:
+    meta = PROVIDER_METADATA.get(provider_id, {})
+    cpm = meta.get("cost_per_million", 0)
+    cost = (tokens / 1_000_000) * cpm
+    increment_ai_usage(db=db, provider=provider_id, model=model, tokens=tokens, cost=cost)
+
+
+def chat_for_feature(
+    *,
+    db: Any,
+    feature: str | None,
+    prompt: str,
+    system: str | None = None,
+    max_tokens: int = 256,
+) -> dict[str, Any] | None:
+    """Direct LLM call using the 3-tier provider chain (for non-enrich callers)."""
+    if ai_mode(db) == "ai_off" or db is None:
+        return None
+
+    errors: list[str] = []
+    provider_chain = get_ai_provider_chain(db=db, feature=feature)
+    if not provider_chain:
+        return None
+
+    for provider_fn in provider_chain:
+        pname = getattr(provider_fn, "_provider_name", "unknown")
+        tier = getattr(provider_fn, "_tier", "unknown")
+        t0 = time.perf_counter()
+        try:
+            meta = PROVIDER_METADATA.get(pname, {})
+            rpm = meta.get("rate_limit_rpm", 0)
+            if not _check_rate_limit(pname, rpm):
+                _record_fallback(pname)
+                errors.append(f"{pname}:rate_limited")
+                continue
+
+            result = provider_fn(prompt, max_tokens, system=system)
+            latency_ms = int((time.perf_counter() - t0) * 1000)
+            if result is None:
+                _record_fallback(pname)
+                errors.append(f"{pname}:call_failed")
+                continue
+
+            _record_call(pname)
+            tokens_returned = int(result.get("tokens") or 0) or max_tokens
+            _record_usage(db, result.get("provider", pname), result.get("model", ""), tokens_returned)
+            log.info(
+                "ai.chat_for_feature_success",
+                provider=pname,
+                tier=tier,
+                feature=feature,
+                latency_ms=latency_ms,
+                tokens=tokens_returned,
+            )
+            return result
+        except Exception as exc:
+            latency_ms = int((time.perf_counter() - t0) * 1000)
+            _record_fallback(pname)
+            errors.append(f"{pname}:{exc}")
+            log.warning(
+                "ai.chat_for_feature_error",
+                provider=pname,
+                tier=tier,
+                feature=feature,
+                latency_ms=latency_ms,
+                exc_info=True,
+            )
+
+    if errors:
+        log.warning("ai.chat_for_feature_all_failed", feature=feature, errors=errors)
+    return None
 
 
 def enrich_with_ai(
@@ -580,10 +674,11 @@ def enrich_with_ai(
                 return {"available": False, "mode": mode, "reason": "model_not_configured"}
         return {"available": False, "mode": mode, "reason": "no_providers_configured", "errors": errors}
 
-    preferred_provider: str | None = getattr(provider_chain[0], "_provider_name", None)
+    preferred_tier: str | None = getattr(provider_chain[0], "_tier", None)
 
     for provider_fn in provider_chain:
         pname = getattr(provider_fn, "_provider_name", "unknown")
+        tier = getattr(provider_fn, "_tier", "unknown")
         t0 = time.perf_counter()
 
         try:
@@ -598,21 +693,29 @@ def enrich_with_ai(
             latency_ms = int((time.perf_counter() - t0) * 1000)
             if result is None:
                 _record_fallback(pname)
-                errors.append(f"{pname}:no_api_key")
-                log.warning("ai.provider_failed", provider=pname, feature=feature, reason="no_api_key", latency_ms=latency_ms)
+                errors.append(f"{pname}:call_failed")
+                log.warning(
+                    "ai.provider_failed",
+                    provider=pname,
+                    tier=tier,
+                    feature=feature,
+                    reason="call_failed",
+                    latency_ms=latency_ms,
+                )
                 continue
 
             _record_call(pname)
             log.info(
                 "ai.provider_success",
                 provider=pname,
+                tier=tier,
                 model=result.get("model"),
                 feature=feature,
                 latency_ms=latency_ms,
                 tokens=result.get("tokens"),
             )
 
-            if preferred_provider and pname != preferred_provider:
+            if preferred_tier and tier != preferred_tier:
                 _record_fallback(pname)
 
             tokens_returned = int(result.get("tokens") or 0) or max_tokens
@@ -623,6 +726,7 @@ def enrich_with_ai(
                 "feature": feature,
                 "provider": result["provider"],
                 "model": result["model"],
+                "tier": tier,
                 "summary": result["text"].strip().replace("**", ""),
                 "tokens": tokens_returned,
                 "cached": False,
@@ -633,15 +737,7 @@ def enrich_with_ai(
             }
             _cache_set(cache_key, feature, prompt, payload)
             if db is not None:
-                cpm = meta.get("cost_per_million", 0)
-                cost = (tokens_returned / 1_000_000) * cpm
-                increment_ai_usage(
-                    db=db,
-                    provider=result.get("provider", pname),
-                    model=result.get("model", ""),
-                    tokens=tokens_returned,
-                    cost=cost,
-                )
+                _record_usage(db, result.get("provider", pname), result.get("model", ""), tokens_returned)
             return payload
         except Exception as exc:
             latency_ms = int((time.perf_counter() - t0) * 1000)
@@ -650,9 +746,45 @@ def enrich_with_ai(
             log.warning(
                 "ai.provider_error",
                 provider=pname,
+                tier=tier,
                 feature=feature,
                 latency_ms=latency_ms,
                 exc_info=True,
             )
 
     return {"available": False, "mode": mode, "reason": "all_providers_failed", "errors": errors}
+
+
+# Back-compat alias for legacy callers / tests that patch _ollama_cloud.
+def _ollama_cloud(
+    prompt: str,
+    max_tokens: int,
+    system: str | None = None,
+    model: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    api_key = kwargs.get("_resolved_api_key", "").strip()
+    if not api_key or not model:
+        return None
+    import httpx
+
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    with httpx.Client(timeout=60.0) as client:
+        resp = client.post(
+            "https://ollama.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": model, "messages": messages, "max_tokens": max_tokens},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    text = data["choices"][0]["message"]["content"]
+    usage = data.get("usage") or {}
+    return {
+        "provider": "ollama_cloud",
+        "model": model,
+        "text": text,
+        "tokens": usage.get("total_tokens", 0),
+    }

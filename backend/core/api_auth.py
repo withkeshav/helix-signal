@@ -27,12 +27,32 @@ from core.admin_auth import (
     _extract_admin_token,
     _verify_session_token,
 )
+from core.api_resource_registry import (
+    DEFAULT_SCOPES,
+    LEGACY_READ_ALIAS,
+    READ_BUNDLES,
+    VALID_SCOPES,
+    expand_legacy_scopes,
+    window_to_hours,
+)
 from database import ApiKey, get_db
 
 log = logging.getLogger(__name__)
 
-VALID_SCOPES = frozenset({"intelligence:read", "investigate:write", "admin"})
-DEFAULT_SCOPES = ["intelligence:read"]
+# Re-export for callers that import from api_auth.
+__all__ = [
+    "AuthContext",
+    "DEFAULT_SCOPES",
+    "VALID_SCOPES",
+    "clamp_history_hours",
+    "filter_assets",
+    "generate_api_key",
+    "hash_api_key",
+    "require_bundle",
+    "require_keyed_always",
+    "require_read_open",
+    "resolve_auth",
+]
 
 # In-process RPM fallback when Redis is absent (lock rule 12).
 _RPM_BUCKETS: dict[int, list[float]] = {}
@@ -47,6 +67,7 @@ class AuthContext:
     scopes: set[str] = field(default_factory=set)
     api_key_id: int | None = None
     api_key_name: str | None = None
+    access_policy: dict[str, Any] | None = None
 
 
 def hash_api_key(raw_key: str) -> str:
@@ -58,6 +79,101 @@ def generate_api_key() -> tuple[str, str, str]:
     raw = f"hx_{secrets.token_urlsafe(32)}"
     prefix = raw[:12]
     return raw, prefix, hash_api_key(raw)
+
+
+def _normalize_access_policy(raw: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    policy: dict[str, Any] = {}
+    bundles = raw.get("allowed_bundles")
+    if isinstance(bundles, list):
+        policy["allowed_bundles"] = [str(b) for b in bundles if str(b) in VALID_SCOPES]
+    assets = raw.get("allowed_assets")
+    if isinstance(assets, list):
+        policy["allowed_assets"] = [str(a).strip().upper() for a in assets if str(a).strip()]
+    max_h = raw.get("max_history_hours")
+    if max_h is not None:
+        try:
+            policy["max_history_hours"] = max(1, int(max_h))
+        except (TypeError, ValueError):
+            pass
+    return policy or None
+
+
+def _effective_scopes(ctx: AuthContext) -> set[str]:
+    if ctx.kind in ("admin_session", "legacy_token"):
+        return set(VALID_SCOPES)
+    raw = {s for s in ctx.scopes if s in VALID_SCOPES}
+    scopes = expand_legacy_scopes(set(raw))
+    if LEGACY_READ_ALIAS in raw:
+        scopes.add(LEGACY_READ_ALIAS)
+    if ctx.kind != "api_key":
+        return scopes
+    policy = ctx.access_policy or {}
+    allowed = policy.get("allowed_bundles")
+    if isinstance(allowed, list) and allowed:
+        allowed_set = {str(b) for b in allowed if str(b) in VALID_SCOPES}
+        scopes &= expand_legacy_scopes(allowed_set)
+        if LEGACY_READ_ALIAS in raw and LEGACY_READ_ALIAS in allowed_set:
+            scopes.add(LEGACY_READ_ALIAS)
+    if "admin" in raw:
+        scopes.add("admin")
+    return scopes
+
+
+def _needed_scope_granted(effective: set[str], raw: set[str], needed: str) -> bool:
+    if needed in effective:
+        return True
+    if needed == LEGACY_READ_ALIAS and (LEGACY_READ_ALIAS in raw or effective & READ_BUNDLES):
+        return True
+    if needed in READ_BUNDLES and LEGACY_READ_ALIAS in raw:
+        return True
+    return False
+
+
+def require_bundle(ctx: AuthContext, bundle: str) -> None:
+    """Raise 403 when the auth context lacks a bundle (admin unrestricted)."""
+    if ctx.kind in ("admin_session", "legacy_token"):
+        return
+    if bundle not in VALID_SCOPES:
+        raise HTTPException(status_code=500, detail=f"Unknown bundle: {bundle}")
+    effective = _effective_scopes(ctx)
+    if "admin" in effective:
+        return
+    if not _needed_scope_granted(effective, ctx.scopes, bundle):
+        raise HTTPException(
+            status_code=403,
+            detail=f"API key missing required bundle: {bundle}",
+        )
+
+
+def clamp_history_hours(ctx: AuthContext, requested_hours: int) -> int:
+    """Return requested_hours capped by key policy (admin unrestricted)."""
+    if ctx.kind in ("admin_session", "legacy_token"):
+        return requested_hours
+    policy = ctx.access_policy or {}
+    max_h = policy.get("max_history_hours")
+    if max_h is None:
+        return requested_hours
+    try:
+        cap = max(1, int(max_h))
+    except (TypeError, ValueError):
+        return requested_hours
+    return min(max(1, requested_hours), cap)
+
+
+def filter_assets(ctx: AuthContext, assets: list[str] | None) -> list[str]:
+    """Filter asset symbols by key policy; empty allowed_assets means no filter."""
+    if ctx.kind in ("admin_session", "legacy_token"):
+        return [a.strip().upper() for a in (assets or []) if str(a).strip()]
+    policy = ctx.access_policy or {}
+    allowed = policy.get("allowed_assets")
+    if not isinstance(allowed, list) or not allowed:
+        return [a.strip().upper() for a in (assets or []) if str(a).strip()]
+    allowed_set = {str(a).strip().upper() for a in allowed if str(a).strip()}
+    if not assets:
+        return sorted(allowed_set)
+    return [a.strip().upper() for a in assets if a.strip().upper() in allowed_set]
 
 
 def _get_auth_mode(db: Session | None) -> str:
@@ -180,7 +296,13 @@ def resolve_auth(
         _check_rpm(row)
         _schedule_last_used(background_tasks, row.id)
         scopes = {str(s) for s in (row.scopes or []) if str(s) in VALID_SCOPES}
-        return AuthContext(kind="api_key", scopes=scopes, api_key_id=row.id, api_key_name=row.name)
+        return AuthContext(
+            kind="api_key",
+            scopes=scopes,
+            api_key_id=row.id,
+            api_key_name=row.name,
+            access_policy=_normalize_access_policy(row.access_policy),
+        )
 
     token = _extract_admin_token(request, x_admin_token)
     if token:
@@ -198,9 +320,10 @@ def _enforce_scopes(ctx: AuthContext, needed: tuple[str, ...]) -> None:
     if ctx.kind in ("admin_session", "legacy_token"):
         return
     if ctx.kind == "api_key":
-        if "admin" in ctx.scopes:
+        effective = _effective_scopes(ctx)
+        if "admin" in effective:
             return
-        if needed and not any(s in ctx.scopes for s in needed):
+        if needed and not any(_needed_scope_granted(effective, ctx.scopes, s) for s in needed):
             raise HTTPException(
                 status_code=403,
                 detail=f"API key missing required scope: one of {', '.join(needed)}",
@@ -212,7 +335,7 @@ def _enforce_scopes(ctx: AuthContext, needed: tuple[str, ...]) -> None:
 def require_read_open(*scopes: str) -> Callable:
     """Anonymous OK in open mode; otherwise key/admin with scopes."""
 
-    needed = scopes or ("intelligence:read",)
+    needed = scopes or ("core:read",)
 
     def dependency(
         request: Request,
@@ -235,7 +358,7 @@ def require_read_open(*scopes: str) -> Callable:
 def require_keyed_always(*scopes: str) -> Callable:
     """Key or admin required in both auth modes — never anonymous."""
 
-    needed = scopes or ("intelligence:read",)
+    needed = scopes or ("core:read",)
 
     def dependency(
         request: Request,
@@ -252,3 +375,27 @@ def require_keyed_always(*scopes: str) -> Callable:
         return ctx
 
     return dependency
+
+
+def enforce_window_history(ctx: AuthContext, window: str) -> None:
+    """Reject trend/event windows that exceed the key's history cap."""
+    if ctx.kind in ("admin_session", "legacy_token", "anonymous"):
+        return
+    need = window_to_hours(window)
+    if need is None:
+        return
+    cap = clamp_history_hours(ctx, need)
+    if need > cap:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Window '{window}' exceeds API key history limit ({cap}h)",
+        )
+
+
+def enforce_asset_allowed(ctx: AuthContext, asset: str) -> None:
+    """Reject asset requests outside the key's allowed_assets list."""
+    if ctx.kind in ("admin_session", "legacy_token", "anonymous"):
+        return
+    sym = asset.strip().upper()
+    if sym and sym not in filter_assets(ctx, [sym]):
+        raise HTTPException(status_code=403, detail=f"Asset '{sym}' not permitted for this API key")

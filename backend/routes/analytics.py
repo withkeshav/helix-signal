@@ -42,9 +42,10 @@ def api_patterns(
     return detect_patterns(db, asset_symbol=asset.upper(), window_days=window_days)
 
 
+@router.get("/analytics/sentiment", dependencies=[Depends(require_read_open("intelligence:read"))])
 @router.get("/analytics/finbert/sentiment", dependencies=[Depends(require_read_open("intelligence:read"))])
 @limiter.limit("60/minute")
-def api_finbert_sentiment(
+def api_sentiment(
     request: Request,
     text: str = Query(..., min_length=1, max_length=512),
     db: Session = Depends(get_db),
@@ -53,7 +54,7 @@ def api_finbert_sentiment(
     if not get_setting("feature_nlp_sentiment", db):
         return {"available": False, "reason": "NLP sentiment is disabled"}
     from services.sentiment import analyze_batch
-    results = analyze_batch([text])
+    results = analyze_batch([text], db=db)
     result = results[0] if results else {"score": 0.0, "label": "neutral", "fallback": True}
     result["available"] = True
     return result

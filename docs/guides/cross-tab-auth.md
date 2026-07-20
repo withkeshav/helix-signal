@@ -12,7 +12,7 @@ Helix is a **single-operator** console, not a multi-user SaaS product.
 | SQLAdmin `/admin` | Same admin user; rare table/registry ops (Tier 2) |
 | `HELIX_ADMIN_TOKEN` | Optional **legacy** static token for `X-Admin-Token` (rollout/automation only) |
 
-There is **no** self-service registration. Extra accounts are not required; if you ever enable `feature_multi_user`, user CRUD is admin-only and still not the product default.
+There is **no** self-service registration and no multi-user CRUD API — one seeded admin is the product model.
 
 ## Browser session flow
 
@@ -49,6 +49,4 @@ Then either:
 | `CORS_ORIGINS` | If cross-origin UI | Must not be `*` when using credentials |
 | `HELIX_ADMIN_TOKEN` | Optional | Legacy static token; prefer signed sessions |
 
-## Multi-user flag
-
-`feature_multi_user` (settings registry) gates `/api/users*` CRUD. Leave **off** unless you deliberately run multiple operators. Product docs and Control Room assume one admin.
+Rare table/registry edits: SQLAdmin at `/admin` (same admin login as Settings).

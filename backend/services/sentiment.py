@@ -4,24 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
-import httpx
+from sqlalchemy.orm import Session
 
 _SENTIMENT_CACHE: dict[str, dict[str, Any]] = {}
 
-
-def _ollama_api_base() -> str:
-    return os.getenv("OLLAMA_CLOUD_BASE", "https://ollama.com/v1")
-
-
-def _ollama_api_key() -> str:
-    return os.getenv("OLLAMA_API_KEY", "")
-
-
-def _ollama_model() -> str:
-    return os.getenv("OLLAMA_CLOUD_MODEL", "ministral-3:8b-cloud")
 
 def _sentiment_max_articles() -> int:
     from providers.settings import get_setting
@@ -31,12 +19,16 @@ def _sentiment_max_articles() -> int:
             return int(val)
     except Exception:
         logging.getLogger(__name__).debug("Sentiment max articles lookup failed", exc_info=True)
+    import os
     return int(os.getenv("SENTIMENT_MAX_ARTICLES_PER_BATCH", "15"))
 
 
 def _within_sentiment_budget(estimated_tokens: int) -> bool:
-    from services.components.ai.facade import within_budget
-    return within_budget(estimated_tokens)
+    try:
+        from services.components.ai.facade import within_budget
+        return within_budget(estimated_tokens)
+    except Exception:
+        return True
 
 
 def _parse_sentiment(item: dict) -> dict[str, Any]:
@@ -46,8 +38,13 @@ def _parse_sentiment(item: dict) -> dict[str, Any]:
     return {"score": round(score_map.get(label, 0.0) * conf, 4), "label": label}
 
 
-def _make_request(titles: list[str]) -> list[dict[str, Any]]:
-    if not _ollama_api_key():
+def _make_request(titles: list[str], db: Session | None = None) -> list[dict[str, Any]]:
+    if db is None:
+        return [{"score": 0.0, "label": "neutral"} for _ in titles]
+
+    from services.ai_router import ai_mode, chat_for_feature
+
+    if ai_mode(db) == "ai_off":
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
     titles = titles[:_sentiment_max_articles()]
@@ -70,22 +67,16 @@ def _make_request(titles: list[str]) -> list[dict[str, Any]]:
         return [{"score": 0.0, "label": "neutral"} for _ in titles]
 
     try:
-        resp = httpx.post(
-            f"{_ollama_api_base()}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {_ollama_api_key()}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": _ollama_model(),
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.0,
-                "max_tokens": 500,
-            },
-            timeout=30,
+        result = chat_for_feature(
+            db=db,
+            feature="market_narrative",
+            prompt=prompt,
+            system="Respond ONLY with valid JSON.",
+            max_tokens=500,
         )
-        resp.raise_for_status()
-        text = resp.json()["choices"][0]["message"]["content"]
+        if not result or not result.get("text"):
+            return [{"score": 0.0, "label": "neutral"} for _ in titles]
+        text = result["text"]
         results = json.loads(text)
         if not isinstance(results, list):
             raise ValueError("Expected array")
@@ -99,12 +90,12 @@ def clear_cache() -> None:
     _SENTIMENT_CACHE.clear()
 
 
-def analyze_batch(titles: list[str]) -> list[dict[str, Any]]:
+def analyze_batch(titles: list[str], db: Session | None = None) -> list[dict[str, Any]]:
     """Analyze sentiment for a list of titles, caching by title to avoid re-calls."""
     uncached = [(i, t) for i, t in enumerate(titles) if t not in _SENTIMENT_CACHE]
     if uncached:
         uncached_titles = [t for _, t in uncached]
-        results = _make_request(uncached_titles)
+        results = _make_request(uncached_titles, db=db)
         for (_, title), result in zip(uncached, results):
             _SENTIMENT_CACHE[title] = result
     return [_SENTIMENT_CACHE.get(t, {"score": 0.0, "label": "neutral"}) for t in titles]

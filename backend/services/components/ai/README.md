@@ -1,69 +1,38 @@
 # AI Service Components
 
-This directory contains modular components for the AI service, providing cache management, budget tracking, and token management.
+Modular helpers used by `services/ai_router.py` and `services/llm_client.py`.
 
 ## Component Overview
 
 ### `cache.py`
-Cache management for AI responses with both exact-match and semantic caching.
+Cache management for AI responses with exact-match and optional semantic caching.
 
-Key features:
-- LRU eviction for exact-match cache
-- Trigram similarity for semantic caching
-- Configurable TTL and size limits
-- Cache statistics tracking
+- LRU eviction, configurable TTL/size limits
+- `cache_get()` / `cache_set()` / `semantic_cache_search()` / `get_cache_stats()`
 
-Functions:
-- `cache_get()` - Retrieve exact-match cached response
-- `cache_set()` - Store response in exact-match cache
-- `semantic_cache_search()` - Find semantically similar cached responses
-- `get_cache_stats()` - Get cache usage statistics
+Settings keys: `ai_cache_semantic_enabled`, `ai_cache_ttl_seconds`, `ai_cache_max_entries`, etc. (Control Room Advanced allowlist).
 
-### `budget.py`
-AI token budget management and tracking.
-
-Functions:
-- `_deduct_tokens()` - Deduct tokens from daily budget
-- `_within_budget()` - Check if operation would exceed budget (non-deducting)
-- `get_budget_status()` - Get current budget utilization
-
-## Benefits
-
-- **Modularity**: Clear separation of caching and budget concerns
-- **Configurability**: All limits and thresholds are environment-configurable
-- **Performance**: Efficient cache algorithms with LRU eviction
-- **Observability**: Comprehensive statistics and monitoring
-- **Flexibility**: Semantic caching can be enabled/disabled
+### `providers/`
+Legacy OpenRouter helper; production path is **`llm_client.chat_completion()`** against rows in `ai_providers`.
 
 ## Configuration
 
-The components read configuration from environment variables:
+Provider credentials live in the **`ai_providers`** table (encrypted). Per-feature routing uses `ai_model_{feature}` as `provider_id:model_id` with 3-tier fallback documented in `docs/guides/ai-configuration.md`.
 
-- `AI_CACHE_TTL_SECONDS` - Cache entry TTL (default: 3600)
-- `AI_CACHE_MAX_ENTRIES` - Maximum exact-match cache entries (default: 1000)
-- `AI_CACHE_SEMANTIC_ENABLED` - Enable semantic caching (default: false)
-- `AI_CACHE_SEMANTIC_THRESHOLD` - Semantic similarity threshold (default: 0.90)
-- `AI_CACHE_MAX_SEMANTIC_ENTRIES` - Maximum semantic cache entries (default: 200)
-- `AI_DAILY_TOKEN_BUDGET` - Daily token budget limit (default: 50000)
+Usage tracking: `services/ai_usage.py` (`AiUsage` table) — incremented from `enrich_with_ai` after successful completions.
 
 ## Usage
 
-The components are used internally by the AI router service:
+```python
+from services.llm_client import chat_completion
+
+result = chat_completion(db, provider_id="ollama_cloud", model="ministral-3:8b-cloud", messages=[...])
+```
+
+Or the higher-level router:
 
 ```python
-from services.components.ai.cache import cache_get, cache_set
-from services.components.ai.budget import get_budget_status
+from services.ai_router import enrich_with_ai
 
-# Check cache
-cached_response = cache_get(cache_key)
-if cached_response:
-    return cached_response
-
-# Check budget
-budget = get_budget_status()
-if not budget["within_budget"]:
-    raise Exception("AI budget exceeded")
-
-# Store in cache
-cache_set(cache_key, feature, prompt, response)
+out = enrich_with_ai(feature="risk_explain", context={...}, db=db)
 ```

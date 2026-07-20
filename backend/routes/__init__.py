@@ -5,6 +5,7 @@ def register_routes(app):
     from routes.admin import router as admin_router
     from routes.ai_routes import router as ai_router
     from routes.ai_models import router as ai_models_router
+    from routes.ai_providers import router as ai_providers_router
     from routes.alerts import router as alerts_router
     from routes.auth import router as auth_router
     from routes.dashboard import router as dashboard_router
@@ -22,8 +23,8 @@ def register_routes(app):
     from routes.analytics import router as analytics_router
     from routes.settings_audit import router as settings_audit_router
     from routes.settings_import_export import router as settings_import_export_router
-    from routes.users import router as users_router
     from routes.dews import router as dews_router
+    from routes.public import router as public_router
     from routes.onchain import router as onchain_router
     from routes.external_intel_webhook import router as external_intel_webhook_router
     from routes.investigate import router as investigate_router
@@ -33,10 +34,14 @@ def register_routes(app):
     from routes.api_keys import router as api_keys_router
     from routes.insights import router as insights_router
     from routes.event_labels import router as event_labels_router
+    from routes.webhook_endpoints import router as webhook_endpoints_router
+    from routes.health_status import router as health_status_router
+    from routes.timeline import router as timeline_router
 
     app.include_router(admin_router, prefix="/api", tags=["admin"])
     app.include_router(ai_router, prefix="/api", tags=["ai"])
     app.include_router(ai_models_router, prefix="/api", tags=["admin"])
+    app.include_router(ai_providers_router, prefix="/api", tags=["admin"])
     app.include_router(alerts_router, prefix="/api", tags=["alerts"])
     app.include_router(auth_router, prefix="/api", tags=["auth"])
     app.include_router(dashboard_router, prefix="/api", tags=["dashboard"])
@@ -54,7 +59,7 @@ def register_routes(app):
     app.include_router(analytics_router, prefix="/api", tags=["analytics"])
     app.include_router(settings_audit_router, prefix="/api", tags=["settings"])
     app.include_router(settings_import_export_router, prefix="/api", tags=["settings"])
-    app.include_router(users_router, prefix="/api", tags=["users"])
+    app.include_router(public_router, prefix="/api", tags=["public"])
     app.include_router(dews_router, prefix="/api", tags=["dews"])
     app.include_router(onchain_router, prefix="/api", tags=["onchain"])
     app.include_router(external_intel_webhook_router, prefix="/api", tags=["webhooks"])
@@ -65,3 +70,6 @@ def register_routes(app):
     app.include_router(api_keys_router, prefix="/api", tags=["api-keys"])
     app.include_router(insights_router, prefix="/api", tags=["insights"])
     app.include_router(event_labels_router, prefix="/api", tags=["events"])
+    app.include_router(webhook_endpoints_router, prefix="/api", tags=["webhooks"])
+    app.include_router(health_status_router, prefix="/api", tags=["settings"])
+    app.include_router(timeline_router, prefix="/api", tags=["timeline"])

@@ -148,8 +148,8 @@ def _flush_events(db: Session, pending_events: list[SignalEvent], *, metrics_by_
     import threading
     def _bg_dispatch():
         try:
-            from services.webhook_dispatcher import dispatch_events
-            dispatch_events(db, to_dispatch, metrics_by_asset=metrics_by_asset)
+            from services.alert_router import deliver_events
+            deliver_events(db, to_dispatch, metrics_by_asset=metrics_by_asset)
         except Exception as exc:
             log = __import__("structlog").get_logger(__name__)
             log.warning("webhook.dispatch_error", exc_info=True)

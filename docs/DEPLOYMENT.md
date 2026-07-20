@@ -311,6 +311,8 @@ docker compose up -d --build
 
 | Tag | SHA | Date | Notes |
 |-----|-----|------|-------|
+| v4.3.0 | local `95c1d24`+ | 2026-07-20 | Re-arch, web search cache, Control Room polish, forecast writer, secret import/PUT safety, FE asset/overlay fixes |
+| v4.2.0 | local | 2026-07-19 | Hypertables, event labels, scheduler hardening |
 | v4.1.0 | local | 2026-07-19 | Control Room (6 sub-tabs), data-quality snapshots, insight assets API |
 | v4.0.7 | local | 2026-07-19 | Global strip + signal hero, `.data-table` lists, Fernet settings encryption, security headers, OLAP amputate (fred_yields only) |
 | v4.0.6 | local | 2026-07-19 | Frontend liveness (`refreshTick`), `GET /api/dashboard/summary`, settings-driven retention (11 tables), Timescale `drop_chunks` + compression |
@@ -327,4 +329,4 @@ docker compose up -d --build
 
 ---
 
-*Last updated: 2026-07-16*
+*Last updated: 2026-07-20 (v4.3.0 post-deploy operator guide)*

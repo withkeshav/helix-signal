@@ -1,4 +1,4 @@
-"""Data retention pruning — OLTP aware."""
+"""Data retention pruning - OLTP aware."""
 
 from __future__ import annotations
 
@@ -53,6 +53,11 @@ RETENTION_TABLES: list[tuple[str, Any, str, str, str, int, bool]] = [
     ("web_search_rows", WebSearchSnapshot, "fetched_at", "retention_web_search_snapshots_days", "RETENTION_WEB_SEARCH_SNAPSHOTS_DAYS", 30, False),
 ]
 
+# Hardcoded hypertable names only (never user input) for Timescale drop_chunks.
+_ALLOWED_HYPERTABLE_NAMES = frozenset(
+    model.__tablename__ for _, model, _, _, _, _, is_hyper in RETENTION_TABLES if is_hyper
+)
+
 
 def get_last_prune_result() -> dict[str, Any] | None:
     return _LAST_PRUNE_RESULT
@@ -83,14 +88,17 @@ def _prune_table(db: Session, model: Any, ts_col: str, cutoff: datetime, hyperta
     col = getattr(model, ts_col)
     if hypertable and _is_postgres(db):
         table = model.__tablename__
+        if table not in _ALLOWED_HYPERTABLE_NAMES:
+            raise ValueError(f"refusing Timescale prune for unknown table: {table}")
+        # table is allowlisted ORM __tablename__ only (never request/user input)
         result = db.execute(
-            text(f"SELECT count(*) FROM show_chunks('{table}', older_than => :cutoff)"),
+            text(f"SELECT count(*) FROM show_chunks('{table}', older_than => :cutoff)"),  # nosec B608
             {"cutoff": cutoff},
         )
         chunk_count = int(result.scalar() or 0)
         if chunk_count:
             db.execute(
-                text(f"SELECT drop_chunks('{table}', older_than => :cutoff)"),
+                text(f"SELECT drop_chunks('{table}', older_than => :cutoff)"),  # nosec B608
                 {"cutoff": cutoff},
             )
         return chunk_count

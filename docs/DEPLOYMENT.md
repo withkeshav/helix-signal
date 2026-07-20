@@ -1,7 +1,8 @@
 # Helix Signal — Deployment Runbook
 
-> Tracked items: deploy profiles, cache-busting, CSP drift, CI gaps, config hazards.
-> This is a living document — update when deployment constraints change.
+> Living document for safe deploy + **post-deploy operator setup**.  
+> Current release target: **v4.3.0** (product re-arch, web search, Control Room, forecast writer).  
+> Companions: `SECURITY.md`, `docs/guides/ai-configuration.md`, `docs/guides/cross-tab-auth.md`.
 
 ## Prerequisites
 
@@ -9,33 +10,191 @@
 - `.env` configured (copy from `.env.example`) — **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
 - **`SETTINGS_ENCRYPTION_KEY`** (recommended for production): Fernet key for secret settings at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Without it, secrets store as plaintext (dev OK).
 - **`RATE_LIMITER_STORAGE_URI`** defaults to `redis://redis:6379/0` in `docker-compose.yml` so multi-worker rate limits share state. Backend image must include the **`redis`** Python package (`backend/requirements.txt`) or startup fails with `ConfigurationError: 'redis' prerequisite not available`.
-- **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend.
+- **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend. Head includes `v4_016_web_search_snapshots`.
 - **Auth:** single seeded admin (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD`). Sign in at Settings → Admin login. See `docs/guides/cross-tab-auth.md`.
-- For production intelligence API: set `API_AUTH_MODE=key_required` (or Settings `api_auth_mode`) and create keys via `POST /api/v1/api-keys` / SQLAdmin.
-- **Internet-facing:** enable Settings `ai_require_token=true` so AI explain/narrative routes are not anonymous cost sinks; set `HELIX_COOKIE_SECURE=1` behind HTTPS. See `SECURITY.md`.
-- **Settings export/import:** export masks secrets as `configured`. Import skips those sentinels so it will not clobber live keys. To rotate a key, set a real new value in Control Room or import an explicit plaintext secret intentionally.
-- Git checkout of target release
+- **Compose project name must stay `helix-signal`** so the volume stays `helix-signal_postgres_data`.
+- Git checkout of target release (after push, `git pull origin main` on the server)
+
+### Before first public internet exposure
+
+Do these in `.env` / Control Room (see `SECURITY.md`):
+
+| Setting | Recommendation |
+|---------|----------------|
+| `ai_require_token` | **true** — AI explain/narrative not anonymous |
+| `api_auth_mode` | `key_required` for non-admin API consumers |
+| `HELIX_COOKIE_SECURE` | `1` behind HTTPS |
+| `SETTINGS_ENCRYPTION_KEY` | set (Fernet) |
+| `TRUSTED_PROXY_CIDR` | Docker/proxy network only |
+| Settings export/import | Export masks secrets; import **skips** mask sentinels (will not clobber live keys) |
+
+---
 
 ## Deploy
 
 ```bash
 # ALWAYS use the same project name (server volume: helix-signal_postgres_data)
 export COMPOSE_PROJECT_NAME=helix-signal
+cd /apps/helix-signal   # or your checkout path
 git pull origin main
+# preserve .env — do not rotate POSTGRES_PASSWORD casually
+bash scripts/backup.sh || true
+
+# Full rebuild when FE + BE both changed (v4.3.0-class releases)
+docker compose -p helix-signal build --no-cache backend frontend   # optional but safer after large FE/BE delta
 docker compose -p helix-signal up -d --build --remove-orphans
-# Never: docker compose down -v  (wipes Postgres)
+
+# Never:
+# docker compose down -v   # wipes Postgres named volume
 ```
 
-Verify:
+### Verify boot
 
 ```bash
 docker volume ls | grep postgres   # expect helix-signal_postgres_data
-docker ps --filter name=helix
-curl -sf http://localhost/api/health | python3 -m json.tool
-curl -sfI http://localhost/admin/statics/css/tabler.min.css   # expect 200 (nginx ^~ /admin)
+docker compose -p helix-signal ps  # postgres, redis, backend, frontend healthy
+curl -sf http://127.0.0.1:8000/api/health | python3 -m json.tool
+# expect: status ok, db/redis true, scheduler_running true, version "4.3.0" (or current release)
+curl -sfI http://127.0.0.1:3080/ 2>/dev/null || curl -sfI http://127.0.0.1/
+docker compose -p helix-signal exec -T backend alembic current
+# expect head including v4_016_web_search_snapshots after migrate
+./scripts/smoke-check.sh http://127.0.0.1   # or your public base URL
 ```
 
-Operator CRUD: open `http://localhost/admin` and sign in with the seeded admin user.
+Hard-refresh the browser (Ctrl+Shift+R) after frontend deploys so static JS is not stale.
+
+SQLAdmin (Tier-2): `http://<host>/admin` with seeded admin — for rare table ops, not daily Control Room use.
+
+---
+
+## Post-deploy operator guide (v4.3.0)
+
+Complete these **after** containers are healthy. Order matters for AI and web search.
+
+### 1. Admin login
+
+1. Open the app → **Settings**.
+2. **Admin login** with `HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` from `.env`.
+3. Confirm nav shows authenticated state (not stuck “logged out” with a valid cookie).
+4. Control Room sub-tabs: Overview, AI & Models, Data & Sources, Alerts, Security, Advanced.
+
+See `docs/guides/cross-tab-auth.md` for single-admin session model.
+
+### 2. Security posture (if exposed beyond trusted LAN)
+
+In Control Room → **Security** (or Advanced):
+
+1. Set **`api_auth_mode`** = `key_required` if third parties call intelligence APIs.
+2. Set **`ai_require_token`** = **true** so AI routes need admin session / token.
+3. Confirm `.env`: `HELIX_COOKIE_SECURE=1` (HTTPS), `TRUSTED_PROXY_CIDR` correct.
+4. Create API keys if needed: Control Room Security or `POST /api/v1/api-keys` / SQLAdmin.
+
+### 3. AI mode and provider keys
+
+In Control Room → **AI & Models**:
+
+1. Run **Quick Setup** (2 steps) or set playbook (Off / Lite / Full).
+2. Set **`ai_mode`**: `ai_off` | `ai_lite` | `ai_full` (enum select).
+3. **Rotate secrets** (paste new key only; leave blank/`configured` to keep existing):
+   - `Ollama` — LLM (required for default models)
+   - `OpenRouter` — fallback / stronger models
+4. **Refresh model lists** → pick per-feature models (or type `provider:model_id` manually).
+5. Confirm feature toggles: `feature_ai_explain`, `feature_ai_summary`, `feature_ai_narrative`, `feature_ai_insights`.
+6. Open **Signal** → AI cards: structured `STATUS` + bullets, or deterministic fallback when AI off / failed.
+7. Errors should surface under panels when HTTP fails (not silent forever).
+
+Canonical guide: `docs/guides/ai-configuration.md`.
+
+### 4. Optional web search (AI headline context)
+
+**Opt-in only.** Ollama alone does **not** enable web search.
+
+| Requirement | Detail |
+|-------------|--------|
+| Keys | Control Room secrets: **Tavily** and/or **Exa** |
+| Mode | `ai_mode` is `ai_lite` or `ai_full` |
+| Chain | Tavily → Exa → Ollama `web_search` (3rd fallback only) |
+| Cadence | Cron **06:15 & 18:15 UTC** (`web-search-refresh`) |
+| First fill | After keys are set, **restart backend once** so `web-search-startup-once` can run ~5 minutes later if cache empty/stale |
+| AI path | Cached `WEB_CONTEXT` only — no live search on each AI click |
+| Spend | Successful searches increment `SourceUsage` as `web_search_{provider}` |
+
+Verify later:
+
+```bash
+docker compose -p helix-signal exec -T backend python -c "
+from database import SessionLocal, WebSearchSnapshot
+from services.web_search.job import web_search_feature_enabled
+db=SessionLocal()
+print('feature', web_search_feature_enabled(db))
+print('rows', db.query(WebSearchSnapshot).count())
+db.close()
+"
+```
+
+### 5. On-chain / whale data (optional)
+
+1. Advanced / secrets: **Moralis**, **Alchemy**, **The Graph**, **Flipside** as needed.
+2. Enable **`feature_onchain_signals`** and **`provider_moralis`** (and related providers).
+3. Whale rows persist to `whale_activity_snapshots` (not cache-only).  
+   Note: series field `exchange_inflow_usd_24h` is **gross large-transfer volume** (historical name); alias `large_transfer_volume_usd_24h` may appear in series payloads.
+
+### 6. Market forecasts
+
+- Job **`forecast-refresh`** (cron ~5/11/17/23:20 UTC) + **startup-once ~3 min after boot**.
+- Model id: `helix_linear_trend` (trend extrapolate from `asset_trend_snapshots` — not TimesFM).
+- Market tab overlays use `forecast_points.peg` / `.supply`. Empty charts mean no history yet or job not run — not a permanent wrong overlay.
+- Need core refresh history first (defillama-refresh) so trends exist for extrapolation.
+
+### 7. Data & jobs sanity
+
+| Job / area | Expectation |
+|------------|-------------|
+| Core refresh | ~`refresh_core_seconds` (default 300s) — strip KPIs fill |
+| OSINT | Interval from `refresh_osint_minutes` |
+| Fiat reserves | Daily ~05:00 UTC, best-effort |
+| Insights | Daily deterministic rebuild ~04:30 — **no LLM** on that path |
+| Retention | Nightly prune; web search snapshots default 30 days |
+| Overview | Control Room Overview: scheduler, quality, last prune |
+
+### 8. Tab smoke checklist (UI)
+
+| Tab | Check |
+|-----|--------|
+| **Signal** | Hero score, strip, token cards switch asset **and** DEWS/AI follow same asset, AI cards, fundamentals |
+| **Market** | Supply KPIs without visiting Signal first; forecast charts or honest empty state; contagion/rotation |
+| **Intel** | OSINT, SMIDGE, on-chain cards when configured |
+| **Forensics** | Blacklist stats; Cmd+K / investigate address works |
+| **Alerts** | Active/filtered vs recent event stream labels make sense |
+| **System** | Sources + quality; Admin ops if needed |
+| **Settings** | Secrets rotate, enums for `ai_mode` / `api_auth_mode`, Advanced float keys (e.g. anomaly floor) |
+
+### 9. Settings import / export
+
+- **Export** includes secrets only as `"configured"`.
+- **Import** **skips** secret keys when value is a mask sentinel — will not wipe live API keys.
+- To change a key: Control Room **Rotate** with a real new value, or import an intentional plaintext secret.
+- Import toast shows imported / skipped / errors.
+
+### 10. Optional: force one-shot jobs after deploy
+
+If you need cache/forecast sooner than cron:
+
+```bash
+# Web search (only if feature on — Tavily/Exa + ai_mode)
+docker compose -p helix-signal exec -T backend python -c "
+from database import SessionLocal
+from services.web_search.job import run_web_search_job
+db=SessionLocal(); print(run_web_search_job(db)); db.close()
+"
+
+# Forecasts
+docker compose -p helix-signal exec -T backend python -c "
+from database import SessionLocal
+from services.forecast_writer import run_forecast_job
+db=SessionLocal(); print(run_forecast_job(db)); db.close()
+"
+```
 
 ---
 

@@ -8,23 +8,32 @@ from typing import Dict, Any
 
 from sqlalchemy.orm import Session
 
-from providers.settings import get_all_settings, set_setting
+from providers.settings import (
+    get_all_settings,
+    is_secret_skip_value,
+    set_setting,
+    setting_is_secret,
+)
 
 
 def export_settings(db: Session) -> Dict[str, Any]:
-    """Export all settings as a dictionary."""
+    """Export all settings as a dictionary.
+
+    Secret values are already masked by get_all_settings (``configured`` / null).
+    Re-importing that payload must not overwrite real secrets (see import_settings).
+    """
     settings = get_all_settings(db)
-    
+
     # Create a dictionary with setting keys and values
     exported_settings = {s["key"]: s["value"] for s in settings}
-    
+
     # Add metadata
     export_data = {
         "settings": exported_settings,
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "version": "1.0",
     }
-    
+
     return export_data
 
 
@@ -36,31 +45,40 @@ def import_settings(
     user_agent: str = None,
 ) -> Dict[str, Any]:
     """Import settings from a dictionary.
-    
+
     Returns a dictionary with import results:
     {
         "imported": int,  # Number of settings imported
         "skipped": int,   # Number of settings skipped
         "errors": list,   # List of errors encountered
     }
+
+    Secret keys with masked/sentinel values (e.g. export's ``configured``) are
+    skipped so a round-trip export→import cannot clobber live API keys.
     """
     results = {
         "imported": 0,
         "skipped": 0,
         "errors": [],
     }
-    
+
     # Validate the import data
     if "settings" not in settings_data:
         results["errors"].append("Invalid export format: missing 'settings' key")
         return results
-    
+
     settings_to_import = settings_data["settings"]
-    
+    if not isinstance(settings_to_import, dict):
+        results["errors"].append("Invalid export format: 'settings' must be an object")
+        return results
+
     # Import each setting in a single transaction
     try:
         for key, value in settings_to_import.items():
             try:
+                if setting_is_secret(str(key)) and is_secret_skip_value(value):
+                    results["skipped"] += 1
+                    continue
                 set_setting(key, value, db, user, ip_address, user_agent, flush=True)
                 results["imported"] += 1
             except ValueError as e:
@@ -72,7 +90,7 @@ def import_settings(
     except Exception:
         db.rollback()
         raise
-    
+
     return results
 
 

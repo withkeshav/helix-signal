@@ -193,6 +193,31 @@ def mask_secret(value: str) -> str | None:
     return "configured" if value else None
 
 
+_MASKED_SENTINELS = frozenset({"", "configured", "********", "****", "[redacted]", "[REDACTED]"})
+
+
+def is_secret_skip_value(value: Any) -> bool:
+    """True when a submitted secret must NOT overwrite the stored value.
+
+    Used by REST import, PUT /settings, and SQLAdmin so masked export
+    round-trips never encrypt the sentinel string ``configured`` as a key.
+    """
+    if value is None:
+        return True
+    text = str(value).strip()
+    if text.lower() in {s.lower() for s in _MASKED_SENTINELS}:
+        return True
+    # Common mask patterns: last-4 reveal style "••••abcd" / "****abcd"
+    if text.startswith(("•", "*")) and len(text) <= 12:
+        return True
+    return False
+
+
+def setting_is_secret(key: str) -> bool:
+    meta = _DEFAULT_SETTINGS.get(key) or {}
+    return meta.get("type") == "secret"
+
+
 def get_all_settings(db: Session) -> list[dict[str, Any]]:
     rows = {r.key: r.value for r in db.execute(select(Setting)).scalars().all()}
     out: list[dict[str, Any]] = []

@@ -2,6 +2,12 @@
 
 ## Unreleased (post-4.2.0 verification + product re-arch pass)
 
+### Security (settings secrets)
+- **Import footgun fixed:** REST settings import skips secret keys when the value is a mask sentinel (`configured`, blank, `********`, etc.) so export→import cannot overwrite live API keys.
+- **PUT `/api/settings`:** secret keys never echo plaintext; response value is always `configured`; sentinel PUTs do not overwrite.
+- Shared `is_secret_skip_value` / `setting_is_secret` in `providers.settings` (SQLAdmin uses the same helpers).
+- Docs: `SECURITY.md` rewritten for session auth + Fernet secrets; `ai-configuration` model paths; internet-facing `ai_require_token` guidance.
+
 ### AI mode (optimized)
 - **Structured prompts** — `STATUS:` + `- ` bullets sized for Insight card; richer DATA (peg, DEWS, anomalies).
 - **Homepage Insight** — parses structured AI into status bar + bullet list; shows provider/model/cached.

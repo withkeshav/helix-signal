@@ -151,15 +151,19 @@ With JSON logging, every exception should be logged with `exc_info=True` so the 
 
 ## Model Discovery
 
-The model-discovery API lists known providers and, when an API key is present, fetches available models from OpenRouter:
+Control Room model pickers call (admin session / token required where configured):
 
 ```bash
-GET /api/admin/ai/providers
-GET /api/admin/ai/providers/openrouter/models
-GET /api/admin/ai/providers/ollama_cloud/models
+GET /api/ai/providers/{provider_id}/models
+# e.g. GET /api/ai/providers/openrouter/models
+#      GET /api/ai/providers/ollama_cloud/models
 ```
 
-The Ollama Cloud provider returns a static list; OpenRouter queries the OpenRouter API.
+When API keys are present, both OpenRouter and Ollama Cloud list models from their APIs (not a hard-coded static list only).
+
+### AI route auth (internet-facing)
+
+By default `ai_require_token` is **false** so trusted LAN installs can call AI explain/narrative without an admin header. For any host reachable from the public internet, set **`ai_require_token=true`** in Control Room (AI & Intelligence) so those routes require admin session or `X-Admin-Token`. Also consider `api_auth_mode=key_required` (see `docs/DEPLOYMENT.md` and `SECURITY.md`).
 
 ## Homepage Insight display
 

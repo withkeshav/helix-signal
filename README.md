@@ -260,7 +260,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 
 ## E2E tests (Playwright)
 
-The frontend ships a 28-test Playwright suite covering all 8 dashboard tabs. Tests run against the Docker frontend on port **3080** (override via `FRONTEND_PORT`).
+The frontend ships a Playwright suite under `frontend/e2e/` (**15** spec files, **~41** tests) covering the main dashboard tabs and Control Room flows. Tests run against the Docker frontend on port **3080** (override via `FRONTEND_PORT`).
 
 ```bash
 cd /path/to/helix-signal

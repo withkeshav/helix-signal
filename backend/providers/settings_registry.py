@@ -906,7 +906,10 @@ _DEFAULT_SETTINGS: Dict[str, Dict[str, Any]] = {
         "type": "bool",
         "default": False,
         "group": "AI & Intelligence",
-        "description": "Require X-Admin-Token header for AI features",
+        "description": (
+            "When true, AI explain/narrative routes require admin session or X-Admin-Token. "
+            "Default false for trusted LAN/OSS. Enable for any internet-facing deploy to limit cost abuse."
+        ),
         "requires_restart": False,
         "affects_rate_limits": False,
     },

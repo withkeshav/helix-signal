@@ -12,6 +12,8 @@
 - **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend.
 - **Auth:** single seeded admin (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD`). Sign in at Settings → Admin login. See `docs/guides/cross-tab-auth.md`.
 - For production intelligence API: set `API_AUTH_MODE=key_required` (or Settings `api_auth_mode`) and create keys via `POST /api/v1/api-keys` / SQLAdmin.
+- **Internet-facing:** enable Settings `ai_require_token=true` so AI explain/narrative routes are not anonymous cost sinks; set `HELIX_COOKIE_SECURE=1` behind HTTPS. See `SECURITY.md`.
+- **Settings export/import:** export masks secrets as `configured`. Import skips those sentinels so it will not clobber live keys. To rotate a key, set a real new value in Control Room or import an explicit plaintext secret intentionally.
 - Git checkout of target release
 
 ## Deploy

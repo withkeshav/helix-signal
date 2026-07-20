@@ -16,31 +16,21 @@ from starlette.requests import Request
 from wtforms import ValidationError
 
 from database import ApiKey, Playbook, SettingsAuditLog, SessionLocal, User, engine
-from providers.settings import Setting, mask_secret, set_setting
+from providers.settings import (
+    Setting,
+    is_secret_skip_value,
+    mask_secret,
+    set_setting,
+    setting_is_secret,
+)
 from providers.settings_registry import _DEFAULT_SETTINGS
 from services.user_service import authenticate_user, get_password_hash
 
 log = logging.getLogger(__name__)
 
-_MASKED_SENTINELS = frozenset({"", "configured", "********", "****", "[redacted]", "[REDACTED]"})
-
-
-def is_secret_skip_value(value: Any) -> bool:
-    """True when a submitted secret should NOT overwrite the stored value."""
-    if value is None:
-        return True
-    text = str(value).strip()
-    if text.lower() in {s.lower() for s in _MASKED_SENTINELS}:
-        return True
-    # Common mask patterns: last-4 reveal style "••••abcd" / "****abcd"
-    if text.startswith(("•", "*")) and len(text) <= 12:
-        return True
-    return False
-
 
 def _setting_is_secret(key: str) -> bool:
-    meta = _DEFAULT_SETTINGS.get(key) or {}
-    return meta.get("type") == "secret"
+    return setting_is_secret(key)
 
 
 def _format_setting_value(model: Setting, _attr: Any) -> str:

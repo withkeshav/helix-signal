@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from core.admin_auth import require_admin_token
 from core.limiter import limiter
 from database import get_db
-from providers.settings import get_all_settings, set_setting
+from providers.settings import (
+    get_all_settings,
+    is_secret_skip_value,
+    set_setting,
+    setting_is_secret,
+)
 from services.retention import get_last_prune_result
 
 router = APIRouter()
@@ -127,6 +132,13 @@ def api_update_setting(
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     try:
+        # Never persist masked export sentinels as secret values; never echo secrets.
+        if setting_is_secret(body.key):
+            if is_secret_skip_value(body.value):
+                return {"ok": True, "key": body.key, "value": "configured", "skipped": True}
+            set_setting(body.key, body.value, db, user, ip_address, user_agent)
+            _validate_webhook_settings(db)
+            return {"ok": True, "key": body.key, "value": "configured"}
         set_setting(body.key, body.value, db, user, ip_address, user_agent)
         _validate_webhook_settings(db)
         return {"ok": True, "key": body.key, "value": body.value}

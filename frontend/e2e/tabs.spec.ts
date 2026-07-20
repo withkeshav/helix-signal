@@ -39,6 +39,8 @@ test.describe('Tab navigation', () => {
     await waitForAlpine(page);
     await page.getByRole('tab', { name: /settings/i }).click();
     await expect(page.locator('#tab-settings')).toBeVisible();
-    await expect(page.getByText('Admin Login')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Admin login/i })).toBeVisible();
+    await expect(page.getByPlaceholder('Username')).toBeVisible();
+    await expect(page.getByPlaceholder('Password')).toBeVisible();
   });
 });

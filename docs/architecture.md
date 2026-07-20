@@ -87,18 +87,17 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 
 ### Frontend (`frontend/`)
 
-- `index.html` — dashboard shell, Alpine.js bindings, CDN ECharts
-- `js/init.js` — Alpine component (`helixApp`), chart wiring, tab loaders
-- `js/stores/` — Alpine stores: `dashboard.js` (shared data), `ui.js` (tab/admin/theme)
-- `js/composables/` — Alpine components (per-tab x-data): `useMarket.js`, `useOSINT.js`, `useSMIDGE.js`, `useForecast.js`, `useGovernance.js`
-- `js/charts.js` — ECharts rendering (extracted from init.js)
-- `js/utils.js` — Shared utility functions (formatUsd, formatWhen, etc.)
-- `styles.css` — Design system: tokens, glass, elevation, skeleton, icon utilities
-- 7-tab layout: Signal | Market | Analytics | Intel | Forensics | Alerts | System | Settings (operator shell; full CRUD at `/admin` SQLAdmin)
-- Frontend a11y: `@media (prefers-reduced-motion: reduce)`, `:focus-visible` outlines, `aria-label` on icon-only buttons, `role="dialog"` + `aria-modal` on all modals, global toast/modal composables in `stores/ui.js`
-- nginx in Docker: same-origin `/api` proxy; `location ^~ /admin` → backend SQLAdmin; `return 404` for public `/metrics`
-- Frontend container binds to host port 80 (mapped from container port 80)
-- Content-Security-Policy uses SHA-256 hashes to allow specific inline scripts (like importmap) without using 'unsafe-inline'
+- `index.html` — dashboard shell, Alpine.js bindings, CDN ECharts + **Tabler CSS** layout base
+- `js/init.js` — Alpine root (`helixApp`), Cmd+K, refresh loop; tab/asset synced with `$store.ui` / `$store.dashboard`
+- `js/stores/` — **source of truth**: `dashboard.js` (shared risk data), `ui.js` (tab/auth/theme/refreshTick)
+- `js/composables/` — per-tab panels: Signal `market`, Market supply/forecast, Intel, Forensics, Alerts, System, Settings Control Room
+- `js/charts.js` — ECharts + `helixTheme()`; sparklines for global strip
+- `js/utils.js` — formatUsd, formatWhen, etc.
+- `styles.css` — Helix tokens override Tabler; glass, skeleton, Control Room, hero
+- **IA:** Signal is answer-first home (risk + **fundamentals** yield/collateral/reserve); Market = forecasts/supply; Intel = OSINT; Forensics = investigate; Settings = single-admin Control Room
+- **Data plane:** Moralis refresh persists `whale_activity_snapshots`; fiat reserve daily scrape is best-effort; Market tab bootstraps dashboard store without visiting Signal
+- nginx: same-origin `/api`; `^~ /admin` → SQLAdmin; CSP allows `cdn.jsdelivr.net` for ECharts/Alpine/Tabler
+- Compose project name **`helix-signal`** → volume `helix-signal_postgres_data` (never `down -v` on upgrade)
 
 ## Local development
 
@@ -122,14 +121,16 @@ Post-deploy validation:
 
 - **Backend:** pytest suite (`cd backend && python -m pytest`) — ~485 cases as of v4.1.0
 
-## Data assets (v4.1.0+)
+## Data assets (v4.1.0+ / post-4.2.0)
 
 - **`data_quality_snapshots`** — daily persisted quality metrics; `GET /api/data-quality/summary` serves the latest row.
-- **`insight_assets`** — versioned deterministic insight objects per `kind` + `asset_scope`; `GET /api/insights/{kind}` always returns `deterministic_payload`; optional `ai_narrative` when AI on.
+- **`insight_assets`** — versioned deterministic insight objects; GET path is deterministic-only (no LLM on request).
+- **`whale_activity_snapshots`** — written when Moralis is configured during on-chain refresh (not cache-only).
+- **`fiat_reserve_snapshots`** — optional daily scrape job (`fiat-reserve-scrape`); failures isolated.
 
 ## Settings Control Room (v4.1.0+)
 
-Tier 1: Settings tab with 6 sub-tabs (~25 high-touch keys). Tier 2: SQLAdmin at `/admin` for full registry CRUD.
+Tier 0: optional first-run wizard. Tier 1: Settings Control Room (6 sub-tabs, ~25 high-touch keys + secret rotate). Tier 2: SQLAdmin at `/admin` for full registry / rare table ops. Auth is single-admin (seeded user), not multi-user self-service.
 
 ## OLAP / DuckDB (v4.0.7+)
 

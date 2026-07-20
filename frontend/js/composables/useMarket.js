@@ -1,4 +1,4 @@
-import { gaugeArc, gaugeColor, formatUsd, formatWhen, formatAiAge, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta } from '../utils.js';
+import { gaugeArc, gaugeColor, formatUsd, formatWhen, formatAiAge, pegLabel, formatFreshnessLabel, freshnessBandClass, formatDisplayName, depegVelocityMeta, parseAiStructured } from '../utils.js';
 import { useEventLabels } from './useEventLabels.js';
 import { renderCharts, destroyCharts, _makeBar, loadTrendChart, renderSupplyChart, renderHeroPegChart, _setupResizeHandler, _disposeAllCharts, _disposeChart, renderRiskTerminalChart, renderContagionGraph, resizeAllHelixCharts } from '../charts.js';
 
@@ -39,6 +39,10 @@ export function useMarket() {
     aiSummary: '',
     aiNarrative: '',
     aiInsights: '',
+    /** { provider, model } meta for active AI panels */
+    aiOverviewMeta: null,
+    aiNarrativeMeta: null,
+    aiInsightsMeta: null,
     predictive: {},
     dews: {},
     stressLeaderboard: [],
@@ -53,6 +57,8 @@ export function useMarket() {
     aiNarrativeExpiresAt: '',
     aiInsightsGeneratedAt: '',
     aiInsightsExpiresAt: '',
+
+    parseAiStructured,
     
     // Computed properties
     get gaugeArc() { return gaugeArc(this.signal.score); },
@@ -129,23 +135,6 @@ export function useMarket() {
         this.timeRange = range;
         this.loadChartRange();
       }
-    },
-    
-    downloadDiagnostics() {
-      const snapshot = {
-        timestamp: new Date().toISOString(),
-        asset: this.asset,
-        signal: this.signal,
-        depeg: this.depeg,
-        dews: this.dews,
-      };
-      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `helix-diagnostics-${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
     },
     
     loadChartRange() {
@@ -236,7 +225,7 @@ export function useMarket() {
       });
       
       // Reload AI panels when admin session changes
-      this.$watch('$store.ui.adminToken', () => this._reloadAiPanels());
+      this.$watch('$store.ui.isAuthenticated', () => this._reloadAiPanels());
 
       // Reload AI panels when settings change (cross-tab)
       this._settingsChangedHandler = () => this._reloadAiPanels();
@@ -445,18 +434,23 @@ export function useMarket() {
           const j = await r.json();
           if (j.available) {
             this.marketOverview = j.summary || '';
+            this.aiOverviewMeta = { provider: j.provider, model: j.model, cached: j.cached };
+            this.aiOverviewError = '';
           } else {
             this.marketOverview = '';
-            this.aiOverviewError = j.reason || 'AI overview disabled — enable feature_ai_summary in Settings.';
+            this.aiOverviewMeta = null;
+            this.aiOverviewError = '';
           }
           this.marketOverviewGeneratedAt = j.generated_at || '';
           this.marketOverviewExpiresAt = j.expires_at || '';
           return { summary: this.marketOverview, generatedAt: this.marketOverviewGeneratedAt, expiresAt: this.marketOverviewExpiresAt };
         }
         this.marketOverview = '';
+        this.aiOverviewMeta = null;
         this.aiOverviewError = this._formatAiFetchError(r, 'market overview');
       } catch (e) {
         this.marketOverview = '';
+        this.aiOverviewMeta = null;
         this.aiOverviewError = `Network error: ${e.message}`;
       }
       return { summary: '', generatedAt: '', expiresAt: '' };
@@ -484,18 +478,23 @@ export function useMarket() {
           const j = await r.json();
           if (j.available) {
             this.aiNarrative = j.summary || '';
+            this.aiNarrativeMeta = { provider: j.provider, model: j.model, cached: j.cached };
+            this.aiNarrativeError = '';
           } else {
             this.aiNarrative = '';
-            this.aiNarrativeError = j.reason || 'Narrative disabled — enable feature_ai_narrative in Settings.';
+            this.aiNarrativeMeta = null;
+            this.aiNarrativeError = '';
           }
           this.aiNarrativeGeneratedAt = j.generated_at || '';
           this.aiNarrativeExpiresAt = j.expires_at || '';
           return { summary: this.aiNarrative, generatedAt: this.aiNarrativeGeneratedAt, expiresAt: this.aiNarrativeExpiresAt };
         }
         this.aiNarrative = '';
+        this.aiNarrativeMeta = null;
         this.aiNarrativeError = this._formatAiFetchError(r, 'narrative');
       } catch (e) {
         this.aiNarrative = '';
+        this.aiNarrativeMeta = null;
         this.aiNarrativeError = `Network error: ${e.message}`;
       }
       return { summary: '', generatedAt: '', expiresAt: '' };
@@ -509,18 +508,23 @@ export function useMarket() {
           const j = await r.json();
           if (j.available) {
             this.aiInsights = j.summary || '';
+            this.aiInsightsMeta = { provider: j.provider, model: j.model, cached: j.cached };
+            this.aiInsightsError = '';
           } else {
             this.aiInsights = '';
-            this.aiInsightsError = j.reason || 'Insights disabled — enable feature_ai_insights in Settings.';
+            this.aiInsightsMeta = null;
+            this.aiInsightsError = '';
           }
           this.aiInsightsGeneratedAt = j.generated_at || '';
           this.aiInsightsExpiresAt = j.expires_at || '';
           return { summary: this.aiInsights, generatedAt: this.aiInsightsGeneratedAt, expiresAt: this.aiInsightsExpiresAt };
         }
         this.aiInsights = '';
+        this.aiInsightsMeta = null;
         this.aiInsightsError = this._formatAiFetchError(r, 'insights');
       } catch (e) {
         this.aiInsights = '';
+        this.aiInsightsMeta = null;
         this.aiInsightsError = `Network error: ${e.message}`;
       }
       return { summary: '', generatedAt: '', expiresAt: '' };

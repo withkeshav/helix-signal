@@ -21,3 +21,4 @@ defusedxml>=0.7.1
 sqladmin==0.29.0
 itsdangerous>=2.1.0
 cryptography>=43.0.0
+redis>=5.0.0

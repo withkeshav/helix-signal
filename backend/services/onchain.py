@@ -1,4 +1,8 @@
-"""On-chain signal aggregation — whale flow, holder concentration, mint/burn (transform.md §4.2 #4/#6/#11, §9.5)."""
+"""On-chain signal aggregation — whale flow, holder concentration, mint/burn.
+
+Moralis holder/transfer results are cached in-memory AND persisted to
+`whale_activity_snapshots` so DEWS/history/series APIs have durable data.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +10,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
+from structlog import get_logger
 
+from database import WhaleActivitySnapshot
 from providers.settings import get_setting, get_secret
 from sources.flipside import FlipsideSource
 from sources.moralis import MoralisSource
 from sources.thegraph import TheGraphSource
+
+log = get_logger(__name__)
 
 _CACHE: dict[str, dict[str, Any]] = {}
 _LAST_REFRESH: datetime | None = None
@@ -60,12 +68,49 @@ def refresh_onchain_signals(db: Session, symbols: list[str] | None = None) -> No
         if moralis.configured(db):
             entry["holders"] = moralis.fetch_holder_concentration(sym, db=db)
             entry["transfers"] = moralis.fetch_large_transfers(sym, db=db)
+            _persist_whale_activity(db, sym, entry.get("holders") or {}, entry.get("transfers") or {})
         if flipside.configured(db):
             entry["flipside_flow"] = flipside.fetch_holder_flow(sym, db=db)
         _CACHE[sym] = entry
 
+    try:
+        db.commit()
+    except Exception:
+        log.exception("onchain.whale_persist_commit_failed")
+        db.rollback()
+
     global _LAST_REFRESH
     _LAST_REFRESH = datetime.now(timezone.utc)
+
+
+def _persist_whale_activity(
+    db: Session,
+    symbol: str,
+    holders: dict[str, Any],
+    transfers: dict[str, Any],
+) -> None:
+    """Write one whale_activity_snapshots row when Moralis returns usable data."""
+    if not holders.get("available") and not transfers.get("available"):
+        return
+    large = transfers.get("large_transfers") or []
+    try:
+        db.add(
+            WhaleActivitySnapshot(
+                asset_symbol=symbol.upper(),
+                chain="ethereum",
+                top10_holder_pct=float(holders["top10_share_pct"])
+                if holders.get("top10_share_pct") is not None
+                else None,
+                top10_holder_pct_delta_24h=None,
+                large_transfer_count_24h=len(large) if transfers.get("available") else None,
+                exchange_inflow_usd_24h=float(transfers.get("whale_net_outflow_usd") or 0)
+                if transfers.get("available")
+                else None,
+                timestamp=datetime.now(timezone.utc),
+            )
+        )
+    except Exception:
+        log.exception("onchain.whale_persist_failed", asset=symbol)
 
 
 def get_whale_flow(asset: str, db: Session | None = None) -> dict[str, Any]:

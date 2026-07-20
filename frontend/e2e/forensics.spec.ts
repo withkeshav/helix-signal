@@ -21,7 +21,9 @@ test.describe('Forensics tab', () => {
   });
 
   test('loads events section', async ({ page }) => {
-    await expect(page.locator('#tab-forensics').getByRole('heading', { name: 'Events', exact: true })).toBeVisible();
+    await expect(
+      page.locator('#tab-forensics').getByRole('heading', { name: /Blacklist Events/i }),
+    ).toBeVisible();
   });
 
   test('loads investigate address form', async ({ page }) => {

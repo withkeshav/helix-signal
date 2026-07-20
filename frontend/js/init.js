@@ -181,6 +181,7 @@ Alpine.data('helixApp', () => ({
     })();
     this.theme = storedTheme || root.getAttribute('data-theme') || 'dark';
     root.setAttribute('data-theme', this.theme);
+    document.body?.setAttribute('data-bs-theme', this.theme === 'light' ? 'light' : 'dark');
     this.$store.ui.setTheme(this.theme);
 
     // Cmd+K command palette
@@ -337,6 +338,7 @@ Alpine.data('helixApp', () => ({
     const root = document.documentElement;
     this.theme = this.theme === 'light' ? 'dark' : 'light';
     root.setAttribute('data-theme', this.theme);
+    document.body?.setAttribute('data-bs-theme', this.theme === 'light' ? 'light' : 'dark');
     try { localStorage.setItem('helix_theme', this.theme); } catch {}
     this.$store.ui.setTheme(this.theme);
   },
@@ -349,15 +351,18 @@ Alpine.data('helixApp', () => ({
     if (this.enabledAssets.includes(symbol)) {
       this.asset = symbol;
       this.$store.dashboard.asset = symbol;
+      window.dispatchEvent(new CustomEvent('asset-changed', { detail: { asset: symbol } }));
     }
   },
 
   switchAsset() {
     this.$store.dashboard.asset = this.asset;
+    window.dispatchEvent(new CustomEvent('asset-changed', { detail: { asset: this.asset } }));
   },
 
   loadTab() {
     this.$store.ui.tab = this.tab;
+    location.hash = this.tab;
   },
 
   downloadDiagnostics() {

@@ -1,3 +1,14 @@
+/**
+ * UI store — theme, tabs, toasts, and single-operator admin session.
+ *
+ * Auth model (single admin, not multi-user product):
+ * - One admin row is seeded via HELIX_ADMIN_USERNAME/PASSWORD (seed_admin / deploy).
+ * - POST /api/auth/login → HMAC session token in JSON + httpOnly helix_session cookie.
+ * - Browser keeps a mirror in localStorage (X-Admin-Token) for non-cookie clients.
+ * - isAuthenticated is the UI gate; restoreSession() re-hydrates from cookie and/or token.
+ * - Multi-user CRUD exists only behind feature_multi_user (off by default) — not the product path.
+ */
+
 const ADMIN_TOKEN_KEY = 'helix_admin_token';
 
 function _loadStoredAdminToken() {
@@ -36,7 +47,11 @@ export function registerUiStore(Alpine) {
     fetchInFlight: 0,
     searchQuery: '',
     searchResults: [],
+    /** Mirror of session token for X-Admin-Token header (same value as helix_session cookie body). */
     adminToken: _loadStoredAdminToken(),
+    /** True when operator session is valid (cookie and/or token). Prefer this over raw adminToken for UI. */
+    isAuthenticated: !!_loadStoredAdminToken(),
+    adminUsername: '',
     loginUsername: '',
     loginPassword: '',
     authError: '',
@@ -95,6 +110,29 @@ export function registerUiStore(Alpine) {
     setTab(t) {
       this.tab = t;
       location.hash = t;
+      // Keep root helixApp.tab in sync when Alpine is mounted (prevents nav desync)
+      try {
+        const root = document.documentElement;
+        const app = root?._x_dataStack?.[0];
+        if (app && app.tab !== undefined) app.tab = t;
+      } catch {
+        /* ignore */
+      }
+    },
+
+    _setAuthenticated(ok, { token, username } = {}) {
+      this.isAuthenticated = !!ok;
+      if (username != null) this.adminUsername = username || '';
+      if (token != null) {
+        this.adminToken = token || '';
+        _persistAdminToken(this.adminToken);
+      }
+      if (!ok) {
+        this.adminToken = '';
+        this.adminUsername = '';
+        _persistAdminToken('');
+      }
+      _dispatchAuthChanged(!!ok);
     },
 
     adminHeaders() {
@@ -104,16 +142,14 @@ export function registerUiStore(Alpine) {
     async adminFetch(url, opts = {}) {
       const token = this.adminToken;
       const headers = { ...(opts.headers || {}), ...this.adminHeaders() };
-      const sentToken = !!token;  // capture at request time, not response time
+      const sentToken = !!token;
+      const wasAuthed = this.isAuthenticated;
       const response = await fetch(url, { ...opts, headers, credentials: 'include' });
-      // Only clear the token if this request included it (token was invalid/expired).
-      // Don't clear on 401 from requests that had no token (e.g. pre-login composable fetches
-      // whose 401 response arrives after login sets the token — race condition).
-      if ((response.status === 401 || response.status === 403) && sentToken) {
-        this.adminToken = '';
-        _persistAdminToken('');
+      // Clear session only when we believed we were authed and server rejected us.
+      // Cookie-only sessions may omit X-Admin-Token; still clear on 401/403 if isAuthenticated.
+      if ((response.status === 401 || response.status === 403) && (sentToken || wasAuthed)) {
+        this._setAuthenticated(false);
         this.authError = 'Session expired — sign in via Settings';
-        _dispatchAuthChanged(false);
         this.showToast(this.authError, 'warning', 6000);
       }
       return response;
@@ -124,7 +160,9 @@ export function registerUiStore(Alpine) {
       const next = e.newValue || '';
       if (next === this.adminToken) return;
       this.adminToken = next;
+      this.isAuthenticated = !!next;
       this.authError = '';
+      if (!next) this.adminUsername = '';
       _dispatchAuthChanged(!!next);
     },
 
@@ -134,13 +172,27 @@ export function registerUiStore(Alpine) {
 
     async restoreSession() {
       try {
-        const r = await fetch('/api/auth/me', { credentials: 'include', headers: this.adminHeaders(), cache: 'no-store' });
+        const r = await fetch('/api/auth/me', {
+          credentials: 'include',
+          headers: this.adminHeaders(),
+          cache: 'no-store',
+        });
         if (r.ok) {
+          const data = await r.json().catch(() => ({}));
           this.authError = '';
+          // Keep existing token mirror if present; cookie may be enough for API.
+          this.isAuthenticated = true;
+          this.adminUsername = data.username || this.adminUsername || '';
           _dispatchAuthChanged(true);
           return true;
         }
-      } catch {}
+        // Invalid stale mirror — clear
+        if (this.adminToken) {
+          this._setAuthenticated(false);
+        }
+      } catch {
+        /* network — leave local mirror; next adminFetch will revalidate */
+      }
       return false;
     },
 
@@ -150,8 +202,14 @@ export function registerUiStore(Alpine) {
       let password = this.loginPassword;
       if (!username || !password) {
         const root = document.getElementById('tab-settings');
-        username = username || root?.querySelector('input[placeholder="Username"]')?.value || '';
-        password = password || root?.querySelector('input[placeholder="Password"]')?.value || '';
+        username = username || root?.querySelector('input[placeholder="Username"]')?.value
+          || root?.querySelector('input[autocomplete="username"]')?.value || '';
+        password = password || root?.querySelector('input[placeholder="Password"]')?.value
+          || root?.querySelector('input[autocomplete="current-password"]')?.value || '';
+      }
+      if (!username || !password) {
+        this.authError = 'Enter username and password';
+        return false;
       }
       const body = new URLSearchParams({ username, password });
       try {
@@ -162,15 +220,18 @@ export function registerUiStore(Alpine) {
           credentials: 'include',
         });
         if (!r.ok) {
-          this.authError = 'Invalid credentials';
+          this.authError = r.status === 503
+            ? 'Server auth not configured (SESSION_SIGNING_KEY)'
+            : 'Invalid credentials';
           return false;
         }
         const data = await r.json();
-        this.adminToken = data.access_token || '';
-        _persistAdminToken(this.adminToken);
         this.loginPassword = '';
         this.authError = '';
-        _dispatchAuthChanged(true);
+        this._setAuthenticated(true, {
+          token: data.access_token || '',
+          username: data.username || username,
+        });
         return true;
       } catch {
         this.authError = 'Login failed — check network';
@@ -185,13 +246,13 @@ export function registerUiStore(Alpine) {
           credentials: 'include',
           headers: this.adminHeaders(),
         });
-      } catch {}
-      this.adminToken = '';
+      } catch {
+        /* still clear local state */
+      }
       this.loginUsername = '';
       this.loginPassword = '';
       this.authError = '';
-      _persistAdminToken('');
-      _dispatchAuthChanged(false);
+      this._setAuthenticated(false);
     },
   });
 }

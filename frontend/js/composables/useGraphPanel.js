@@ -1,17 +1,36 @@
 import { formatUsd, formatWhen } from '../utils.js';
 
-const LABEL_COLORS = [
-  '#3b82f6', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#2dd4bf',
-];
+/** Theme-aware colors so Forensics tracks light/dark (Tabler shell + Helix tokens). */
+function _css(name, fallback) {
+  try {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-const CATEGORIES = [
-  { name: 'Seed', itemStyle: { color: '#3b82f6', borderColor: '#1d4ed8', borderWidth: 3 } },
-  { name: 'Peel Hop', itemStyle: { color: '#34d399', borderColor: '#059669', borderWidth: 2 } },
-  { name: 'Cluster', itemStyle: { color: '#fbbf24', borderColor: '#d97706', borderWidth: 1 } },
-  { name: 'Bridge', itemStyle: { color: '#a78bfa', borderColor: '#7c3aed', borderWidth: 1 } },
-  { name: 'Blacklist', itemStyle: { color: '#f87171', borderColor: '#dc2626', borderWidth: 2 } },
-  { name: 'OSINT', itemStyle: { color: '#2dd4bf', borderColor: '#0d9488', borderWidth: 1 } },
-];
+function _palette() {
+  return [
+    _css('--cat-1', '#3b82f6'),
+    _css('--cat-2', '#34d399'),
+    _css('--cat-3', '#fbbf24'),
+    _css('--cat-4', '#f87171'),
+    _css('--cat-5', '#a78bfa'),
+    _css('--up', '#2dd4bf'),
+  ];
+}
+
+function _categories() {
+  const p = _palette();
+  return [
+    { name: 'Seed', itemStyle: { color: p[0], borderColor: p[0], borderWidth: 3 } },
+    { name: 'Peel Hop', itemStyle: { color: p[1], borderColor: p[1], borderWidth: 2 } },
+    { name: 'Cluster', itemStyle: { color: p[2], borderColor: p[2], borderWidth: 1 } },
+    { name: 'Bridge', itemStyle: { color: p[4], borderColor: p[4], borderWidth: 1 } },
+    { name: 'Blacklist', itemStyle: { color: p[3], borderColor: p[3], borderWidth: 2 } },
+    { name: 'OSINT', itemStyle: { color: p[5], borderColor: p[5], borderWidth: 1 } },
+  ];
+}
 
 function _shortAddr(addr) {
   if (!addr || addr.length < 10) return addr || '?';
@@ -19,6 +38,7 @@ function _shortAddr(addr) {
 }
 
 function _buildGraphData(report) {
+  const CATEGORIES = _categories();
   if (!report) return { nodes: [], edges: [], categories: CATEGORIES };
 
   const nodes = [];
@@ -183,11 +203,13 @@ export function renderInvestigationGraph(report, containerId = 'graph-investigat
       subtext: `${report.asset_symbol || ''} · ${report.chain || ''} · risk: ${report.risk_level || '?'}`,
       left: 'center',
       top: 4,
-      textStyle: { color: '#e8edf7', fontSize: 14, fontWeight: 600 },
-      subtextStyle: { color: '#9aa8c4', fontSize: 11 },
+      textStyle: { color: _css('--text', '#e8edf7'), fontSize: 14, fontWeight: 600 },
+      subtextStyle: { color: _css('--muted', '#9aa8c4'), fontSize: 11 },
     },
     tooltip: {
       trigger: 'item',
+      backgroundColor: _css('--panel', '#121826'),
+      borderColor: _css('--line', '#273247'),
       formatter: (p) => {
         if (p.dataType === 'node') return _nodeTooltipHtml(p.data, report);
         if (p.dataType === 'edge') return `Value: ${p.data.value ? formatUsd(p.data.value) : '?'}`;
@@ -195,9 +217,9 @@ export function renderInvestigationGraph(report, containerId = 'graph-investigat
       },
     },
     legend: [{
-      data: CATEGORIES.map(c => c.name),
+      data: (graphData.categories || []).map(c => c.name),
       top: 50,
-      textStyle: { color: '#9aa8c4', fontSize: 11 },
+      textStyle: { color: _css('--muted', '#9aa8c4'), fontSize: 11 },
     }],
     animationDuration: 800,
     animationEasingUpdate: 'cubicOut',
@@ -213,7 +235,7 @@ export function renderInvestigationGraph(report, containerId = 'graph-investigat
       edgeSymbol: ['none', 'arrow'],
       edgeSymbolSize: [0, 10],
       lineStyle: { color: 'source', curveness: 0.3, opacity: 0.7 },
-      label: { show: true, position: 'bottom', color: '#9aa8c4', fontSize: 9 },
+      label: { show: true, position: 'bottom', color: _css('--muted', '#9aa8c4'), fontSize: 9 },
       emphasis: {
         focus: 'adjacency',
         lineStyle: { width: 3 },

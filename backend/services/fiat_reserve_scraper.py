@@ -31,40 +31,65 @@ KNOWN_ATTESTATION_SOURCES: dict[str, str] = {
 
 
 async def scrape_reserves(db: Session) -> dict[str, Any]:
+    """Best-effort issuer page scrape. Never raises — HTML layout drift is expected.
+
+    Isolated so production scheduler cannot crash the process if pages change.
+    """
     scraped = 0
     errors = 0
 
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-        for symbol, url in RESERVE_URLS.items():
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            for symbol, url in RESERVE_URLS.items():
+                try:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    text = resp.text
+
+                    coverage = _extract_coverage(text, symbol)
+                    composition = _extract_composition(text, symbol)
+                    lag_days = _extract_lag_days(text, symbol)
+
+                    composition = composition or {}
+                    # Skip empty parses so we do not store noise rows
+                    if coverage is None and "total_reserves_usd" not in composition:
+                        log.info("reserve_scraper.empty_parse", asset=symbol)
+                        errors += 1
+                        continue
+
+                    db.add(FiatReserveSnapshot(
+                        asset_symbol=symbol,
+                        attestation_date=datetime.now(timezone.utc),
+                        reserve_usd=composition.get("total_reserves_usd"),
+                        circulating_supply=composition.get("circulating_supply_usd"),
+                        coverage_ratio=coverage,
+                        reserve_composition=composition,
+                        attestation_url=url,
+                        attestation_source=KNOWN_ATTESTATION_SOURCES.get(symbol, "unknown"),
+                        attestation_lag_days=lag_days,
+                        genius_act_compliant=symbol in ("USDC", "PYUSD"),
+                        mica_status="compliant" if symbol == "USDC" else "pending" if symbol == "USDT" else "unknown",
+                    ))
+                    scraped += 1
+                except Exception:
+                    log.warning("reserve_scraper.failed", asset=symbol, exc_info=True)
+                    errors += 1
+
+        if scraped:
             try:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                text = resp.text
-
-                coverage = _extract_coverage(text, symbol)
-                composition = _extract_composition(text, symbol)
-                lag_days = _extract_lag_days(text, symbol)
-
-                db.add(FiatReserveSnapshot(
-                    asset_symbol=symbol,
-                    attestation_date=datetime.now(timezone.utc),
-                    reserve_usd=composition.get("total_reserves_usd"),
-                    circulating_supply=composition.get("circulating_supply_usd"),
-                    coverage_ratio=coverage,
-                    reserve_composition=composition,
-                    attestation_url=url,
-                    attestation_source=KNOWN_ATTESTATION_SOURCES.get(symbol, "unknown"),
-                    attestation_lag_days=lag_days,
-                    genius_act_compliant=symbol in ("USDC", "PYUSD"),
-                    mica_status="compliant" if symbol == "USDC" else "pending" if symbol == "USDT" else "unknown",
-                ))
-                scraped += 1
+                db.commit()
             except Exception:
-                log.exception("reserve_scraper.failed", asset=symbol)
-                errors += 1
+                log.exception("reserve_scraper.commit_failed")
+                db.rollback()
+                return {"status": "error", "scraped": 0, "errors": errors + 1}
+    except Exception:
+        log.exception("reserve_scraper.fatal")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return {"status": "error", "scraped": 0, "errors": errors + 1}
 
-    if scraped:
-        db.commit()
     log.info("reserve_scraper.complete", scraped=scraped, errors=errors)
     return {"status": "ok", "scraped": scraped, "errors": errors}
 

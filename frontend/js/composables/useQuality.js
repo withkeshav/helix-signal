@@ -32,11 +32,11 @@ export function useQuality() {
     },
 
     _bindAuth() {
-      this.$watch('$store.ui.adminToken', () => this.loadQualityData());
+      this.$watch('$store.ui.isAuthenticated', () => this.loadQualityData());
     },
 
     get adminToken() {
-      return this.$store.ui.adminToken;
+      return this.$store.ui.isAuthenticated || this.$store.ui.adminToken;
     },
 
     async loadQualityData() {

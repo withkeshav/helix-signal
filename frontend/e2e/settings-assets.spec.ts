@@ -6,8 +6,10 @@ test.describe('Settings assets catalog', () => {
     await page.goto('/#settings');
     await waitForAlpine(page);
     await signInAsAdmin(page);
-    await expect(page.getByText('Enabled Assets')).toBeVisible({ timeout: 15000 });
-    await page.getByRole('button', { name: 'Refresh catalog' }).click();
-    await expect(page.locator('#tab-settings').getByText(/USDT|USDC|DAI/).first()).toBeVisible({ timeout: 15000 });
+    const panel = page.locator('#tab-settings');
+    await panel.getByRole('button', { name: 'Data & Sources' }).click();
+    await expect(panel.getByRole('heading', { name: /Enabled assets/i })).toBeVisible({ timeout: 15000 });
+    await panel.getByRole('button', { name: 'Refresh catalog' }).click();
+    await expect(panel.getByText(/USDT|USDC|DAI/).first()).toBeVisible({ timeout: 15000 });
   });
 });

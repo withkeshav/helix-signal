@@ -1,5 +1,41 @@
 # Helix Signal Changelog
 
+## Unreleased (post-4.2.0 verification + product re-arch pass)
+
+### AI mode (optimized)
+- **Structured prompts** — `STATUS:` + `- ` bullets sized for Insight card; richer DATA (peg, DEWS, anomalies).
+- **Homepage Insight** — parses structured AI into status bar + bullet list; shows provider/model/cached.
+- **Control Room model pickers** — per-feature provider + auto-fetched models (`/api/ai/providers/*/models`) or manual model id.
+- **pytest** — re-enable AI feature toggles after L4 tests so enrich suite is green.
+
+### Web search for AI (scheduled cache)
+- **Providers:** Tavily → Exa → Ollama `web_search` (Ollama is 3rd fallback only).
+- **Opt-in:** Tavily and/or Exa secret present + `ai_mode` on. Ollama alone never enables search.
+- **Keys:** rotate after login in Settings → Control Room (secrets). No separate enable toggle.
+- **Storage:** `web_search_snapshots` table + Alembic `v4_016_web_search_snapshots`; 30-day retention.
+- **Job:** `web-search-refresh` cron 06:15 & 18:15 UTC; one-shot `web-search-startup-once` ~5 min after boot if feature on and cache empty/stale.
+- **AI path:** injects cached `WEB_CONTEXT` only (no live search on request).
+
+### Fixed
+- **Backend boot:** add `redis>=5.0.0` so Redis rate-limiter storage can import; widen `alembic_version.version_num` in `v4_013` so long revision ids stamp successfully.
+- **Insights API:** `GET /api/insights/{kind}` no longer runs LLM on the request path (was causing 504s); deterministic rebuild only; stored AI narrative still returned when present.
+- **L4 UI:** AI overview/narrative/insights show deterministic text when AI is off or providers fail (no raw `all_providers_failed` dead-end).
+- **Auth UX:** single-operator session state (`isAuthenticated` + username); Settings **Admin login** labeling; cookie restore no longer looks logged-out when only cookie is valid.
+- **Control Room:** provider secret rotate UI (Ollama, OpenRouter, Moralis, Alchemy, FRED, Coinglass, webhook); AI feature map; Data tab Refresh catalog; DEWS strip spark; hero-shaped skeleton.
+- **Moralis:** holder/transfer refresh now **persists** `whale_activity_snapshots` (was cache-only).
+- **Fiat reserves:** best-effort daily scrape job (isolated failures; no crash path).
+- **Dead CMC settings:** `provider_coinmarketcap` + `secret_cmc_api_key` removed (no client).
+- **Backup script:** project-aware paths (`helix-signal_*` volumes, `/apps/helix-signal`).
+- **UI shell:** Tabler CSS layout base + Helix token overrides; tab nav sync via `ui.setTab`; Forensics graph theme tokens; System quality panel demoted to section (not second product).
+- **E2E:** selectors updated for Control Room / Blacklist Events / Admin login.
+- **pytest:** phase2 enrich fixture sets DB `ai_mode` + provider secrets for post-4.0.5.1 chain.
+
+### Docs
+- `docs/guides/cross-tab-auth.md` rewritten as single-admin operator guide.
+- `docs/DEPLOYMENT.md` — redis package, alembic width, auth seed, **COMPOSE_PROJECT_NAME=helix-signal**.
+- `docs/architecture.md` — Control Room + single-admin tabs.
+- `.progress/PRODUCT_REARCH.md` — full re-arch plan.
+
 ## v4.2.0 (2026-07-19) — Hypertables + event labels + scheduler hardening
 
 ### Added

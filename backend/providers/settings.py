@@ -336,7 +336,7 @@ def get_current_usage(key: str, db: Session) -> Any:
         from services.source_usage import get_source_usage_summary
 
         if key in ("provider_dexscreener", "provider_coingecko", "provider_defillama",
-                     "provider_coinmarketcap", "provider_moralis", "provider_thegraph", "provider_flipside"):
+                     "provider_moralis", "provider_thegraph", "provider_flipside"):
             source_name = key.replace("provider_", "")
             usage_summary = get_source_usage_summary(db)
             source_usage = usage_summary.get("sources", {}).get(source_name, {})

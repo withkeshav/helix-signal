@@ -8,20 +8,26 @@
 - Docker + Compose plugin
 - `.env` configured (copy from `.env.example`) — **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
 - **`SETTINGS_ENCRYPTION_KEY`** (recommended for production): Fernet key for secret settings at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Without it, secrets store as plaintext (dev OK).
-- **`RATE_LIMITER_STORAGE_URI`** defaults to `redis://redis:6379/0` in `docker-compose.yml` so multi-worker rate limits share state.
+- **`RATE_LIMITER_STORAGE_URI`** defaults to `redis://redis:6379/0` in `docker-compose.yml` so multi-worker rate limits share state. Backend image must include the **`redis`** Python package (`backend/requirements.txt`) or startup fails with `ConfigurationError: 'redis' prerequisite not available`.
+- **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend.
+- **Auth:** single seeded admin (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD`). Sign in at Settings → Admin login. See `docs/guides/cross-tab-auth.md`.
 - For production intelligence API: set `API_AUTH_MODE=key_required` (or Settings `api_auth_mode`) and create keys via `POST /api/v1/api-keys` / SQLAdmin.
 - Git checkout of target release
 
 ## Deploy
 
 ```bash
+# ALWAYS use the same project name (server volume: helix-signal_postgres_data)
+export COMPOSE_PROJECT_NAME=helix-signal
 git pull origin main
-docker compose up -d --build
+docker compose -p helix-signal up -d --build --remove-orphans
+# Never: docker compose down -v  (wipes Postgres)
 ```
 
 Verify:
 
 ```bash
+docker volume ls | grep postgres   # expect helix-signal_postgres_data
 docker ps --filter name=helix
 curl -sf http://localhost/api/health | python3 -m json.tool
 curl -sfI http://localhost/admin/statics/css/tabler.min.css   # expect 200 (nginx ^~ /admin)

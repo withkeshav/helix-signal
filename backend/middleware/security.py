@@ -34,8 +34,8 @@ _CSP = os.getenv(
     "CONTENT_SECURITY_POLICY",
     "default-src 'self'; "
     "script-src 'self' https://cdn.jsdelivr.net 'unsafe-eval' 'sha256-9RZrN3RExF+0bvaRfEqFGDB1AuQYP7U9C++sm12qeCQ=' 'sha256-YY7B1+ExoluQx0JdcMuQ3KniZujV85d3RORaBWuEbAE='; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-    "font-src 'self' https://fonts.gstatic.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+    "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; "
     "img-src 'self' data:; "
     "connect-src 'self'; "
     "frame-ancestors 'none'; "

@@ -669,6 +669,29 @@ class EventLabel(Base):
     )
 
 
+class WebSearchSnapshot(Base):
+    """Cached external web search hits for AI grounding (12h cadence)."""
+
+    __tablename__ = "web_search_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    query_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query_text: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    hits: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    raw_meta: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("ix_web_search_key_fetched", "query_key", "fetched_at"),
+    )
+
+
 class InsightAsset(Base):
     """Versioned deterministic insight objects (WO-DA-4)."""
 

@@ -48,13 +48,31 @@ def _truncate_usage_tables():
 
 @pytest.fixture()
 def _enrich_env(monkeypatch: pytest.MonkeyPatch, db_session) -> None:
-    """Set up standard env vars and per-feature model settings for enrichment tests."""
+    """Set up standard env vars and per-feature model settings for enrichment tests.
+
+    Post-4.0.5.1 chain is settings-driven: ai_mode + provider:model + secrets/env keys.
+    """
     monkeypatch.setenv("AI_MODE", "ai_lite")
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     monkeypatch.setenv("OLLAMA_API_KEY", "ok-test")
+    set_setting("ai_mode", "ai_lite", db_session)
+    # L4 tests permanently set these False in shared settings table — re-enable for enrich.
+    for key in (
+        "feature_ai_summary",
+        "feature_ai_explain",
+        "feature_ai_insights",
+        "feature_ai_narrative",
+    ):
+        set_setting(key, True, db_session)
     set_setting("ai_model_risk_explain", "ollama_cloud:ministral-3:8b-cloud", db_session)
     set_setting("ai_fallback_provider", "openrouter", db_session)
     set_setting("ai_fallback_model", "openai/gpt-4o-mini", db_session)
+    # Ensure get_secret / resolve path sees configured keys (plaintext OK in tests)
+    try:
+        set_setting("secret_ollama_api_key", "ok-test", db_session)
+        set_setting("secret_openrouter_api_key", "sk-test", db_session)
+    except Exception:
+        pass
 
 
 def _mock_provider(text: str = "Test response", tokens: int = 50, provider: str = "ollama_cloud", model: str = "ministral-3:8b-cloud"):

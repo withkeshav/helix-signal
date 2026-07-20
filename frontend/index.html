@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <!-- Tabler layout primitives (nav/cards/tables); Helix tokens in styles.css override theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" integrity="sha384-o5uz97et3bErHvpKfD4Jz4n0JfhJDWABFuF4NP+iEEDxE1VwMWJ19QGR0lqFZnr6" crossorigin="anonymous" defer></script>
   <!-- WARNING: Changing importmap content requires updating SHA-256 hash in CSP (middleware/security.py + nginx.conf) -->
@@ -27,7 +29,7 @@
     }
   </style>
   </head>
-<body>
+<body class="helix-app" data-bs-theme="dark">
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
 
     <!-- Navigation / UI -->
@@ -208,7 +210,7 @@
             <option x-text="a" :value="a"></option>
           </template>
         </select>
-        <span class="badge badge-info" style="font-size:11px;margin-right:6px" x-text="$store.ui.adminToken ? 'Signed in' : 'View only'"></span>
+        <span class="badge badge-info" style="font-size:11px;margin-right:6px" x-text="$store.ui.isAuthenticated ? ('Operator' + ($store.ui.adminUsername ? (': ' + $store.ui.adminUsername) : '')) : 'View only'"></span>
         <span class="badge" style="font-size:11px;margin-right:6px" x-text="'AI: ' + ($store.ui.aiModeLabel || 'Off')"></span>
         <span class="badge" style="font-size:11px;margin-right:6px" x-text="'Data: ' + ($store.ui.dataHealthLabel || '—')"></span>
         <button class="btn btn-primary" @click="refresh()" :disabled="$store.ui.refreshing" title="Refresh now" aria-label="Refresh now">
@@ -243,6 +245,9 @@
             <div class="kpi-value" style="font-size:var(--fs-kpi)" x-text="$store.dashboard.dews?.dews_score ?? '--'"></div>
             <div class="kpi-trend" x-text="($store.dashboard.dews?.band||'normal').toUpperCase()"></div>
           </div>
+          <svg class="kpi-spark" viewBox="0 0 60 20" style="stroke:var(--spark)">
+            <polyline fill="none" stroke-width="1.5" :points="$store.dashboard.dewsSpark || $store.dashboard.signalSpark || '0,10 60,10'"></polyline>
+          </svg>
         </div>
       </div>
       <div class="kpi-card" @click="$store.ui.setTab('signal')">
@@ -313,29 +318,20 @@
       <!-- Error Banner -->
       <div x-cloak x-show="errorOverview" class="warning-banner visible" x-text="errorOverview" style="margin-bottom:8px"></div>
 
-      <!-- Skeleton loader shown during dashboard loading -->
+      <!-- Skeleton loader matches signal hero layout (not legacy donut) -->
       <div x-cloak x-show="$store.dashboard.loading">
-        <!-- Hero skeleton -->
-        <div style="display:flex;gap:1.5rem;margin-bottom:1.5rem">
-          <div class="skeleton skeleton-circle" style="width:180px;height:180px;flex-shrink:0"></div>
-          <div style="flex:1;display:flex;flex-direction:column;gap:.75rem;padding-top:.5rem">
+        <div class="signal-hero skeleton-hero">
+          <div class="signal-hero-left">
+            <div class="skeleton" style="height:56px;width:40%;margin-bottom:8px"></div>
+            <div class="skeleton skeleton-text" style="width:30%"></div>
+            <div class="skeleton skeleton-text" style="width:55%;margin-top:12px"></div>
+          </div>
+          <div class="signal-hero-right">
             <div class="skeleton skeleton-title"></div>
-            <div class="skeleton skeleton-text"></div>
-            <div class="skeleton skeleton-text" style="width:60%"></div>
+            <div class="skeleton skeleton-card" style="height:140px"></div>
           </div>
         </div>
-        <!-- KPI strip skeleton -->
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.5rem">
-          <template x-for="n in 5">
-            <div class="skeleton skeleton-card" style="height:90px"></div>
-          </template>
-        </div>
-        <!-- Context skeleton -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
-          <template x-for="n in 3">
-            <div class="skeleton skeleton-card" style="height:140px"></div>
-          </template>
-        </div>
+        <div class="skeleton skeleton-card" style="height:80px;margin-bottom:12px"></div>
       </div>
 
       <!-- Main dashboard content (hidden while loading) -->
@@ -366,28 +362,63 @@
         </div>
       </div>
 
-      <!-- ROW 2: AI insight (below hero — L4 deterministic fallback) -->
+      <!-- ROW 2: AI insight (below hero — structured STATUS + bullets; L4 deterministic fallback) -->
       <div class="insight-card glass ai-insight-row">
-        <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
-          <span class="section-heading" style="margin:0;border:none;padding:0">Insight</span>
-          <button class="time-pill" :class="aiSubTab==='overview'&&'active'" @click="aiSubTab='overview'">Overview</button>
-          <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
-          <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
+        <div class="helix-panel-head" style="margin-bottom:8px">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+            <span class="section-heading" style="margin:0;border:none;padding:0">Insight</span>
+            <button class="time-pill" :class="aiSubTab==='overview'&&'active'" @click="aiSubTab='overview'">Overview</button>
+            <button class="time-pill" :class="aiSubTab==='narrative'&&'active'" @click="aiSubTab='narrative'">Narrative</button>
+            <button class="time-pill" :class="aiSubTab==='insights'&&'active'" @click="aiSubTab='insights'">Insights</button>
+          </div>
+          <span class="kpi-sub mono" x-cloak x-show="aiSubTab==='overview' && aiOverviewMeta"
+                x-text="(aiOverviewMeta?.provider || '') + (aiOverviewMeta?.model ? ' · ' + aiOverviewMeta.model : '') + (aiOverviewMeta?.cached ? ' · cached' : '')"></span>
+          <span class="kpi-sub mono" x-cloak x-show="aiSubTab==='narrative' && aiNarrativeMeta"
+                x-text="(aiNarrativeMeta?.provider || '') + (aiNarrativeMeta?.model ? ' · ' + aiNarrativeMeta.model : '') + (aiNarrativeMeta?.cached ? ' · cached' : '')"></span>
+          <span class="kpi-sub mono" x-cloak x-show="aiSubTab==='insights' && aiInsightsMeta"
+                x-text="(aiInsightsMeta?.provider || '') + (aiInsightsMeta?.model ? ' · ' + aiInsightsMeta.model : '') + (aiInsightsMeta?.cached ? ' · cached' : '')"></span>
         </div>
         <div id="signal-ai-overview" x-cloak x-show="aiSubTab==='overview'">
-          <p x-cloak x-show="marketOverview" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="marketOverview"></p>
-          <p x-cloak x-show="!marketOverview && !aiOverviewError" style="margin:0;font-size:13px;line-height:1.5" x-text="deterministicOverviewText()"></p>
-          <p x-cloak x-show="aiOverviewError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiOverviewError"></p>
+          <template x-if="marketOverview">
+            <div class="ai-report">
+              <div class="ai-report-status" x-show="parseAiStructured(marketOverview).status" x-text="parseAiStructured(marketOverview).status"></div>
+              <ul class="ai-report-bullets" x-show="parseAiStructured(marketOverview).bullets.length">
+                <template x-for="(b, i) in parseAiStructured(marketOverview).bullets" :key="'ov'+i">
+                  <li x-text="b"></li>
+                </template>
+              </ul>
+              <p class="ai-report-body" x-show="parseAiStructured(marketOverview).body && !parseAiStructured(marketOverview).bullets.length" x-text="marketOverview"></p>
+            </div>
+          </template>
+          <p x-cloak x-show="!marketOverview" class="ai-report-body" x-text="deterministicOverviewText()"></p>
         </div>
         <div id="signal-ai-narrative" x-cloak x-show="aiSubTab==='narrative'">
-          <p x-cloak x-show="aiNarrative" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiNarrative"></p>
-          <p x-cloak x-show="!aiNarrative && !aiNarrativeError" style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="deterministicNarrativeText()"></p>
-          <p x-cloak x-show="aiNarrativeError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiNarrativeError"></p>
+          <template x-if="aiNarrative">
+            <div class="ai-report">
+              <div class="ai-report-status" x-show="parseAiStructured(aiNarrative).status" x-text="parseAiStructured(aiNarrative).status"></div>
+              <ul class="ai-report-bullets" x-show="parseAiStructured(aiNarrative).bullets.length">
+                <template x-for="(b, i) in parseAiStructured(aiNarrative).bullets" :key="'na'+i">
+                  <li x-text="b"></li>
+                </template>
+              </ul>
+              <p class="ai-report-body" x-show="parseAiStructured(aiNarrative).body && !parseAiStructured(aiNarrative).bullets.length" x-text="aiNarrative"></p>
+            </div>
+          </template>
+          <p x-cloak x-show="!aiNarrative" class="ai-report-body" style="white-space:pre-wrap" x-text="deterministicNarrativeText()"></p>
         </div>
         <div id="signal-ai-insights" x-cloak x-show="aiSubTab==='insights'">
-          <p x-cloak x-show="aiInsights" style="margin:0 0 8px;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="aiInsights"></p>
-          <p x-cloak x-show="!aiInsights && !aiInsightsError" style="margin:0;font-size:13px;line-height:1.5;white-space:pre-wrap" x-text="deterministicInsightsText()"></p>
-          <p x-cloak x-show="aiInsightsError" class="kpi-sub" style="margin:0;color:var(--down)" x-text="aiInsightsError"></p>
+          <template x-if="aiInsights">
+            <div class="ai-report">
+              <div class="ai-report-status" x-show="parseAiStructured(aiInsights).status" x-text="parseAiStructured(aiInsights).status"></div>
+              <ul class="ai-report-bullets" x-show="parseAiStructured(aiInsights).bullets.length">
+                <template x-for="(b, i) in parseAiStructured(aiInsights).bullets" :key="'in'+i">
+                  <li x-text="b"></li>
+                </template>
+              </ul>
+              <p class="ai-report-body" x-show="parseAiStructured(aiInsights).body && !parseAiStructured(aiInsights).bullets.length" x-text="aiInsights"></p>
+            </div>
+          </template>
+          <p x-cloak x-show="!aiInsights" class="ai-report-body" style="white-space:pre-wrap" x-text="deterministicInsightsText()"></p>
         </div>
         <div class="time-range" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
           <span class="time-range-label">Range:</span>
@@ -597,6 +628,47 @@
         </div>
       </div>
 
+      <!-- Fundamentals (yield, collateral, reserve) — answer-first on Signal -->
+      <div x-data="fundamentalsPanel" x-init="loadFundamentals($store.dashboard.asset)" @asset-changed.window="loadFundamentals($event.detail.asset)" style="margin-top:16px">
+        <div x-cloak x-show="fundamentalsError" class="warning-banner visible" x-text="fundamentalsError" style="margin-bottom:8px"></div>
+        <div x-cloak x-show="fundamentalsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading fundamentals for <span x-text="fundamentalsSymbol"></span>...</div>
+        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">Data populating for <span x-text="fundamentalsSymbol"></span> — first readings arrive within 15 minutes of backend startup.</div>
+        <div x-cloak x-show="hasAnyFundamentals()" class="insight-grid">
+          <div class="insight-card" x-cloak x-show="fundamentals.yield">
+            <h2>Yield</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Current APY</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.yield?.current_apy)"></div></div>
+              <div><div class="kpi-label">7d Avg APY</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.yield?.apy_7d_avg)"></div></div>
+              <div><div class="kpi-label">Yield Source</div><div style="font-size:var(--fs-base)" x-text="fundamentals.yield?.yield_source || '-'"></div></div>
+              <div><div class="kpi-label">Sustainability</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.yield?.yield_sustainability)"></div></div>
+              <div><div class="kpi-label">Funding Rate (current)</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.yield?.funding_rate_current)"></div></div>
+              <div><div class="kpi-label">Insurance Fund</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.yield?.insurance_fund_usd)"></div></div>
+            </div>
+          </div>
+          <div class="insight-card" x-cloak x-show="fundamentals.collateral">
+            <h2>Collateral</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Collateral Ratio</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.collateral?.collateral_ratio)"></div></div>
+              <div><div class="kpi-label">Liquidation Threshold</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.liquidation_threshold)"></div></div>
+              <div><div class="kpi-label">Liquidation Queue</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.collateral?.liquidation_queue_usd)"></div></div>
+              <div><div class="kpi-label">Largest Vault</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.collateral?.largest_vault_usd)"></div></div>
+              <div><div class="kpi-label">Debt Ceiling Util</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.debt_ceiling_utilization_pct)"></div></div>
+              <div><div class="kpi-label">Health Score</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.collateral_health_score)"></div></div>
+            </div>
+          </div>
+          <div class="insight-card" x-cloak x-show="fundamentals.reserve">
+            <h2>Reserve Attestation</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+              <div><div class="kpi-label">Reserve USD</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtUsd(fundamentals.reserve?.reserve_usd)"></div></div>
+              <div><div class="kpi-label">Coverage Ratio</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.reserve?.coverage_ratio)"></div></div>
+              <div><div class="kpi-label">Attestation Date</div><div style="font-size:var(--fs-base)" x-text="fmtDate(fundamentals.reserve?.attestation_date)"></div></div>
+              <div><div class="kpi-label">Lag (days)</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.attestation_lag_days ?? '-'"></div></div>
+              <div><div class="kpi-label">GENIUS Act</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.genius_act_compliant == null ? '-' : (fundamentals.reserve?.genius_act_compliant ? 'Compliant' : 'Non-compliant')"></div></div>
+              <div><div class="kpi-label">MiCA Status</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.mica_status || '-'"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- Signal Trend Chart -->
       <div class="chart-card" x-data="trendsDeepDive">
         <h2>Signal Score Trend <span class="time-badge" x-text="timeRange.toUpperCase()"></span>
@@ -823,47 +895,12 @@
         </div>
       </div>
 
-      <!-- Fundamentals sub-panel (yield, collateral, reserve) -->
-      <div x-data="fundamentalsPanel" x-init="loadFundamentals($store.dashboard.asset)" @asset-changed.window="loadFundamentals($event.detail.asset)" style="margin-top:16px">
-        <div x-cloak x-show="fundamentalsError" class="warning-banner visible" x-text="fundamentalsError" style="margin-bottom:8px"></div>
-        <div x-cloak x-show="fundamentalsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading fundamentals for <span x-text="fundamentalsSymbol"></span>...</div>
-        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">Data populating for <span x-text="fundamentalsSymbol"></span> — first readings arrive within 15 minutes of backend startup.</div>
-        <div x-cloak x-show="hasAnyFundamentals()" class="insight-grid">
-          <div class="insight-card" x-cloak x-show="fundamentals.yield">
-            <h2>Yield</h2>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-              <div><div class="kpi-label">Current APY</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.yield?.current_apy)"></div></div>
-              <div><div class="kpi-label">7d Avg APY</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.yield?.apy_7d_avg)"></div></div>
-              <div><div class="kpi-label">Yield Source</div><div style="font-size:var(--fs-base)" x-text="fundamentals.yield?.yield_source || '-'"></div></div>
-              <div><div class="kpi-label">Sustainability</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.yield?.yield_sustainability)"></div></div>
-              <div><div class="kpi-label">Funding Rate (current)</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.yield?.funding_rate_current)"></div></div>
-              <div><div class="kpi-label">Insurance Fund</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.yield?.insurance_fund_usd)"></div></div>
-            </div>
-          </div>
-          <div class="insight-card" x-cloak x-show="fundamentals.collateral">
-            <h2>Collateral</h2>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-              <div><div class="kpi-label">Collateral Ratio</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.collateral?.collateral_ratio)"></div></div>
-              <div><div class="kpi-label">Liquidation Threshold</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.liquidation_threshold)"></div></div>
-              <div><div class="kpi-label">Liquidation Queue</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.collateral?.liquidation_queue_usd)"></div></div>
-              <div><div class="kpi-label">Largest Vault</div><div style="font-size:var(--fs-base)" x-text="fmtUsd(fundamentals.collateral?.largest_vault_usd)"></div></div>
-              <div><div class="kpi-label">Debt Ceiling Util</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.debt_ceiling_utilization_pct)"></div></div>
-              <div><div class="kpi-label">Health Score</div><div style="font-size:var(--fs-base)" x-text="fmtPct(fundamentals.collateral?.collateral_health_score)"></div></div>
-            </div>
-          </div>
-          <div class="insight-card" x-cloak x-show="fundamentals.reserve">
-            <h2>Reserve Attestation</h2>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-              <div><div class="kpi-label">Reserve USD</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtUsd(fundamentals.reserve?.reserve_usd)"></div></div>
-              <div><div class="kpi-label">Coverage Ratio</div><div style="font-size:var(--fs-lg);font-weight:700" x-text="fmtPct(fundamentals.reserve?.coverage_ratio)"></div></div>
-              <div><div class="kpi-label">Attestation Date</div><div style="font-size:var(--fs-base)" x-text="fmtDate(fundamentals.reserve?.attestation_date)"></div></div>
-              <div><div class="kpi-label">Lag (days)</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.attestation_lag_days ?? '-'"></div></div>
-              <div><div class="kpi-label">GENIUS Act</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.genius_act_compliant == null ? '-' : (fundamentals.reserve?.genius_act_compliant ? 'Compliant' : 'Non-compliant')"></div></div>
-              <div><div class="kpi-label">MiCA Status</div><div style="font-size:var(--fs-base)" x-text="fundamentals.reserve?.mica_status || '-'"></div></div>
-            </div>
-          </div>
-        </div>
+      <!-- Fundamentals moved to Signal (answer-first IA) -->
+      <div class="insight-card" style="margin-top:16px">
+        <h2 class="section-heading">Issuer fundamentals</h2>
+        <p class="kpi-sub">Yield, collateral, and reserve attestation live on the <button type="button" class="btn btn-muted label-btn" @click="$store.ui.setTab('signal')">Signal</button> tab under the risk answer.</p>
       </div>
+
     </div>
     </div>
     </template>
@@ -1427,17 +1464,14 @@
       <div class="insight-grid">
         <!-- Quality Dashboard Header -->
         <div class="insight-card" style="grid-column:1/-1">
-          <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div class="helix-panel-head">
             <div>
-              <h1 style="margin:0 0 8px 0">Data Quality Dashboard</h1>
-              <p class="kpi-sub" style="margin:0">Monitor the health and quality of your data sources and system metrics</p>
+              <h2 class="section-heading" style="margin:0">Data quality</h2>
+              <p class="kpi-sub" style="margin:4px 0 0">Trust layer for sources and coverage — same System tab as health</p>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-              <button class="btn btn-primary" @click="refreshQualityData()" style="padding:10px 20px">Refresh Data</button>
-            </div>
+            <button class="btn btn-primary" type="button" @click="refreshQualityData()">Refresh</button>
           </div>
-          
-          <div x-cloak x-show="lastUpdated" style="margin-top:12px;padding:12px;background:var(--bg-accent);border-radius:6px;font-size:13px">
+          <div x-cloak x-show="lastUpdated" class="kpi-sub" style="margin-top:8px">
             Last updated: <strong x-text="lastUpdated"></strong>
           </div>
         </div>
@@ -1555,25 +1589,27 @@
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
           <h2 class="section-heading">Control Room</h2>
-          <p class="kpi-sub">Tier-1 operator surface — SQLAdmin remains Tier 2 for raw tables and user CRUD.</p>
+          <p class="kpi-sub">Single-operator console (one admin account). SQLAdmin at /admin is Tier 2 for rare table ops — not multi-user self-service.</p>
           <div x-cloak x-show="$store.ui.authError" class="warning-banner visible" x-text="$store.ui.authError"></div>
           <div x-cloak x-show="settingsError" class="warning-banner visible" x-text="settingsError"></div>
-          <form class="cr-setting-row" @submit.prevent="submitAdminLogin()">
+          <h3 class="section-heading" style="margin-top:12px">Admin login</h3>
+          <form class="cr-setting-row" @submit.prevent="submitAdminLogin()" aria-label="Admin login">
             <input class="input" type="text" x-model="$store.ui.loginUsername" placeholder="Username" autocomplete="username">
             <input class="input" type="password" x-model="$store.ui.loginPassword" placeholder="Password" autocomplete="current-password">
             <button class="btn btn-primary" type="submit">Sign in</button>
-            <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.adminToken" @click="$store.ui.logout(); settingsError=''; settingsList=[]">Sign out</button>
+            <button class="btn btn-muted" type="button" x-cloak x-show="$store.ui.isAuthenticated" @click="$store.ui.logout(); settingsError=''; settingsList=[]">Sign out</button>
           </form>
+          <p class="kpi-sub" x-cloak x-show="$store.ui.isAuthenticated" x-text="'Signed in as ' + ($store.ui.adminUsername || 'operator')"></p>
         </div>
 
-        <div class="insight-card" style="grid-column:1/-1" x-show="!$store.ui.adminToken">
-          <p class="kpi-sub">Sign in to manage AI, retention, alerts, API keys, and registry settings.</p>
+        <div class="insight-card" style="grid-column:1/-1" x-show="!$store.ui.isAuthenticated">
+          <p class="kpi-sub">Sign in with the seeded admin user (HELIX_ADMIN_USERNAME / HELIX_ADMIN_PASSWORD) to manage AI, retention, alerts, API keys, and registry settings.</p>
         </div>
 
-        <div class="insight-card" style="grid-column:1/-1" x-show="$store.ui.adminToken">
+        <div class="insight-card" style="grid-column:1/-1" x-show="$store.ui.isAuthenticated">
           <nav class="control-room-subtabs" aria-label="Control Room sections">
             <template x-for="t in controlSubTabs" :key="t.id">
-              <button type="button" class="control-room-subtab" :class="controlSubTab===t.id&&'active'" @click="controlSubTab=t.id; if(t.id==='overview') loadOpsStatus()" x-text="t.label"></button>
+              <button type="button" class="control-room-subtab" :class="controlSubTab===t.id&&'active'" @click="onControlSubTab(t.id)" x-text="t.label"></button>
             </template>
           </nav>
 
@@ -1632,6 +1668,59 @@
                 <template x-if="s.type!=='bool' && s.type!=='enum'"><input class="input" :value="s.value" @change="onTier1Change(s, $event)"></template>
               </div>
             </template>
+            <h3 class="section-heading">Models per feature</h3>
+            <p class="kpi-sub">Format saved as <code>provider:model_id</code>. Lists auto-load from Ollama Cloud / OpenRouter when keys are set; you can still type any model id.</p>
+            <button class="btn btn-muted" type="button" :disabled="modelCatalogLoading" @click="loadModelCatalogs()" x-text="modelCatalogLoading ? 'Loading models…' : 'Refresh model lists'"></button>
+            <p class="kpi-sub" x-show="modelCatalogError" x-text="modelCatalogError" style="color:var(--neutral)"></p>
+            <template x-for="feat in aiModelFeatures" :key="feat.key">
+              <div class="cr-setting-row" style="flex-wrap:wrap;align-items:flex-start">
+                <label style="min-width:180px">
+                  <span x-text="feat.label"></span>
+                  <span class="cr-setting-hint mono" x-text="modelSettingValue(feat.key) || 'not set'"></span>
+                </label>
+                <div class="ai-model-picker" x-data="{ p: splitProviderModel(modelSettingValue(feat.key)).provider, m: splitProviderModel(modelSettingValue(feat.key)).model }">
+                  <select class="select" x-model="p" @change="m = ''">
+                    <option value="ollama_cloud">Ollama Cloud</option>
+                    <option value="openrouter">OpenRouter</option>
+                  </select>
+                  <select class="select" x-show="(modelCatalog[p] || []).length" x-model="m">
+                    <option value="">— pick listed model —</option>
+                    <template x-for="mod in (modelCatalog[p] || [])" :key="mod.id">
+                      <option :value="mod.id" x-text="mod.name || mod.id"></option>
+                    </template>
+                  </select>
+                  <input class="input" type="text" x-model="m" :placeholder="p === 'openrouter' ? 'openai/gpt-4o-mini' : 'ministral-3:8b-cloud'" style="min-width:200px">
+                  <button class="btn btn-primary" type="button" @click="saveFeatureModel(feat.key, p, m)">Save</button>
+                </div>
+              </div>
+            </template>
+            <h3 class="section-heading">Provider secrets</h3>
+            <p class="kpi-sub">Rotate-only — values stay masked. Paste a new key to replace.</p>
+            <template x-for="s in secretSettings()" :key="s.key">
+              <div class="cr-setting-row">
+                <label>
+                  <span x-text="s.label || s.key"></span>
+                  <span class="cr-setting-hint" x-text="s.value ? 'configured' : 'not set'"></span>
+                </label>
+                <button class="btn btn-muted" type="button" @click="rotateSecretKey(s.key)">Rotate</button>
+              </div>
+            </template>
+            <h3 class="section-heading">Where AI shows up</h3>
+            <div class="data-table-wrap" style="max-height:none">
+              <table class="data-table">
+                <thead><tr><th>Surface</th><th>Tab</th><th>Toggle</th><th></th></tr></thead>
+                <tbody>
+                  <template x-for="row in aiFeatureMap" :key="row.ui">
+                    <tr>
+                      <td x-text="row.ui"></td>
+                      <td x-text="row.tab"></td>
+                      <td class="mono" x-text="row.toggle"></td>
+                      <td><button class="btn btn-muted label-btn" type="button" x-show="row.effectSelector" @click="navigateAiEffect(row)">Go</button></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
             <h3 class="section-heading">Playbooks</h3>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
               <template x-for="pb in playbooks" :key="pb.name">
@@ -1655,7 +1744,8 @@
             <p class="kpi-sub">Score sparkline (30d): <span x-text="qualitySparkline() || '—'"></span></p>
             <button class="btn btn-muted" type="button" @click="loadOpsStatus()">Refresh quality</button>
             <h3 class="section-heading">Enabled assets</h3>
-            <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button class="btn btn-muted" type="button" @click="loadAssetCatalog()">Refresh catalog</button>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
               <template x-for="row in assetCatalog" :key="row.symbol">
                 <label class="signal-hero-chip"><input type="checkbox" :checked="row.enabled" @change="toggleAssetEnabled(row)"> <span x-text="row.symbol"></span></label>
               </template>

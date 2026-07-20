@@ -44,6 +44,28 @@ Scopes: `intelligence:read`, `investigate:write`, `admin`. Manage keys in SQLAdm
 
 Browser UI: `/admin` (SQLAdmin). Requires an admin user login (same seeded account as Settings). nginx must proxy with `location ^~ /admin`.
 
+### On-chain / whale (when enabled)
+
+| Method | Path | Notes |
+|--------|------|--------|
+| GET | `/api/onchain/whale-flow?asset=` | Mint/burn + large transfers (The Graph / Moralis / Flipside) |
+| GET | `/api/onchain/holder-concentration?asset=` | Requires Moralis |
+| GET | `/api/v1/series/whale?asset=&days=` | History from **`whale_activity_snapshots`** (persisted on Moralis refresh) |
+
+Enable `feature_onchain_signals` + `provider_moralis` and set `secret_moralis_api_key` in Control Room.
+
+### Operator login (single-admin product model)
+
+Helix is **single-operator** by default: one seeded admin (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD`). No self-service multi-user.
+
+| Method | Path | Notes |
+|--------|------|--------|
+| POST | `/api/auth/login` | Form body `username` + `password`. Returns `access_token` + sets httpOnly `helix_session` (~30 min). Rejects non-admin roles. |
+| POST | `/api/auth/logout` | Clears cookie; requires valid session. |
+| GET | `/api/auth/me` | Current operator `{username, role}`. |
+
+Admin-gated routes accept: signed session cookie, `X-Admin-Token: <access_token>`, or legacy `HELIX_ADMIN_TOKEN`. See `docs/guides/cross-tab-auth.md`.
+
 ---
 
 ## Core

@@ -335,100 +335,114 @@ def _feature_enabled(feature: str, db: Any) -> bool:
     return _setting_bool(get_setting(key, db), default=True)
 
 
+# Structured plain-text contract for UI parsing (lines starting with "- ").
+_AI_OUTPUT_RULES = (
+    "Plain text only — no markdown headings, no bold (**), no code fences. "
+    "Each bullet must start with '- ' (hyphen + space). "
+    "Use ONLY numbers and facts from the DATA block. Never invent prices, scores, or events. "
+    "If a field is missing or '?', say 'data unavailable' — do not guess. "
+    "Stay within the word limit so the full answer fits the dashboard card."
+)
+
 _FEATURE_PROMPTS: dict[str, dict[str, Any]] = {
     "risk_explain": {
         "system": (
-            "You are a stablecoin risk analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 2-3 bullet points starting with '-'. Limit: ~80 words. Be concise and data-driven. "
-            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
-            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+            f"You are a stablecoin risk analyst. {_AI_OUTPUT_RULES} "
+            "Return exactly this structure:\n"
+            "STATUS: <one line: Normal|Watch|Risk and why, ≤20 words>\n"
+            "- <primary driver with score/band numbers>\n"
+            "- <secondary driver or mitigating factor>\n"
+            "- <one watch item>\n"
+            "Word budget: ~90 words total."
         ),
         "user": (
-            "Asset: {asset_symbol}\n"
-            "Risk Score: {signal_score}/100\n"
-            "Band: {signal_band}\n"
-            "Regime: {regime}\n"
-            "Explain the key risk driver."
+            "DATA for {asset_symbol}:\n"
+            "Risk Score: {signal_score}/100 | Band: {signal_band} | Regime: {regime}\n"
+            "Peg: {peg_price} | Supply Δ24h: {supply_change_pct}% | Top chain: {top_chain_share}%\n"
+            "DEWS: {dews_score} ({dews_band}) | Anomalies: {anomaly_count}\n"
+            "Write the STATUS line and 2-3 bullets."
+        ),
+        "max_tokens_lite": 400,
+        "max_tokens_full": 550,
+    },
+    "market_narrative": {
+        "system": (
+            f"You are a crypto market analyst for stablecoins. {_AI_OUTPUT_RULES} "
+            "Return:\n"
+            "STATUS: <one line market posture>\n"
+            "- <key driver>\n"
+            "- <context from sentiment/events if present>\n"
+            "- <what to watch next 24h>\n"
+            "Word budget: ~120 words."
+        ),
+        "user": (
+            "DATA for {asset_symbol}:\n"
+            "Risk {signal_score}/100 ({signal_band}) | Regime: {regime}\n"
+            "Depeg 1h: {depeg_1h}% | Depeg 24h: {depeg_24h}%\n"
+            "Sentiment: {sentiment_label} ({sentiment_score})\n"
+            "Recent events: {recent_events}\n"
+            "Write STATUS + 3 bullets."
+        ),
+        "max_tokens_lite": 550,
+        "max_tokens_full": 750,
+    },
+    "anomaly_investigation": {
+        "system": (
+            f"You are a stablecoin forensics analyst. {_AI_OUTPUT_RULES} "
+            "Return:\n"
+            "STATUS: <likely severity>\n"
+            "- <likely cause from metrics>\n"
+            "- <market impact>\n"
+            "- <recommended operator action>\n"
+            "Word budget: ~100 words."
+        ),
+        "user": (
+            "DATA for {asset_symbol}:\n"
+            "Highest Z-Score: {z_score_max}\n"
+            "Anomaly Metrics: {anomalies}\n"
+            "Bridge Flow: {bridge_flow}\n"
+            "Write STATUS + 3 bullets."
         ),
         "max_tokens_lite": 350,
         "max_tokens_full": 500,
     },
-    "market_narrative": {
-        "system": (
-            "You are a crypto market analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 3-4 bullet points starting with '-'. Limit: ~120 words. Cover: key driver, market context, what to watch. "
-            "Be specific and data-driven. "
-            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
-            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
-        ),
-        "user": (
-            "Asset: {asset_symbol}\n"
-            "Risk Score: {signal_score}/100\n"
-            "Band: {signal_band}\n"
-            "Regime: {regime}\n"
-            "Depeg Probability (1h): {depeg_1h}%\n"
-            "Depeg Probability (24h): {depeg_24h}%\n"
-            "Sentiment: {sentiment_label} ({sentiment_score})\n"
-            "Recent Events: {recent_events}\n"
-            "Explain the current market narrative and what to watch."
-        ),
-        "max_tokens_lite": 500,
-        "max_tokens_full": 700,
-    },
-    "anomaly_investigation": {
-        "system": (
-            "You are a stablecoin forensics analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 2-3 bullet points starting with '-'. Cover: likely cause, market impact, recommended action. "
-            "Be specific and data-driven. CRITICAL: Use ONLY the data provided below. Do NOT use your "
-            "internal training knowledge or fabricate numbers. If data doesn't support a claim, say so."
-        ),
-        "user": (
-            "Asset: {asset_symbol}\n"
-            "Highest Z-Score: {z_score_max}\n"
-            "Anomaly Metrics: {anomalies}\n"
-            "Bridge Flow: {bridge_flow}\n"
-            "Investigate the root cause and recommend action."
-        ),
-        "max_tokens_lite": 200,
-        "max_tokens_full": 400,
-    },
     "market_overview": {
         "system": (
-            "You are a crypto market intelligence analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 4-5 bullet points starting with '-'. Limit: ~180 words. Cover: overall market health, notable trends, "
-            "risk concentrations, and assets to watch. Be specific and data-driven. "
-            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
-            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+            f"You are a multi-stablecoin market intelligence analyst. {_AI_OUTPUT_RULES} "
+            "Return:\n"
+            "STATUS: <book-wide health one-liner>\n"
+            "- <stability / average risk>\n"
+            "- <band concentration or divergence>\n"
+            "- <supply or chain note>\n"
+            "- <asset(s) to watch>\n"
+            "Word budget: ~160 words."
         ),
         "user": (
-            "Tracked Assets ({asset_count}): {asset_list}\n"
-            "Average Risk Score: {avg_signal_score}/100\n"
-            "Band Distribution: {band_summary}\n"
-            "Total Active Chains: {total_chains}\n"
-            "24h Supply Changes: {supply_changes}\n"
-            "Provide a market-wide intelligence overview covering overall stability, "
-            "notable divergences, and assets requiring attention."
+            "DATA book:\n"
+            "Assets ({asset_count}): {asset_list}\n"
+            "Average Risk: {avg_signal_score}/100 | Bands: {band_summary}\n"
+            "Chains: {total_chains} | Supply changes 24h: {supply_changes}\n"
+            "Write STATUS + 4 bullets."
         ),
-        "max_tokens_lite": 800,
-        "max_tokens_full": 1200,
+        "max_tokens_lite": 700,
+        "max_tokens_full": 1000,
     },
     "insight_summary": {
         "system": (
-            "You are a stablecoin intelligence analyst. Plain text only — no markdown, no bold, no italics. "
-            "Output 3-4 bullet points starting with '-'. Limit: ~120 words. Cover: stability status, key trends, risk watch. "
-            "Be specific and data-driven. "
-            "CRITICAL: Use ONLY the data provided below. Do NOT use your internal training "
-            "knowledge or fabricate numbers. If data doesn't support a claim, say so."
+            f"You are a stablecoin intelligence analyst. {_AI_OUTPUT_RULES} "
+            "Return:\n"
+            "STATUS: <stability one-liner>\n"
+            "- <trend from supply/chains>\n"
+            "- <risk watch (anomalies/regime)>\n"
+            "- <operator focus>\n"
+            "Word budget: ~110 words."
         ),
         "user": (
-            "Asset: {asset_symbol}\n"
-            "Risk Score: {signal_score}/100 (Band: {signal_band})\n"
-            "Regime: {regime}\n"
-            "Supply Change 24h: {supply_change_pct}%\n"
-            "Chain Count: {chain_count}\n"
-            "Top Chain Share: {top_chain_share}%\n"
-            "Anomalies (7d): {anomaly_count}\n"
-            "What are the most important trends and risks?"
+            "DATA for {asset_symbol}:\n"
+            "Risk {signal_score}/100 ({signal_band}) | Regime: {regime}\n"
+            "Supply Δ24h: {supply_change_pct}% | Chains: {chain_count} | Top share: {top_chain_share}%\n"
+            "Anomalies 7d: {anomaly_count} | Peg: {peg_price} | DEWS: {dews_score}\n"
+            "Write STATUS + 3 bullets."
         ),
         "max_tokens_lite": 500,
         "max_tokens_full": 700,
@@ -473,11 +487,16 @@ def _build_prompt(feature: str, context: dict[str, Any], db: Any = None) -> tupl
         "z_score_max", "anomalies", "bridge_flow", "asset_count", "asset_list",
         "avg_signal_score", "band_summary", "total_chains", "supply_changes",
         "supply_change_pct", "chain_count", "top_chain_share", "anomaly_count",
+        "peg_price", "dews_score", "dews_band", "web_context",
     ):
         available.setdefault(k, "?")
     if "feature" in template:
         available.setdefault("feature", feature)
+    # Append cached web context when present (scheduled search; not live)
     prompt = template.format(**available)
+    web_ctx = str(context.get("web_context") or "").strip()
+    if web_ctx and web_ctx != "?":
+        prompt = f"{prompt}\n\n{web_ctx}"
     mode = ai_mode(db)
     max_tokens = config["max_tokens_lite"] if mode == "ai_lite" else config["max_tokens_full"]
     return prompt, system, max_tokens

@@ -1,4 +1,16 @@
-"""Authentication API endpoints."""
+"""Operator authentication API (single-admin product model).
+
+Helix is **not** a multi-tenant user product. One admin account is seeded at
+deploy (`HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` via `scripts/seed_admin.py`).
+Additional users are out of scope unless `feature_multi_user` is explicitly on
+(SQLAdmin / rare ops only).
+
+Login flow:
+1. POST /api/auth/login with username+password (form)
+2. Server returns HMAC-signed session token (~30 min) and sets httpOnly cookie `helix_session`
+3. UI stores the same token as X-Admin-Token mirror for adminFetch
+4. require_admin_token accepts cookie OR X-Admin-Token OR legacy HELIX_ADMIN_TOKEN
+"""
 
 from __future__ import annotations
 
@@ -33,12 +45,20 @@ def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """User login endpoint."""
+    """Operator login — seeded admin user only in the default product path."""
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    session_token = _sign_session_token({"sub": user.id, "role": user.role})
-    body = {"access_token": session_token, "token_type": "bearer", "username": user.username, "role": user.role}
+    is_admin = bool(getattr(user, "is_admin", False) or getattr(user, "role", None) == "admin")
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin role required")
+    session_token = _sign_session_token({"sub": user.id, "role": "admin"})
+    body = {
+        "access_token": session_token,
+        "token_type": "bearer",
+        "username": user.username,
+        "role": "admin",
+    }
     response = JSONResponse(content=body)
     secure = os.getenv("HELIX_COOKIE_SECURE", "").strip().lower() in ("1", "true", "yes")
     response.set_cookie(

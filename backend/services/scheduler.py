@@ -184,6 +184,32 @@ async def _blacklist_job() -> None:
         db.close()
 
 
+async def _fiat_reserve_job() -> None:
+    """Best-effort fiat reserve scrape — failures never re-raise."""
+    db = SessionLocal()
+    try:
+        from services.fiat_reserve_scraper import scrape_reserves
+        result = await scrape_reserves(db)
+        log.info("fiat_reserve_job.complete", **(result or {}))
+    except Exception:
+        log.exception("fiat_reserve_job.failed")
+    finally:
+        db.close()
+
+
+def _web_search_job() -> None:
+    """12h web context refresh — only when AI on + Tavily/Exa key."""
+    db = SessionLocal()
+    try:
+        from services.web_search.job import run_web_search_job
+        result = run_web_search_job(db)
+        log.info("web_search_job.complete", **(result or {}))
+    except Exception:
+        log.exception("web_search_job.failed")
+    finally:
+        db.close()
+
+
 def register_scheduler_jobs(
     scheduler: AsyncIOScheduler,
     setup_db: Session,
@@ -220,6 +246,43 @@ def register_scheduler_jobs(
     _add_job(_retention_job, "cron", job_id="history-retention", hour=3, minute=15)
     _add_job(_data_quality_snapshot_job, "cron", job_id="data-quality-snapshot", hour=4, minute=0)
     _add_job(_insight_refresh_job, "cron", job_id="insight-assets-refresh", hour=4, minute=30)
+    # Daily best-effort issuer reserve scrape (isolated; HTML drift only logs warnings)
+    _add_job(_fiat_reserve_job, "cron", job_id="fiat-reserve-scrape", hour=5, minute=0)
+    # Web search cache for AI (12h) — skipped unless Tavily/Exa secret present + ai_mode on
+    _add_job(_web_search_job, "cron", job_id="web-search-refresh", hour="6,18", minute=15)
+    # One delayed boot fill if feature on and cache empty/stale (avoids waiting until next 06:15/18:15)
+    try:
+        from sqlalchemy import desc, select
+
+        from database import WebSearchSnapshot
+        from services.web_search.job import web_search_feature_enabled
+
+        if web_search_feature_enabled(setup_db):
+            now = datetime.now(timezone.utc)
+            last = (
+                setup_db.execute(
+                    select(WebSearchSnapshot)
+                    .order_by(desc(WebSearchSnapshot.fetched_at))
+                    .limit(1)
+                )
+                .scalars()
+                .first()
+            )
+            stale = last is None or (
+                last.fetched_at is not None
+                and last.fetched_at < now - timedelta(hours=12)
+            )
+            if stale:
+                run_at = now + timedelta(minutes=5)
+                _add_job(
+                    _web_search_job,
+                    "date",
+                    job_id="web-search-startup-once",
+                    run_date=run_at,
+                )
+                log.info("web_search.startup_once_scheduled", run_at=run_at.isoformat())
+    except Exception:
+        log.warning("web_search.startup_once_schedule_failed", exc_info=True)
     _add_job(_osint_job, "interval", job_id="osint-ingest", minutes=osint_minutes)
     _add_job(_osint_attestation_refresh, "interval", job_id="osint-attestation-refresh", minutes=osint_minutes)
     _add_job(

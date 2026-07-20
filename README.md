@@ -57,8 +57,11 @@ cp .env.example .env
 # REQUIRED before first deploy: SESSION_SIGNING_KEY (openssl rand -hex 32),
 # POSTGRES_PASSWORD, HELIX_ADMIN_PASSWORD (for first admin seed)
 # If SESSION_SIGNING_KEY is blank, all admin logins will fail with 503.
-docker compose up --build -d
-# Sign in at Settings → admin / your HELIX_ADMIN_PASSWORD
+export COMPOSE_PROJECT_NAME=helix-signal   # keep forever — volume names depend on this
+docker compose -p helix-signal up --build -d
+# Sign in at Settings → Admin login (seeded HELIX_ADMIN_USERNAME / HELIX_ADMIN_PASSWORD).
+# Single-operator product — not multi-user self-service. See docs/guides/cross-tab-auth.md
+# NEVER: docker compose down -v  (wipes postgres_data)
 ./scripts/smoke-check.sh http://localhost:80
 ```
 

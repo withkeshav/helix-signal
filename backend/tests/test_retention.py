@@ -31,6 +31,7 @@ def test_retention_registry_keys_present():
         "retention_settings_audit_log_days",
         "retention_source_usage_days",
         "retention_ai_usage_days",
+        "retention_web_search_snapshots_days",
     }
     assert expected.issubset(keys)
 

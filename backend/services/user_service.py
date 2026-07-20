@@ -1,4 +1,9 @@
-"""User service for multi-user support."""
+"""User service — single-operator admin is the product default.
+
+Multi-user CRUD exists for rare ops when `feature_multi_user` is enabled; it is
+not the intended deployment model. Prefer one seeded admin via
+`scripts/seed_admin.py` (HELIX_ADMIN_USERNAME / HELIX_ADMIN_PASSWORD).
+"""
 
 from __future__ import annotations
 

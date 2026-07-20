@@ -134,6 +134,8 @@ export function loadTrendChart() {
         const sup = t.points.map(p => p.total_supply);
         if (typeof this._computeSpark === 'function') {
           this.$store.dashboard.signalSpark = this._computeSpark(sig);
+          // DEWS strip spark: use signal scores as proxy until dedicated DEWS history series ships
+          this.$store.dashboard.dewsSpark = this._computeSpark(sig);
           this.$store.dashboard.pegSpark = this._computeSpark(peg);
           this.$store.dashboard.supplySpark = this._computeSpark(sup);
         }

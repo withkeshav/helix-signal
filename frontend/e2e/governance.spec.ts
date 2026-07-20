@@ -88,6 +88,8 @@ test.describe('Governance Tab (Settings)', () => {
   });
 
   test('shows AI mode status on overview', async ({ page }) => {
-    await expect(page.locator('#tab-settings').getByText(/AI mode/i)).toBeVisible({ timeout: 120000 });
+    const panel = page.locator('#tab-settings');
+    await panel.getByRole('button', { name: 'Overview' }).click();
+    await expect(panel.locator('.cr-status-label', { hasText: 'AI mode' })).toBeVisible({ timeout: 120000 });
   });
 });

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from structlog import get_logger
 
 from database import ForecastPoint, ForecastRun, InsightAsset
-from services.ai_router import ai_mode, enrich_with_ai
+from services.ai_router import ai_mode
 from services.anomaly import detect_anomalies
 from services.dashboard import build_dashboard_response
 from services.predictive import run_predictive_bundle
@@ -205,18 +205,11 @@ def get_insight_response(
 
     sym = asset.upper()
     row = get_latest_insight(db, kind, sym)
+    # On the request path: only rebuild deterministic payload (fast). Never call LLM
+    # here — that caused nginx 504s on market_snapshot. AI narratives come from the
+    # background insight job or stored row.ai_narrative when ai_mode is on.
     if refresh_if_stale and insight_is_stale(row):
-        ai_narr = None
-        if ai_mode(db) != "ai_off" and kind in ("risk_explain", "market_snapshot"):
-            try:
-                ctx = build_deterministic_payload(db, kind, sym)
-                feature = "risk_explain" if kind == "risk_explain" else "market_summary"
-                ai_result = enrich_with_ai(feature=feature, context=ctx, db=db)
-                if ai_result.get("available"):
-                    ai_narr = ai_result
-            except Exception:
-                log.warning("insight.ai_narrative_failed", kind=kind, asset=sym, exc_info=True)
-        row = persist_insight(db, kind, sym, ai_narrative=ai_narr)
+        row = persist_insight(db, kind, sym, ai_narrative=None)
     elif row is None:
         row = persist_insight(db, kind, sym)
 

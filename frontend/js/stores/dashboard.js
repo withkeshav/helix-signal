@@ -24,6 +24,7 @@ export function registerDashboardStore(Alpine) {
     aiInsights: '',
     nlpAvailable: false,
     signalSpark: '',
+    dewsSpark: '',
     pegSpark: '',
     supplySpark: '',
     loading: false,

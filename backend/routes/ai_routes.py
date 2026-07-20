@@ -34,21 +34,44 @@ def _require_admin_token(request: Request) -> None:
     require_admin_token(request, token=token)
 
 
+def _attach_web_context(ctx: dict[str, Any], db: Session, asset: str) -> None:
+    """Inject cached web hits into context for prompt templates (no live search)."""
+    try:
+        from services.web_search.store import format_web_context_for_prompt, load_web_context_for_asset
+
+        blocks = load_web_context_for_asset(db, asset)
+        text = format_web_context_for_prompt(blocks)
+        if text:
+            ctx["web_context"] = text
+        else:
+            ctx.setdefault("web_context", "")
+    except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.web_context_failed", asset=asset, exc_info=True)
+        ctx.setdefault("web_context", "")
+
+
 def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
+    """Rich deterministic context for AI — no external web search."""
     try:
         dash = build_dashboard_response(db, asset)
     except Exception:
         import structlog
         structlog.get_logger(__name__).warning("ai.build_context_failed", asset=asset, exc_info=True)
         return None
-    ctx = {
+    peg = getattr(dash.depeg_index, "current_price", None) if dash.depeg_index else None
+    ctx: dict[str, Any] = {
         "asset_symbol": dash.asset.symbol,
         "signal_score": dash.asset_signal.score,
         "signal_band": dash.asset_signal.band,
         "regime": "?",
-        "supply_change_pct": dash.total_supply_change_24h_pct or 0,
+        "supply_change_pct": round(float(dash.total_supply_change_24h_pct or 0), 3),
         "chain_count": len(dash.chains),
-        "top_chain_share": dash.chain_concentration.top_chain_share_pct or 0,
+        "top_chain_share": round(float(dash.chain_concentration.top_chain_share_pct or 0), 2),
+        "peg_price": f"{float(peg):.4f}" if peg is not None else "?",
+        "dews_score": "?",
+        "dews_band": "?",
+        "anomaly_count": "?",
     }
     try:
         from services.predictive import run_predictive_bundle
@@ -57,6 +80,24 @@ def _build_context(asset: str, db: Session) -> dict[str, Any] | None:
     except Exception:
         import structlog
         structlog.get_logger(__name__).warning("ai.regime_lookup_failed", asset=asset, exc_info=True)
+    try:
+        from services.dews_payload import build_dews_payload
+        dews = build_dews_payload(db, asset.upper())
+        if isinstance(dews, dict) and dews.get("available") is not False:
+            ctx["dews_score"] = dews.get("dews_score", "?")
+            ctx["dews_band"] = dews.get("band", "?")
+    except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.dews_lookup_failed", asset=asset, exc_info=True)
+    try:
+        from services.anomaly import detect_anomalies
+        an = detect_anomalies(db, asset_symbol=asset)
+        rows = (an or {}).get("anomalies") or []
+        ctx["anomaly_count"] = len(rows)
+    except Exception:
+        import structlog
+        structlog.get_logger(__name__).warning("ai.anomaly_count_failed", asset=asset, exc_info=True)
+    _attach_web_context(ctx, db, asset)
     return ctx
 
 

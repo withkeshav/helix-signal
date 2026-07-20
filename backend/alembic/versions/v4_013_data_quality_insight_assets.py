@@ -16,6 +16,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Alembic default version_num is VARCHAR(32). This revision id is 34 chars;
+    # widen first so the post-upgrade stamp cannot fail with StringDataRightTruncation.
+    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
+
     op.create_table(
         "data_quality_snapshots",
         sa.Column("id", sa.Integer(), autoincrement=True, primary_key=True),

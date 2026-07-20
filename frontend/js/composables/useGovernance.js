@@ -1,11 +1,19 @@
 /** Settings Control Room (v4.1.0 — kimi §7.2). */
 export function useGovernance() {
+  const AI_MODEL_FEATURES = [
+    { key: 'ai_model_risk_explain', label: 'Risk explain' },
+    { key: 'ai_model_market_overview', label: 'Market overview (Insight tab)' },
+    { key: 'ai_model_market_narrative', label: 'Market narrative' },
+    { key: 'ai_model_insight_summary', label: 'Insights summary' },
+    { key: 'ai_model_anomaly_investigation', label: 'Anomaly investigation' },
+  ];
+
   const TIER1 = {
     ai: [
-      'ai_mode', 'feature_ai_summary', 'feature_ai_explain', 'feature_ai_insights',
+      'ai_mode', 'ai_fallback_provider', 'ai_fallback_model',
+      'feature_ai_summary', 'feature_ai_explain', 'feature_ai_insights',
       'feature_ai_narrative', 'feature_nlp_sentiment', 'feature_osint_feed',
-      'ai_model_risk_explain', 'ai_model_market_overview', 'ai_model_market_narrative',
-      'ai_model_insight_summary', 'ai_model_anomaly_investigation',
+      // model strings handled by dedicated pickers (AI_MODEL_FEATURES)
     ],
     data: [
       'refresh_core_seconds', 'refresh_osint_minutes', 'funding_rate_poll_interval_seconds',
@@ -20,7 +28,9 @@ export function useGovernance() {
   };
 
   const ADVANCED_ALLOWLIST = new Set([
-    'feature_multi_user', 'feature_onchain_signals', 'anomaly_std_floor',
+    // feature_multi_user intentionally omitted — single-operator product
+    'feature_onchain_signals', 'provider_moralis', 'provider_thegraph', 'provider_flipside',
+    'anomaly_std_floor', 'onchain_whale_threshold_usd',
     'ai_cache_enabled', 'ai_cache_ttl_seconds', 'semantic_cache_enabled',
     'retention_chain_trend_snapshots_days', 'retention_yield_bearing_snapshots_days',
     'retention_collateral_snapshots_days', 'retention_whale_activity_snapshots_days',
@@ -28,6 +38,7 @@ export function useGovernance() {
     'retention_settings_audit_log_days', 'retention_source_usage_days', 'retention_ai_usage_days',
     'retention_fred_yields_days', 'retention_fiat_reserve_snapshots_days',
     'webhook_timeout_seconds', 'external_intel_webhook_enabled',
+    'ethena_enabled', 'sky_protocol_enabled', 'coinglass_enabled', 'aave_enabled', 'ondo_enabled',
   ]);
 
   return {
@@ -42,6 +53,11 @@ export function useGovernance() {
       { id: 'security', label: 'Security' },
       { id: 'advanced', label: 'Advanced' },
     ],
+
+    aiModelFeatures: AI_MODEL_FEATURES,
+    modelCatalog: { ollama_cloud: [], openrouter: [] },
+    modelCatalogLoading: false,
+    modelCatalogError: '',
 
     opsStatus: null,
     qualitySummary: null,
@@ -283,7 +299,89 @@ export function useGovernance() {
     },
 
     get adminToken() {
-      return this.$store.ui.adminToken;
+      // Prefer isAuthenticated so cookie-only sessions still unlock Control Room.
+      return this.$store.ui.isAuthenticated || this.$store.ui.adminToken;
+    },
+
+    secretSettings() {
+      // Product-relevant secrets only (CMC removed). Moralis/Alchemy enable underutilized data.
+      const keys = [
+        'secret_ollama_api_key',
+        'secret_openrouter_api_key',
+        'secret_tavily_api_key',
+        'secret_exa_api_key',
+        'secret_moralis_api_key',
+        'secret_alchemy_api_key',
+        'webhook_signing_secret',
+        'fred_api_key',
+        'coinglass_api_key',
+      ];
+      return keys
+        .map(k => this.settingsList.find(s => s.key === k))
+        .filter(Boolean);
+    },
+
+    splitProviderModel(val) {
+      const s = String(val || '').trim();
+      const i = s.indexOf(':');
+      if (i <= 0) return { provider: 'ollama_cloud', model: s };
+      return { provider: s.slice(0, i), model: s.slice(i + 1) };
+    },
+
+    modelSettingValue(key) {
+      const s = this.settingsList.find(x => x.key === key);
+      return s?.value || '';
+    },
+
+    async loadModelCatalogs() {
+      if (!this.adminToken) return;
+      this.modelCatalogLoading = true;
+      this.modelCatalogError = '';
+      try {
+        const [o, r] = await Promise.all([
+          this._adminFetch('/api/ai/providers/ollama_cloud/models', { cache: 'no-store' }),
+          this._adminFetch('/api/ai/providers/openrouter/models', { cache: 'no-store' }),
+        ]);
+        const ollama = o.ok ? await o.json() : [];
+        const openrouter = r.ok ? await r.json() : [];
+        this.modelCatalog = {
+          ollama_cloud: Array.isArray(ollama) ? ollama : [],
+          openrouter: Array.isArray(openrouter) ? openrouter : [],
+        };
+        if (!o.ok && !r.ok) this.modelCatalogError = 'Could not load models — set API keys first';
+      } catch (e) {
+        this.modelCatalogError = e.message || 'Model catalog failed';
+      } finally {
+        this.modelCatalogLoading = false;
+      }
+    },
+
+    async saveFeatureModel(key, provider, modelId) {
+      const model = (modelId || '').trim();
+      const prov = (provider || 'ollama_cloud').trim();
+      if (!model) {
+        this.showToast('Model id required', 'error');
+        return;
+      }
+      const value = `${prov}:${model}`;
+      try {
+        await this.toggleSetting(key, value);
+        this.showToast(`${key} → ${value}`, 'success');
+        await this.loadSettings();
+      } catch (e) {
+        this.showToast(e.message, 'error');
+      }
+    },
+
+    onControlSubTab(id) {
+      this.controlSubTab = id;
+      if (id === 'overview') this.loadOpsStatus();
+      if (id === 'security') this.loadApiKeys();
+      if (id === 'data') this.loadAssetCatalog();
+      if (id === 'ai') {
+        this.loadSettings();
+        this.loadModelCatalogs();
+      }
     },
 
     async runTestAi() {

@@ -23,6 +23,7 @@ export function useAlerts() {
     },
 
     _bindAuth() {
+      this.$watch('$store.ui.isAuthenticated', () => this._loadAll());
       this.$watch('$store.ui.adminToken', () => this._loadAll());
     },
 
@@ -79,7 +80,7 @@ export function useAlerts() {
     },
 
     openRuleEditor() {
-      if (!this.$store.ui.adminToken) {
+      if (!this.$store.ui.isAuthenticated && !this.$store.ui.adminToken) {
         this.error = 'Sign in via Settings to edit alert rules.';
         return;
       }

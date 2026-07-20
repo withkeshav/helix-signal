@@ -25,6 +25,7 @@ from database import (
     SignalEvent,
     SourceUsage,
     WhaleActivitySnapshot,
+    WebSearchSnapshot,
     YieldBearingSnapshot,
 )
 
@@ -49,6 +50,7 @@ RETENTION_TABLES: list[tuple[str, Any, str, str, str, int, bool]] = [
     ("settings_audit_rows", SettingsAuditLog, "created_at", "retention_settings_audit_log_days", "RETENTION_SETTINGS_AUDIT_LOG_DAYS", 365, False),
     ("source_usage_rows", SourceUsage, "created_at", "retention_source_usage_days", "RETENTION_SOURCE_USAGE_DAYS", 400, False),
     ("ai_usage_rows", AiUsage, "created_at", "retention_ai_usage_days", "RETENTION_AI_USAGE_DAYS", 400, False),
+    ("web_search_rows", WebSearchSnapshot, "fetched_at", "retention_web_search_snapshots_days", "RETENTION_WEB_SEARCH_SNAPSHOTS_DAYS", 30, False),
 ]
 
 

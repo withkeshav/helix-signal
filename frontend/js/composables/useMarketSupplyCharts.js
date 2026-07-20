@@ -87,8 +87,10 @@ export function useMarketSupplyCharts() {
     },
 
     async _ensureDashboardSummary() {
+      // Market tab has no `market` composable — bootstrap store so strip + supply charts work
+      // without visiting Signal first (single dashboard source of truth).
       const d = this.$store.dashboard;
-      if (d.chains && d.chains.length && d.totalSupply != null && d.concentration) return;
+      if (d.chains && d.chains.length && d.totalSupply != null && d.signal && d.signal.score != null) return;
 
       this.$store.dashboard.loading = true;
       try {
@@ -99,6 +101,12 @@ export function useMarketSupplyCharts() {
         d.concentration = payload.chain_concentration || {};
         d.totalSupply = payload.total_supply_current;
         d.supplyChange = payload.total_supply_change_24h_pct;
+        d.signal = payload.asset_signal || d.signal || {};
+        d.depeg = payload.depeg_index || d.depeg || {};
+        d.freshness = payload.freshness || d.freshness || {};
+        d.sources = payload.sources || d.sources || [];
+        d.crossSource = payload.cross_source_signal || d.crossSource || {};
+        d.generatedAt = payload.generated_at || d.generatedAt || '';
       } catch {
         // Leave dashboard values as-is; UI should render placeholder empty states.
       } finally {

@@ -1,4 +1,18 @@
+/* Helix terminal — Tabler provides layout primitives; tokens below win for brand. */
 [x-cloak]{display:none!important}
+.helix-app{background:var(--bg)!important;color:var(--text)!important;font-family:Inter,"Segoe UI",Arial,sans-serif!important}
+.helix-app .page,.helix-app .page-wrapper,.helix-app .container-xl{background:transparent!important}
+.helix-panel-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+/* Structured AI report card (STATUS + bullets) */
+.ai-report{font-size:13px;line-height:1.55}
+.ai-report-status{font-weight:700;font-size:14px;margin:0 0 8px;padding:8px 10px;border-left:3px solid var(--spark);background:var(--bg-accent);border-radius:0 6px 6px 0}
+.ai-report-bullets{margin:0;padding:0 0 0 1.1rem}
+.ai-report-bullets li{margin:0 0 6px}
+.ai-report-body{margin:0;font-size:13px;line-height:1.5;color:var(--text)}
+.ai-model-picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ai-model-picker .select,.ai-model-picker .input{min-width:140px;max-width:220px}
+.helix-app .card{background:var(--panel);border:1px solid var(--line);color:var(--text);box-shadow:var(--card-shadow)}
+.helix-app .navbar,.helix-app .navbar-expand-md{background:var(--panel)!important;border-color:var(--line)!important}
 :root{color-scheme:light dark;--bg:#f4f7fb;--bg-accent:#e9eef9;--panel:#fff;--line:#d5deed;--text:#0f172a;--muted:#52607a;--text-muted:var(--muted);--warn:var(--neutral);--up:#0f8f68;--down:#b6283a;--neutral:#9a6a00;--ok-bg:rgba(15,143,104,0.12);--warn-bg:rgba(154,106,0,0.12);--alert-bg:rgba(182,40,58,0.12);--btn-bg:#111827;--btn-text:#f9fafb;--spark:#3b82f6;--card-shadow:0 8px 24px rgba(15,23,42,0.06);--cat-1:#3b82f6;--cat-2:#2dd4bf;--cat-3:#f59e0b;--cat-4:#ef4444;--cat-5:#8b5cf6;--fs-xs:11px;--fs-sm:13px;--fs-base:14px;--fs-lg:18px;--fs-xl:24px;--fs-hero:3.5rem;--fs-kpi:1.5rem;--fs-title:16px;--fs-section:12px;--fs-data:12px;--fs-sub:11px;--shadow-sm:0 4px 12px rgba(15,23,42,0.04);--shadow-lg:0 16px 40px rgba(15,23,42,0.1);--radius-sm:6px;--radius-md:10px;--radius-lg:14px;--space-xs:4px;--space-sm:8px;--space-md:12px;--space-lg:20px;--space-xl:28px;--container:min(1440px,99vw);--card-pad:12px;--grid-gap:8px}
 :root[data-theme="dark"]{--bg:#0c1018;--bg-accent:#172138;--panel:#121826;--line:#273247;--text:#e8edf7;--muted:#9aa8c4;--up:#2dd4bf;--down:#f87171;--neutral:#fbbf24;--ok-bg:rgba(45,212,191,0.12);--warn-bg:rgba(251,191,36,0.12);--alert-bg:rgba(248,113,113,0.12);--btn-bg:#e8edf7;--btn-text:#0f172a;--spark:#60a5fa;--card-shadow:0 10px 28px rgba(0,0,0,0.35);--cat-1:#60a5fa;--cat-2:#34d399;--cat-3:#fbbf24;--cat-4:#f87171;--cat-5:#a78bfa;--shadow-sm:0 4px 12px rgba(0,0,0,0.25);--shadow-lg:0 16px 40px rgba(0,0,0,0.4)}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:var(--fs-base);background:radial-gradient(circle at 20% 0%,var(--bg-accent),var(--bg));color:var(--text);min-height:100vh;transition:background .3s ease,color .2s ease}

@@ -2,6 +2,35 @@ export function formatUsd(v) {
   return formatSI(v, { prefix: '$' });
 }
 
+/**
+ * Parse AI plain-text into structured UI blocks.
+ * Expects optional "STATUS: ..." line and "- " bullets (see ai_router prompts).
+ */
+export function parseAiStructured(text) {
+  const raw = (text || '').trim();
+  if (!raw) return { status: '', bullets: [], body: '' };
+  const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let status = '';
+  const bullets = [];
+  const other = [];
+  for (const line of lines) {
+    if (/^STATUS:\s*/i.test(line)) {
+      status = line.replace(/^STATUS:\s*/i, '').trim();
+      continue;
+    }
+    if (/^[-•*]\s+/.test(line)) {
+      bullets.push(line.replace(/^[-•*]\s+/, '').trim());
+      continue;
+    }
+    other.push(line);
+  }
+  return {
+    status,
+    bullets,
+    body: other.join(' ').trim(),
+  };
+}
+
 /** Abbreviate large numbers with SI suffixes (K/M/B/T). */
 export function formatSI(v, opts = {}) {
   const { prefix = '', suffix = '', decimals = 2 } = opts;

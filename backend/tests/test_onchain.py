@@ -132,7 +132,7 @@ def test_refresh_and_whale_flow_cached(mock_moralis_cls, mock_graph_cls, mock_ge
         "available": True,
         "whale_net_outflow_usd": 3_000_000,
         "whale_alert": False,
-        "large_transfers": [],
+        "large_transfers": [{"hash": "0x1"}],
     }
     moralis.fetch_holder_concentration.return_value = {"available": True, "top10_share_pct": 45}
 
@@ -142,6 +142,21 @@ def test_refresh_and_whale_flow_cached(mock_moralis_cls, mock_graph_cls, mock_ge
     assert out["available"] is True
     assert out["net_mint_burn_usd_24h"] == 1_000_000
     assert "thegraph" in out["sources"]
+    # Durable history: Moralis results persist to whale_activity_snapshots
+    assert db.add.called
+    assert db.commit.called
+    row = db.add.call_args[0][0]
+    assert row.asset_symbol == "USDT"
+    assert row.top10_holder_pct == 45
+    assert row.large_transfer_count_24h == 1
+
+
+def test_persist_whale_activity_skips_empty():
+    from services.onchain import _persist_whale_activity
+
+    db = MagicMock()
+    _persist_whale_activity(db, "USDT", {"available": False}, {"available": False})
+    assert not db.add.called
 
 
 @patch("services.onchain.get_setting")

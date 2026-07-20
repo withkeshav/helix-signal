@@ -57,6 +57,12 @@ def run_web_search_job(db: Session) -> dict[str, Any]:
                 )
                 if row:
                     saved += 1
+                    try:
+                        from services.source_usage import increment_source_usage
+
+                        increment_source_usage(db, f"web_search_{provider}")
+                    except Exception:
+                        log.warning("web_search.usage_record_failed", provider=provider, exc_info=True)
                     log.info(
                         "web_search.ok",
                         query_key=qkey,
@@ -71,5 +77,12 @@ def run_web_search_job(db: Session) -> dict[str, Any]:
         except Exception:
             errors += 1
             log.exception("web_search.query_failed", query_key=qkey)
+
+    try:
+        from services.source_usage import flush_source_usage
+
+        flush_source_usage(db)
+    except Exception:
+        log.warning("web_search.usage_flush_failed", exc_info=True)
 
     return {"status": "ok", "saved": saved, "errors": errors, "planned": len(plan)}

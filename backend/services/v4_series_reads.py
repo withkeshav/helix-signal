@@ -250,7 +250,9 @@ def fetch_whale_activity_history(db: Session, *, asset_symbol: str, days: int) -
                 "asset_symbol": r["asset_symbol"],
                 "chain": r["chain"],
                 "top10_holder_pct": r["avg_top10_holder_pct"],
+                # Column name historical: gross large-transfer volume (USD), not net inflow
                 "exchange_inflow_usd_24h": r["avg_exchange_inflow_usd_24h"],
+                "large_transfer_volume_usd_24h": r["avg_exchange_inflow_usd_24h"],
                 "large_transfer_count_24h": r["total_large_transfers"],
                 "sample_count": r["sample_count"],
                 "source": "aggregate",
@@ -270,6 +272,7 @@ def fetch_whale_activity_history(db: Session, *, asset_symbol: str, days: int) -
             "chain": r.chain,
             "top10_holder_pct": r.top10_holder_pct,
             "exchange_inflow_usd_24h": r.exchange_inflow_usd_24h,
+            "large_transfer_volume_usd_24h": r.exchange_inflow_usd_24h,
             "large_transfer_count_24h": r.large_transfer_count_24h,
             "sample_count": 1,
             "source": "raw",

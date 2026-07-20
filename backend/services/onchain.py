@@ -6,9 +6,10 @@ Moralis holder/transfer results are cached in-memory AND persisted to
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 from structlog import get_logger
 
@@ -22,6 +23,52 @@ log = get_logger(__name__)
 
 _CACHE: dict[str, dict[str, Any]] = {}
 _LAST_REFRESH: datetime | None = None
+
+
+def _top10_delta_24h(db: Session, symbol: str, holders: dict[str, Any]) -> float | None:
+    """Delta vs most recent prior snapshot for this asset (approx 24h when polled daily+)."""
+    cur = holders.get("top10_share_pct")
+    if cur is None:
+        return None
+    try:
+        prev = (
+            db.execute(
+                select(WhaleActivitySnapshot)
+                .where(
+                    WhaleActivitySnapshot.asset_symbol == symbol.upper(),
+                    WhaleActivitySnapshot.top10_holder_pct.isnot(None),
+                )
+                .order_by(desc(WhaleActivitySnapshot.timestamp))
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+        if prev is None or prev.top10_holder_pct is None:
+            return None
+        # Prefer a row older than ~12h if available so delta is meaningful
+        older = (
+            db.execute(
+                select(WhaleActivitySnapshot)
+                .where(
+                    WhaleActivitySnapshot.asset_symbol == symbol.upper(),
+                    WhaleActivitySnapshot.top10_holder_pct.isnot(None),
+                    WhaleActivitySnapshot.timestamp
+                    < datetime.now(timezone.utc) - timedelta(hours=12),
+                )
+                .order_by(desc(WhaleActivitySnapshot.timestamp))
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
+        base = older or prev
+        if base.top10_holder_pct is None:
+            return None
+        return round(float(cur) - float(base.top10_holder_pct), 4)
+    except Exception:
+        log.warning("onchain.top10_delta_failed", asset=symbol, exc_info=True)
+        return None
 
 
 def _feature_enabled(db: Session | None) -> bool:
@@ -101,9 +148,15 @@ def _persist_whale_activity(
                 top10_holder_pct=float(holders["top10_share_pct"])
                 if holders.get("top10_share_pct") is not None
                 else None,
-                top10_holder_pct_delta_24h=None,
+                # Delta requires prior snapshot; filled when previous row exists (see below)
+                top10_holder_pct_delta_24h=_top10_delta_24h(db, symbol, holders),
                 large_transfer_count_24h=len(large) if transfers.get("available") else None,
-                exchange_inflow_usd_24h=float(transfers.get("whale_net_outflow_usd") or 0)
+                # Column name is historical: stores gross large-transfer volume (USD), not net exchange inflow
+                exchange_inflow_usd_24h=float(
+                    transfers.get("large_transfer_volume_usd")
+                    or transfers.get("whale_net_outflow_usd")
+                    or 0
+                )
                 if transfers.get("available")
                 else None,
                 timestamp=datetime.now(timezone.utc),

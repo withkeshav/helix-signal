@@ -32,6 +32,7 @@ export function useMarket() {
     errorOverview: '',
 
     aiOverviewError: '',
+    aiExplainError: '',
     aiNarrativeError: '',
     aiInsightsError: '',
 
@@ -182,17 +183,22 @@ export function useMarket() {
       try {
         // Skip redundant API calls if dashboard already loaded (tabs share `$store.dashboard`)
         if (!this.$store.dashboard.chains?.length) {
-          await this.loadDashboard(this.asset);
-          await this.loadAllAssetSnapshots();
-          await this.loadAnomalies();
-          await this.loadPredictive();
-          await this.loadDews();
-          await this.loadMarketOverview();
-          await this.loadAiExplain();
-          await this.loadNarrative();
-          await this.loadInsights();
-          await this.loadStressLeaderboard();
-          await this.loadRotation();
+          const a = this.$store.dashboard.asset || this.asset;
+          this.asset = a;
+          // Parallel cold-start (dashboard first so strip has data)
+          await this.loadDashboard(a);
+          await Promise.all([
+            this.loadAllAssetSnapshots(),
+            this.loadAnomalies(),
+            this.loadPredictive(),
+            this.loadDews(),
+            this.loadMarketOverview(),
+            this.loadAiExplain(),
+            this.loadNarrative(),
+            this.loadInsights(),
+            this.loadStressLeaderboard(),
+            this.loadRotation(),
+          ]);
         } else {
           // Sync shared store data to this component's local state
           const s = this.$store.dashboard;
@@ -291,6 +297,7 @@ export function useMarket() {
       this.$store.ui.beginFetch();
       try {
         const asset = this.$store.dashboard.asset || this.asset;
+        this.asset = asset;
         await Promise.all([
           this.loadDashboard(asset),
           this.loadAllAssetSnapshots(),
@@ -299,6 +306,13 @@ export function useMarket() {
           this.loadDews(),
           this.loadStressLeaderboard(),
           this.loadRotation(),
+          // AI panels refresh on tick (Signal only) so age/meta stay current
+          ...(tab === 'signal' ? [
+            this.loadMarketOverview(),
+            this.loadAiExplain(),
+            this.loadNarrative(),
+            this.loadInsights(),
+          ] : []),
         ]);
       } finally {
         this.$store.ui.endFetch();
@@ -413,7 +427,8 @@ export function useMarket() {
 
     async loadDews() {
       try {
-        const r = await fetch(`/api/dews?asset=${this.asset}`, { cache: 'no-store' });
+        const asset = this.$store.dashboard.asset || this.asset;
+        const r = await fetch(`/api/dews?asset=${asset}`, { cache: 'no-store' });
         if (r.ok) {
           this.dews = await r.json();
           this.$store.dashboard.dews = this.dews;
@@ -471,23 +486,30 @@ export function useMarket() {
     },
     
     async loadAiExplain() {
+      this.aiExplainError = '';
       try {
-        const r = await this.$store.ui.adminFetch(`/api/ai/explain?asset=${this.asset}`, { cache: 'no-store' });
+        const asset = this.$store.dashboard.asset || this.asset;
+        const r = await this.$store.ui.adminFetch(`/api/ai/explain?asset=${asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           this.aiSummary = j.available ? j.summary : (j.reason || '');
           this.aiGeneratedAt = j.generated_at || '';
           this.aiExpiresAt = j.expires_at || '';
+          this.aiExplainError = j.available ? '' : (j.reason || '');
           return { summary: this.aiSummary, generatedAt: this.aiGeneratedAt, expiresAt: this.aiExpiresAt };
         }
-      } catch (e) {}
+        this.aiExplainError = this._formatAiFetchError(r, 'risk explain');
+      } catch (e) {
+        this.aiExplainError = `Network error: ${e.message}`;
+      }
       return { summary: '', generatedAt: '', expiresAt: '' };
     },
     
     async loadNarrative() {
       this.aiNarrativeError = '';
       try {
-        const r = await this.$store.ui.adminFetch(`/api/ai/narrative?asset=${this.asset}`, { cache: 'no-store' });
+        const asset = this.$store.dashboard.asset || this.asset;
+        const r = await this.$store.ui.adminFetch(`/api/ai/narrative?asset=${asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           if (j.available) {
@@ -517,7 +539,8 @@ export function useMarket() {
     async loadInsights() {
       this.aiInsightsError = '';
       try {
-        const r = await this.$store.ui.adminFetch(`/api/ai/insights?asset=${this.asset}`, { cache: 'no-store' });
+        const asset = this.$store.dashboard.asset || this.asset;
+        const r = await this.$store.ui.adminFetch(`/api/ai/insights?asset=${asset}`, { cache: 'no-store' });
         if (r.ok) {
           const j = await r.json();
           if (j.available) {

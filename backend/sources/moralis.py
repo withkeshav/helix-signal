@@ -131,23 +131,23 @@ class MoralisSource:
 
         decimals = int(token["decimals"])
         large: list[dict[str, Any]] = []
-        net_out = 0.0
+        gross_volume = 0.0
         for row in body.get("result") or []:
             val_raw = float(row.get("value") or 0)
             value_usd = val_raw / (10 ** decimals)
             if value_usd < threshold:
                 continue
-            direction = "out" if row.get("from_address") else "unknown"
+            # ERC20 transfer list has no wallet-relative direction without a seed address.
+            # Label as transfer; accumulate gross large-transfer volume (not "net outflow").
             large.append({
                 "hash": row.get("transaction_hash"),
                 "from": row.get("from_address"),
                 "to": row.get("to_address"),
                 "value_usd": round(value_usd, 2),
-                "direction": direction,
+                "direction": "transfer",
                 "block_timestamp": row.get("block_timestamp"),
             })
-            if direction == "out":
-                net_out += value_usd
+            gross_volume += value_usd
 
         return {
             "available": True,
@@ -155,7 +155,9 @@ class MoralisSource:
             "large_transfers": large,
             "large_transfer_count": len(large),
             "whale_alert": len(large) >= 3,
-            "whale_net_outflow_usd": round(net_out, 2),
+            # Historical key name kept for callers; value is gross large-transfer USD volume
+            "whale_net_outflow_usd": round(gross_volume, 2),
+            "large_transfer_volume_usd": round(gross_volume, 2),
             "threshold_usd": threshold,
             "fetched_at": datetime.now(timezone.utc).isoformat(),
         }

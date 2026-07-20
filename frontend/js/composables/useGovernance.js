@@ -113,6 +113,26 @@ export function useGovernance() {
       return v === true || v === 'true' || v === 1 || v === '1';
     },
 
+    async initControlRoom() {
+      await Promise.all([
+        this.loadSettings(),
+        this.loadPlaybooks(),
+        this.loadAssetCatalog(),
+      ]);
+      // Bridge: open sub-tab requested via goSettings() without Alpine internals
+      const sub = this.$store?.ui?.controlSubTabRequest;
+      if (sub) {
+        this.controlSubTab = sub;
+        this.$store.ui.controlSubTabRequest = '';
+      }
+      this.$watch('$store.ui.controlSubTabRequest', (v) => {
+        if (v) {
+          this.controlSubTab = v;
+          this.$store.ui.controlSubTabRequest = '';
+        }
+      });
+    },
+
     tier1Settings(group) {
       const keys = TIER1[group] || [];
       return keys

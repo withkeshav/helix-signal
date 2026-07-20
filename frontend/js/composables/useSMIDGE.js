@@ -34,7 +34,7 @@ export function useSMIDGE() {
     },
 
     init() {
-      this.$store.osint.loadAttestation();
+      // Attestation is owned by osint panel init on Intel tab — avoid duplicate fetch
       this.loadSmidge(this.$store.dashboard.asset);
       this.$watch('$store.dashboard.asset', (a) => this.loadSmidge(a));
       this.$watch('$store.ui.tab', (tab) => {

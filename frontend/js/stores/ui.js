@@ -58,6 +58,10 @@ export function registerUiStore(Alpine) {
     enabledAssets: [],
     aiModeLabel: 'Off',
     dataHealthLabel: '—',
+    /** Bridge: Settings sub-tab to open after navigating to Settings (avoids Alpine _x_dataStack). */
+    controlSubTabRequest: '',
+    /** Bridge: address to investigate after navigating to Forensics. */
+    pendingInvestigateAddress: '',
     refreshing: false,
     toastMessage: '',
     toastType: 'info',
@@ -110,14 +114,16 @@ export function registerUiStore(Alpine) {
     setTab(t) {
       this.tab = t;
       location.hash = t;
-      // Keep root helixApp.tab in sync when Alpine is mounted (prevents nav desync)
-      try {
-        const root = document.documentElement;
-        const app = root?._x_dataStack?.[0];
-        if (app && app.tab !== undefined) app.tab = t;
-      } catch {
-        /* ignore */
-      }
+      // helixApp watches $store.ui.tab — no _x_dataStack required
+      window.dispatchEvent(new CustomEvent('ui-tab-set', { detail: { tab: t } }));
+    },
+
+    requestSettingsSubTab(sub) {
+      this.controlSubTabRequest = sub || 'overview';
+    },
+
+    requestInvestigate(addr) {
+      this.pendingInvestigateAddress = (addr || '').trim();
     },
 
     _setAuthenticated(ok, { token, username } = {}) {

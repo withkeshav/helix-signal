@@ -143,6 +143,18 @@ def set_setting(key: str, value: Any, db: Session, user: Any = None, ip_address:
         if max_val is not None and int_val > max_val:
             raise ValueError(f"Setting '{key}' must be <= {max_val}")
         value = int_val
+    if meta.get("type") in ("float", "number"):
+        try:
+            float_val = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Setting '{key}' requires a number") from exc
+        min_val = meta.get("min")
+        max_val = meta.get("max")
+        if min_val is not None and float_val < min_val:
+            raise ValueError(f"Setting '{key}' must be >= {min_val}")
+        if max_val is not None and float_val > max_val:
+            raise ValueError(f"Setting '{key}' must be <= {max_val}")
+        value = float_val
     if meta.get("type") == "str" and "choices" in meta:
         if str(value) not in meta["choices"]:
             raise ValueError(f"Setting '{key}' must be one of: {', '.join(meta['choices'])}")
@@ -283,6 +295,11 @@ def _coerce(val: str, typ: str) -> Any:
     if typ == "int":
         try:
             return int(val)
+        except (ValueError, TypeError):
+            return None
+    if typ in ("float", "number"):
+        try:
+            return float(val)
         except (ValueError, TypeError):
             return None
     return val

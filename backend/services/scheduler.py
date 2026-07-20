@@ -210,6 +210,19 @@ def _web_search_job() -> None:
         db.close()
 
 
+def _forecast_job() -> None:
+    """Trend-extrapolate forecasts into forecast_runs/points for Market charts."""
+    db = SessionLocal()
+    try:
+        from services.forecast_writer import run_forecast_job
+        result = run_forecast_job(db)
+        log.info("forecast_job.complete", **(result or {}))
+    except Exception:
+        log.exception("forecast_job.failed")
+    finally:
+        db.close()
+
+
 def register_scheduler_jobs(
     scheduler: AsyncIOScheduler,
     setup_db: Session,
@@ -250,6 +263,18 @@ def register_scheduler_jobs(
     _add_job(_fiat_reserve_job, "cron", job_id="fiat-reserve-scrape", hour=5, minute=0)
     # Web search cache for AI (12h) — skipped unless Tavily/Exa secret present + ai_mode on
     _add_job(_web_search_job, "cron", job_id="web-search-refresh", hour="6,18", minute=15)
+    # Lightweight peg/supply forecasts for Market tab (no TimesFM dependency)
+    _add_job(_forecast_job, "cron", job_id="forecast-refresh", hour="5,11,17,23", minute=20)
+    # One delayed forecast fill after boot so Market is not empty until next cron
+    try:
+        _add_job(
+            _forecast_job,
+            "date",
+            job_id="forecast-startup-once",
+            run_date=datetime.now(timezone.utc) + timedelta(minutes=3),
+        )
+    except Exception:
+        log.warning("forecast.startup_once_schedule_failed", exc_info=True)
     # One delayed boot fill if feature on and cache empty/stale (avoids waiting until next 06:15/18:15)
     try:
         from sqlalchemy import desc, select

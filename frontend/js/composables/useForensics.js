@@ -236,6 +236,7 @@ export function useForensics() {
     init() {
       this.loadBlacklistStats();
       this.loadBlacklistEvents();
+      this._consumePendingInvestigate();
 
       this._graphNodeClickHandler = (e) => this._onGraphNodeClick(e);
       window.addEventListener('graph-node-click', this._graphNodeClickHandler);
@@ -244,6 +245,7 @@ export function useForensics() {
         if (tab === 'forensics') {
           this.loadBlacklistStats();
           this.loadBlacklistEvents();
+          this._consumePendingInvestigate();
           this.$nextTick(() => {
             if (this.investigationResult && !this.graphChart && this.graphSubTab === 'graph') {
               this._renderActiveSubTab();
@@ -251,6 +253,28 @@ export function useForensics() {
             this._resizeAllCharts();
           });
         }
+      });
+
+      // Refresh blacklist KPIs on global 60s tick while on Forensics
+      this.$watch('$store.ui.refreshTick', () => {
+        if (this.$store.ui.tab === 'forensics') {
+          this.loadBlacklistStats();
+          this.loadBlacklistEvents();
+        }
+      });
+
+      this.$watch('$store.ui.pendingInvestigateAddress', (addr) => {
+        if (addr) this._consumePendingInvestigate();
+      });
+    },
+
+    _consumePendingInvestigate() {
+      const addr = (this.$store?.ui?.pendingInvestigateAddress || '').trim();
+      if (!addr) return;
+      this.investigateAddress = addr;
+      this.$store.ui.pendingInvestigateAddress = '';
+      this.$nextTick(() => {
+        if (typeof this.investigate === 'function') this.investigate();
       });
     },
 

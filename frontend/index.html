@@ -387,7 +387,8 @@
                   <li x-text="b"></li>
                 </template>
               </ul>
-              <p class="ai-report-body" x-show="parseAiStructured(marketOverview).body && !parseAiStructured(marketOverview).bullets.length" x-text="marketOverview"></p>
+              <p class="ai-report-body" x-show="parseAiStructured(marketOverview).body" x-text="parseAiStructured(marketOverview).body"></p>
+              <p class="kpi-sub" x-cloak x-show="aiOverviewError" x-text="aiOverviewError" style="color:var(--neutral);margin-top:6px"></p>
             </div>
           </template>
           <p x-cloak x-show="!marketOverview" class="ai-report-body" x-text="deterministicOverviewText()"></p>
@@ -401,7 +402,8 @@
                   <li x-text="b"></li>
                 </template>
               </ul>
-              <p class="ai-report-body" x-show="parseAiStructured(aiNarrative).body && !parseAiStructured(aiNarrative).bullets.length" x-text="aiNarrative"></p>
+              <p class="ai-report-body" x-show="parseAiStructured(aiNarrative).body" x-text="parseAiStructured(aiNarrative).body"></p>
+              <p class="kpi-sub" x-cloak x-show="aiNarrativeError" x-text="aiNarrativeError" style="color:var(--neutral);margin-top:6px"></p>
             </div>
           </template>
           <p x-cloak x-show="!aiNarrative" class="ai-report-body" style="white-space:pre-wrap" x-text="deterministicNarrativeText()"></p>
@@ -415,7 +417,9 @@
                   <li x-text="b"></li>
                 </template>
               </ul>
-              <p class="ai-report-body" x-show="parseAiStructured(aiInsights).body && !parseAiStructured(aiInsights).bullets.length" x-text="aiInsights"></p>
+              <p class="ai-report-body" x-show="parseAiStructured(aiInsights).body" x-text="parseAiStructured(aiInsights).body"></p>
+              <p class="kpi-sub" x-cloak x-show="aiInsightsError" x-text="aiInsightsError" style="color:var(--neutral);margin-top:6px"></p>
+              <p class="kpi-sub" x-cloak x-show="aiExplainError && aiSubTab==='insights'" x-text="aiExplainError" style="color:var(--neutral);margin-top:6px"></p>
             </div>
           </template>
           <p x-cloak x-show="!aiInsights" class="ai-report-body" style="white-space:pre-wrap" x-text="deterministicInsightsText()"></p>
@@ -803,7 +807,7 @@
       <div x-data="forecast">
         <div x-cloak x-show="errorForecast" class="warning-banner visible" x-text="errorForecast" style="margin-bottom:8px"></div>
         <div class="chart-card">
-          <h2>Peg Forecast (24h) <span class="model-badge">TimesFM 2.5</span></h2>
+          <h2>Peg Forecast (24h) <span class="model-badge">trend extrapolate</span></h2>
           <div class="chart-wrap xl" id="chart-peg-forecast" style="position:relative">
             <div x-cloak x-show="loadingForecast && !(_forecastData?.forecast_points?.peg?.length)" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
             <div x-cloak x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress. Enable in Settings or check back soon.</div>
@@ -811,7 +815,7 @@
           </div>
         </div>
         <div class="chart-card">
-          <h2>Supply Forecast (7d) <span class="model-badge">TimesFM 2.5</span></h2>
+          <h2>Supply Forecast (7d) <span class="model-badge">trend extrapolate</span></h2>
           <div class="chart-wrap xl" id="chart-supply-forecast" style="position:relative">
             <div x-cloak x-show="loadingForecast && !(_forecastData?.forecast_points?.supply?.length)" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);border-radius:8px"><span class="loading-spinner"></span>Loading forecast...</div>
             <div x-cloak x-show="!loadingForecast && !errorForecast && !$store.dashboard.predictive?.available" class="kpi-sub" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--panel);border-radius:8px;text-align:center;padding:16px">Predictive analytics disabled or model training in progress.</div>
@@ -1256,7 +1260,8 @@
 
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:span 2">
-          <h2>Fired Alerts</h2>
+          <h2>Active / Filtered Alerts</h2>
+          <p class="kpi-sub" style="margin:0 0 8px">Live inbox from the alert engine (filterable). History below is the recent event stream.</p>
           <div style="margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
             <input type="text" placeholder="Filter by asset (e.g. USDT)" x-model="assetFilter" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px;flex:1" @keyup.enter="filterAlerts()" />
             <select x-model="severityFilter" @change="filterAlerts()" style="border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--bg);color:var(--text);font-size:13px">
@@ -1324,7 +1329,8 @@
           </template>
         </div>
         <div class="insight-card" style="grid-column:span 2">
-          <h2 class="section-heading">Alert History</h2>
+          <h2 class="section-heading">Recent Event Stream</h2>
+          <p class="kpi-sub" style="margin:0 0 8px">Signal/OSINT-style events (not a second copy of the filtered inbox).</p>
           <div class="data-table-wrap" x-cloak x-show="historyEvents.length">
             <table class="data-table">
               <thead><tr><th></th><th>Time</th><th>Event</th><th>Severity</th></tr></thead>
@@ -1584,7 +1590,7 @@
     <!-- Tab: Settings (lazy-mounted via x-if — DOM unmounts on tab switch) -->
     <template x-if="$store.ui.tab === 'settings'">
     <div class="tab-content settings" x-cloak x-data="governance"
-         x-init="loadSettings(); loadPlaybooks(); loadAssetCatalog();"
+         x-init="initControlRoom()"
          role="tabpanel" id="tab-settings">
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
@@ -1644,7 +1650,7 @@
           <!-- AI & Models -->
           <div x-show="controlSubTab==='ai'">
             <div x-show="!setupDone" class="cr-status-card" style="margin-bottom:12px">
-              <h3>Quick Setup — Step <span x-text="wizardStep"></span> of 3</h3>
+              <h3>Quick Setup — Step <span x-text="Math.min(wizardStep, 2)"></span> of 2</h3>
               <div x-show="wizardStep===1">
                 <select class="select" x-model="wizardPlaybook">
                   <option value="max_free">Off / Minimal</option>
@@ -1811,10 +1817,16 @@
                 <template x-if="s.type==='int'">
                   <input class="input" type="number" :value="advancedDirty[s.key] ?? s.value" style="width:100px" @change="markAdvancedDirty(s.key, parseInt($event.target.value,10))">
                 </template>
+                <template x-if="s.type==='float' || s.type==='number'">
+                  <input class="input" type="number" step="any" :value="advancedDirty[s.key] ?? s.value" style="width:100px" @change="markAdvancedDirty(s.key, parseFloat($event.target.value))">
+                </template>
                 <template x-if="s.type==='enum'">
                   <select class="select" :value="advancedDirty[s.key] ?? s.value" @change="markAdvancedDirty(s.key, $event.target.value)">
                     <template x-for="opt in (s.options||[])" :key="opt"><option :value="opt" x-text="opt"></option></template>
                   </select>
+                </template>
+                <template x-if="s.type!=='bool' && s.type!=='int' && s.type!=='float' && s.type!=='number' && s.type!=='enum' && s.type!=='secret'">
+                  <input class="input" type="text" :value="advancedDirty[s.key] ?? s.value" @change="markAdvancedDirty(s.key, $event.target.value)">
                 </template>
               </div>
             </template>
@@ -1822,7 +1834,7 @@
               <span x-text="`${advancedDirtyCount} unsaved change(s)`"></span>
               <button class="btn btn-primary" type="button" :disabled="advancedSaving" @click="saveAdvancedDirty()">Save</button>
             </div>
-            <p class="kpi-sub" style="margin-top:12px"><a href="/admin" target="_blank" rel="noopener">Open SQLAdmin</a> for users, audit, and all 110 keys.</p>
+            <p class="kpi-sub" style="margin-top:12px"><a href="/admin" target="_blank" rel="noopener">Open SQLAdmin</a> for users, audit, and the full settings registry (~129 keys).</p>
             <button class="btn btn-muted" type="button" @click="exportSettings()">Export</button>
             <button class="btn btn-muted" type="button" @click="triggerImport()">Import</button>
             <input type="file" x-ref="settingsImportInput" accept="application/json,.json" style="display:none" @change="importSettings($event)">

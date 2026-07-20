@@ -13,9 +13,17 @@ export function parseAiStructured(text) {
   let status = '';
   const bullets = [];
   const other = [];
+  let statusSeen = false;
   for (const line of lines) {
     if (/^STATUS:\s*/i.test(line)) {
-      status = line.replace(/^STATUS:\s*/i, '').trim();
+      // First STATUS wins; later STATUS lines become body prose (avoid duplicate bar)
+      const rest = line.replace(/^STATUS:\s*/i, '').trim();
+      if (!statusSeen) {
+        status = rest;
+        statusSeen = true;
+      } else if (rest) {
+        other.push(rest);
+      }
       continue;
     }
     if (/^[-•*]\s+/.test(line)) {
@@ -27,7 +35,8 @@ export function parseAiStructured(text) {
   return {
     status,
     bullets,
-    body: other.join(' ').trim(),
+    // Keep prose even when bullets exist (UI can show both)
+    body: other.join('\n').trim(),
   };
 }
 

@@ -1,6 +1,19 @@
 # Helix Signal Changelog
 
-## Unreleased (post-4.2.0 verification + product re-arch pass)
+## v4.3.0 (2026-07-20) — Product re-arch, web search, Control Room, audit remediation
+
+### Added
+- Scheduled web search cache for AI (Tavily → Exa → Ollama; opt-in via Tavily/Exa secrets).
+- Linear-trend forecast writer (`forecast-refresh` + startup-once) so Market peg/supply charts have data without TimesFM.
+- Control Room model pickers, secret rotate (incl. Tavily/Exa), settings enum options, import/export secret safety.
+- Web search usage counters via `SourceUsage` (`web_search_{provider}`).
+
+### Fixed (audit Batches A–D)
+- Market forecast overlays, asset store sync, settings enum options, Cmd+K investigate, import toast, AI badge.
+- Alpine store bridges for Settings sub-tab + Forensics investigate (less `_x_dataStack`).
+- Signal cold-start parallelization; AI panels refresh on 60s tick; hashchange tab sync.
+- AI parser keeps prose with bullets; AI fetch errors visible; wizard copy; Advanced float controls.
+- Forensics blacklist refresh on tick; Moralis large-transfer volume semantics; top10 delta when prior snapshot exists.
 
 ### Control Room / docs (audit Batch B)
 - **Wizard rate limit** — `PUT /api/settings` admin limit **30/min** (was 5); wizard applies features with per-key error reporting.

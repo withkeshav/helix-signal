@@ -308,7 +308,7 @@ All endpoints return JSON. Error responses follow:
     "USDC": {"age_hours": 0.17, "last_fetch": "2026-05-27T11:55:00Z"}
   },
   "worst_asset_age_hours": 0.17,
-  "version": "4.2.0"
+  "version": "4.3.0"
 }
 ```
 

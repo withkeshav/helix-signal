@@ -121,24 +121,13 @@ Alpine.data('helixApp', () => ({
   },
 
   goSettings(sub) {
+    this.$store.ui.requestSettingsSubTab(sub || 'overview');
     this.goTab('settings');
-    this.$nextTick(() => {
-      const gov = document.querySelector('#tab-settings')?._x_dataStack?.[0];
-      if (gov) gov.controlSubTab = sub;
-    });
   },
 
   investigateAddress(addr) {
+    this.$store.ui.requestInvestigate(addr);
     this.goTab('forensics');
-    this.$nextTick(() => {
-      const panel = document.querySelector('#tab-forensics')?._x_dataStack?.[0];
-      if (panel) {
-        panel.investigateAddress = addr;
-        // Forensics composable method is investigate(), not runInvestigate
-        if (typeof panel.investigate === 'function') panel.investigate();
-        else if (typeof panel.runInvestigate === 'function') panel.runInvestigate();
-      }
-    });
   },
 
   openPalette() {
@@ -253,18 +242,33 @@ Alpine.data('helixApp', () => ({
       if (!document.hidden) this.$store.ui.refreshTick++;
     });
 
-    // Browser back/forward support — sync tab from URL hash (Phase 3.1)
-    window.addEventListener('popstate', () => {
-      const hashTab = location.hash.slice(1);
+    // Browser back/forward + manual hash edits
+    const applyHashTab = () => {
+      let hashTab = location.hash.slice(1) || 'signal';
+      if (hashTab === 'analytics') hashTab = 'signal';
       if (validTabs.includes(hashTab) && hashTab !== this.tab) {
         this.tab = hashTab;
         this.$store.ui.tab = hashTab;
       }
+    };
+    window.addEventListener('popstate', applyHashTab);
+    window.addEventListener('hashchange', applyHashTab);
+
+    // Store → root tab bridge (setTab / ui-tab-set)
+    this.$watch('$store.ui.tab', (t) => {
+      if (t && t !== this.tab) this.tab = t;
     });
-    
+    window.addEventListener('ui-tab-set', (e) => {
+      const t = e?.detail?.tab;
+      if (t && validTabs.includes(t) && t !== this.tab) {
+        this.tab = t;
+        this.$store.ui.tab = t;
+      }
+    });
+
     // Sync asset changes to dashboard store
     this.$watch('asset', val => this.$store.dashboard.asset = val);
-    
+
     // Load warnings
     await this._loadWarnings();
     // Start global refresh cycle with backpressure

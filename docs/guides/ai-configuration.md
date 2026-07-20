@@ -111,10 +111,13 @@ Each feature can be enabled/disabled independently:
 
 | Setting Key | Default | Effect |
 |-------------|---------|--------|
-| `feature_ai_risk_explain` | `true` | Risk explanation panel on Signal tab |
-| `feature_ai_market_narrative` | `true` | Market narrative on Market tab |
-| `feature_ai_insight_summary` | `true` | Asset insight summary |
-| `feature_ai_predictive` | `true` | Predictive analytics (regime / depeg) |
+| `feature_ai_explain` | `true` | Risk explain LLM path on Signal |
+| `feature_ai_summary` | `true` | Market overview / insight overview LLM |
+| `feature_ai_narrative` | `true` | Market narrative LLM |
+| `feature_ai_insights` | `true` | Insights summary LLM |
+| `feature_nlp_sentiment` | (registry) | NLP sentiment (separate from LLM panels) |
+
+Predictive/regime math is **not** gated by a `feature_ai_predictive` key in current registry; use `ai_mode` and predictive services. LLM panels each have their own `feature_ai_*` toggle.
 
 These toggles are evaluated only when `ai_mode` is `ai_lite` or `ai_full`.
 

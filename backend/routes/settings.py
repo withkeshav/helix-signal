@@ -121,7 +121,7 @@ def api_settings_ops(
 
 
 @router.put("/settings")
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")  # Admin-only; wizard/batch toggles need headroom over 5/min
 def api_update_setting(
     request: Request,
     body: SettingUpdate,

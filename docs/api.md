@@ -180,7 +180,7 @@ Long-range reads use Timescale continuous aggregates on PostgreSQL (≥7d window
 
 ## Insight Assets (v4.1.0+)
 
-Versioned deterministic insight objects (L4: payload always present; `ai_narrative` only when `ai_mode` on).
+Versioned **deterministic** insight objects. The scheduled refresh job and request path never call the LLM (avoids 504s). Live AI narratives use `/api/ai/*` instead. The optional `ai_narrative` field is only present if a historical row still has it; new writes leave it unset.
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -236,18 +236,28 @@ Data Quality Dashboard provides comprehensive monitoring of:
 | GET | `/api/ai/narrative?asset=USDT` | Market narrative with sentiment + events | 30/min | `AI_MODE != ai_off` |
 | GET | `/api/ai/insights?asset=USDT` | Supply, chain, and anomaly insights | 30/min | `AI_MODE != ai_off` |
 | GET | `/api/ai/market-overview` | Cross-asset market summary | 20/min | `AI_MODE != ai_off` (returns engine data when off) |
-| GET | `/api/ai/usage` | Recent AI usage per feature / provider / model | 30/min | Always available |
+| GET | `/api/ai/usage` | Recent AI usage per feature / provider / model | 30/min | **Admin** session or token |
+| GET | `/api/ai/warnings` | Operational AI/source warnings banner | 30/min | Admin |
+| GET | `/api/ai/providers` | List AI providers (Ollama Cloud, OpenRouter) | 30/min | Admin |
+| GET | `/api/ai/providers/{provider_id}/models` | Models for provider | 30/min | Admin |
 
-AI endpoints can optionally require `X-Admin-Token` — enable `ai_require_token` in Settings UI.
-When enabled, failed auth triggers a per-IP lockout after 20 failed attempts (15-minute window).
-Lockout uses Redis when available, falling back to in-memory tracking.
+AI explain/narrative routes can optionally require admin auth — enable `ai_require_token` in Settings (recommended when internet-facing). Default is open for trusted LAN.
 
-## AI Model Discovery (Admin)
+**Models response shape:**
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| GET | `/api/admin/ai/providers` | List all available AI providers | Admin token |
-| GET | `/api/admin/ai/providers/{provider_id}/models` | List models available from a specific provider | Admin token |
+```json
+{ "models": [{ "id": "…", "name": "…" }], "error": null, "provider": "ollama_cloud" }
+```
+
+`error` is `null` on success, or e.g. `no_api_key`, `provider_http_401`, `provider_error:TimeoutException` so the UI can distinguish empty catalogs from misconfiguration.
+
+## Settings import / export (Admin)
+
+| Method | Endpoint | Notes |
+|--------|----------|-------|
+| GET | `/api/settings/export` | Secrets exported as `"configured"` only |
+| POST | `/api/settings/import` | Skips secret keys when value is a mask sentinel (does not clobber live keys) |
+| PUT | `/api/settings` | Admin; secrets never echoed in response (`value: "configured"`) |
 
 ## AI Provider Facade (Internal)
 

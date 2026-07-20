@@ -2,6 +2,13 @@
 
 ## Unreleased (post-4.2.0 verification + product re-arch pass)
 
+### Control Room / docs (audit Batch B)
+- **Wizard rate limit** — `PUT /api/settings` admin limit **30/min** (was 5); wizard applies features with per-key error reporting.
+- **Model catalog** — `GET /api/ai/providers/{id}/models` returns `{models, error}` (`no_api_key` vs HTTP errors vs empty list).
+- **Advanced allowlist** — real `ai_cache_semantic_*` keys; drop dead `ai_cache_enabled` / `semantic_cache_enabled`; add `liquity_enabled`, web_search retention.
+- **Secrets rotate** — Flipside, The Graph, Etherscan added to Control Room list.
+- **Docs** — `api.md` AI paths + insights deterministic; feature toggle names; README 7-tab; `.env.example` AI/web keys; architecture web_search.
+
 ### Frontend / Control Room (audit Batch A)
 - **Market forecast overlays** — empty-state keys aligned with API `forecast_points.peg` / `.supply` (no permanent wrong overlay).
 - **Asset switch** — token-card `switchTo` updates `$store.dashboard.asset` so DEWS/AI/panels track the selected asset.

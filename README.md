@@ -40,7 +40,7 @@ One-stop monitoring terminal covering USDT, USDC, DAI, and PYUSD across 17+ chai
 - **AI anomaly detection** (gated): Z-score, Isolation Forest (trained on startup when enough history), StatsForecast forecast. Train ONNX depeg model with `scripts/train_depeg_model.py` using labels from `data/depeg_events.json`.
 - **DuckDB analytics**: embedded time-series queries on trend data
 - **17 chains**: Tron, Ethereum, BSC, Solana, Arbitrum, Polygon, Avalanche, Optimism, Base, Celo, Fantom, Gnosis, zkSync Era, Aptos, TON, Plasma, NEAR
-- **Alpine.js + ECharts frontend**: 8-tab layout (Signal, Market, Analytics, Intel, Forensics, Alerts, System, Settings), lazy-mounted Settings tab, chart dispose-on-unmount, no build step, CDN-loaded
+- **Alpine.js + ECharts frontend**: 7-tab layout (Signal, Market, Intel, Forensics, Alerts, System, Settings — Analytics merged into Signal), lazy-mounted Settings, chart dispose-on-unmount, no build step, CDN-loaded
 
 ## Quick Start
 
@@ -234,7 +234,7 @@ Configured chains: `config/chains.json`. Assets: `config/assets.json`. Alerts: `
 - `backend/services/attestation.py` — Reserve attestation parsing and freshness scoring
 - `backend/services/rss_feed.py` — OSINT RSS feed ingestion with sentiment scoring
 - `backend/data_quality/` — Data quality checks (freshness, cross-source validation, coverage) using SA 2.0 style
-- `frontend/` — pure static HTML, Alpine.js 8-tab dashboard (lazy-mounted Settings), ECharts with dispose-on-unmount, nginx API proxy
+- `frontend/` — pure static HTML, Alpine.js 7-tab dashboard (lazy-mounted Settings), ECharts with dispose-on-unmount, nginx API proxy
 - `frontend/js/` — ES6 modules (init, charts, market, osint, governance, forecast, forensics, onchain, taxonomy)
 - `config/` — chain, asset, and alert configuration
 - `docs/` — Architecture, API reference, plus `concepts/`, `guides/`, and `reference/` subdirectories

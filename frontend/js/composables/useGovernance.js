@@ -31,14 +31,19 @@ export function useGovernance() {
     // feature_multi_user intentionally omitted — single-operator product
     'feature_onchain_signals', 'provider_moralis', 'provider_thegraph', 'provider_flipside',
     'anomaly_std_floor', 'onchain_whale_threshold_usd',
-    'ai_cache_enabled', 'ai_cache_ttl_seconds', 'semantic_cache_enabled',
+    // Real cache keys used by ai_router / playbooks (not legacy ai_cache_enabled)
+    'ai_cache_semantic_enabled', 'ai_cache_semantic_threshold',
+    'ai_cache_ttl_seconds', 'ai_cache_ttl_market_narrative',
+    'ai_cache_max_entries', 'ai_cache_max_semantic_entries',
     'retention_chain_trend_snapshots_days', 'retention_yield_bearing_snapshots_days',
     'retention_collateral_snapshots_days', 'retention_whale_activity_snapshots_days',
     'retention_forecast_runs_days', 'retention_ai_narrative_history_days',
+    'retention_web_search_snapshots_days',
     'retention_settings_audit_log_days', 'retention_source_usage_days', 'retention_ai_usage_days',
     'retention_fred_yields_days', 'retention_fiat_reserve_snapshots_days',
     'webhook_timeout_seconds', 'external_intel_webhook_enabled',
-    'ethena_enabled', 'sky_protocol_enabled', 'coinglass_enabled', 'aave_enabled', 'ondo_enabled',
+    'ethena_enabled', 'sky_protocol_enabled', 'coinglass_enabled', 'aave_enabled',
+    'ondo_enabled', 'liquity_enabled',
   ]);
 
   return {
@@ -309,7 +314,7 @@ export function useGovernance() {
     },
 
     secretSettings() {
-      // Product-relevant secrets only (CMC removed). Moralis/Alchemy enable underutilized data.
+      // Product-relevant secrets (CMC removed). Extra on-chain keys optional.
       const keys = [
         'secret_ollama_api_key',
         'secret_openrouter_api_key',
@@ -317,6 +322,9 @@ export function useGovernance() {
         'secret_exa_api_key',
         'secret_moralis_api_key',
         'secret_alchemy_api_key',
+        'secret_flipside_api_key',
+        'secret_thegraph_api_key',
+        'secret_etherscan_api_key',
         'webhook_signing_secret',
         'fred_api_key',
         'coinglass_api_key',
@@ -338,6 +346,28 @@ export function useGovernance() {
       return s?.value || '';
     },
 
+    _parseModelCatalogResponse(payload) {
+      // New shape: { models: [], error: string|null }; legacy: bare array
+      if (Array.isArray(payload)) {
+        return { models: payload, error: null };
+      }
+      if (payload && typeof payload === 'object') {
+        return {
+          models: Array.isArray(payload.models) ? payload.models : [],
+          error: payload.error || null,
+        };
+      }
+      return { models: [], error: 'invalid_response' };
+    },
+
+    _catalogErrorMessage(err) {
+      if (!err) return '';
+      if (err === 'no_api_key') return 'API key not configured';
+      if (String(err).startsWith('provider_http_')) return `Provider HTTP ${String(err).slice('provider_http_'.length)}`;
+      if (String(err).startsWith('provider_error:')) return `Provider error (${String(err).slice('provider_error:'.length)})`;
+      return String(err);
+    },
+
     async loadModelCatalogs() {
       if (!this.adminToken) return;
       this.modelCatalogLoading = true;
@@ -347,13 +377,19 @@ export function useGovernance() {
           this._adminFetch('/api/ai/providers/ollama_cloud/models', { cache: 'no-store' }),
           this._adminFetch('/api/ai/providers/openrouter/models', { cache: 'no-store' }),
         ]);
-        const ollama = o.ok ? await o.json() : [];
-        const openrouter = r.ok ? await r.json() : [];
+        const ollamaRaw = o.ok ? await o.json() : { models: [], error: o.status === 401 ? 'auth' : 'fetch_failed' };
+        const openrouterRaw = r.ok ? await r.json() : { models: [], error: r.status === 401 ? 'auth' : 'fetch_failed' };
+        const ollama = this._parseModelCatalogResponse(ollamaRaw);
+        const openrouter = this._parseModelCatalogResponse(openrouterRaw);
         this.modelCatalog = {
-          ollama_cloud: Array.isArray(ollama) ? ollama : [],
-          openrouter: Array.isArray(openrouter) ? openrouter : [],
+          ollama_cloud: ollama.models,
+          openrouter: openrouter.models,
         };
-        if (!o.ok && !r.ok) this.modelCatalogError = 'Could not load models — set API keys first';
+        const parts = [];
+        if (ollama.error) parts.push(`Ollama: ${this._catalogErrorMessage(ollama.error)}`);
+        if (openrouter.error) parts.push(`OpenRouter: ${this._catalogErrorMessage(openrouter.error)}`);
+        if (!o.ok && !r.ok) parts.push('Could not load models — sign in and set API keys');
+        this.modelCatalogError = parts.join(' · ');
       } catch (e) {
         this.modelCatalogError = e.message || 'Model catalog failed';
       } finally {
@@ -437,14 +473,27 @@ export function useGovernance() {
         this.settingsError = 'Sign in to save feature toggles';
         return;
       }
-      for (const [key, val] of Object.entries(this.wizardFeatures)) {
+      // Sequential PUTs under admin rate limit (30/min); tiny gap avoids burst edge cases
+      const entries = Object.entries(this.wizardFeatures || {});
+      let failed = 0;
+      for (const [key, val] of entries) {
         const s = this.settingsList.find(x => x.key === key);
-        if (s) await this.toggleSetting(key, val);
+        if (!s) continue;
+        try {
+          await this.toggleSetting(key, val);
+        } catch (e) {
+          failed += 1;
+          this.showToast(`${key}: ${e.message}`, 'error');
+        }
+        await new Promise(res => setTimeout(res, 50));
       }
       try { localStorage.setItem('helix_setup_done', '1'); } catch {}
       this.setupDone = true;
       this.wizardStep = 3;
-      this.showToast('Quick Setup complete', 'success');
+      this.showToast(
+        failed ? `Quick Setup done with ${failed} error(s)` : 'Quick Setup complete',
+        failed ? 'warning' : 'success',
+      );
     },
 
     async loadAssetCatalog() {

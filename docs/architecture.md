@@ -74,10 +74,12 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - **`data_quality/`** — Freshness, cross-source validation, coverage checks using SA 2.0 style
 - **SA 2.0 migration** — All 63 `db.query()` calls in production code converted to `select()` + `execute()`
 - **Predictive** (`services/predictive.py`): statistical/ML outputs — always available without LLM
-- **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `AI_REQUIRE_TOKEN` gate with per-IP lockout after 20 failed attempts; pre-flight budget deduct in `enrich_with_ai()`
-- **APScheduler** runs all periodic jobs in-process (ingest, OSINT, retention, quality checks) — no separate worker needed
+- **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `ai_require_token` gate; usage tracked (no hard token budget)
+- **Web search cache** (`services/web_search/`): scheduled only — job `web-search-refresh` (06:15 & 18:15 UTC) + optional startup-once if cache stale; table `web_search_snapshots`; chain Tavily → Exa → Ollama search; **opt-in only when Tavily and/or Exa secret present** (Ollama alone never enables); AI injects cached `WEB_CONTEXT` on `/api/ai/*` — never live search on HTTP path
+- **Insight assets** (`services/insight_assets.py`): deterministic snapshots on schedule; LLM narratives via `/api/ai/*` not the insight job
+- **APScheduler** runs all periodic jobs in-process (ingest, OSINT, retention, quality, web search, fiat scrape, …) — no separate worker needed
 - **CORS origins** loaded from env at module level (safe before `init_db()`). DB setting (`cors_origins`) loaded into `app.state.cors_origins` after DB init for future live-refresh on Settings update.
-- **Settings priority** (`providers/settings.py`): runtime reads use **DB → env → default**. The Settings UI (`GET /api/settings`) and `get_setting()` both prefer database values when a row exists; environment variables act as fallbacks for unset keys. Secrets are never returned via API — only `"configured"` or `null`.
+- **Settings priority** (`providers/settings.py`): runtime reads use **DB → env → default**. Secrets use Fernet when `SETTINGS_ENCRYPTION_KEY` is set. `GET /api/settings` never returns raw secrets (`"configured"` only). Constrained strings are exposed as `type=enum` with `options` for Control Room selects. Import skips masked secret sentinels so export→import cannot clobber live keys.
 
 ### Data Store
 

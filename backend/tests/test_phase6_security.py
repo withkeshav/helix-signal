@@ -207,11 +207,16 @@ class TestRateLimiting:
         assert False, "Expected 429 before 11th request"
 
     def test_settings_put_rate_limited(self, client, admin_headers):
-        for i in range(6):
-            resp = client.put("/api/settings", json={"key": "test", "value": True}, headers=admin_headers)
+        # Admin PUT limit is 30/min (wizard batch headroom); expect 429 within a burst past that.
+        for i in range(35):
+            resp = client.put(
+                "/api/settings",
+                json={"key": "ai_mode", "value": "ai_off"},
+                headers=admin_headers,
+            )
             if resp.status_code == 429:
                 return
-        assert False, "Expected 429 before 6th request"
+        assert False, "Expected 429 before 35th request"
 
 
 class TestXForwardedFor:

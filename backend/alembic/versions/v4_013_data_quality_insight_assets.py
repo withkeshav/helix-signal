@@ -18,7 +18,10 @@ depends_on = None
 def upgrade() -> None:
     # Alembic default version_num is VARCHAR(32). This revision id is 34 chars;
     # widen first so the post-upgrade stamp cannot fail with StringDataRightTruncation.
-    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
+    # Postgres only: SQLite lacks ALTER COLUMN TYPE (CI alembic smoke uses SQLite).
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
 
     op.create_table(
         "data_quality_snapshots",

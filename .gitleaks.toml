@@ -1,0 +1,10 @@
+# Gitleaks config for Helix-Signal
+# Test fixtures use placeholder keys (encryption, API stubs). Those are not production secrets.
+title = "helix-signal"
+
+[allowlist]
+description = "Test fixtures and known non-secret placeholders"
+paths = [
+  '''(^|/)backend/tests/.*''',
+  '''(^|/)frontend/e2e/.*''',
+]

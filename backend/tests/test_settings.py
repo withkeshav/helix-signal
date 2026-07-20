@@ -26,3 +26,17 @@ def test_mask_secret_returns_configured() -> None:
 def test_ai_mode_enum_validation(db_session) -> None:
     with pytest.raises(ValueError, match="must be one of"):
         set_setting("ai_mode", "banana", db_session)
+
+
+def test_get_all_settings_emits_enum_options(db_session) -> None:
+    """Control Room needs type=enum + options for constrained string settings."""
+    from providers.settings import get_all_settings
+
+    rows = {r["key"]: r for r in get_all_settings(db_session)}
+    ai = rows["ai_mode"]
+    assert ai["type"] == "enum"
+    assert "ai_full" in (ai.get("options") or [])
+    assert ai.get("choices") == ai.get("options")
+    auth = rows["api_auth_mode"]
+    assert auth["type"] == "enum"
+    assert "key_required" in (auth.get("options") or [])

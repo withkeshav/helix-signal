@@ -2,6 +2,15 @@
 
 ## Unreleased (post-4.2.0 verification + product re-arch pass)
 
+### Frontend / Control Room (audit Batch A)
+- **Market forecast overlays** — empty-state keys aligned with API `forecast_points.peg` / `.supply` (no permanent wrong overlay).
+- **Asset switch** — token-card `switchTo` updates `$store.dashboard.asset` so DEWS/AI/panels track the selected asset.
+- **Settings enums** — `GET /api/settings` emits `type=enum` + `options`/`choices` for constrained strings (`ai_mode`, `api_auth_mode`, …).
+- **Cmd+K investigate** — calls forensics `investigate()`.
+- **Import toast** — reports imported / skipped / errors.
+- **Nav AI badge** — syncs from Control Room `ai_mode`.
+- **Insights job** — documented deterministic-only (no silent AI narrative path).
+
 ### Security (settings secrets)
 - **Import footgun fixed:** REST settings import skips secret keys when the value is a mask sentinel (`configured`, blank, `********`, etc.) so export→import cannot overwrite live API keys.
 - **PUT `/api/settings`:** secret keys never echo plaintext; response value is always `configured`; sentinel PUTs do not overwrite.

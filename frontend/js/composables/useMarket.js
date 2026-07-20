@@ -124,10 +124,21 @@ export function useMarket() {
       return snap?.chains ?? (asset === this.asset ? this.chains : []);
     },
     switchTo(symbol) {
-      if (this.enabledAssets.includes(symbol)) {
-        this.asset = symbol;
-        this.$dispatch('asset-changed', { asset: symbol });
+      if (!this.enabledAssets.includes(symbol)) return;
+      // Single source of truth: dashboard store drives watchers (DEWS/AI/etc.)
+      this.asset = symbol;
+      if (this.$store?.dashboard) {
+        this.$store.dashboard.asset = symbol;
       }
+      // Keep root helixApp asset in sync when token cards fire from market scope
+      try {
+        const root = document.documentElement?._x_dataStack?.[0];
+        if (root && Object.prototype.hasOwnProperty.call(root, 'asset')) {
+          root.asset = symbol;
+        }
+      } catch (_) { /* Alpine stack optional */ }
+      this.$dispatch('asset-changed', { asset: symbol });
+      window.dispatchEvent(new CustomEvent('asset-changed', { detail: { asset: symbol } }));
     },
     
     setTimeRange(range) {
@@ -231,8 +242,10 @@ export function useMarket() {
       this._settingsChangedHandler = () => this._reloadAiPanels();
       window.addEventListener('settings-changed', this._settingsChangedHandler);
 
-      // Reload data and charts when asset changes
+      // Reload data and charts when asset changes (store is source of truth)
       this.$watch('$store.dashboard.asset', async (newAsset) => {
+        if (!newAsset) return;
+        this.asset = newAsset;
         if (this.chains.length === 0) this.$store.dashboard.loading = true;
         try {
           await Promise.all([
@@ -251,11 +264,12 @@ export function useMarket() {
         } finally {
           this.$store.dashboard.loading = false;
         }
-        
+
         // Re-render charts after data reload
         this.$nextTick(() => {
           this.renderCharts({ chains: this.chains });
           this.renderSupplyChart();
+          this.renderHeroPegChart();
           this.renderRiskTerminalChart(this.predictive);
           this.renderContagionGraph(this.rotation);
         });

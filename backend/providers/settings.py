@@ -243,10 +243,18 @@ def get_all_settings(db: Session) -> list[dict[str, Any]]:
         # Get current usage for settings that track usage
         current_usage = get_current_usage(key, db)
 
+        api_type = meta.get("type", "bool")
+        choices = meta.get("choices")
+        # Control Room templates branch on type==="enum" + options; registry stores
+        # constrained strings as type "str" with choices — expose both shapes.
+        options = list(choices) if choices else None
+        if options and api_type == "str":
+            api_type = "enum"
+
         out_item = {
             "key": key,
             "label": meta.get("label"),
-            "type": meta.get("type", "bool"),
+            "type": api_type,
             "value": mask_secret(typed) if meta.get("type") == "secret" else typed,
             "default": meta.get("default"),
             "always_active": meta.get("always_active", False),
@@ -262,6 +270,9 @@ def get_all_settings(db: Session) -> list[dict[str, Any]]:
             "provider_metadata": meta.get("provider_metadata"),
             "current_usage": current_usage,
         }
+        if options is not None:
+            out_item["choices"] = options
+            out_item["options"] = options
         out.append(out_item)
     return out
 

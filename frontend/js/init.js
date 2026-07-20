@@ -134,7 +134,9 @@ Alpine.data('helixApp', () => ({
       const panel = document.querySelector('#tab-forensics')?._x_dataStack?.[0];
       if (panel) {
         panel.investigateAddress = addr;
-        panel.runInvestigate?.();
+        // Forensics composable method is investigate(), not runInvestigate
+        if (typeof panel.investigate === 'function') panel.investigate();
+        else if (typeof panel.runInvestigate === 'function') panel.runInvestigate();
       }
     });
   },

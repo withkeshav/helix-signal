@@ -288,9 +288,14 @@ export function useGovernance() {
     get aiModeLabel() {
       const s = this.settingsList.find(x => x.key === 'ai_mode');
       const mode = s?.value || 'ai_off';
-      if (mode === 'ai_full') return 'Full';
-      if (mode === 'ai_lite') return 'Lite';
-      return 'Off';
+      let label = 'Off';
+      if (mode === 'ai_full') label = 'Full';
+      else if (mode === 'ai_lite') label = 'Lite';
+      // Keep nav badge in sync (badge reads $store.ui.aiModeLabel, not this getter)
+      if (this.$store?.ui && this.$store.ui.aiModeLabel !== label) {
+        this.$store.ui.aiModeLabel = label;
+      }
+      return label;
     },
 
     get authModeLabel() {
@@ -543,6 +548,8 @@ export function useGovernance() {
         if (r.ok) {
           this.settingsList = await r.json();
           this._syncWizardFeaturesFromSettings();
+          // Touch getter so nav badge ($store.ui.aiModeLabel) updates
+          void this.aiModeLabel;
         }
       } catch (e) {
         this.settingsError = e.message;
@@ -559,8 +566,13 @@ export function useGovernance() {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.detail || `Failed to update ${key}`);
       }
+      const j = await r.json().catch(() => ({}));
       const s = this.settingsList.find(x => x.key === key);
-      if (s) s.value = value;
+      if (s) {
+        // Secrets: never keep plaintext in Alpine state after save
+        s.value = s.type === 'secret' ? (j.value || 'configured') : (j.value !== undefined ? j.value : value);
+      }
+      if (key === 'ai_mode') void this.aiModeLabel;
       window.dispatchEvent(new CustomEvent('settings-changed'));
     },
 
@@ -607,7 +619,13 @@ export function useGovernance() {
         const r = await this._adminFetch('/api/settings/import/json', { method: 'POST', body: fd });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.detail || 'Import failed');
-        this.showToast(`Imported ${j.imported ?? '?'} settings`, 'success');
+        const imported = j.imported ?? 0;
+        const skipped = j.skipped ?? 0;
+        const errN = Array.isArray(j.errors) ? j.errors.length : 0;
+        let msg = `Imported ${imported}`;
+        if (skipped) msg += `, skipped ${skipped} (incl. masked secrets)`;
+        if (errN) msg += `, ${errN} error(s)`;
+        this.showToast(msg, errN ? 'warning' : 'success');
         await this.loadSettings();
       } catch (e) {
         this.showToast(e.message, 'error');

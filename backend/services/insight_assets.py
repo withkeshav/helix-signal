@@ -206,8 +206,9 @@ def get_insight_response(
     sym = asset.upper()
     row = get_latest_insight(db, kind, sym)
     # On the request path: only rebuild deterministic payload (fast). Never call LLM
-    # here — that caused nginx 504s on market_snapshot. AI narratives come from the
-    # background insight job or stored row.ai_narrative when ai_mode is on.
+    # here — that caused nginx 504s. The scheduled refresh job also writes
+    # deterministic-only payloads today (ai_narrative intentionally unset).
+    # Live AI narratives for the UI come from /api/ai/* routes, not this table.
     if refresh_if_stale and insight_is_stale(row):
         row = persist_insight(db, kind, sym, ai_narrative=None)
     elif row is None:
@@ -222,6 +223,7 @@ def get_insight_response(
         "sources": row.sources,
         "quality_score": row.quality_score,
     }
+    # Optional legacy field: only if a row was historically filled (job no longer writes it)
     if ai_mode(db) != "ai_off" and row.ai_narrative:
         out["ai_narrative"] = row.ai_narrative
     return out
@@ -253,13 +255,14 @@ def export_insights_ndjson(db: Session, kind: str, *, limit: int = 100) -> str:
 
 
 def refresh_all_insights_job(db: Session) -> dict[str, Any]:
+    """Deterministic insight snapshots only — no LLM (keeps job fast/cheap)."""
     assets = [str(a.get("symbol", "USDT")).upper() for a in load_enabled_assets(db)] or ["USDT"]
     written = 0
     for asset in assets[:5]:
         for kind in VALID_KINDS:
             try:
-                persist_insight(db, kind, asset)
+                persist_insight(db, kind, asset, ai_narrative=None)
                 written += 1
             except Exception:
                 log.warning("insight.refresh_failed", kind=kind, asset=asset, exc_info=True)
-    return {"insights_written": written, "assets": assets[:5]}
+    return {"insights_written": written, "assets": assets[:5], "ai_narrative": False}

@@ -1,0 +1,20 @@
+---
+description: Never use em dashes in docs, UI copy, or commits
+alwaysApply: true
+---
+
+# No em dashes
+
+Never write the em dash character (Unicode U+2014).
+
+Applies to: markdown, docs, HTML/JS UI strings, commit messages, PR text, and agent replies about this repo.
+
+**Replacements:**
+
+- Heading aside: use `:` or parentheses (`## Title: subtitle`)
+- Clause break: comma, semicolon, period, or ` - ` (ASCII hyphen with spaces)
+- Missing UI value: `-` or `N/A`, not an em dash
+
+If you touch a file that already contains U+2014, replace it.
+
+See `AGENTS.md` for full examples.

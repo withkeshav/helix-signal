@@ -28,9 +28,9 @@ Model ids are **free text** (no maintained catalog required). Feature settings u
 
 For each task (e.g. `risk_explain`):
 
-1. **Primary** — `ai_model_{feature}` → `provider_id:model_id`
-2. **Task fallback** — `ai_fallback_provider` + `ai_fallback_model` (legacy)
-3. **Global default** — `ai_default_fallback_provider` + `ai_default_fallback_model_id`
+1. **Primary** - `ai_model_{feature}` → `provider_id:model_id`
+2. **Task fallback** - `ai_fallback_provider` + `ai_fallback_model` (legacy)
+3. **Global default** - `ai_default_fallback_provider` + `ai_default_fallback_model_id`
 
 Each attempt logs the tier used. If all fail, the response includes a clear `all_providers_failed` reason. Usage is recorded in `AiUsage`.
 

@@ -71,8 +71,8 @@ Note: the UI may still use Alpine.js patterns that require careful CSP review (`
 
 ### Settings and API keys
 
-- Secret-type settings (provider API keys) are written through `set_setting` and, when `SETTINGS_ENCRYPTION_KEY` is set, stored as **Fernet ciphertext** in Postgres. Without that key (dev), values may be plaintext at rest — rely on DB/host access control.
-- `GET /api/settings` never returns raw secret values — only `"configured"` or empty/null.
+- Secret-type settings (provider API keys) are written through `set_setting` and, when `SETTINGS_ENCRYPTION_KEY` is set, stored as **Fernet ciphertext** in Postgres. Without that key (dev), values may be plaintext at rest - rely on DB/host access control.
+- `GET /api/settings` never returns raw secret values - only `"configured"` or empty/null.
 - `PUT /api/settings` for secret keys returns `"configured"` only; never echoes the submitted plaintext. Masked sentinels (`configured`, blank, `********`) do **not** overwrite an existing secret.
 - Settings **export** includes masked secrets; **import** skips secret keys when the value is a mask sentinel so export→import cannot clobber live keys with the string `configured`.
 - Settings audit log entries for secret-type keys store `[REDACTED]` instead of the actual value (v4.0.4+).
@@ -80,4 +80,4 @@ Note: the UI may still use Alpine.js patterns that require careful CSP review (`
 
 ### Data volume safety
 
-Compose project name should stay **`helix-signal`**. Never run `docker compose down -v` on upgrade — that deletes `helix-signal_postgres_data`.
+Compose project name should stay **`helix-signal`**. Never run `docker compose down -v` on upgrade - that deletes `helix-signal_postgres_data`.

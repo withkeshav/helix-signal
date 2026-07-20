@@ -18,7 +18,7 @@ When no rows exist in `webhook_endpoints`, these settings still work:
 
 On first admin list of endpoints, configured legacy settings are migrated into one default endpoint row.
 
-Email is configured separately via SMTP settings + `alert_email_event_types` (not via Discord/Telegram adapters — those are not built in).
+Email is configured separately via SMTP settings + `alert_email_event_types` (not via Discord/Telegram adapters - those are not built in).
 
 ## Signature Verification
 
@@ -48,4 +48,4 @@ Matches `webhook_dispatcher.build_alert_payload` (plus `event_category` from the
 
 ## Automation examples
 
-Zapier, n8n, Make, Pabbly — point at a public HTTPS catch URL and verify the HMAC header.
+Zapier, n8n, Make, Pabbly - point at a public HTTPS catch URL and verify the HMAC header.

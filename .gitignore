@@ -136,7 +136,9 @@ docs/grant-strategy.md
 *STRATEGIC_REPORT*
 helix_signal_strategic_report.md
 *.plan.md
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # pytest coverage
 .coverage

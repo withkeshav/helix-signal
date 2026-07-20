@@ -39,7 +39,7 @@ frontend:80  (/api/* proxied to backend:8000, static assets)
 backend:8000 (internal network only)
     |
     v
-SQLite at /data/helix.db (volume helix_data) — default local profile
+SQLite at /data/helix.db (volume helix_data) - default local profile
 
 Optional VPS data profile:
 
@@ -69,15 +69,15 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 - APScheduler: interval ingest + hourly OSINT + retention
 - Signal engine: ingest, V4 scoring via `risk_inputs.py`, 5-minute buckets, deduplicated events
 - **`osint.py` decomposed** → `attestation.py` (reserve parsing + freshness) + `rss_feed.py` (RSS sentiment) with backward-compatible re-exports
-- **`services/scheduler.py`** — 11 job functions extracted from `main.py` (409→190 lines) via `register_scheduler_jobs()`
-- **`services/dashboard.py`** — `build_dashboard_response` decomposed: 274→31 lines orchestration + 6 sub-functions
-- **`data_quality/`** — Freshness, cross-source validation, coverage checks using SA 2.0 style
-- **SA 2.0 migration** — All 63 `db.query()` calls in production code converted to `select()` + `execute()`
-- **Predictive** (`services/predictive.py`): statistical/ML outputs — always available without LLM
+- **`services/scheduler.py`** - 11 job functions extracted from `main.py` (409→190 lines) via `register_scheduler_jobs()`
+- **`services/dashboard.py`** - `build_dashboard_response` decomposed: 274→31 lines orchestration + 6 sub-functions
+- **`data_quality/`** - Freshness, cross-source validation, coverage checks using SA 2.0 style
+- **SA 2.0 migration** - All 63 `db.query()` calls in production code converted to `select()` + `execute()`
+- **Predictive** (`services/predictive.py`): statistical/ML outputs - always available without LLM
 - **AI router** (`services/ai_router.py`): optional explanations; `AI_MODE=ai_off` keeps core APIs unchanged; optional `ai_require_token` gate; usage tracked (no hard token budget)
-- **Web search cache** (`services/web_search/`): scheduled only — job `web-search-refresh` (06:15 & 18:15 UTC) + optional startup-once if cache stale; table `web_search_snapshots`; chain Tavily → Exa → Ollama search; **opt-in only when Tavily and/or Exa secret present** (Ollama alone never enables); AI injects cached `WEB_CONTEXT` on `/api/ai/*` — never live search on HTTP path
+- **Web search cache** (`services/web_search/`): scheduled only - job `web-search-refresh` (06:15 & 18:15 UTC) + optional startup-once if cache stale; table `web_search_snapshots`; chain Tavily → Exa → Ollama search; **opt-in only when Tavily and/or Exa secret present** (Ollama alone never enables); AI injects cached `WEB_CONTEXT` on `/api/ai/*` - never live search on HTTP path
 - **Insight assets** (`services/insight_assets.py`): deterministic snapshots on schedule; LLM narratives via `/api/ai/*` not the insight job
-- **APScheduler** runs all periodic jobs in-process (ingest, OSINT, retention, quality, web search, fiat scrape, …) — no separate worker needed
+- **APScheduler** runs all periodic jobs in-process (ingest, OSINT, retention, quality, web search, fiat scrape, …) - no separate worker needed
 - **CORS origins** loaded from env at module level (safe before `init_db()`). DB setting (`cors_origins`) loaded into `app.state.cors_origins` after DB init for future live-refresh on Settings update.
 - **Settings priority** (`providers/settings.py`): runtime reads use **DB → env → default**. Secrets use Fernet when `SETTINGS_ENCRYPTION_KEY` is set. `GET /api/settings` never returns raw secrets (`"configured"` only). Constrained strings are exposed as `type=enum` with `options` for Control Room selects. Import skips masked secret sentinels so export→import cannot clobber live keys.
 
@@ -89,13 +89,13 @@ Environment is loaded from `.env` (copy from `.env.example`). Secrets (`secrets/
 
 ### Frontend (`frontend/`)
 
-- `index.html` — dashboard shell, Alpine.js bindings, CDN ECharts + **Tabler CSS** layout base
-- `js/init.js` — Alpine root (`helixApp`), Cmd+K, refresh loop; tab/asset synced with `$store.ui` / `$store.dashboard`
-- `js/stores/` — **source of truth**: `dashboard.js` (shared risk data), `ui.js` (tab/auth/theme/refreshTick)
-- `js/composables/` — per-tab panels: Signal `market`, Market supply/forecast, Intel, Forensics, Alerts, System, Settings Control Room
-- `js/charts.js` — ECharts + `helixTheme()`; sparklines for global strip
-- `js/utils.js` — formatUsd, formatWhen, etc.
-- `styles.css` — Helix tokens override Tabler; glass, skeleton, Control Room, hero
+- `index.html` - dashboard shell, Alpine.js bindings, CDN ECharts + **Tabler CSS** layout base
+- `js/init.js` - Alpine root (`helixApp`), Cmd+K, refresh loop; tab/asset synced with `$store.ui` / `$store.dashboard`
+- `js/stores/` - **source of truth**: `dashboard.js` (shared risk data), `ui.js` (tab/auth/theme/refreshTick)
+- `js/composables/` - per-tab panels: Signal `market`, Market supply/forecast, Intel, Forensics, Alerts, System, Settings Control Room
+- `js/charts.js` - ECharts + `helixTheme()`; sparklines for global strip
+- `js/utils.js` - formatUsd, formatWhen, etc.
+- `styles.css` - Helix tokens override Tabler; glass, skeleton, Control Room, hero
 - **IA:** Signal is answer-first home (risk + **fundamentals** yield/collateral/reserve); Market = forecasts/supply; Intel = OSINT; Forensics = investigate; Settings = single-admin Control Room
 - **Data plane:** Moralis refresh persists `whale_activity_snapshots`; fiat reserve daily scrape is best-effort; Market tab bootstraps dashboard store without visiting Signal
 - nginx: same-origin `/api`; `^~ /admin` → SQLAdmin; CSP allows `cdn.jsdelivr.net` for ECharts/Alpine/Tabler
@@ -121,17 +121,17 @@ Post-deploy validation:
 
 ## Test coverage
 
-- **Backend:** pytest suite (`cd backend && python -m pytest`) — ~560+ cases as of v4.4.0
+- **Backend:** pytest suite (`cd backend && python -m pytest`) - ~560+ cases as of v4.4.0
 
 ## Data assets (v4.1.0+ / post-4.4.0)
 
-- **`data_quality_snapshots`** — daily persisted quality metrics; `GET /api/data-quality/summary` serves the latest row.
-- **`insight_assets`** — versioned deterministic insight objects; GET path is deterministic-only (no LLM on request).
-- **`whale_activity_snapshots`** — written when Moralis is configured during on-chain refresh (not cache-only).
-- **`fiat_reserve_snapshots`** — optional daily scrape job (`fiat-reserve-scrape`); failures isolated.
-- **`fred_yields`** — FRED macro series in Postgres (v4.4.0+); DuckDB mirror optional during cutover.
-- **`webhook_endpoints`** — multi-destination signed alert routing (v4.4.0+).
-- **`ai_providers`** — OpenAI-compatible LLM registry (v4.4.0+).
+- **`data_quality_snapshots`** - daily persisted quality metrics; `GET /api/data-quality/summary` serves the latest row.
+- **`insight_assets`** - versioned deterministic insight objects; GET path is deterministic-only (no LLM on request).
+- **`whale_activity_snapshots`** - written when Moralis is configured during on-chain refresh (not cache-only).
+- **`fiat_reserve_snapshots`** - optional daily scrape job (`fiat-reserve-scrape`); failures isolated.
+- **`fred_yields`** - FRED macro series in Postgres (v4.4.0+); DuckDB mirror optional during cutover.
+- **`webhook_endpoints`** - multi-destination signed alert routing (v4.4.0+).
+- **`ai_providers`** - OpenAI-compatible LLM registry (v4.4.0+).
 
 ## Public display policy (v4.4.0+)
 
@@ -151,4 +151,4 @@ DuckDB is **not** an active analytics mirror in 4.0.x. `core/olap.py` provides o
 - Keep frontend thin; centralize logic on the backend
 - Self-hosted reproducibility via Docker Compose and pytest regression checks
 - Fail gracefully on upstream errors; label chain TVL as chain aggregate context
-- Do not fabricate attestation dates — show issuer report age and supply feed freshness separately
+- Do not fabricate attestation dates - show issuer report age and supply feed freshness separately

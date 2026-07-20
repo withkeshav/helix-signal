@@ -19,7 +19,7 @@ After `docker compose up`, sign in at **Settings** with `HELIX_ADMIN_USERNAME` /
 
 Create your local env file (or export equivalent vars):
 
-- `SESSION_SIGNING_KEY` (**required** — generate via `openssl rand -hex 32`)
+- `SESSION_SIGNING_KEY` (**required** - generate via `openssl rand -hex 32`)
 - `DEFILLAMA_API_KEY` (optional)
 - `DATABASE_URL` (default works for local)
 - `REFRESH_INTERVAL_SECONDS` (default `300`)
@@ -161,7 +161,7 @@ Guidelines:
 
 - All new endpoints go under `/api/v1/` with Pydantic response models
 - Existing `/api/` endpoints remain stable; deprecate via doc comment before removal
-- Legacy `db.query()` style is **being migrated** to SA 2.0 `select()` + `execute()` — new code must use SA 2.0 style
+- Legacy `db.query()` style is **being migrated** to SA 2.0 `select()` + `execute()` - new code must use SA 2.0 style
 
 ## Pull Request Expectations
 
@@ -171,7 +171,7 @@ Guidelines:
 - For deploy-related UI/API changes, run `./scripts/smoke-check.sh https://your-host` when applicable
 - Confirm no secrets were added (`.env`, `secrets/`, internal briefs)
 - Keep docs in sync when behavior or thresholds change
-- Do not commit internal or local docs (`.progress/`, briefs, phase logs — see `.gitignore`)
+- Do not commit internal or local docs (`.progress/`, briefs, phase logs - see `.gitignore`)
 
 ## CI / GitHub Actions Requirements
 
@@ -194,4 +194,4 @@ which requires certain environment variables. These must be set as
 > and is the relevant signal for code review.
 
 `AI_MODE=ai_off` and `HELIX_SKIP_STARTUP_REFRESH=1` are injected automatically
-by the CI workflow — you do not need to set these as secrets.
+by the CI workflow - you do not need to set these as secrets.

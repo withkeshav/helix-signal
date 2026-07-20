@@ -131,7 +131,7 @@ Admin-gated routes accept: signed session cookie, `X-Admin-Token: <access_token>
 | GET | `/api/dashboard?asset=USDT` | Live risk monitoring payload | 60/min |
 | GET | `/api/dashboard/summary` | Per-asset token-card summary for all enabled assets (one query set) | 60/min |
 | POST | `/api/refresh` | Trigger immediate data refresh | 10/min |
-| GET | `/api/metrics` | Prometheus metrics (internal, blocked at nginx in production) | — |
+| GET | `/api/metrics` | Prometheus metrics (internal, blocked at nginx in production) | - |
 | GET | `/api/settings` | Feature flags, provider toggles, intervals (requires X-Admin-Token) | 10/min |
 | PUT | `/api/settings` | Update a setting (`key`, `value`) (requires X-Admin-Token) | 5/min |
 
@@ -294,7 +294,7 @@ Data Quality Dashboard provides comprehensive monitoring of:
 | GET | `/api/ai/providers` | List AI providers (Ollama Cloud, OpenRouter) | 30/min | Admin |
 | GET | `/api/ai/providers/{provider_id}/models` | Models for provider | 30/min | Admin |
 
-AI explain/narrative routes can optionally require admin auth — enable `ai_require_token` in Settings (recommended when internet-facing). Default is open for trusted LAN.
+AI explain/narrative routes can optionally require admin auth - enable `ai_require_token` in Settings (recommended when internet-facing). Default is open for trusted LAN.
 
 **Models response shape:**
 
@@ -365,13 +365,13 @@ All endpoints return JSON. Error responses follow:
 }
 ```
 
-- `db` / `db_connected` — Database connectivity (`SELECT 1` ping)
-- `redis_connected` — Redis reachability (`PING` via `cache._redis.ping()`), false when Redis not configured
-- `last_successful_fetch` — DeFiLlama source last OK fetch timestamp
-- `scheduler_running` — APScheduler background scheduler state
-- `asset_freshness` — Per-asset map of `{symbol: {age_hours, last_fetch}}` from `asset_freshness` table
-- `worst_asset_age_hours` — Highest age_hours across all tracked assets (null if none)
-- `version` — `HELIX_VERSION` from `backend/services/retention.py`
+- `db` / `db_connected` - Database connectivity (`SELECT 1` ping)
+- `redis_connected` - Redis reachability (`PING` via `cache._redis.ping()`), false when Redis not configured
+- `last_successful_fetch` - DeFiLlama source last OK fetch timestamp
+- `scheduler_running` - APScheduler background scheduler state
+- `asset_freshness` - Per-asset map of `{symbol: {age_hours, last_fetch}}` from `asset_freshness` table
+- `worst_asset_age_hours` - Highest age_hours across all tracked assets (null if none)
+- `version` - `HELIX_VERSION` from `backend/services/retention.py`
 
 ## Schema
 
@@ -388,11 +388,11 @@ Typed Pydantic response models in `backend/schemas.py`:
 | `SourceStatusOut` | `/api/sources/status` |
  | `SourceUsageResponse` | `/api/sources/usage` (raw dict, not a Pydantic model) |
 
-## V4 — Intelligence & Forensics
+## V4 - Intelligence & Forensics
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| GET | `/api/dews?asset=USDT` | DEWS anomaly scoring — tiered depeg-watch score, z-score, CUSUM, ONNX probability, whale flow, holder concentration | Public |
+| GET | `/api/dews?asset=USDT` | DEWS anomaly scoring - tiered depeg-watch score, z-score, CUSUM, ONNX probability, whale flow, holder concentration | Public |
 | GET | `/api/onchain/whale-flow?asset=USDT` | Whale net inflow/outflow (24h) by asset, alert threshold breached | Public |
 | GET | `/api/onchain/holder-concentration?asset=USDT` | Top-10 holder share %, mint/burn velocity | Public |
 | GET | `/api/v1/blacklist/stats` | Blacklist aggregate stats (total events, frozen USD, by asset/chain, last 30d) | Public |
@@ -404,4 +404,4 @@ Typed Pydantic response models in `backend/schemas.py`:
 | GET | `/api/v1/assets/{symbol}/yield` | Yield snapshot: `current_apy`, `apy_7d_avg`, `apy_7d_delta`, `yield_source`, `yield_sustainability`, `funding_rate_current/7d_avg`, `insurance_fund_usd/coverage`, `staking_ratio`, `lending_utilization_pct` | Public |
 | GET | `/api/v1/assets/{symbol}/collateral` | Collateral snapshot: `collateral_ratio`, `collateral_assets`, `liquidation_threshold`, `liquidation_queue_usd`, `debt_ceiling_utilization_pct`, `largest_vault_usd`, `collateral_health_score` | Public |
 | GET | `/api/v1/assets/{symbol}/reserve` | Reserve snapshot: `reserve_usd`, `circulating_supply`, `coverage_ratio`, `reserve_composition`, `attestation_date/source/url`, `attestation_lag_days`, `genius_act_compliant`, `mica_status` | Public |
-| POST | `/api/v1/investigate` | Investigation pipeline — peel chain, bridge hops, clustering, blacklist, OSINT, timeline, risk, AI narrative | Admin token |
+| POST | `/api/v1/investigate` | Investigation pipeline - peel chain, bridge hops, clustering, blacklist, OSINT, timeline, risk, AI narrative | Admin token |

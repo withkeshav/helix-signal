@@ -4,8 +4,8 @@ Helix delivers outbound alerts through **`alert_router`** when signal events are
 
 ## Channels
 
-1. **Multi-webhook endpoints** — table `webhook_endpoints`; each has its own URL, HMAC signing secret, min severity, event types, and asset filter.
-2. **SMTP email** — settings `alert_email_*` / `alert_smtp_*` plus `alert_email_event_types` (JSON array of catalog ids) and `alert_email_min_severity`.
+1. **Multi-webhook endpoints** - table `webhook_endpoints`; each has its own URL, HMAC signing secret, min severity, event types, and asset filter.
+2. **SMTP email** - settings `alert_email_*` / `alert_smtp_*` plus `alert_email_event_types` (JSON array of catalog ids) and `alert_email_min_severity`.
 
 There is **no** Discord or Telegram adapter.
 

@@ -19,7 +19,7 @@ Legacy OpenRouter helper; production path is **`llm_client.chat_completion()`** 
 
 Provider credentials live in the **`ai_providers`** table (encrypted). Per-feature routing uses `ai_model_{feature}` as `provider_id:model_id` with 3-tier fallback documented in `docs/guides/ai-configuration.md`.
 
-Usage tracking: `services/ai_usage.py` (`AiUsage` table) — incremented from `enrich_with_ai` after successful completions.
+Usage tracking: `services/ai_usage.py` (`AiUsage` table) - incremented from `enrich_with_ai` after successful completions.
 
 ## Usage
 

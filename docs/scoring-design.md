@@ -14,7 +14,7 @@ Used in `compute_risk_score()` (`signal_engine/components/composite_scoring.py`)
 | Liquidity depth | 0.10   | `liquidity_depth_score()` from `slippage_100k_bps` |
 | Age penalty     | 0.20   | 4-tier freshness model in `composite_scoring.py` |
 
-**Velocity:** Contracting supply (negative %) contributes via `abs(velocity)` — no directional guard.
+**Velocity:** Contracting supply (negative %) contributes via `abs(velocity)` - no directional guard.
 
 **Depeg index:** Linear interpolation between breakpoints `[(0,0), (0.1,0), (0.5,25), (1.0,50), (2.0,75), (4.0,100)]`.
 
@@ -32,7 +32,7 @@ Used in `chain_row_signal()` (`signal_engine/scoring.py`). Applied per chain wit
 | Depeg index     | 0.40   | `peg_analysis.py` |
 | Momentum        | 0.20   | `supply_momentum_component()` via `momentum_score_hint` |
 
-**Band thresholds:** same as asset-level — ≤20 Normal, ≤60 Watch, >60 Alert (via `composite_band()`).
+**Band thresholds:** same as asset-level - ≤20 Normal, ≤60 Watch, >60 Alert (via `composite_band()`).
 
 ## Health Flag
 

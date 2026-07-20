@@ -1,6 +1,6 @@
 # Adding a Chain
 
-Adding a new chain takes **2 steps** — configuration only.
+Adding a new chain takes **2 steps** - configuration only.
 
 ## Step 1: Add to chains.json
 

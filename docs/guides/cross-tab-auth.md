@@ -12,7 +12,7 @@ Helix is a **single-operator** console, not a multi-user SaaS product.
 | SQLAdmin `/admin` | Same admin user; rare table/registry ops (Tier 2) |
 | `HELIX_ADMIN_TOKEN` | Optional **legacy** static token for `X-Admin-Token` (rollout/automation only) |
 
-There is **no** self-service registration and no multi-user CRUD API — one seeded admin is the product model.
+There is **no** self-service registration and no multi-user CRUD API - one seeded admin is the product model.
 
 ## Browser session flow
 
@@ -43,7 +43,7 @@ Then either:
 
 | Env | Required | Notes |
 |-----|----------|--------|
-| `SESSION_SIGNING_KEY` | **Yes** | `openssl rand -hex 32` — blank ⇒ login returns **503** |
+| `SESSION_SIGNING_KEY` | **Yes** | `openssl rand -hex 32` - blank ⇒ login returns **503** |
 | `HELIX_ADMIN_USERNAME` / `HELIX_ADMIN_PASSWORD` | First deploy | Seeds the only operator account |
 | `HELIX_COOKIE_SECURE=1` | HTTPS | Sets Secure on `helix_session` |
 | `CORS_ORIGINS` | If cross-origin UI | Must not be `*` when using credentials |

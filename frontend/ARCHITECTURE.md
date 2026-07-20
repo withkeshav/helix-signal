@@ -39,11 +39,11 @@ Composable functions encapsulate component-specific logic and state. Each tab/fe
 
 **Available Composables:**
 - `composables/useGovernance.js` - Settings tab logic
-- `composables/useHealth.js` - System tab — health composable
+- `composables/useHealth.js` - System tab - health composable
 - `composables/useMarket.js` - Market tab logic (supply + forecast composables)
-- `composables/useOSINT.js` - Intel tab — OSINT + SMIDGE composables
-- `composables/useForecast.js` - Market tab — forecast composable
-- `composables/useQuality.js` - System tab — quality composable
+- `composables/useOSINT.js` - Intel tab - OSINT + SMIDGE composables
+- `composables/useForecast.js` - Market tab - forecast composable
+- `composables/useQuality.js` - System tab - quality composable
 
 **Usage:**
 ```js

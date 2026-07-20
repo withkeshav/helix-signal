@@ -7,8 +7,8 @@ This document explains how Helix-Signal computes and presents asset-chain stable
 ## Primary and supplemental sources
 
 - **DefiLlama** stablecoins API (supply, peg price, chain TVL)
-- **CoinGecko** (price, market cap, volume) — optional enrichment
-- **DEX Screener** (pool liquidity, top-3 pool concentration) — used for liquidity depth scoring
+- **CoinGecko** (price, market cap, volume) - optional enrichment
+- **DEX Screener** (pool liquidity, top-3 pool concentration) - used for liquidity depth scoring
 
 ## Primary Source (DefiLlama)
 
@@ -97,11 +97,11 @@ Higher scores mean more suggested monitoring attention (stress across dimensions
 
 **Weights** (see `signal_engine/components/composite_scoring.py` and API `components`):
 
-- Depeg index: 35% — peg deviation from $1 anchor (continuous linear interpolation)
-- Concentration: 20% — HHI (crypto-calibrated 2000/4000/7000) + top-3 DEX pool share
-- Supply velocity: 15% — 1h/4h supply change (abs() so contracting contributes)
-- Liquidity depth: 10% — from 100k USD slippage bps via `liquidity_depth_score()`
-- Age penalty: 20% — 4-tier freshness: fresh(<1h)=0, aging(<2h)=10, stale(<24h)=15, very stale(>=24h)=20
+- Depeg index: 35% - peg deviation from $1 anchor (continuous linear interpolation)
+- Concentration: 20% - HHI (crypto-calibrated 2000/4000/7000) + top-3 DEX pool share
+- Supply velocity: 15% - 1h/4h supply change (abs() so contracting contributes)
+- Liquidity depth: 10% - from 100k USD slippage bps via `liquidity_depth_score()`
+- Age penalty: 20% - 4-tier freshness: fresh(<1h)=0, aging(<2h)=10, stale(<24h)=15, very stale(>=24h)=20
 
 A source health modifier applies a 50% penalty when data sources are degraded (factor of 0.5).
 
@@ -146,9 +146,9 @@ Cumulative Sum (CUSUM) in `services/anomaly.py` detects sustained regime shifts 
 
 Different z-score sensitivities per metric to reduce false positives:
 
-- **Price depeg**: z > 2.5, min_bps = 5 (tightest — price stress is the primary signal)
-- **Supply**: z > 3.5, min_bps = 15 (wider — supply is more volatile across chains)
-- **Depeg index**: z > 2.5, min_bps = 5 (tight — tracks compounding peg pressure)
+- **Price depeg**: z > 2.5, min_bps = 5 (tightest - price stress is the primary signal)
+- **Supply**: z > 3.5, min_bps = 15 (wider - supply is more volatile across chains)
+- **Depeg index**: z > 2.5, min_bps = 5 (tight - tracks compounding peg pressure)
 
 ### Predictive layer (optional API)
 
@@ -239,8 +239,8 @@ The **signal feed** is a local SQLite timeline of meaningful deltas, not outboun
 
 A daily scheduler job deletes rows older than configured thresholds:
 
-- `TREND_RETENTION_DAYS` (default **90**) — `asset_trend_snapshots` and `chain_trend_snapshots`
-- `EVENT_RETENTION_DAYS` (default **30**) — `signal_events`
+- `TREND_RETENTION_DAYS` (default **90**) - `asset_trend_snapshots` and `chain_trend_snapshots`
+- `EVENT_RETENTION_DAYS` (default **30**) - `signal_events`
 
 Fresh installs with little history are unaffected beyond normal low-data messaging.
 
@@ -260,7 +260,7 @@ Parsed only from issuer transparency pages when a report date can be proven (e.g
 - **aging**: 90–179 days
 - **stale**: 180+ days
 - **unknown**: issuer page not parseable (USDT, PYUSD today)
-- **n/a**: on-chain-only assets (DAI) — no issuer attestation model
+- **n/a**: on-chain-only assets (DAI) - no issuer attestation model
 
 Helix does **not** use DefiLlama refresh time as a proxy for attestation dates.
 
@@ -295,9 +295,9 @@ Daily prune job (`history-retention`, 03:15 UTC) removes rows older than setting
 | `source_usage` | 400 | ORM delete |
 | `ai_usage` | 400 | ORM delete |
 | `fred_yields` (DuckDB) | 730 | DuckDB delete |
-| `blacklist_events` | ∞ | Forensics — never pruned |
-| `address_tags` | ∞ | Curated — never pruned |
-| `event_labels` | ∞ | Operator labeling corpus — never pruned |
+| `blacklist_events` | ∞ | Forensics - never pruned |
+| `address_tags` | ∞ | Curated - never pruned |
+| `event_labels` | ∞ | Operator labeling corpus - never pruned |
 
 ## Labeled event corpus (v4.2.0+)
 

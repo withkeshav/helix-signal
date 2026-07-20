@@ -1,4 +1,4 @@
-# Helix Signal — Deployment Runbook
+# Helix Signal - Deployment Runbook
 
 > Living document for safe deploy + **post-deploy operator setup**.  
 > Current release target: **v4.4.0** (platform Phases 1–8: public 24h, multi-webhook, scoped API keys, AI registry, timeline).  
@@ -7,7 +7,7 @@
 ## Prerequisites
 
 - Docker + Compose plugin
-- `.env` configured (copy from `.env.example`) — **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
+- `.env` configured (copy from `.env.example`) - **`SESSION_SIGNING_KEY` must be set** (`openssl rand -hex 32`). Blank value = all admin logins return 503.
 - **`SETTINGS_ENCRYPTION_KEY`** (recommended for production): Fernet key for secret settings at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Without it, secrets store as plaintext (dev OK).
 - **`RATE_LIMITER_STORAGE_URI`** defaults to `redis://redis:6379/0` in `docker-compose.yml` so multi-worker rate limits share state. Backend image must include the **`redis`** Python package (`backend/requirements.txt`) or startup fails with `ConfigurationError: 'redis' prerequisite not available`.
 - **Alembic:** revision ids longer than 32 chars require `alembic_version.version_num` ≥ VARCHAR(64). Migration `v4_013` widens the column; if a deploy is stuck mid-upgrade with `StringDataRightTruncation`, run `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64);` then restart backend. Head includes **`v4_017_platform_tables`** (webhook_endpoints, ai_providers, fred_yields, api_keys.access_policy).
@@ -21,7 +21,7 @@ Do these in `.env` / Control Room (see `SECURITY.md`):
 
 | Setting | Recommendation |
 |---------|----------------|
-| `ai_require_token` | **true** — AI explain/narrative not anonymous |
+| `ai_require_token` | **true** - AI explain/narrative not anonymous |
 | `api_auth_mode` | `key_required` for non-admin API consumers |
 | `HELIX_COOKIE_SECURE` | `1` behind HTTPS |
 | `SETTINGS_ENCRYPTION_KEY` | set (Fernet) |
@@ -37,7 +37,7 @@ Do these in `.env` / Control Room (see `SECURITY.md`):
 export COMPOSE_PROJECT_NAME=helix-signal
 cd /apps/helix-signal   # or your checkout path
 git pull origin main
-# preserve .env — do not rotate POSTGRES_PASSWORD casually
+# preserve .env - do not rotate POSTGRES_PASSWORD casually
 bash scripts/backup.sh || true
 
 # Full rebuild when FE + BE both changed (v4.4.0-class releases)
@@ -63,7 +63,7 @@ docker compose -p helix-signal exec -T backend alembic current
 
 Hard-refresh the browser (Ctrl+Shift+R) after frontend deploys so static JS is not stale.
 
-SQLAdmin (Tier-2): `http://<host>/admin` with seeded admin — for rare table ops, not daily Control Room use.
+SQLAdmin (Tier-2): `http://<host>/admin` with seeded admin - for rare table ops, not daily Control Room use.
 
 ---
 
@@ -104,8 +104,8 @@ In Control Room → **AI & Models**:
 1. Run **Quick Setup** (2 steps) or set playbook (Off / Lite / Full).
 2. Set **`ai_mode`**: `ai_off` | `ai_lite` | `ai_full` (enum select).
 3. **Rotate secrets** (paste new key only; leave blank/`configured` to keep existing):
-   - `Ollama` — LLM (required for default models)
-   - `OpenRouter` — fallback / stronger models
+   - `Ollama` - LLM (required for default models)
+   - `OpenRouter` - fallback / stronger models
 4. **Refresh model lists** → pick per-feature models (or type `provider:model_id` manually).
 5. Confirm feature toggles: `feature_ai_explain`, `feature_ai_summary`, `feature_ai_narrative`, `feature_ai_insights`.
 6. Open **Signal** → AI cards: structured `STATUS` + bullets, or deterministic fallback when AI off / failed.
@@ -124,7 +124,7 @@ Canonical guide: `docs/guides/ai-configuration.md`.
 | Chain | Tavily → Exa → Ollama `web_search` (3rd fallback only) |
 | Cadence | Cron **06:15 & 18:15 UTC** (`web-search-refresh`) |
 | First fill | After keys are set, **restart backend once** so `web-search-startup-once` can run ~5 minutes later if cache empty/stale |
-| AI path | Cached `WEB_CONTEXT` only — no live search on each AI click |
+| AI path | Cached `WEB_CONTEXT` only - no live search on each AI click |
 | Spend | Successful searches increment `SourceUsage` as `web_search_{provider}` |
 
 Verify later:
@@ -150,18 +150,18 @@ db.close()
 ### 6. Market forecasts
 
 - Job **`forecast-refresh`** (cron ~5/11/17/23:20 UTC) + **startup-once ~3 min after boot**.
-- Model id: `helix_linear_trend` (trend extrapolate from `asset_trend_snapshots` — not TimesFM).
-- Market tab overlays use `forecast_points.peg` / `.supply`. Empty charts mean no history yet or job not run — not a permanent wrong overlay.
+- Model id: `helix_linear_trend` (trend extrapolate from `asset_trend_snapshots` - not TimesFM).
+- Market tab overlays use `forecast_points.peg` / `.supply`. Empty charts mean no history yet or job not run - not a permanent wrong overlay.
 - Need core refresh history first (defillama-refresh) so trends exist for extrapolation.
 
 ### 7. Data & jobs sanity
 
 | Job / area | Expectation |
 |------------|-------------|
-| Core refresh | ~`refresh_core_seconds` (default 300s) — strip KPIs fill |
+| Core refresh | ~`refresh_core_seconds` (default 300s) - strip KPIs fill |
 | OSINT | Interval from `refresh_osint_minutes` |
 | Fiat reserves | Daily ~05:00 UTC, best-effort |
-| Insights | Daily deterministic rebuild ~04:30 — **no LLM** on that path |
+| Insights | Daily deterministic rebuild ~04:30 - **no LLM** on that path |
 | Retention | Nightly prune; web search snapshots default 30 days |
 | Overview | Control Room Overview: scheduler, quality, last prune |
 
@@ -198,7 +198,7 @@ db.close()
 ### 12. Settings import / export
 
 - **Export** includes secrets only as `"configured"`.
-- **Import** **skips** secret keys when value is a mask sentinel — will not wipe live API keys.
+- **Import** **skips** secret keys when value is a mask sentinel - will not wipe live API keys.
 - To change a key: Control Room **Rotate** with a real new value, or import an intentional plaintext secret.
 - Import toast shows imported / skipped / errors.
 
@@ -207,7 +207,7 @@ db.close()
 If you need cache/forecast sooner than cron:
 
 ```bash
-# Web search (only if feature on — Tavily/Exa + ai_mode)
+# Web search (only if feature on - Tavily/Exa + ai_mode)
 docker compose -p helix-signal exec -T backend python -c "
 from database import SessionLocal
 from services.web_search.job import run_web_search_job
@@ -249,7 +249,7 @@ CSP headers are set in **two places**:
 - `backend/config/middleware.py` (default CSP)
 - `frontend/nginx.conf` (nginx-level CSP)
 
-These can drift — if the backend middleware is updated, nginx.conf must be updated in sync.
+These can drift - if the backend middleware is updated, nginx.conf must be updated in sync.
 
 **Verify:** Check both files for matching CSP directives before deploy.
 
@@ -261,7 +261,7 @@ The CI unit test suite runs against SQLite. The `init_db()` playbook seed path a
 
 **Fix-tracked:** Add a CI job that starts Postgres via service container and runs `init_db()` against it.
 
-### 6. `docker-compose.override.yml` — reload hazard
+### 6. `docker-compose.override.yml` - reload hazard
 
 A gitignored `docker-compose.override.yml` in the project root can override the backend `command`, e.g. injecting `--reload` or changing `--app-dir`. This:
 - Suppresses `Application startup complete.` in logs (reloader worker)
@@ -314,7 +314,7 @@ See `SECURITY.md` §X-Forwarded-For Trust for details.
 If the backend container restarts repeatedly with exit code 3 (uvicorn's `STARTUP_FAILURE`):
 
 1. Check logs: `docker compose logs backend`
-2. Look for `lifespan.startup_failed` — if present, the fail-loud wrapper captured the exception
+2. Look for `lifespan.startup_failed` - if present, the fail-loud wrapper captured the exception
 3. If no `lifespan.startup_failed`, the crash is before the wrapper (e.g. import error)
 4. Common causes:
    - `init_db()` failure (alembic migration issue, DB unreachable)
@@ -345,11 +345,11 @@ docker compose up -d --build
 | v4.0.6 | local | 2026-07-19 | Frontend liveness (`refreshTick`), `GET /api/dashboard/summary`, settings-driven retention (11 tables), Timescale `drop_chunks` + compression |
 | v4.0.5.1 | local | 2026-07-16 | AI provider simplification (Ollama Cloud + OpenRouter), per-feature `provider:model_id` settings, budget enforcement removed, error-logging hardening, APScheduler `max_instances=1` |
 | v4.0.5 | local | 2026-07-16 | SQLAdmin `/admin`, secured intelligence API keys + tiers, Alpine settings shrink, FRED/ONNX DB-first |
-| v4.0.4 | `d0a69ab` | 2026-07-10 | Settings wiring fix — DB priority over env, audit redaction, mask_secret, unified Settings UI, Signal refresh |
-| v4.0.3 | `HEAD` | 2026-07-08 | FE lifecycle refactor — x-if tabs, single Market, auth dedupe, chart lifecycle, Settings wizard + AI mapping, bounded empty states |
+| v4.0.4 | `d0a69ab` | 2026-07-10 | Settings wiring fix - DB priority over env, audit redaction, mask_secret, unified Settings UI, Signal refresh |
+| v4.0.3 | `HEAD` | 2026-07-08 | FE lifecycle refactor - x-if tabs, single Market, auth dedupe, chart lifecycle, Settings wizard + AI mapping, bounded empty states |
 | v4.0.2 | `c5427f5` | 2026-07-08 | Cookie session auth, alert rule editor, asset enable overrides, provider test, CI Postgres path, E2E expansion |
-| v4.0.1 | `cabb85a` | 2026-07-08 | Audit rectification — auth, hardening, reliability, SA 2.0, docs, tests |
-| v4.0.0 | `cabb85a` | 2026-07-05 | Current prod HEAD — 24-coin taxonomy, ONNX models, forensics, investigation |
+| v4.0.1 | `cabb85a` | 2026-07-08 | Audit rectification - auth, hardening, reliability, SA 2.0, docs, tests |
+| v4.0.0 | `cabb85a` | 2026-07-05 | Current prod HEAD - 24-coin taxonomy, ONNX models, forensics, investigation |
 | v3.10.3 | `0496bea` | 2026-06-25 | Bugfix audit completed |
 | v3.10.2 | `c56df3b` | 2026-06-24 | UI/UX redesign rollout |
 | v3.10.1 | `6757a71` | 2026-06-24 | Bugfix audit pass (auth, security, perf) |

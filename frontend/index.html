@@ -212,7 +212,7 @@
         </select>
         <span class="badge badge-info" style="font-size:11px;margin-right:6px" x-text="$store.ui.isAuthenticated ? ('Operator' + ($store.ui.adminUsername ? (': ' + $store.ui.adminUsername) : '')) : 'View only'"></span>
         <span class="badge" style="font-size:11px;margin-right:6px" x-text="'AI: ' + ($store.ui.aiModeLabel || 'Off')"></span>
-        <span class="badge" style="font-size:11px;margin-right:6px" x-text="'Data: ' + ($store.ui.dataHealthLabel || '—')"></span>
+        <span class="badge" style="font-size:11px;margin-right:6px" x-text="'Data: ' + ($store.ui.dataHealthLabel || '-')"></span>
         <button class="btn btn-primary" @click="refresh()" :disabled="$store.ui.refreshing" title="Refresh now" aria-label="Refresh now">
           <span x-show="$store.ui.refreshing" class="loading-spinner" style="width:14px;height:14px;border-width:2px"></span>
           <span x-show="!$store.ui.refreshing">⟳</span>
@@ -336,7 +336,7 @@
 
       <!-- Main dashboard content (hidden while loading) -->
       <div x-cloak x-show="!$store.dashboard.loading">
-      <!-- ROW 1: Signal hero — machine signals only (L4) -->
+      <!-- ROW 1: Signal hero - machine signals only (L4) -->
       <div id="signal-hero" class="signal-hero" :class="'hero-band-' + ((signal.band||'normal').toLowerCase())">
         <div class="signal-hero-left">
           <div class="signal-hero-score" x-text="signal.score ?? '--'"></div>
@@ -356,13 +356,13 @@
           <div class="section-heading">Peg · 7d</div>
           <div class="chart-wrap" id="chart-hero-peg"></div>
           <div class="signal-hero-chips">
-            <span class="signal-hero-chip" x-text="depeg.current_price != null ? `Peg ${depeg.current_price.toFixed(4)}` : 'Peg —'"></span>
-            <span class="signal-hero-chip" :class="supplyChange >= 0 ? 'text-green' : 'text-red'" x-text="supplyChange != null ? `Supply ${supplyChange>=0?'+':''}${supplyChange.toFixed(2)}% 24h` : 'Supply —'"></span>
+            <span class="signal-hero-chip" x-text="depeg.current_price != null ? `Peg ${depeg.current_price.toFixed(4)}` : 'Peg -'"></span>
+            <span class="signal-hero-chip" :class="supplyChange >= 0 ? 'text-green' : 'text-red'" x-text="supplyChange != null ? `Supply ${supplyChange>=0?'+':''}${supplyChange.toFixed(2)}% 24h` : 'Supply -'"></span>
           </div>
         </div>
       </div>
 
-      <!-- ROW 2: AI insight (below hero — structured STATUS + bullets; L4 deterministic fallback) -->
+      <!-- ROW 2: AI insight (below hero - structured STATUS + bullets; L4 deterministic fallback) -->
       <div class="insight-card glass ai-insight-row">
         <div class="helix-panel-head" style="margin-bottom:8px">
           <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
@@ -470,7 +470,7 @@
                     <tr>
                       <td><span class="sev-dot" :style="`background:var(--${row.direction==='inflow'?'up':'down'})`"></span></td>
                       <td class="mono" x-text="row.chain_name"></td>
-                      <td class="mono num" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="row.velocity_24h_pct != null ? `${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}%` : '—'"></td>
+                      <td class="mono num" :class="row.velocity_24h_pct > 0 ? 'text-green' : 'text-red'" x-text="row.velocity_24h_pct != null ? `${row.velocity_24h_pct > 0 ? '+' : ''}${row.velocity_24h_pct?.toFixed(2)}%` : '-'"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -494,7 +494,7 @@
                     <tr>
                       <td class="mono" x-text="`${p.asset_a} vs ${p.asset_b}`"></td>
                       <td class="mono num" :class="p.correlation_7d > 0 ? 'text-green' : 'text-red'" x-text="p.correlation_7d?.toFixed(3)"></td>
-                      <td x-text="p.dominance_shift ? formatDisplayName(p.dominance_shift) : '—'"></td>
+                      <td x-text="p.dominance_shift ? formatDisplayName(p.dominance_shift) : '-'"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -611,8 +611,8 @@
                   <td><span class="sev-dot" :style="`background:var(--${a.direction === 'above' ? 'down' : 'up'})`"></span></td>
                   <td class="mono" x-text="formatWhen(a.timestamp)"></td>
                   <td x-text="a.metric"></td>
-                  <td class="mono num" x-text="a.z_score ? a.z_score.toFixed(2) : '—'"></td>
-                  <td x-text="a.direction || '—'"></td>
+                  <td class="mono num" x-text="a.z_score ? a.z_score.toFixed(2) : '-'"></td>
+                  <td x-text="a.direction || '-'"></td>
                   <td>
                     <span class="label-pill" x-show="latestAnomalyLabel(a)" x-text="latestAnomalyLabel(a)"></span>
                     <div class="label-actions" x-show="!latestAnomalyLabel(a)">
@@ -632,11 +632,11 @@
         </div>
       </div>
 
-      <!-- Fundamentals (yield, collateral, reserve) — answer-first on Signal -->
+      <!-- Fundamentals (yield, collateral, reserve) - answer-first on Signal -->
       <div x-data="fundamentalsPanel" x-init="loadFundamentals($store.dashboard.asset)" @asset-changed.window="loadFundamentals($event.detail.asset)" style="margin-top:16px">
         <div x-cloak x-show="fundamentalsError" class="warning-banner visible" x-text="fundamentalsError" style="margin-bottom:8px"></div>
         <div x-cloak x-show="fundamentalsLoading" class="kpi-sub" style="margin-bottom:8px"><span class="loading-spinner" style="vertical-align:middle;margin-right:6px"></span>Loading fundamentals for <span x-text="fundamentalsSymbol"></span>...</div>
-        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">Data populating for <span x-text="fundamentalsSymbol"></span> — first readings arrive within 15 minutes of backend startup.</div>
+        <div x-cloak x-show="!fundamentalsLoading && !hasAnyFundamentals()" class="kpi-sub" style="padding:16px;text-align:center">Data populating for <span x-text="fundamentalsSymbol"></span> - first readings arrive within 15 minutes of backend startup.</div>
         <div x-cloak x-show="hasAnyFundamentals()" class="insight-grid">
           <div class="insight-card" x-cloak x-show="fundamentals.yield">
             <h2>Yield</h2>
@@ -730,7 +730,7 @@
                   <td class="mono num" :class="c.price&&Math.abs(c.price-1)>0.001?'band-watch':'text-green'" x-text="c.price!=null?c.price.toFixed(4):'N/A'"></td>
                   <td class="mono num" x-text="formatUsd(c.supply_current)"></td>
                   <td class="mono num" x-text="c.chain_share_pct!=null?`${c.chain_share_pct.toFixed(1)}%`:'N/A'"></td>
-                  <td class="mono num" :class="`band-${(c.chain_signal?.band||'normal').toLowerCase()}`" x-text="`${c.chain_signal?.score??'—'} ${c.chain_signal?.band||''}`"></td>
+                  <td class="mono num" :class="`band-${(c.chain_signal?.band||'normal').toLowerCase()}`" x-text="`${c.chain_signal?.score??'-'} ${c.chain_signal?.band||''}`"></td>
                   <td x-text="`${c.data_confidence?.label||''} (${c.data_confidence?.score??''})`"></td>
                 </tr>
               </template>
@@ -765,7 +765,7 @@
                     <tr>
                       <td class="mono" x-text="cp.timestamp"></td>
                       <td x-text="cp.metric || 'metric'"></td>
-                      <td class="mono num" x-text="cp.score != null ? fmtNum(cp.score) : '—'"></td>
+                      <td class="mono num" x-text="cp.score != null ? fmtNum(cp.score) : '-'"></td>
                     </tr>
                   </template>
                 </tbody>
@@ -826,7 +826,7 @@
           <h2>Contagion Map <span class="model-badge">correlation</span></h2>
           <p class="kpi-sub" style="margin:0 0 8px">Stablecoin supply rotation links; dashed = known collateral tie (e.g. DAI→USDC)</p>
           <div id="chart-contagion" class="chart-wrap tall" style="min-height:220px"></div>
-          <div x-cloak x-show="!($store.dashboard.rotation?.pairs?.length)" class="kpi-sub" style="padding:8px 0">No rotation pairs yet — needs 7d history on multiple assets</div>
+          <div x-cloak x-show="!($store.dashboard.rotation?.pairs?.length)" class="kpi-sub" style="padding:8px 0">No rotation pairs yet - needs 7d history on multiple assets</div>
         </div>
         <div class="insight-grid">
           <div class="insight-card">
@@ -930,7 +930,7 @@
           </div>
           <div class="insight-card">
             <h2 class="section-heading">OSINT Feed</h2>
-            <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">Sentiment analysis disabled — enable <code>feature_nlp_sentiment</code> in Settings</div>
+            <div x-cloak x-show="!nlpAvailable && osintArticles.length > 0" class="kpi-sub" style="padding:4px 0 8px;color:var(--neutral)">Sentiment analysis disabled - enable <code>feature_nlp_sentiment</code> in Settings</div>
             <div class="data-table-wrap" x-cloak x-show="osintArticles.length">
               <table class="data-table">
                 <thead><tr><th></th><th>Time</th><th>Source</th><th>Title</th><th class="num">Sentiment</th><th>Label</th></tr></thead>
@@ -938,7 +938,7 @@
                   <template x-for="art in osintArticles" :key="art.id">
                     <tr>
                       <td><span class="sev-dot" :style="`background:var(--${art.sentiment_score > 0.1 ? 'up' : art.sentiment_score < -0.1 ? 'down' : 'muted'})`"></span></td>
-                      <td class="mono" x-text="art.published_at ? formatWhen(art.published_at) : '—'"></td>
+                      <td class="mono" x-text="art.published_at ? formatWhen(art.published_at) : '-'"></td>
                       <td x-text="art.source"></td>
                       <td><a :href="art.url" target="_blank" rel="noopener" class="table-link" x-text="art.title"></a></td>
                       <td class="mono num" x-text="art.sentiment_score?.toFixed(2) ?? '0.00'"></td>
@@ -974,7 +974,7 @@
               <div style="font-size:13px;line-height:1.8">
                 <template x-for="(label, key) in (smidge?.labels || {})" :key="key">
                   <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:4px 0">
-                    <span x-text="`${key} — ${label}`"></span>
+                    <span x-text="`${key} - ${label}`"></span>
                     <strong x-text="smidge?.dimensions?.[key] ?? '--'"></strong>
                   </div>
                 </template>
@@ -1052,9 +1052,9 @@
               <div>
                 <h3 style="font-size:14px;margin:0 0 8px">Whale Flow</h3>
                 <div x-cloak x-show="whaleFlow?.available" style="font-size:13px;line-height:1.8">
-                  <div>Net mint/burn (24h): <strong x-text="whaleFlow?.net_mint_burn_usd_24h != null ? `$${Number(whaleFlow.net_mint_burn_usd_24h).toLocaleString()}` : '—'"></strong></div>
-                  <div>Whale outflow: <strong x-text="whaleFlow?.whale_net_outflow_usd != null ? `$${Number(whaleFlow.whale_net_outflow_usd).toLocaleString()}` : '—'"></strong></div>
-                  <div x-cloak x-show="whaleFlow?.whale_alert" class="text-red" style="margin-top:4px">Whale alert — multiple large transfers</div>
+                  <div>Net mint/burn (24h): <strong x-text="whaleFlow?.net_mint_burn_usd_24h != null ? `$${Number(whaleFlow.net_mint_burn_usd_24h).toLocaleString()}` : '-'"></strong></div>
+                  <div>Whale outflow: <strong x-text="whaleFlow?.whale_net_outflow_usd != null ? `$${Number(whaleFlow.whale_net_outflow_usd).toLocaleString()}` : '-'"></strong></div>
+                  <div x-cloak x-show="whaleFlow?.whale_alert" class="text-red" style="margin-top:4px">Whale alert - multiple large transfers</div>
                   <div class="kpi-sub" style="margin-top:4px" x-text="`Sources: ${(whaleFlow?.sources || []).join(', ') || 'none'}`"></div>
                 </div>
                 <div x-cloak x-show="!whaleFlow?.available && onchainConfigured()" class="kpi-sub">Whale flow unavailable for this asset</div>
@@ -1062,11 +1062,11 @@
               <div>
                 <h3 style="font-size:14px;margin:0 0 8px">Holder Concentration</h3>
                 <div x-cloak x-show="holderConcentration?.available" style="font-size:13px;line-height:1.8">
-                  <div>Top-10 share: <strong x-text="holderConcentration?.top10_share_pct != null ? `${holderConcentration.top10_share_pct}%` : '—'"></strong></div>
-                  <div>Risk band: <strong x-text="holderConcentration?.concentration_risk || '—'"></strong></div>
+                  <div>Top-10 share: <strong x-text="holderConcentration?.top10_share_pct != null ? `${holderConcentration.top10_share_pct}%` : '-'"></strong></div>
+                  <div>Risk band: <strong x-text="holderConcentration?.concentration_risk || '-'"></strong></div>
                   <template x-for="h in (holderConcentration?.holders || []).slice(0,5)" :key="h.address">
                     <div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0;border-bottom:1px solid var(--line)">
-                      <span class="kpi-sub" x-text="h.address ? `${h.address.slice(0,6)}…${h.address.slice(-4)}` : '—'"></span>
+                      <span class="kpi-sub" x-text="h.address ? `${h.address.slice(0,6)}…${h.address.slice(-4)}` : '-'"></span>
                       <span x-text="h.share_pct != null ? `${h.share_pct}%` : ''"></span>
                     </div>
                   </template>
@@ -1118,8 +1118,8 @@
                     <td class="mono" x-text="formatWhen(ev.timestamp)"></td>
                     <td class="mono" x-text="ev.asset_symbol"></td>
                     <td x-text="ev.chain"></td>
-                    <td class="mono num" x-text="ev.frozen_balance_usd != null ? formatUsd(ev.frozen_balance_usd) : '—'"></td>
-                    <td x-text="ev.event_type || '—'"></td>
+                    <td class="mono num" x-text="ev.frozen_balance_usd != null ? formatUsd(ev.frozen_balance_usd) : '-'"></td>
+                    <td x-text="ev.event_type || '-'"></td>
                   </tr>
                 </template>
               </tbody>
@@ -1473,7 +1473,7 @@
           <div class="helix-panel-head">
             <div>
               <h2 class="section-heading" style="margin:0">Data quality</h2>
-              <p class="kpi-sub" style="margin:4px 0 0">Trust layer for sources and coverage — same System tab as health</p>
+              <p class="kpi-sub" style="margin:4px 0 0">Trust layer for sources and coverage - same System tab as health</p>
             </div>
             <button class="btn btn-primary" type="button" @click="refreshQualityData()">Refresh</button>
           </div>
@@ -1587,7 +1587,7 @@
     </div>
     </template>
 
-    <!-- Tab: Settings (lazy-mounted via x-if — DOM unmounts on tab switch) -->
+    <!-- Tab: Settings (lazy-mounted via x-if - DOM unmounts on tab switch) -->
     <template x-if="$store.ui.tab === 'settings'">
     <div class="tab-content settings" x-cloak x-data="governance"
          x-init="initControlRoom()"
@@ -1595,7 +1595,7 @@
       <div class="insight-grid">
         <div class="insight-card" style="grid-column:1/-1">
           <h2 class="section-heading">Control Room</h2>
-          <p class="kpi-sub">Single-operator console (one admin account). SQLAdmin at /admin is Tier 2 for rare table ops — not multi-user self-service.</p>
+          <p class="kpi-sub">Single-operator console (one admin account). SQLAdmin at /admin is Tier 2 for rare table ops - not multi-user self-service.</p>
           <div x-cloak x-show="$store.ui.authError" class="warning-banner visible" x-text="$store.ui.authError"></div>
           <div x-cloak x-show="settingsError" class="warning-banner visible" x-text="settingsError"></div>
           <h3 class="section-heading" style="margin-top:12px">Admin login</h3>
@@ -1624,12 +1624,12 @@
             <div class="cr-status-grid">
               <div class="cr-status-card"><div class="cr-status-label">AI mode</div><div class="cr-status-value" x-text="aiModeLabel"></div></div>
               <div class="cr-status-card"><div class="cr-status-label">Auth mode</div><div class="cr-status-value" x-text="authModeLabel"></div></div>
-              <div class="cr-status-card"><div class="cr-status-label">Sources</div><div class="cr-status-value" x-text="`${opsStatus?.sources_ok ?? '—'}/${opsStatus?.sources_total ?? '—'}`"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Sources</div><div class="cr-status-value" x-text="`${opsStatus?.sources_ok ?? '-'}/${opsStatus?.sources_total ?? '-'}`"></div></div>
               <div class="cr-status-card"><div class="cr-status-label">Scheduler</div><div class="cr-status-value" x-text="opsStatus?.scheduler_running ? 'OK' : 'Down'"></div></div>
-              <div class="cr-status-card"><div class="cr-status-label">Quality</div><div class="cr-status-value" x-text="qualitySummary?.overall_score != null ? Math.round(qualitySummary.overall_score) : '—'"></div></div>
-              <div class="cr-status-card"><div class="cr-status-label">Last prune</div><div class="cr-status-value" style="font-size:12px" x-text="opsStatus?.last_prune?.result?.generated_at?.slice(0,10) || '—'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Quality</div><div class="cr-status-value" x-text="qualitySummary?.overall_score != null ? Math.round(qualitySummary.overall_score) : '-'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">Last prune</div><div class="cr-status-value" style="font-size:12px" x-text="opsStatus?.last_prune?.result?.generated_at?.slice(0,10) || '-'"></div></div>
               <div class="cr-status-card"><div class="cr-status-label">Web search</div><div class="cr-status-value" style="font-size:12px" x-text="webSearchStatus?.feature_enabled ? (webSearchStatus.cache_stale ? 'Stale' : (webSearchStatus.last_provider || 'On')) : 'Off'"></div></div>
-              <div class="cr-status-card"><div class="cr-status-label">AI providers</div><div class="cr-status-value" x-text="(aiHealth?.providers || []).filter(p => p.enabled).length || '—'"></div></div>
+              <div class="cr-status-card"><div class="cr-status-label">AI providers</div><div class="cr-status-value" x-text="(aiHealth?.providers || []).filter(p => p.enabled).length || '-'"></div></div>
             </div>
             <div class="cr-setting-row">
               <button class="btn btn-muted" type="button" :disabled="testAiLoading" @click="runTestAi()">Test AI</button>
@@ -1644,7 +1644,7 @@
                 <thead><tr><th>Key</th><th>User</th><th>When</th></tr></thead>
                 <tbody>
                   <template x-for="row in auditTail" :key="row.id">
-                    <tr><td x-text="row.setting_key"></td><td x-text="row.user_username || '—'"></td><td x-text="row.created_at?.slice(0,19)"></td></tr>
+                    <tr><td x-text="row.setting_key"></td><td x-text="row.user_username || '-'"></td><td x-text="row.created_at?.slice(0,19)"></td></tr>
                   </template>
                 </tbody>
               </table>
@@ -1654,7 +1654,7 @@
           <!-- AI & Models -->
           <div x-show="controlSubTab==='ai'">
             <div x-show="!setupDone" class="cr-status-card" style="margin-bottom:12px">
-              <h3>Quick Setup — Step <span x-text="Math.min(wizardStep, 2)"></span> of 2</h3>
+              <h3>Quick Setup - Step <span x-text="Math.min(wizardStep, 2)"></span> of 2</h3>
               <div x-show="wizardStep===1">
                 <select class="select" x-model="wizardPlaybook">
                   <option value="max_free">Off / Minimal</option>
@@ -1694,7 +1694,7 @@
                     <option value="openrouter">OpenRouter</option>
                   </select>
                   <select class="select" x-show="(modelCatalog[p] || []).length" x-model="m">
-                    <option value="">— pick listed model —</option>
+                    <option value="">- pick listed model -</option>
                     <template x-for="mod in (modelCatalog[p] || [])" :key="mod.id">
                       <option :value="mod.id" x-text="mod.name || mod.id"></option>
                     </template>
@@ -1705,7 +1705,7 @@
               </div>
             </template>
             <h3 class="section-heading">Provider secrets</h3>
-            <p class="kpi-sub">Rotate-only — values stay masked. Paste a new key to replace.</p>
+            <p class="kpi-sub">Rotate-only - values stay masked. Paste a new key to replace.</p>
             <template x-for="s in secretSettings()" :key="s.key">
               <div class="cr-setting-row">
                 <label>
@@ -1751,7 +1751,7 @@
               </div>
             </template>
             <h3 class="section-heading">Quality history</h3>
-            <p class="kpi-sub">Score sparkline (30d): <span x-text="qualitySparkline() || '—'"></span></p>
+            <p class="kpi-sub">Score sparkline (30d): <span x-text="qualitySparkline() || '-'"></span></p>
             <button class="btn btn-muted" type="button" @click="loadOpsStatus()">Refresh quality</button>
             <h3 class="section-heading">Enabled assets</h3>
             <button class="btn btn-muted" type="button" @click="loadAssetCatalog()">Refresh catalog</button>
@@ -1869,7 +1869,7 @@
                     <tr>
                       <td x-text="k.name"></td><td x-text="k.key_prefix"></td>
                       <td x-text="(k.scopes||[]).join(', ')"></td>
-                      <td x-text="k.access_policy ? JSON.stringify(k.access_policy) : '—'" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px"></td>
+                      <td x-text="k.access_policy ? JSON.stringify(k.access_policy) : '-'" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px"></td>
                       <td><button class="btn btn-muted" type="button" x-show="!k.revoked_at" @click="revokeApiKey(k.id)">Revoke</button></td>
                     </tr>
                   </template>

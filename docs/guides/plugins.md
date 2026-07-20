@@ -38,7 +38,7 @@ class MySource(AbstractSource):
         }
 ```
 
-Auto-discovered on startup — no import registration needed.
+Auto-discovered on startup - no import registration needed.
 
 ## ML Model Plugin
 
@@ -79,7 +79,7 @@ class MyChainLoader:
 ```python
 from backend.core.registry import (
     SOURCES_REGISTRY,     # dict[str, type[AbstractSource]]
-    SOURCE_INSTANCES,     # dict[str, AbstractSource] — singletons
+    SOURCE_INSTANCES,     # dict[str, AbstractSource] - singletons
     ML_MODELS_REGISTRY,   # dict[str, type[AbstractModel]]
     CHAIN_LOADERS,        # dict[str, type[ChainLoader]]
     get_source,           # -> singleton instance (preserves circuit breaker state)

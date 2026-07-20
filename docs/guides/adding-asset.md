@@ -1,6 +1,6 @@
 # Adding a Stablecoin
 
-Adding a new stablecoin to Helix-Signal takes **3 steps** — all configuration, zero code.
+Adding a new stablecoin to Helix-Signal takes **3 steps** - all configuration, zero code.
 
 ## Automated Pipeline (Recommended)
 
